@@ -174,7 +174,16 @@ export async function bootstrapSync(tenantId: string): Promise<void> {
   }
 
   const res = await api.get('/sync/bootstrap');
-  if (!res.data.success) return;
+  if (!res.data.success) {
+    // Server responded but something went wrong — wipe local mirrors so the
+    // user doesn't see (and try to act on) invoices that no longer exist on
+    // the server (e.g. after a DB reset or tenant rebuild).
+    await syncDb.transaction('rw', syncDb.accounts, syncDb.invoices, async () => {
+      await syncDb.accounts.clear();
+      await syncDb.invoices.clear();
+    });
+    return;
+  }
 
   const { accounts, invoices, sequence } = res.data.data;
 

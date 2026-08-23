@@ -69,11 +69,11 @@ export function PublicFooter() {
             <ul className="space-y-2.5">
               <li>
                 <a
-                  href="mailto:developershub26@gmail.com"
+                  href="mailto:ledgioapp@gmail.com"
                   className="flex items-center gap-2 text-sm text-secondary-400 hover:text-emerald-400 transition-colors"
                 >
                   <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-                  developershub26@gmail.com
+                  ledgioapp@gmail.com
                 </a>
               </li>
               <li>

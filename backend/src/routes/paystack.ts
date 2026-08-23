@@ -204,7 +204,7 @@ router.post('/invoices/:invoiceId/initialize', requireRole('Accountant'), async 
     });
 
     if (!invoice) {
-      res.status(404).json({ success: false, error: 'Invoice not found.' });
+      res.status(404).json({ success: false, error: 'Invoice not found on the server. Please refresh your invoice list and try again.' });
       return;
     }
     if (invoice.status === 'DRAFT') {
