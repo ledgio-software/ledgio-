@@ -9,6 +9,14 @@ import { computeSubscriptionState } from '../middleware/subscriptionEnforcementM
 import { invalidateTenantCacheById } from '../cache/tenantCache';
 import * as paystackService from '../services/paystackService';
 import { PaystackServiceError } from '../services/paystackService';
+import { z } from 'zod';
+import { validateBody } from '../middleware/validateBody';
+
+const initializeSchema = z.object({ planTier: z.number().int().min(1).max(3) });
+const verifySchema = z.object({
+  reference: z.string().min(1).max(100),
+  planTier: z.number().int().min(1).max(3),
+});
 
 const router = Router();
 
@@ -109,7 +117,7 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
  * Initialises a Paystack checkout for a subscription payment.
  * Body: { planTier: 1 | 2 | 3 }
  */
-router.post('/initialize', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+router.post('/initialize', requireRole('Admin'), validateBody(initializeSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!paystackService.isPaystackConfigured()) {
       res.status(503).json({ success: false, error: 'Payment processing is not configured for this environment.' });
@@ -117,7 +125,7 @@ router.post('/initialize', requireRole('Admin'), async (req: Request, res: Respo
     }
 
     const { planTier } = req.body as { planTier: number };
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === Number(planTier));
+    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === planTier);
     if (!plan) {
       res.status(400).json({ success: false, error: 'Invalid plan tier. Must be 1, 2, or 3.' });
       return;
@@ -160,7 +168,7 @@ router.post('/initialize', requireRole('Admin'), async (req: Request, res: Respo
  * Verifies a Paystack reference and activates the subscription.
  * Body: { reference: string, planTier: 1 | 2 | 3 }
  */
-router.post('/verify', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+router.post('/verify', requireRole('Admin'), validateBody(verifySchema), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!paystackService.isPaystackConfigured()) {
       res.status(503).json({ success: false, error: 'Payment processing is not configured for this environment.' });
@@ -168,12 +176,8 @@ router.post('/verify', requireRole('Admin'), async (req: Request, res: Response)
     }
 
     const { reference, planTier } = req.body as { reference: string; planTier: number };
-    if (!reference) {
-      res.status(400).json({ success: false, error: 'Payment reference is required.' });
-      return;
-    }
 
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === Number(planTier));
+    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === planTier);
     if (!plan) {
       res.status(400).json({ success: false, error: 'Invalid plan tier.' });
       return;

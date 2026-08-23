@@ -28,6 +28,39 @@ import { generateInvoicePdf } from '../services/pdfGenerationService';
 import * as tenantRepository from '../repository/tenantRepository';
 import { assertWarehouseAccess, WarehouseAccessError } from '../services/warehouseAccessService';
 import { encryptCredential, decryptCredential } from '../utils/credentialEncryption';
+import { z } from 'zod';
+import { validateBody } from '../middleware/validateBody';
+
+const createCustomerSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email().max(320),
+  phone: z.string().max(30).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  creditLimit: z.number().nonnegative().optional().nullable(),
+  tin: z.string().max(20).optional().nullable(),
+  customerType: z.enum(['RETAIL', 'WHOLESALE']).optional(),
+});
+const updateCustomerSchema = createCustomerSchema.partial().extend({
+  email: z.string().email().max(320).optional(),
+});
+
+const lineItemSchema = z.object({
+  description: z.string().min(1).max(500),
+  quantity: z.number().positive(),
+  unitPrice: z.number().nonnegative(),
+  inventoryItemId: z.string().uuid().optional().nullable(),
+});
+const createInvoiceSchema = z.object({
+  customerId: z.string().uuid(),
+  dueDate: z.string().datetime({ offset: true }).optional().nullable(),
+  currency: z.string().length(3).optional(),
+  exchangeRate: z.number().positive().optional(),
+  items: z.array(lineItemSchema).min(1).max(100),
+  taxRateId: z.string().uuid().optional().nullable(),
+  fundId: z.string().uuid().optional().nullable(),
+  warehouseId: z.string().uuid().optional().nullable(),
+  clientTxnId: z.string().min(1).max(100).optional().nullable(),
+});
 
 /** Decrypt a customer row's PII fields. Returns plaintext; tolerates plaintext input (transitional). */
 function decryptCustomer(c: any): any {
@@ -90,18 +123,10 @@ router.get('/customers', async (req: Request, res: Response): Promise<void> => {
  * Adds a new customer. Shop Manager can add a walk-in customer on the spot
  * when creating a sale for them - see POST / below.
  */
-router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/customers', requireRole('Accountant', 'Shop Manager'), validateBody(createCustomerSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
-    if (!name || !email) {
-      res.status(400).json({ success: false, error: 'Customer name and email are required.' });
-      return;
-    }
-    if (creditLimit !== undefined && creditLimit !== null && (typeof creditLimit !== 'number' || creditLimit < 0)) {
-      res.status(400).json({ success: false, error: 'creditLimit must be a non-negative number, or null for no limit.' });
-      return;
-    }
     const resolvedType = customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
 
     const created = await withCurrentTenantDb(prisma, async (client) => {
@@ -130,16 +155,11 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req:
  * PUT /api/v1/customers/:id
  * Updates a customer's contact details and/or credit limit.
  */
-router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.put('/customers/:id', requireRole('Accountant'), validateBody(updateCustomerSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
-
-    if (creditLimit !== undefined && creditLimit !== null && (typeof creditLimit !== 'number' || creditLimit < 0)) {
-      res.status(400).json({ success: false, error: 'creditLimit must be a non-negative number, or null for no limit.' });
-      return;
-    }
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).customer.findFirst({ where: { id, tenantId } });
@@ -238,15 +258,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * below so they can only sell out of a warehouse they're actually assigned
  * to, mirroring how they're already scoped for Inventory and POS.
  */
-router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createInvoiceSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { customerId, dueDate, currency = 'USD', exchangeRate = 1.0, items, taxRateId, fundId, warehouseId, clientTxnId } = req.body;
 
-    if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ success: false, error: 'Customer and at least one item are required.' });
-      return;
-    }
     // Itemized invoice (deducts real stock at issue time) vs. a plain
     // "Simple Invoice" line-item-only-in-name record: mirrors
     // VendorBill's Simple/Itemized toggle on the purchase side.

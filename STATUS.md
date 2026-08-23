@@ -2,6 +2,24 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-23] - Security Phase 3: Zod Input Validation on High-Risk Write Endpoints
+
+**What/Why:** All validation was hand-rolled `if (!field)` guards — no schema library, no type coercion. Malformed or out-of-range values (negative quantities, `planTier: 999`, empty item arrays) reached business logic unchecked. Added Zod v4 to enforce types, ranges, and required fields before any handler runs.
+
+**Changes:**
+
+- **`backend/package.json`** — Added `zod@^4.x` dependency.
+
+- **`backend/src/middleware/validateBody.ts`** (new) — Generic Zod validation middleware factory. On failure returns HTTP 400 `{ success: false, error: 'Validation failed.', fields: [...] }` matching the existing business error shape. On success, replaces `req.body` with the coerced, sanitized value so handlers can trust types without re-checking.
+
+- **`backend/src/routes/invoices.ts`** — Added `createCustomerSchema`, `updateCustomerSchema`, and `createInvoiceSchema` (with nested `lineItemSchema`). Attached `validateBody(...)` to `POST /customers`, `PUT /customers/:id`, and `POST /`. Removed now-redundant hand-rolled guards (`if (!name || !email)`, `creditLimit < 0` check, `if (!customerId || !items)`) that Zod already enforces.
+
+- **`backend/src/routes/cashTill.ts`** — Added `createSaleSchema` (with nested `saleLineSchema`). Attached `validateBody(createSaleSchema)` to `POST /tills/sales`. Validates `tillId` (UUID), `items[].itemId` (UUID), `items[].quantity` (positive int ≤ 10000), `cashGiven` (nonnegative).
+
+- **`backend/src/routes/subscription.ts`** — Added `initializeSchema` and `verifySchema`. Attached `validateBody(...)` to `POST /initialize` and `POST /verify`. `planTier: 999` now returns 400 instead of reaching Paystack. Removed redundant `if (!reference)` guard.
+
+**Verification:** Backend `tsc --noEmit` clean.
+
 ## [Date: 2026-08-23] - Security Phase 2: Encrypt Customer PII at Application Layer
 
 **What/Why:** Customer `email`, `phone`, and `tin` were stored as plaintext in the `customers` table. Ghana's Data Protection Act requires reasonable safeguards. The existing AES-256-GCM utility (`credentialEncryption.ts`) already proven for GRA/Paystack credentials was reused.
