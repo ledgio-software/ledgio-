@@ -189,7 +189,7 @@ async function setMeta(key: string, value: string): Promise<void> {
 
 /** Wipes every locally-synced table - called on logout, or when the bootstrapped tenant doesn't match the current one (shared-device safety, same reasoning as TenantSettingsContext resetting on logout). */
 export async function resetLocalSyncData(): Promise<void> {
-  await syncDb.transaction('rw', syncDb.accounts, syncDb.invoices, syncDb.customers, syncDb.inventoryItems, syncDb.outbox, syncDb.meta, async () => {
+  await syncDb.transaction('rw', [syncDb.accounts, syncDb.invoices, syncDb.customers, syncDb.inventoryItems, syncDb.outbox, syncDb.meta], async () => {
     await syncDb.accounts.clear();
     await syncDb.invoices.clear();
     await syncDb.customers.clear();
