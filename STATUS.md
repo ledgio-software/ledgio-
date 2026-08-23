@@ -2,6 +2,102 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-23] - Security Phase 3: Zod Input Validation on High-Risk Write Endpoints
+
+**What/Why:** All validation was hand-rolled `if (!field)` guards — no schema library, no type coercion. Malformed or out-of-range values (negative quantities, `planTier: 999`, empty item arrays) reached business logic unchecked. Added Zod v4 to enforce types, ranges, and required fields before any handler runs.
+
+**Changes:**
+
+- **`backend/package.json`** — Added `zod@^4.x` dependency.
+
+- **`backend/src/middleware/validateBody.ts`** (new) — Generic Zod validation middleware factory. On failure returns HTTP 400 `{ success: false, error: 'Validation failed.', fields: [...] }` matching the existing business error shape. On success, replaces `req.body` with the coerced, sanitized value so handlers can trust types without re-checking.
+
+- **`backend/src/routes/invoices.ts`** — Added `createCustomerSchema`, `updateCustomerSchema`, and `createInvoiceSchema` (with nested `lineItemSchema`). Attached `validateBody(...)` to `POST /customers`, `PUT /customers/:id`, and `POST /`. Removed now-redundant hand-rolled guards (`if (!name || !email)`, `creditLimit < 0` check, `if (!customerId || !items)`) that Zod already enforces.
+
+- **`backend/src/routes/cashTill.ts`** — Added `createSaleSchema` (with nested `saleLineSchema`). Attached `validateBody(createSaleSchema)` to `POST /tills/sales`. Validates `tillId` (UUID), `items[].itemId` (UUID), `items[].quantity` (positive int ≤ 10000), `cashGiven` (nonnegative).
+
+- **`backend/src/routes/subscription.ts`** — Added `initializeSchema` and `verifySchema`. Attached `validateBody(...)` to `POST /initialize` and `POST /verify`. `planTier: 999` now returns 400 instead of reaching Paystack. Removed redundant `if (!reference)` guard.
+
+**Verification:** Backend `tsc --noEmit` clean. `posCart.test.ts` updated to expect HTTP 400 (not 500) for a non-UUID `itemId` — Zod's `z.string().uuid()` now correctly rejects malformed IDs before the handler runs, which is the right behavior. Full CI suite green on commit `c85c52f`.
+
+## [Date: 2026-08-23] - Security Phase 2: Encrypt Customer PII at Application Layer
+
+**What/Why:** Customer `email`, `phone`, and `tin` were stored as plaintext in the `customers` table. Ghana's Data Protection Act requires reasonable safeguards. The existing AES-256-GCM utility (`credentialEncryption.ts`) already proven for GRA/Paystack credentials was reused.
+
+**Changes:**
+
+- **`backend/src/services/customerPiiMigrationService.ts`** (new) — Idempotent one-shot backfill function `migrateCustomerPii()`. Detects already-encrypted rows by `ivHex:authTagHex:ciphertextHex` format; skips them. Encrypts `email` (always), `phone`/`tin` (when non-null) for every row that is still plaintext.
+
+- **`backend/src/index.ts`** — Calls `migrateCustomerPii()` on server start after DB connect (same pattern as cron init). Errors are logged but do not crash the server.
+
+- **`backend/src/routes/invoices.ts`** — Added `decryptCustomer()` helper (tolerates plaintext input during transitional period). `POST /customers` now encrypts before write; `GET /customers`, `POST /customers`, `PUT /customers/:id` all decrypt before returning. `GET /:id/pdf` and `POST /:id/gra-clearance` decrypt the nested customer before using `email`/`tin`. `POST /:id/send` response decrypts customer.
+
+- **`backend/src/services/invoiceEmailService.ts`** — Decrypts `customer.email` and `customer.address` before sending invoice emails and writing audit log entries.
+
+- **`backend/src/services/dunningReminderService.ts`** — Decrypts `customer.email` before sending payment reminder emails and writing audit log entries.
+
+- **`backend/src/routes/paystack.ts`** — Decrypts `customer.email` before passing to Paystack `initializeTransaction`.
+
+- **`backend/src/services/syncChangeLogService.ts`** — Removed `email` from the inline `customer` snapshot in `invoiceToSyncPayload` (consistent with Phase 1's field-stripping; email was never needed by the frontend sync layer).
+
+- **`frontend/src/lib/syncEngine.ts`** — Dropped `email` from the nested `customer` field of `LocalInvoice` interface to match.
+
+- **`backend/src/routes/search.ts`** — Customer search now matches on `name` only (email/phone are ciphertext and cannot be substring-searched). Result subtitle still shows the decrypted email via `safeDecrypt`.
+
+**Operator note:** `CREDENTIAL_ENCRYPTION_KEY` must be set on the Render backend service. It is already required for GRA/Paystack credential encryption. The backfill runs automatically on the first server start after deployment.
+
+**Verification:** Backend `tsc --noEmit` clean. Frontend `npm run build` clean.
+
+## [Date: 2026-08-23] - Security Phase 1: Strip PII from Sync Bootstrap Payload
+
+**What/Why:** The `GET /sync/bootstrap` endpoint was returning full DB rows for customers and inventory items, including PII fields (`email`, `phone`, `address`, `tin`, `tenantId`, `costPrice`, etc.) that no frontend component currently reads from IndexedDB. These fields are only needed on the authenticated REST endpoints that already require a JWT. Stripping them from the sync payload reduces the data surface stored in every user's browser IndexedDB and transmitted over the wire.
+
+**Changes:**
+
+- **`backend/src/routes/sync.ts`** — Added `select` clauses to both `findMany` calls in `GET /bootstrap`. Customers now return only `{ id, name, customerType, creditLimit }`. InventoryItems return only `{ id, sku, name, sellingPrice, wholesalePrice, reorderLevel }`. No other sync behavior changed.
+
+- **`frontend/src/lib/syncEngine.ts`** — Trimmed `LocalCustomer` interface to `{ id, name, customerType, creditLimit }` (dropped `tenantId`, `email`, `phone`, `address`, `tin`, `createdAt`). Trimmed `LocalInventoryItem` to `{ id, sku, name, sellingPrice, wholesalePrice, reorderLevel }` (dropped `tenantId`, `category`, `unitOfMeasure`, `costPrice`, `createdAt`). Updated `applyChangeEntry` for both entity types to destructure only the safe fields before writing to IndexedDB, preventing PII from leaking into local storage via the WebSocket change-push path.
+
+**Verification:** `npm run build` in `/frontend` — clean (0 type errors). No UI components read customer PII or inventory cost/category data from IndexedDB — both collections are fetched live from REST on every mount.
+
+## [Date: 2026-08-23] - Tier 1 Offline-First Upgrade: Customers + Inventory in Local Sync (PR #90)
+
+**What/Why:** Extended the local-first IndexedDB sync layer to cover reference data (customers and inventory items) so users can browse, filter, and work with those entities offline. Also added two UI signals that make sync state visible: an offline banner and a pending-writes indicator in the sidebar.
+
+**Changes:**
+
+- **`backend/src/routes/sync.ts`** — Bootstrap endpoint (`GET /sync/bootstrap`) now fetches customers and inventory items alongside accounts and invoices in one parallel `Promise.all`. Response gains `customers` and `inventoryItems` arrays.
+
+- **`frontend/src/lib/syncEngine.ts`** — Added `LocalCustomer` and `LocalInventoryItem` interfaces. Bumped Dexie to version 2 with new `customers` (indexed on `id, name`) and `inventoryItems` (indexed on `id, name, sku`) tables; existing data migrates transparently. `bootstrapSync` now stores all four entity types and explicitly clears them on `success: false` responses (previously stale data was left in place, causing the Paystack 404 bug). `resetLocalSyncData` clears all six tables using array-form `transaction()` call (Dexie's TS overloads cap at 7 args; the fix avoids a `TS2554` build error). `applyChangeEntry` handles WebSocket `Customer` and `InventoryItem` push events.
+
+- **`frontend/src/components/layout/OfflineBanner.tsx`** (new) — Amber strip rendered below the Header whenever `navigator.onLine` is false. Shows count of pending outbox entries. Uses `useLiveQuery` to stay reactive and `window.addEventListener("online"/"offline")` for the connectivity state.
+
+- **`frontend/src/components/layout/MainLayout.tsx`** — Renders `<OfflineBanner />` between `<Header />` and `<SubscriptionBanner />`.
+
+- **`frontend/src/components/layout/Sidebar.tsx`** — Added a spinning "N changes syncing…" chip above the Settings link whenever the outbox has pending entries (works online too, for slow connections).
+
+**Files changed:**
+`backend/src/routes/sync.ts`, `frontend/src/lib/syncEngine.ts`, `frontend/src/components/layout/OfflineBanner.tsx` (new), `frontend/src/components/layout/MainLayout.tsx`, `frontend/src/components/layout/Sidebar.tsx`
+
+---
+
+## [Date: 2026-08-23] - Fix: Paystack 404 on stale IndexedDB invoice (PR #89)
+
+**What/Why:** Clicking "Pay Now → Generate Link" on an invoice returned a 404. Root cause: the invoice existed in local IndexedDB but had been deleted server-side (after a DB reset on staging). Three-part fix.
+
+**Changes:**
+
+- **`backend/src/routes/paystack.ts`** — 404 response message changed to "Invoice not found on the server. Please refresh your invoice list and try again." (actionable, not generic).
+
+- **`frontend/src/lib/syncEngine.ts`** — `bootstrapSync` now clears local tables when the server returns `success: false` instead of leaving stale data in place. This prevents the scenario from recurring across all sync entities.
+
+- **`frontend/src/pages/invoices/Invoices.tsx`** — `handleGeneratePaystackLink` catch block detects a 404 response, shows the server's error message as a toast, triggers `resyncInvoicesFromServer()` in the background, and closes the modal — self-healing with no user action required.
+
+**Files changed:**
+`backend/src/routes/paystack.ts`, `frontend/src/lib/syncEngine.ts`, `frontend/src/pages/invoices/Invoices.tsx`
+
+---
+
 ## [Date: 2026-08-22] - User-Reported UX & Bug Fixes (KANESHIE OIL SHOP)
 
 **What/Why:** Five real support tickets from live users addressed:

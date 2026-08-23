@@ -5,6 +5,12 @@ import { runWithTenantContext } from '../context/tenantContext';
 import { EmailService } from './EmailService';
 import { recordAuditLogTx } from './auditLogService';
 import { recordChange, notifyChange, invoiceToSyncPayload } from './syncChangeLogService';
+import { decryptCredential } from '../utils/credentialEncryption';
+
+function safeDecrypt(v: string | null | undefined): string | null {
+  if (!v) return v ?? null;
+  try { return decryptCredential(v); } catch { return v; }
+}
 
 function formatDateLabel(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -85,7 +91,7 @@ export class DunningReminderCronService {
                   const balanceDue = Math.round((Number(invoice.total) - Number(invoice.amountPaid)) * 100) / 100;
 
                   const sent = await EmailService.sendPaymentReminderEmail(
-                    invoice.customer.email,
+                    safeDecrypt(invoice.customer.email) ?? '',
                     invoice.customer.name,
                     tenant.name,
                     {
@@ -122,7 +128,7 @@ export class DunningReminderCronService {
                       action: 'INVOICE.PAYMENT_REMINDER_SENT',
                       entity: 'Invoice',
                       entityId: invoiceUpdated.id,
-                      details: `Payment reminder emailed to ${invoice.customer.email} (${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue).`,
+                      details: `Payment reminder emailed to ${safeDecrypt(invoice.customer.email)} (${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue).`,
                     });
 
                     return invoiceUpdated;

@@ -27,6 +27,50 @@ import { GraEvatServiceError } from '../services/graEvatService';
 import { generateInvoicePdf } from '../services/pdfGenerationService';
 import * as tenantRepository from '../repository/tenantRepository';
 import { assertWarehouseAccess, WarehouseAccessError } from '../services/warehouseAccessService';
+import { encryptCredential, decryptCredential } from '../utils/credentialEncryption';
+import { z } from 'zod';
+import { validateBody } from '../middleware/validateBody';
+
+const createCustomerSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email().max(320),
+  phone: z.string().max(30).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  creditLimit: z.number().nonnegative().optional().nullable(),
+  tin: z.string().max(20).optional().nullable(),
+  customerType: z.enum(['RETAIL', 'WHOLESALE']).optional(),
+});
+const updateCustomerSchema = createCustomerSchema.partial().extend({
+  email: z.string().email().max(320).optional(),
+});
+
+const lineItemSchema = z.object({
+  description: z.string().min(1).max(500),
+  quantity: z.number().positive(),
+  unitPrice: z.number().nonnegative(),
+  inventoryItemId: z.string().uuid().optional().nullable(),
+});
+const createInvoiceSchema = z.object({
+  customerId: z.string().uuid(),
+  dueDate: z.string().datetime({ offset: true }).optional().nullable(),
+  currency: z.string().length(3).optional(),
+  exchangeRate: z.number().positive().optional(),
+  items: z.array(lineItemSchema).min(1).max(100),
+  taxRateId: z.string().uuid().optional().nullable(),
+  fundId: z.string().uuid().optional().nullable(),
+  warehouseId: z.string().uuid().optional().nullable(),
+  clientTxnId: z.string().min(1).max(100).optional().nullable(),
+});
+
+/** Decrypt a customer row's PII fields. Returns plaintext; tolerates plaintext input (transitional). */
+function decryptCustomer(c: any): any {
+  if (!c) return c;
+  const safe = (v: string | null): string | null => {
+    if (!v) return v;
+    try { return decryptCredential(v); } catch { return v; }
+  };
+  return { ...c, email: safe(c.email), phone: safe(c.phone), tin: safe(c.tin) };
+}
 
 // Sentinel used to unwind a poisoned transaction cleanly on a clientTxnId
 // race (see the POST / handler) - never surfaced to a caller directly.
@@ -66,7 +110,7 @@ router.get('/customers', async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json({
       success: true,
-      data: { customers },
+      data: { customers: customers.map(decryptCustomer) },
     });
   } catch (error: any) {
     console.error('[Invoices] Error fetching customers:', error);
@@ -79,18 +123,10 @@ router.get('/customers', async (req: Request, res: Response): Promise<void> => {
  * Adds a new customer. Shop Manager can add a walk-in customer on the spot
  * when creating a sale for them - see POST / below.
  */
-router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/customers', requireRole('Accountant', 'Shop Manager'), validateBody(createCustomerSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
-    if (!name || !email) {
-      res.status(400).json({ success: false, error: 'Customer name and email are required.' });
-      return;
-    }
-    if (creditLimit !== undefined && creditLimit !== null && (typeof creditLimit !== 'number' || creditLimit < 0)) {
-      res.status(400).json({ success: false, error: 'creditLimit must be a non-negative number, or null for no limit.' });
-      return;
-    }
     const resolvedType = customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
 
     const created = await withCurrentTenantDb(prisma, async (client) => {
@@ -98,17 +134,17 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req:
         data: {
           tenantId,
           name: name.trim(),
-          email: email.trim().toLowerCase(),
-          phone,
+          email: encryptCredential(email.trim().toLowerCase()),
+          phone: phone ? encryptCredential(String(phone).trim()) : null,
           address,
           creditLimit: creditLimit ?? null,
-          tin: tin ? String(tin).trim() || null : null,
+          tin: tin ? encryptCredential(String(tin).trim()) : null,
           customerType: resolvedType,
         },
       });
     });
 
-    res.status(201).json({ success: true, data: { customer: created } });
+    res.status(201).json({ success: true, data: { customer: decryptCustomer(created) } });
   } catch (error: any) {
     console.error('[Invoices] Error creating customer:', error);
     res.status(500).json({ success: false, error: 'Failed to create customer.' });
@@ -119,16 +155,11 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req:
  * PUT /api/v1/customers/:id
  * Updates a customer's contact details and/or credit limit.
  */
-router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.put('/customers/:id', requireRole('Accountant'), validateBody(updateCustomerSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
-
-    if (creditLimit !== undefined && creditLimit !== null && (typeof creditLimit !== 'number' || creditLimit < 0)) {
-      res.status(400).json({ success: false, error: 'creditLimit must be a non-negative number, or null for no limit.' });
-      return;
-    }
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).customer.findFirst({ where: { id, tenantId } });
@@ -137,11 +168,11 @@ router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res
         where: { id },
         data: {
           ...(name !== undefined && { name: String(name).trim() }),
-          ...(email !== undefined && { email: String(email).trim().toLowerCase() }),
-          ...(phone !== undefined && { phone }),
+          ...(email !== undefined && { email: encryptCredential(String(email).trim().toLowerCase()) }),
+          ...(phone !== undefined && { phone: phone ? encryptCredential(String(phone).trim()) : null }),
           ...(address !== undefined && { address }),
           ...(creditLimit !== undefined && { creditLimit }),
-          ...(tin !== undefined && { tin: tin ? String(tin).trim() || null : null }),
+          ...(tin !== undefined && { tin: tin ? encryptCredential(String(tin).trim()) : null }),
           ...(customerType !== undefined && { customerType: customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL' }),
         },
       });
@@ -152,7 +183,7 @@ router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res
       return;
     }
 
-    res.status(200).json({ success: true, data: { customer: updated } });
+    res.status(200).json({ success: true, data: { customer: decryptCustomer(updated) } });
   } catch (error: any) {
     console.error('[Invoices] Error updating customer:', error);
     res.status(500).json({ success: false, error: 'Failed to update customer.' });
@@ -227,15 +258,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * below so they can only sell out of a warehouse they're actually assigned
  * to, mirroring how they're already scoped for Inventory and POS.
  */
-router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createInvoiceSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { customerId, dueDate, currency = 'USD', exchangeRate = 1.0, items, taxRateId, fundId, warehouseId, clientTxnId } = req.body;
 
-    if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ success: false, error: 'Customer and at least one item are required.' });
-      return;
-    }
     // Itemized invoice (deducts real stock at issue time) vs. a plain
     // "Simple Invoice" line-item-only-in-name record: mirrors
     // VendorBill's Simple/Itemized toggle on the purchase side.
@@ -630,6 +657,7 @@ router.get('/:id/pdf', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    invoice.customer = decryptCustomer(invoice.customer);
     const pdfBuffer = await generateInvoicePdf(tenantName || 'Company', {
       invoiceNumber: invoice.invoiceNumber,
       issueDateLabel: new Date(invoice.issueDate).toLocaleDateString('en-GH'),
@@ -676,8 +704,8 @@ router.post('/:id/send', requireRole('Accountant'), async (req: Request, res: Re
     const updated = await invoiceEmailService.sendInvoiceEmail(req.params.id, actor);
     res.status(200).json({
       success: true,
-      message: `Invoice emailed to ${updated.customer.email}.`,
-      data: { invoice: updated },
+      message: `Invoice emailed to ${decryptCustomer(updated.customer).email}.`,
+      data: { invoice: { ...updated, customer: decryptCustomer(updated.customer) } },
     });
   } catch (error: any) {
     if (error instanceof InvoiceEmailServiceError) {
@@ -718,6 +746,8 @@ router.post('/:id/gra-clearance', requireRole('Accountant'), async (req: Request
       res.status(400).json({ success: false, error: 'This invoice is already GRA-cleared.' });
       return;
     }
+
+    invoice.customer = decryptCustomer(invoice.customer);
 
     try {
       const tenant = await tenantRepository.findTenantById(prisma, tenantId);

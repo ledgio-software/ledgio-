@@ -172,8 +172,8 @@ describe('Cash Till API - multi-item cart', () => {
       .set('X-Tenant-ID', tenantSlug)
       .send({ tillId: freshTill, items: [{ itemId: 'not-a-real-item-id', quantity: 1 }], cashGiven: 100 });
 
-    expect(res.status).toBe(500);
-    expect(res.body.error).toContain('not found');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Validation failed.');
   });
 
   it('rejects a non-integer or zero quantity before touching the database', async () => {

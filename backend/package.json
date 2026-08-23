@@ -54,7 +54,8 @@
     "prom-client": "^15.1.2",
     "qrcode": "^1.5.4",
     "typescript": "^5.4.5",
-    "ws": "^8.21.3"
+    "ws": "^8.21.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",

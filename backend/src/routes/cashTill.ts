@@ -6,6 +6,23 @@ import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { assertWarehouseAccess, getAccessibleWarehouseIds, WarehouseAccessError } from '../services/warehouseAccessService';
+import { z } from 'zod';
+import { validateBody } from '../middleware/validateBody';
+
+const saleLineSchema = z.object({
+  itemId: z.string().uuid(),
+  quantity: z.number().int().positive().max(10000),
+});
+const createSaleSchema = z.object({
+  tillId: z.string().uuid(),
+  items: z.array(saleLineSchema).min(1).max(200),
+  cashGiven: z.number().nonnegative(),
+  clientTxnId: z.string().min(1).max(100).optional().nullable(),
+  clientOccurredAt: z.string().datetime({ offset: true }).optional().nullable(),
+  saleType: z.enum(['RETAIL', 'WHOLESALE']).optional(),
+  customerPhone: z.string().max(30).optional().nullable(),
+  customerName: z.string().max(200).optional().nullable(),
+});
 import { verifyPassword } from '../utils/password';
 import { recordAuditLog, recordAuditLogTx, actorFromRequest, AuditActor } from '../services/auditLogService';
 import { SmsService } from '../services/smsService';
@@ -241,7 +258,7 @@ router.post('/open', async (req: Request, res: Response): Promise<void> => {
  * stock deduction across every line. Body: { tillId, items: [{itemId,
  * quantity}], cashGiven }.
  */
-router.post('/sales', async (req: Request, res: Response): Promise<void> => {
+router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName } = req.body;

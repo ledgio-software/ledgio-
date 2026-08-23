@@ -57,6 +57,10 @@ const startServer = async () => {
     // Initialize daily fixed-asset depreciation sweep
     const { FixedAssetDepreciationCronService } = require('./services/fixedAssetDepreciationCronService');
     FixedAssetDepreciationCronService.init();
+
+    // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
+    const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
+    migrateCustomerPii().catch((err: unknown) => console.error('[CustomerPiiMigration] Backfill failed:', err));
   });
 
   const gracefulShutdown = async () => {
