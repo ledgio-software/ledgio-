@@ -5,10 +5,12 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import type { WorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import { getVisibleNavGroups, getVisibleHrefs } from "../../lib/navigation";
-import { Settings, Lock, X, Mail, CreditCard } from "lucide-react";
+import { Settings, Lock, X, Mail, CreditCard, RefreshCw } from "lucide-react";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { TIER_NAMES } from "../../types/tenant";
 import type { TenantTier } from "../../types/tenant";
+import { useLiveQuery } from "dexie-react-hooks";
+import { syncDb } from "../../lib/syncEngine";
 
 const MODE_LABELS: Record<WorkspaceMode, string> = {
   operations: "Simple",
@@ -53,6 +55,12 @@ export function Sidebar() {
   })();
 
   const isRestricted = getVisibleHrefs(user?.role) !== null;
+
+  const pendingCount = useLiveQuery(
+    () => syncDb.outbox.where("status").equals("pending").count(),
+    [],
+    0
+  );
   const visibleGroups = getVisibleNavGroups(
     user?.role,
     user?.orgType,
@@ -200,6 +208,13 @@ export function Sidebar() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {(pendingCount ?? 0) > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg mx-1">
+            <RefreshCw size={12} className="flex-shrink-0 animate-spin" />
+            <span>{pendingCount} {pendingCount === 1 ? "change" : "changes"} syncing…</span>
           </div>
         )}
 
