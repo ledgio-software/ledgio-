@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-23] - Security Phase 1: Strip PII from Sync Bootstrap Payload
+
+**What/Why:** The `GET /sync/bootstrap` endpoint was returning full DB rows for customers and inventory items, including PII fields (`email`, `phone`, `address`, `tin`, `tenantId`, `costPrice`, etc.) that no frontend component currently reads from IndexedDB. These fields are only needed on the authenticated REST endpoints that already require a JWT. Stripping them from the sync payload reduces the data surface stored in every user's browser IndexedDB and transmitted over the wire.
+
+**Changes:**
+
+- **`backend/src/routes/sync.ts`** — Added `select` clauses to both `findMany` calls in `GET /bootstrap`. Customers now return only `{ id, name, customerType, creditLimit }`. InventoryItems return only `{ id, sku, name, sellingPrice, wholesalePrice, reorderLevel }`. No other sync behavior changed.
+
+- **`frontend/src/lib/syncEngine.ts`** — Trimmed `LocalCustomer` interface to `{ id, name, customerType, creditLimit }` (dropped `tenantId`, `email`, `phone`, `address`, `tin`, `createdAt`). Trimmed `LocalInventoryItem` to `{ id, sku, name, sellingPrice, wholesalePrice, reorderLevel }` (dropped `tenantId`, `category`, `unitOfMeasure`, `costPrice`, `createdAt`). Updated `applyChangeEntry` for both entity types to destructure only the safe fields before writing to IndexedDB, preventing PII from leaking into local storage via the WebSocket change-push path.
+
+**Verification:** `npm run build` in `/frontend` — clean (0 type errors). No UI components read customer PII or inventory cost/category data from IndexedDB — both collections are fetched live from REST on every mount.
+
 ## [Date: 2026-08-23] - Tier 1 Offline-First Upgrade: Customers + Inventory in Local Sync (PR #90)
 
 **What/Why:** Extended the local-first IndexedDB sync layer to cover reference data (customers and inventory items) so users can browse, filter, and work with those entities offline. Also added two UI signals that make sync state visible: an offline banner and a pending-writes indicator in the sidebar.

@@ -33,28 +33,18 @@ export interface LocalAccount {
 
 export interface LocalCustomer {
   id: string;
-  tenantId: string;
   name: string;
-  email: string;
-  phone: string | null;
-  address: string | null;
+  customerType: string;
   creditLimit: number | null;
-  tin: string | null;
-  createdAt: string;
 }
 
 export interface LocalInventoryItem {
   id: string;
-  tenantId: string;
   sku: string;
   name: string;
-  category: string;
-  unitOfMeasure: string;
-  costPrice: number;
   sellingPrice: number;
   wholesalePrice: number | null;
   reorderLevel: number;
-  createdAt: string;
 }
 
 export interface LocalInvoiceItem {
@@ -265,13 +255,15 @@ async function applyChangeEntry(entry: {
     if (entry.operation === 'DELETE') {
       await syncDb.customers.delete(entry.entityId);
     } else {
-      await syncDb.customers.put(entry.payload as LocalCustomer);
+      const { id, name, customerType, creditLimit } = entry.payload as any;
+      await syncDb.customers.put({ id, name, customerType, creditLimit });
     }
   } else if (entry.entityType === 'InventoryItem') {
     if (entry.operation === 'DELETE') {
       await syncDb.inventoryItems.delete(entry.entityId);
     } else {
-      await syncDb.inventoryItems.put(entry.payload as LocalInventoryItem);
+      const { id, sku, name, sellingPrice, wholesalePrice, reorderLevel } = entry.payload as any;
+      await syncDb.inventoryItems.put({ id, sku, name, sellingPrice, wholesalePrice, reorderLevel });
     }
   }
   await setMeta(META_LAST_SEQUENCE, entry.sequence);

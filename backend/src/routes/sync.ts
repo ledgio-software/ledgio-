@@ -35,10 +35,12 @@ router.get('/bootstrap', async (req: Request, res: Response): Promise<void> => {
         }),
         (client as any).customer.findMany({
           where: { tenantId },
+          select: { id: true, name: true, customerType: true, creditLimit: true },
           orderBy: { name: 'asc' },
         }),
         (client as any).inventoryItem.findMany({
           where: { tenantId },
+          select: { id: true, sku: true, name: true, sellingPrice: true, wholesalePrice: true, reorderLevel: true },
           orderBy: { name: 'asc' },
         }),
         getCurrentSequence(client, tenantId),

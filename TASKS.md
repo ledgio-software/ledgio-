@@ -2,6 +2,12 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Security Hardening (2026-08-23)
+
+- [x] **Security Phase 1 — Strip PII from sync bootstrap** (2026-08-23) — `GET /sync/bootstrap` now sends only non-sensitive fields for customers (`id, name, customerType, creditLimit`) and inventory items (`id, sku, name, sellingPrice, wholesalePrice, reorderLevel`). `LocalCustomer` and `LocalInventoryItem` interfaces trimmed to match; `applyChangeEntry` updated to destructure only safe fields. Frontend build clean. PR pending.
+- [ ] **Security Phase 2 — Encrypt Customer PII at application layer** — Encrypt `email`, `phone`, `tin` in `customers` table using existing AES-256-GCM utility (`credentialEncryption.ts`). Backfill existing rows on startup. Decrypt on all reads in `invoices.ts`. Fix `search.ts` to search by `name` only. Requires `CREDENTIAL_ENCRYPTION_KEY` set on Render backend service.
+- [ ] **Security Phase 3 — Zod input validation on high-risk endpoints** — Install `zod`, add `validateBody` middleware, add schemas to `invoices.ts` (customers + create invoice), `cashTill.ts` (POS sales), `subscription.ts` (initialize + verify).
+
 ## Phase 1: Core Accounting Web Version (MVP)
 
 - [x] Set up project repository and initial WebDev scaffold (w:5)
