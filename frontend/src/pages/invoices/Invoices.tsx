@@ -499,7 +499,14 @@ export function Invoices() {
         }
       }
     } catch (err: any) {
-      showToast(err.response?.data?.error || "Failed to generate Paystack payment link.", "error");
+      const message = err.response?.data?.error || "Failed to generate Paystack payment link.";
+      showToast(message, "error");
+      if (err.response?.status === 404) {
+        // Invoice is in local cache but missing from the server — re-sync so
+        // the stale record disappears and the user can see the true state.
+        resyncInvoicesFromServer().catch(() => {});
+        setPaystackInvoice(null);
+      }
     } finally {
       setIsGeneratingPaystackLink(false);
     }
