@@ -18,7 +18,7 @@ This file records all significant changes, decisions, and progress made on the M
 
 - **`backend/src/routes/subscription.ts`** — Added `initializeSchema` and `verifySchema`. Attached `validateBody(...)` to `POST /initialize` and `POST /verify`. `planTier: 999` now returns 400 instead of reaching Paystack. Removed redundant `if (!reference)` guard.
 
-**Verification:** Backend `tsc --noEmit` clean.
+**Verification:** Backend `tsc --noEmit` clean. `posCart.test.ts` updated to expect HTTP 400 (not 500) for a non-UUID `itemId` — Zod's `z.string().uuid()` now correctly rejects malformed IDs before the handler runs, which is the right behavior. Full CI suite green on commit `c85c52f`.
 
 ## [Date: 2026-08-23] - Security Phase 2: Encrypt Customer PII at Application Layer
 
