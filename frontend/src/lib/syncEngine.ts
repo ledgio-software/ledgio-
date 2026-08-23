@@ -60,7 +60,7 @@ export interface LocalInvoice {
   tenantId: string;
   invoiceNumber: string;
   customerId: string;
-  customer?: { id: string; name: string; email: string };
+  customer?: { id: string; name: string };
   items?: LocalInvoiceItem[];
   issueDate: string;
   dueDate: string;

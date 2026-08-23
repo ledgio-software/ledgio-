@@ -27,6 +27,17 @@ import { GraEvatServiceError } from '../services/graEvatService';
 import { generateInvoicePdf } from '../services/pdfGenerationService';
 import * as tenantRepository from '../repository/tenantRepository';
 import { assertWarehouseAccess, WarehouseAccessError } from '../services/warehouseAccessService';
+import { encryptCredential, decryptCredential } from '../utils/credentialEncryption';
+
+/** Decrypt a customer row's PII fields. Returns plaintext; tolerates plaintext input (transitional). */
+function decryptCustomer(c: any): any {
+  if (!c) return c;
+  const safe = (v: string | null): string | null => {
+    if (!v) return v;
+    try { return decryptCredential(v); } catch { return v; }
+  };
+  return { ...c, email: safe(c.email), phone: safe(c.phone), tin: safe(c.tin) };
+}
 
 // Sentinel used to unwind a poisoned transaction cleanly on a clientTxnId
 // race (see the POST / handler) - never surfaced to a caller directly.
@@ -66,7 +77,7 @@ router.get('/customers', async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json({
       success: true,
-      data: { customers },
+      data: { customers: customers.map(decryptCustomer) },
     });
   } catch (error: any) {
     console.error('[Invoices] Error fetching customers:', error);
@@ -98,17 +109,17 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req:
         data: {
           tenantId,
           name: name.trim(),
-          email: email.trim().toLowerCase(),
-          phone,
+          email: encryptCredential(email.trim().toLowerCase()),
+          phone: phone ? encryptCredential(String(phone).trim()) : null,
           address,
           creditLimit: creditLimit ?? null,
-          tin: tin ? String(tin).trim() || null : null,
+          tin: tin ? encryptCredential(String(tin).trim()) : null,
           customerType: resolvedType,
         },
       });
     });
 
-    res.status(201).json({ success: true, data: { customer: created } });
+    res.status(201).json({ success: true, data: { customer: decryptCustomer(created) } });
   } catch (error: any) {
     console.error('[Invoices] Error creating customer:', error);
     res.status(500).json({ success: false, error: 'Failed to create customer.' });
@@ -137,11 +148,11 @@ router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res
         where: { id },
         data: {
           ...(name !== undefined && { name: String(name).trim() }),
-          ...(email !== undefined && { email: String(email).trim().toLowerCase() }),
-          ...(phone !== undefined && { phone }),
+          ...(email !== undefined && { email: encryptCredential(String(email).trim().toLowerCase()) }),
+          ...(phone !== undefined && { phone: phone ? encryptCredential(String(phone).trim()) : null }),
           ...(address !== undefined && { address }),
           ...(creditLimit !== undefined && { creditLimit }),
-          ...(tin !== undefined && { tin: tin ? String(tin).trim() || null : null }),
+          ...(tin !== undefined && { tin: tin ? encryptCredential(String(tin).trim()) : null }),
           ...(customerType !== undefined && { customerType: customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL' }),
         },
       });
@@ -152,7 +163,7 @@ router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res
       return;
     }
 
-    res.status(200).json({ success: true, data: { customer: updated } });
+    res.status(200).json({ success: true, data: { customer: decryptCustomer(updated) } });
   } catch (error: any) {
     console.error('[Invoices] Error updating customer:', error);
     res.status(500).json({ success: false, error: 'Failed to update customer.' });
@@ -630,6 +641,7 @@ router.get('/:id/pdf', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    invoice.customer = decryptCustomer(invoice.customer);
     const pdfBuffer = await generateInvoicePdf(tenantName || 'Company', {
       invoiceNumber: invoice.invoiceNumber,
       issueDateLabel: new Date(invoice.issueDate).toLocaleDateString('en-GH'),
@@ -676,8 +688,8 @@ router.post('/:id/send', requireRole('Accountant'), async (req: Request, res: Re
     const updated = await invoiceEmailService.sendInvoiceEmail(req.params.id, actor);
     res.status(200).json({
       success: true,
-      message: `Invoice emailed to ${updated.customer.email}.`,
-      data: { invoice: updated },
+      message: `Invoice emailed to ${decryptCustomer(updated.customer).email}.`,
+      data: { invoice: { ...updated, customer: decryptCustomer(updated.customer) } },
     });
   } catch (error: any) {
     if (error instanceof InvoiceEmailServiceError) {
@@ -718,6 +730,8 @@ router.post('/:id/gra-clearance', requireRole('Accountant'), async (req: Request
       res.status(400).json({ success: false, error: 'This invoice is already GRA-cleared.' });
       return;
     }
+
+    invoice.customer = decryptCustomer(invoice.customer);
 
     try {
       const tenant = await tenantRepository.findTenantById(prisma, tenantId);

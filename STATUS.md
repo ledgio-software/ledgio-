@@ -2,6 +2,34 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-23] - Security Phase 2: Encrypt Customer PII at Application Layer
+
+**What/Why:** Customer `email`, `phone`, and `tin` were stored as plaintext in the `customers` table. Ghana's Data Protection Act requires reasonable safeguards. The existing AES-256-GCM utility (`credentialEncryption.ts`) already proven for GRA/Paystack credentials was reused.
+
+**Changes:**
+
+- **`backend/src/services/customerPiiMigrationService.ts`** (new) — Idempotent one-shot backfill function `migrateCustomerPii()`. Detects already-encrypted rows by `ivHex:authTagHex:ciphertextHex` format; skips them. Encrypts `email` (always), `phone`/`tin` (when non-null) for every row that is still plaintext.
+
+- **`backend/src/index.ts`** — Calls `migrateCustomerPii()` on server start after DB connect (same pattern as cron init). Errors are logged but do not crash the server.
+
+- **`backend/src/routes/invoices.ts`** — Added `decryptCustomer()` helper (tolerates plaintext input during transitional period). `POST /customers` now encrypts before write; `GET /customers`, `POST /customers`, `PUT /customers/:id` all decrypt before returning. `GET /:id/pdf` and `POST /:id/gra-clearance` decrypt the nested customer before using `email`/`tin`. `POST /:id/send` response decrypts customer.
+
+- **`backend/src/services/invoiceEmailService.ts`** — Decrypts `customer.email` and `customer.address` before sending invoice emails and writing audit log entries.
+
+- **`backend/src/services/dunningReminderService.ts`** — Decrypts `customer.email` before sending payment reminder emails and writing audit log entries.
+
+- **`backend/src/routes/paystack.ts`** — Decrypts `customer.email` before passing to Paystack `initializeTransaction`.
+
+- **`backend/src/services/syncChangeLogService.ts`** — Removed `email` from the inline `customer` snapshot in `invoiceToSyncPayload` (consistent with Phase 1's field-stripping; email was never needed by the frontend sync layer).
+
+- **`frontend/src/lib/syncEngine.ts`** — Dropped `email` from the nested `customer` field of `LocalInvoice` interface to match.
+
+- **`backend/src/routes/search.ts`** — Customer search now matches on `name` only (email/phone are ciphertext and cannot be substring-searched). Result subtitle still shows the decrypted email via `safeDecrypt`.
+
+**Operator note:** `CREDENTIAL_ENCRYPTION_KEY` must be set on the Render backend service. It is already required for GRA/Paystack credential encryption. The backfill runs automatically on the first server start after deployment.
+
+**Verification:** Backend `tsc --noEmit` clean. Frontend `npm run build` clean.
+
 ## [Date: 2026-08-23] - Security Phase 1: Strip PII from Sync Bootstrap Payload
 
 **What/Why:** The `GET /sync/bootstrap` endpoint was returning full DB rows for customers and inventory items, including PII fields (`email`, `phone`, `address`, `tin`, `tenantId`, `costPrice`, etc.) that no frontend component currently reads from IndexedDB. These fields are only needed on the authenticated REST endpoints that already require a JWT. Stripping them from the sync payload reduces the data surface stored in every user's browser IndexedDB and transmitted over the wire.

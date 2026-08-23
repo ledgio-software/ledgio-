@@ -4,6 +4,12 @@ import { requireTenantContext } from '../context/tenantContext';
 import { EmailService } from './EmailService';
 import { recordAuditLogTx, AuditActor } from './auditLogService';
 import { recordChange, notifyChange, invoiceToSyncPayload } from './syncChangeLogService';
+import { decryptCredential } from '../utils/credentialEncryption';
+
+function safeDecrypt(v: string | null | undefined): string | null {
+  if (!v) return v ?? null;
+  try { return decryptCredential(v); } catch { return v; }
+}
 
 export class InvoiceEmailServiceError extends Error {
   statusCode: number;
@@ -44,12 +50,14 @@ export async function sendInvoiceEmail(invoiceId: string, actor: AuditActor) {
     throw new InvoiceEmailServiceError('Email sending is not configured for this platform yet.', 503);
   }
 
-  const sent = await EmailService.sendInvoiceEmail(invoice.customer.email, invoice.customer.name, tenantName || 'Ledgio', {
+  const customerEmail = safeDecrypt(invoice.customer.email) ?? '';
+  const customerAddress = safeDecrypt(invoice.customer.address);
+  const sent = await EmailService.sendInvoiceEmail(customerEmail, invoice.customer.name, tenantName || 'Ledgio', {
     invoiceNumber: invoice.invoiceNumber,
     issueDateLabel: formatDateLabel(invoice.issueDate),
     dueDateLabel: formatDateLabel(invoice.dueDate),
     currency: invoice.currency,
-    customerAddress: invoice.customer.address,
+    customerAddress,
     items: invoice.items.map((item: any) => ({
       description: item.description,
       quantity: Number(item.quantity),
@@ -87,7 +95,7 @@ export async function sendInvoiceEmail(invoiceId: string, actor: AuditActor) {
       entity: 'Invoice',
       entityId: invoiceUpdated.id,
       actor,
-      details: `Invoice ${invoice.invoiceNumber} emailed to ${invoice.customer.email}.`,
+      details: `Invoice ${invoice.invoiceNumber} emailed to ${customerEmail}.`,
     });
 
     return invoiceUpdated;

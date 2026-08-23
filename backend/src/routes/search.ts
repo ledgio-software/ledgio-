@@ -5,6 +5,12 @@ import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { withCurrentTenantDb } from '../database/tenantClient';
+import { decryptCredential } from '../utils/credentialEncryption';
+
+function safeDecrypt(v: string | null | undefined): string | null {
+  if (!v) return v ?? null;
+  try { return decryptCredential(v); } catch { return v; }
+}
 
 const router = Router();
 router.use(authenticateJwt);
@@ -35,10 +41,7 @@ router.get('/', requireRole('Viewer'), async (req: Request, res: Response): Prom
     // Main-schema models filtered by tenantId
     const [customers, invoices, vendors, items] = await Promise.all([
       prisma.customer.findMany({
-        where: {
-          tenantId,
-          OR: [{ name: textSearch }, { email: textSearch }, { phone: textSearch }],
-        },
+        where: { tenantId, name: textSearch },
         select: { id: true, name: true, email: true, customerType: true },
         take: MAX_PER_TYPE,
       }),
@@ -103,7 +106,7 @@ router.get('/', requireRole('Viewer'), async (req: Request, res: Response): Prom
         type: 'customer' as const,
         id: c.id,
         title: c.name,
-        subtitle: [c.email, c.customerType].filter(Boolean).join(' · '),
+        subtitle: [safeDecrypt(c.email), c.customerType].filter(Boolean).join(' · '),
         href: '/customers',
       })),
       ...invoices.map((inv: any) => ({
