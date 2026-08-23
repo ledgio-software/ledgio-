@@ -2,6 +2,44 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-23] - Tier 1 Offline-First Upgrade: Customers + Inventory in Local Sync (PR #90)
+
+**What/Why:** Extended the local-first IndexedDB sync layer to cover reference data (customers and inventory items) so users can browse, filter, and work with those entities offline. Also added two UI signals that make sync state visible: an offline banner and a pending-writes indicator in the sidebar.
+
+**Changes:**
+
+- **`backend/src/routes/sync.ts`** — Bootstrap endpoint (`GET /sync/bootstrap`) now fetches customers and inventory items alongside accounts and invoices in one parallel `Promise.all`. Response gains `customers` and `inventoryItems` arrays.
+
+- **`frontend/src/lib/syncEngine.ts`** — Added `LocalCustomer` and `LocalInventoryItem` interfaces. Bumped Dexie to version 2 with new `customers` (indexed on `id, name`) and `inventoryItems` (indexed on `id, name, sku`) tables; existing data migrates transparently. `bootstrapSync` now stores all four entity types and explicitly clears them on `success: false` responses (previously stale data was left in place, causing the Paystack 404 bug). `resetLocalSyncData` clears all six tables using array-form `transaction()` call (Dexie's TS overloads cap at 7 args; the fix avoids a `TS2554` build error). `applyChangeEntry` handles WebSocket `Customer` and `InventoryItem` push events.
+
+- **`frontend/src/components/layout/OfflineBanner.tsx`** (new) — Amber strip rendered below the Header whenever `navigator.onLine` is false. Shows count of pending outbox entries. Uses `useLiveQuery` to stay reactive and `window.addEventListener("online"/"offline")` for the connectivity state.
+
+- **`frontend/src/components/layout/MainLayout.tsx`** — Renders `<OfflineBanner />` between `<Header />` and `<SubscriptionBanner />`.
+
+- **`frontend/src/components/layout/Sidebar.tsx`** — Added a spinning "N changes syncing…" chip above the Settings link whenever the outbox has pending entries (works online too, for slow connections).
+
+**Files changed:**
+`backend/src/routes/sync.ts`, `frontend/src/lib/syncEngine.ts`, `frontend/src/components/layout/OfflineBanner.tsx` (new), `frontend/src/components/layout/MainLayout.tsx`, `frontend/src/components/layout/Sidebar.tsx`
+
+---
+
+## [Date: 2026-08-23] - Fix: Paystack 404 on stale IndexedDB invoice (PR #89)
+
+**What/Why:** Clicking "Pay Now → Generate Link" on an invoice returned a 404. Root cause: the invoice existed in local IndexedDB but had been deleted server-side (after a DB reset on staging). Three-part fix.
+
+**Changes:**
+
+- **`backend/src/routes/paystack.ts`** — 404 response message changed to "Invoice not found on the server. Please refresh your invoice list and try again." (actionable, not generic).
+
+- **`frontend/src/lib/syncEngine.ts`** — `bootstrapSync` now clears local tables when the server returns `success: false` instead of leaving stale data in place. This prevents the scenario from recurring across all sync entities.
+
+- **`frontend/src/pages/invoices/Invoices.tsx`** — `handleGeneratePaystackLink` catch block detects a 404 response, shows the server's error message as a toast, triggers `resyncInvoicesFromServer()` in the background, and closes the modal — self-healing with no user action required.
+
+**Files changed:**
+`backend/src/routes/paystack.ts`, `frontend/src/lib/syncEngine.ts`, `frontend/src/pages/invoices/Invoices.tsx`
+
+---
+
 ## [Date: 2026-08-22] - User-Reported UX & Bug Fixes (KANESHIE OIL SHOP)
 
 **What/Why:** Five real support tickets from live users addressed:
