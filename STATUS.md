@@ -2,6 +2,38 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [2026-08-24] - Pharmacy Module Phase 2: NHIS Billing, Low-Stock Alerts, Daily Count
+
+**What/Why:** Three must-have features for Ghana FDA-licensed pharmacies that Phase 1 left open: (1) NHIS/insurance billing — a large share of Ghana pharmacy revenue flows through NHIS, which requires separate ledger treatment; (2) low-stock reorder alerts — `reorderLevel` existed on items but no notification fired; (3) end-of-day controlled substance count — Ghana FDA requires a daily physical count of scheduled drugs to be logged.
+
+**Changes:**
+
+- **`backend/prisma/schema.prisma`** — Added `paymentMethod String @default("CASH")`, `nhisClaimRef String?`, `nhisSettledAt DateTime?` to `CashSale`. Added `lastLowStockAlertAt DateTime?` to `InventoryItem`.
+
+- **`backend/prisma/migrations/20260825000000_nhis_billing/migration.sql`** (new) — Adds `payment_method`, `nhis_claim_ref`, `nhis_settled_at` columns to `cash_sales`; index on `(tenant_id, payment_method)`.
+
+- **`backend/prisma/migrations/20260825000001_low_stock_alert/migration.sql`** (new) — Adds `last_low_stock_alert_at` column to `inventory_items`.
+
+- **`backend/src/services/lowStockAlertService.ts`** (new) — `checkAndAlertLowStock(tenantId, itemId)`: sums stock across all warehouses, creates a `LOW_STOCK` in-app `Notification` (broadcast, `userId: null`) and optional SMS to `tenant.bossPhone` when stock ≤ reorderLevel; 24-hour dedup guard via `lastLowStockAlertAt`; invalidates notification Redis cache; all errors swallowed (fire-and-forget safe).
+
+- **`backend/src/routes/cashTill.ts`** — Extended `createSaleSchema` with `paymentMethod` (CASH/NHIS/MOMO/CARD) and `nhisClaimRef`. Non-CASH sales debit NHIS Receivable (code 1020, auto-created on first use) instead of Cash. `nhis_claim_ref` saved via raw SQL alongside customer fields. Added `GET /tills/nhis-claims` (outstanding/settled filter). Added `PUT /tills/sales/:id/settle-nhis` (Accountant role) — sets `nhis_settled_at`, posts Cash-Dr/NHIS-Receivable-Cr reversal journal. Added fire-and-forget low-stock alerts per sale item.
+
+- **`backend/src/routes/inventory.ts`** — Added fire-and-forget `checkAndAlertLowStock` calls after REMOVE adjustments and transfer-out operations.
+
+- **`backend/src/routes/pharmacy.ts`** — Added `DAILY_COUNT` to narcotics entry enum; DAILY_COUNT uses absolute `balanceAfter = quantity` (not delta). New `POST /pharmacy/narcotics/daily-count` (Accountant role): records discrepancy and overrides running balance. PDF renderer: DAILY_COUNT rows show grey background, `[COUNT]` prefix, `Δ±N` discrepancy in balance column.
+
+- **`frontend/src/pages/pos/PointOfSale.tsx`** — 4-tab payment method toggle (CASH/NHIS/MoMo/CARD); NHIS shows claim-ref input, others hide change-due. Payload includes `paymentMethod` and `nhisClaimRef`.
+
+- **`frontend/src/pages/pharmacy/NhisClaims.tsx`** (new) — NHIS claims tracker: outstanding/settled/all filter, total outstanding banner, Settle button per row, days-outstanding color coding.
+
+- **`frontend/src/pages/pharmacy/NarcoticsRegister.tsx`** — Added Daily Count modal (drug picker, expected balance display, counted-qty input, live discrepancy indicator, notes textarea). DAILY_COUNT badge and grey row styling. Added "Daily Count" button in header.
+
+- **`frontend/src/lib/navigation.ts`** — Added NHIS Claims (`/pharmacy/nhis-claims`, ShieldCheck icon) to PHARMACY nav section.
+
+- **`frontend/src/App.tsx`** — Lazy route for `/pharmacy/nhis-claims`.
+
+Both backend and frontend `tsc --noEmit` clean.
+
 ## [Date: 2026-08-24] - Pharmacy Module (Full Implementation)
 
 **What/Why:** Pharmacies are a strong fit for Ledgio's SME target market in Ghana. Ghana FDA requires licensed pharmacies to maintain a Prescription Register, a Narcotics Register, and batch/lot tracking with FEFO dispensing. This module gates all pharmacy features behind a new `PHARMACY` org type.

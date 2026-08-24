@@ -4,6 +4,8 @@ This file lists the development tasks for the Multi-Tenant Web-Based Accounting 
 
 ## Pharmacy Module (2026-08-24)
 
+- [x] **Pharmacy Module Phase 2 — NHIS Billing, Low-Stock Alerts, Daily Count** (2026-08-24) — NHIS/insurance payment method on POS (CASH/NHIS/MoMo/CARD toggle); NHIS Receivable account (code 1020, auto-created); outstanding-claims tracker page; settle endpoint with journal reversal. Low-stock in-app notifications (broadcast, 24-hour dedup, SMS optional) fired after sales, REMOVE adjustments, and transfer-outs. End-of-day narcotics Daily Count endpoint (Accountant role, absolute balance override) with discrepancy logging; Daily Count modal in NarcoticsRegister UI; PDF export grey row with Δ annotation. Backend and frontend tsc clean.
+
 - [x] **Pharmacy Module — Full Implementation** (2026-08-24) — Batch/lot tracking with FEFO dispensing, Prescription Register, Narcotics Register (with Ghana FDA PDF export), Expiry Alerts, regulatory classification per product (GENERAL|PRESCRIPTION|SCHEDULED_A|SCHEDULED_B|CONTROLLED), POS Rx warning banner. Gated behind `PHARMACY` org type. Backend: new Prisma models + migration, `pharmacy.ts` router, inventory batch endpoints, cashTill FEFO/warnings/narcotics auto-log. Frontend: 3 new pharmacy pages, WarehouseManagement batch tracking UI, POS Rx banner, App.tsx routes, navigation orgTypeOnly gating, Register.tsx PHARMACY card. Both backend and frontend `tsc --noEmit` clean.
 
 ## Security Hardening (2026-08-23)
