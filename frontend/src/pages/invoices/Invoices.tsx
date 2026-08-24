@@ -12,7 +12,7 @@ import { syncDb, createInvoiceLocalFirst, payInvoiceLocalFirst, resyncInvoicesFr
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
-import { Plus, CheckCircle, UserPlus, DollarSign, Clock, Undo2, RefreshCw, History, Mail, ChevronDown, ShieldCheck, Download } from "lucide-react";
+import { Plus, CheckCircle, UserPlus, DollarSign, Clock, Undo2, RefreshCw, History, Mail, ChevronDown, ShieldCheck, Download, Trash2 } from "lucide-react";
 
 // Mirrors rbacMiddleware.ts's SCOPED_ROLES - these actions all backend-gate
 // to requireRole('Accountant') (Email Invoice, Request GRA Clearance, Pay
@@ -1094,8 +1094,30 @@ export function Invoices() {
                     setItems(newIt);
                   }}
                 />
+                {items.length > 1 && (
+                  <button
+                    type="button"
+                    className="p-2 text-secondary-400 hover:text-red-500"
+                    onClick={() => {
+                      setItems(items.filter((_, i) => i !== idx));
+                      setItemSearches((prev) => prev.filter((_, i) => i !== idx));
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
+            <button
+              type="button"
+              className="mt-1 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
+              onClick={() => {
+                setItems([...items, { description: "", quantity: 1, unitPrice: 0, amount: 0 }]);
+                setItemSearches((prev) => [...prev, '']);
+              }}
+            >
+              <Plus className="h-3 w-3" /> Add Line
+            </button>
           </div>
 
           <div className="flex justify-end space-x-3 pt-2">
