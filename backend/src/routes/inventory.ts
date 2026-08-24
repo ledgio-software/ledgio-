@@ -180,7 +180,7 @@ router.get('/items', async (req: Request, res: Response): Promise<void> => {
 router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId } = req.body;
+    const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
 
     if (!name || !costPrice || !sellingPrice) {
       res.status(400).json({ success: false, error: 'Item name, cost price, and selling price are required.' });
@@ -216,6 +216,8 @@ router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Ware
           wholesalePrice: wholesalePrice !== undefined && wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null,
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           preferredVendorId: preferredVendorId || null,
+          ...(regulatoryCategory !== undefined && { regulatoryCategory: String(regulatoryCategory) }),
+          ...(requiresBatchTracking !== undefined && { requiresBatchTracking: Boolean(requiresBatchTracking) }),
         },
       });
 
@@ -265,7 +267,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
-    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId } = req.body;
+    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId, requiresBatchTracking } = req.body;
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).inventoryItem.findFirst({ where: { id, tenantId } });
@@ -287,6 +289,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
           ...(wholesalePrice !== undefined && { wholesalePrice: wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null }),
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           ...(preferredVendorId !== undefined && { preferredVendorId: preferredVendorId || null }),
+          ...(requiresBatchTracking !== undefined && { requiresBatchTracking: Boolean(requiresBatchTracking) }),
         },
       });
     });
@@ -813,5 +816,150 @@ router.post('/stock-take', requireRole('Accountant', 'Shop Manager', 'Cashier', 
     res.status(400).json({ success: false, error: error.message || 'Failed to reconcile stock take.' });
   }
 });
+
+// ─── Inventory Batch Endpoints ───────────────────────────────────────────────
+
+/**
+ * GET /api/v1/inventory/batches
+ * Lists inventory batches. Optional ?itemId=, ?warehouseId=, ?expiringSoon=N (days).
+ */
+router.get('/batches', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { itemId, warehouseId, expiringSoon } = req.query;
+
+    const where: any = { tenantId };
+    if (itemId) where.itemId = String(itemId);
+    if (warehouseId) where.warehouseId = String(warehouseId);
+    if (expiringSoon) {
+      const days = parseInt(String(expiringSoon), 10) || 30;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + days);
+      where.expiryDate = { not: null, lte: cutoff };
+    }
+
+    const batches = await withCurrentTenantDb(prisma, async (client) => {
+      return (client as any).inventoryBatch.findMany({
+        where,
+        include: {
+          item: { select: { id: true, name: true, sku: true } },
+          warehouse: { select: { id: true, name: true } },
+        },
+        orderBy: [{ expiryDate: 'asc' }, { createdAt: 'desc' }],
+      });
+    });
+
+    res.status(200).json({ success: true, data: { batches } });
+  } catch (error: any) {
+    console.error('[Inventory] Error fetching batches:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve inventory batches.' });
+  }
+});
+
+/**
+ * POST /api/v1/inventory/batches
+ * Receives a new batch for a batch-tracked item. Upserts the InventoryBatch row and
+ * increments warehouseStock.quantityOnHand. For CONTROLLED items, also posts a
+ * narcotics log RECEIVED entry.
+ */
+router.post(
+  '/batches',
+  requireRole('Accountant', 'Warehouse Manager', 'Shop Manager'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { tenantId } = requireTenantContext();
+      const { itemId, warehouseId, batchNumber, expiryDate, quantity, costPrice, supplierId } = req.body;
+
+      if (!itemId || !warehouseId || !batchNumber || quantity === undefined || costPrice === undefined) {
+        res.status(400).json({ success: false, error: 'itemId, warehouseId, batchNumber, quantity, and costPrice are required.' });
+        return;
+      }
+      const qty = parseInt(String(quantity), 10);
+      if (!Number.isInteger(qty) || qty <= 0) {
+        res.status(400).json({ success: false, error: 'quantity must be a positive integer.' });
+        return;
+      }
+
+      const result = await withCurrentTenantDb(prisma, async (client) => {
+        const item = await (client as any).inventoryItem.findFirst({ where: { id: itemId, tenantId } });
+        if (!item) throw new Error('Item not found.');
+
+        const warehouse = await (client as any).warehouse.findFirst({ where: { id: warehouseId, tenantId } });
+        if (!warehouse) throw new Error('Warehouse not found.');
+
+        await assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, warehouseId);
+
+        // Upsert the batch row
+        const existingBatch = await (client as any).inventoryBatch.findFirst({
+          where: { tenantId, itemId, batchNumber },
+        });
+
+        let batch: any;
+        if (existingBatch) {
+          batch = await (client as any).inventoryBatch.update({
+            where: { id: existingBatch.id },
+            data: { quantityOnHand: { increment: qty } },
+          });
+        } else {
+          batch = await (client as any).inventoryBatch.create({
+            data: {
+              tenantId,
+              itemId,
+              warehouseId,
+              batchNumber: String(batchNumber).trim(),
+              expiryDate: expiryDate ? new Date(expiryDate) : null,
+              quantityOnHand: qty,
+              supplierId: supplierId || null,
+              costPrice: Number(costPrice),
+            },
+          });
+        }
+
+        // Increment the warehouseStock total (the authoritative quantity)
+        await (client as any).warehouseStock.upsert({
+          where: { warehouseId_itemId: { warehouseId, itemId } },
+          create: { tenantId, warehouseId, itemId, quantityOnHand: qty },
+          update: { quantityOnHand: { increment: qty } },
+        });
+
+        // Narcotics auto-log for CONTROLLED items
+        if (item.regulatoryCategory === 'CONTROLLED') {
+          const lastEntry = await (client as any).narcoticsLogEntry.findFirst({
+            where: { tenantId, itemId },
+            orderBy: { entryDate: 'desc' },
+          });
+          const balanceAfter = (lastEntry ? lastEntry.balanceAfter : 0) + qty;
+          await (client as any).narcoticsLogEntry.create({
+            data: {
+              tenantId,
+              itemId,
+              batchNumber: String(batchNumber).trim(),
+              operationType: 'RECEIVED',
+              quantity: qty,
+              balanceAfter,
+              supplierRef: supplierId || null,
+              recordedByName: req.user?.name || req.user?.email || 'Unknown',
+            },
+          });
+        }
+
+        return { batch, item, warehouse };
+      });
+
+      res.status(201).json({ success: true, message: 'Batch received successfully.', data: { batch: result.batch } });
+    } catch (error: any) {
+      console.error('[Inventory] Error receiving batch:', error);
+      if (error.message === 'Item not found.' || error.message === 'Warehouse not found.') {
+        res.status(404).json({ success: false, error: error.message });
+        return;
+      }
+      if (error instanceof WarehouseAccessError) {
+        res.status(error.statusCode).json({ success: false, error: error.message });
+        return;
+      }
+      res.status(500).json({ success: false, error: 'Failed to receive batch.' });
+    }
+  }
+);
 
 export default router;

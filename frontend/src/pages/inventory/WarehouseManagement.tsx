@@ -77,6 +77,8 @@ interface InventoryItem {
   wholesalePrice?: number | null;
   reorderLevel: number;
   warehouseStocks: WarehouseStock[];
+  regulatoryCategory?: string;
+  requiresBatchTracking?: boolean;
 }
 
 interface WarehouseData {
@@ -164,6 +166,17 @@ export function WarehouseManagement() {
   const [initialQty, setInitialQty] = useState("50");
   const [preferredVendorId, setPreferredVendorId] = useState("");
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
+  // Pharmacy fields (only used when orgType === PHARMACY)
+  const [regulatoryCategory, setRegulatoryCategory] = useState("GENERAL");
+  const [requiresBatchTracking, setRequiresBatchTracking] = useState(false);
+  // Receive Batch modal
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [batchItemId, setBatchItemId] = useState("");
+  const [batchWarehouseId, setBatchWarehouseId] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
+  const [batchExpiry, setBatchExpiry] = useState("");
+  const [batchQty, setBatchQty] = useState("1");
+  const [batchCostPrice, setBatchCostPrice] = useState("");
 
   // Transfer Form State
   const [fromWarehouseId, setFromWarehouseId] = useState("");
@@ -235,6 +248,8 @@ export function WarehouseManagement() {
         initialWarehouseId,
         initialQty: Number(initialQty),
         preferredVendorId: preferredVendorId || undefined,
+        regulatoryCategory: user?.orgType === "PHARMACY" ? regulatoryCategory : undefined,
+        requiresBatchTracking: user?.orgType === "PHARMACY" ? requiresBatchTracking : undefined,
       });
 
       if (res.data.success) {
@@ -246,6 +261,29 @@ export function WarehouseManagement() {
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to create item.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReceiveBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await api.post("/inventory/batches", {
+        itemId: batchItemId,
+        warehouseId: batchWarehouseId,
+        batchNumber,
+        expiryDate: batchExpiry ? new Date(batchExpiry).toISOString() : null,
+        quantity: Number(batchQty),
+        costPrice: Number(batchCostPrice),
+      });
+      showToast("Batch received.", "success");
+      setIsBatchModalOpen(false);
+      setBatchNumber(""); setBatchExpiry(""); setBatchQty("1"); setBatchCostPrice("");
+      fetchData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to receive batch.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -792,6 +830,11 @@ export function WarehouseManagement() {
                       </TableCell>
                       <TableCell className="font-medium text-secondary-900 dark:text-secondary-50">
                         {it.name}
+                        {it.regulatoryCategory && it.regulatoryCategory !== "GENERAL" && (
+                          <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${it.regulatoryCategory === "CONTROLLED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"}`}>
+                            {it.regulatoryCategory === "CONTROLLED" ? "CTRL" : "RX"}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs">{it.category}</TableCell>
                       <TableCell className="text-xs">
@@ -845,6 +888,15 @@ export function WarehouseManagement() {
                                 >
                                   Adjust
                                 </button>
+                                {user?.orgType === "PHARMACY" && it.requiresBatchTracking && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setBatchItemId(it.id); setBatchWarehouseId(wh.id); setBatchCostPrice(String(it.costPrice)); setIsBatchModalOpen(true); }}
+                                    className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-xs"
+                                  >
+                                    + Batch
+                                  </button>
+                                )}
                               </div>
                             );
                           })}
@@ -958,9 +1010,91 @@ export function WarehouseManagement() {
               Who to auto-draft a reorder Purchase Order to once stock falls to the reorder level.
             </p>
           </div>
+          {user?.orgType === "PHARMACY" && (
+            <div className="grid grid-cols-2 gap-4 border-t pt-4 dark:border-gray-700">
+              <div>
+                <label className="block text-sm font-medium mb-1">Regulatory Category</label>
+                <select
+                  value={regulatoryCategory}
+                  onChange={(e) => setRegulatoryCategory(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-secondary-300 bg-white dark:bg-secondary-800 text-secondary-900 dark:text-secondary-50 text-sm"
+                >
+                  <option value="GENERAL">General (OTC)</option>
+                  <option value="PRESCRIPTION">Prescription (RX)</option>
+                  <option value="SCHEDULED_A">Scheduled A</option>
+                  <option value="SCHEDULED_B">Scheduled B</option>
+                  <option value="CONTROLLED">Controlled (Narcotic)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input
+                  type="checkbox"
+                  id="requiresBatchTracking"
+                  checked={requiresBatchTracking}
+                  onChange={(e) => setRequiresBatchTracking(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="requiresBatchTracking" className="text-sm font-medium">Requires Batch / Lot Tracking</label>
+              </div>
+            </div>
+          )}
           <div className="flex justify-end space-x-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsItemModalOpen(false)}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Save Product"}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Receive Batch Modal (PHARMACY) */}
+      <Modal isOpen={isBatchModalOpen} onClose={() => setIsBatchModalOpen(false)} title="Receive Batch">
+        <form onSubmit={handleReceiveBatch} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Drug *</label>
+              <select
+                required
+                value={batchItemId}
+                onChange={(e) => setBatchItemId(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              >
+                <option value="">Select item…</option>
+                {items.filter(i => i.requiresBatchTracking).map((it) => (
+                  <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Warehouse *</label>
+              <select
+                required
+                value={batchWarehouseId}
+                onChange={(e) => setBatchWarehouseId(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              >
+                <option value="">Select warehouse…</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Batch Number *</label>
+              <Input required value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="e.g. BN-2024-001" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Expiry Date</label>
+              <Input type="date" value={batchExpiry} onChange={(e) => setBatchExpiry(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Quantity *</label>
+              <Input type="number" min={1} required value={batchQty} onChange={(e) => setBatchQty(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Cost Price (GH₵) *</label>
+              <Input type="number" required value={batchCostPrice} onChange={(e) => setBatchCostPrice(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setIsBatchModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Receive Batch"}</Button>
           </div>
         </form>
       </Modal>

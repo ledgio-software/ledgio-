@@ -22,6 +22,7 @@ const createSaleSchema = z.object({
   saleType: z.enum(['RETAIL', 'WHOLESALE']).optional(),
   customerPhone: z.string().max(30).optional().nullable(),
   customerName: z.string().max(200).optional().nullable(),
+  rxNumber: z.string().min(1).max(100).optional().nullable(),
 });
 import { verifyPassword } from '../utils/password';
 import { recordAuditLog, recordAuditLogTx, actorFromRequest, AuditActor } from '../services/auditLogService';
@@ -261,7 +262,7 @@ router.post('/open', async (req: Request, res: Response): Promise<void> => {
 router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName } = req.body;
+    const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName, rxNumber } = req.body;
     const resolvedSaleType = saleType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
 
     if (!tillId || !Array.isArray(items) || items.length === 0 || cashGiven === undefined || cashGiven === null || cashGiven === '') {
@@ -358,6 +359,15 @@ router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: 
           throw new Error(`Cash given (GH₵ ${cashGiven}) is less than total bill amount (GH₵ ${totalAmount.toFixed(2)}).`);
         }
 
+        // Regulatory warning check: collect non-GENERAL items without an Rx reference.
+        const warnings: string[] = [];
+        for (const line of items) {
+          const item = itemsById.get(line.itemId) as any;
+          if (item.regulatoryCategory && item.regulatoryCategory !== 'GENERAL' && !rxNumber) {
+            warnings.push(`${item.name} (${item.regulatoryCategory}) dispensed without an Rx reference.`);
+          }
+        }
+
         // 1. Deduct stock per line - atomic guarded decrement so two concurrent
         // sales of the same item can't both read the same stale quantity and
         // both succeed (lost-update / phantom-stock bug).
@@ -370,6 +380,30 @@ router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: 
           if (deduction.count === 0) {
             const item = itemsById.get(line.itemId) as any;
             throw new Error(`Insufficient stock for ${item.name} (stock changed concurrently, please retry).`);
+          }
+        }
+
+        // FEFO batch deduction for items with requiresBatchTracking.
+        // Deducts from the nearest-expiry batches first; warehouseStock total is
+        // already updated above - batches are the sub-ledger.
+        for (const line of items) {
+          const item = itemsById.get(line.itemId) as any;
+          if (!item.requiresBatchTracking) continue;
+
+          let remaining = line.quantity;
+          const batches = await (client as any).inventoryBatch.findMany({
+            where: { tenantId, itemId: line.itemId, warehouseId: till.warehouseId, quantityOnHand: { gt: 0 } },
+            orderBy: { expiryDate: 'asc' },
+          });
+
+          for (const batch of batches) {
+            if (remaining <= 0) break;
+            const take = Math.min(batch.quantityOnHand, remaining);
+            await (client as any).inventoryBatch.update({
+              where: { id: batch.id },
+              data: { quantityOnHand: { decrement: take } },
+            });
+            remaining -= take;
           }
         }
 
@@ -444,7 +478,30 @@ router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: 
           data: { cashSalesTotal: { increment: totalAmount } },
         });
 
-        return { sale, lines, totalAmount, changeGiven, replayed: false };
+        // 4. Auto narcotics log for CONTROLLED items.
+        for (const line of items) {
+          const item = itemsById.get(line.itemId) as any;
+          if (item.regulatoryCategory !== 'CONTROLLED') continue;
+          const lastEntry = await (client as any).narcoticsLogEntry.findFirst({
+            where: { tenantId, itemId: line.itemId },
+            orderBy: { entryDate: 'desc' },
+          });
+          const balanceAfter = (lastEntry ? lastEntry.balanceAfter : 0) - line.quantity;
+          await (client as any).narcoticsLogEntry.create({
+            data: {
+              tenantId,
+              itemId: line.itemId,
+              operationType: 'DISPENSED',
+              quantity: line.quantity,
+              balanceAfter,
+              prescriptionRef: rxNumber || null,
+              patientName: customerName ? String(customerName).trim() : null,
+              recordedByName: req.user?.name || req.user?.email || 'Cashier',
+            },
+          });
+        }
+
+        return { sale, lines, totalAmount, changeGiven, replayed: false, warnings };
     });
     } catch (raceError: any) {
       if (raceError instanceof DuplicateSaleReplayError) {
@@ -492,7 +549,7 @@ router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: 
       });
     }
 
-    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: result });
+    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: { ...result, warnings: (result as any).warnings || [] } });
   } catch (error: any) {
     console.error('[CashTill] Error recording cash sale:', error);
     if (error instanceof WarehouseAccessError) {
