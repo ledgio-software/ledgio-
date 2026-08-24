@@ -815,16 +815,17 @@ model Warehouse {
   isPrimary   Boolean  @default(false) @map("is_primary")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  stocks         WarehouseStock[]
-  fromTransfers  StockTransfer[]       @relation("FromWarehouse")
-  toTransfers    StockTransfer[]       @relation("ToWarehouse")
-  tills          CashTill[]
-  closeouts      DailyCloseoutReport[]
-  adjustments    StockAdjustment[]
-  userAccess     WarehouseAccess[]
-  vendorBills    VendorBill[]
-  invoices       Invoice[]
-  purchaseOrders PurchaseOrder[]
+  stocks           WarehouseStock[]
+  fromTransfers    StockTransfer[]       @relation("FromWarehouse")
+  toTransfers      StockTransfer[]       @relation("ToWarehouse")
+  tills            CashTill[]
+  closeouts        DailyCloseoutReport[]
+  adjustments      StockAdjustment[]
+  userAccess       WarehouseAccess[]
+  vendorBills      VendorBill[]
+  invoices         Invoice[]
+  purchaseOrders   PurchaseOrder[]
+  inventoryBatches InventoryBatch[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -852,6 +853,14 @@ model InventoryItem {
   // endpoint (reported back, not silently dropped) rather than guessing
   // which vendor to order from.
   preferredVendorId String?  @map("preferred_vendor_id")
+  // Pharmacy: Ghana FDA regulatory category for this product.
+  // GENERAL (default) = OTC/no prescription required.
+  // PRESCRIPTION | SCHEDULED_A | SCHEDULED_B | CONTROLLED = requires Rx or
+  // narcotics-log entry. Only meaningful for PHARMACY org-type tenants.
+  regulatoryCategory    String  @default("GENERAL") @map("regulatory_category")
+  // Pharmacy: whether this item must be dispensed from a tracked batch (FEFO).
+  // When true, every POS sale and batch receipt must link to an InventoryBatch row.
+  requiresBatchTracking Boolean @default(false) @map("requires_batch_tracking")
   createdAt         DateTime @default(now()) @map("created_at")
 
   warehouseStocks    WarehouseStock[]
@@ -860,10 +869,103 @@ model InventoryItem {
   invoiceLines       InvoiceItem[]
   purchaseOrderLines PurchaseOrderLine[]
   preferredVendor    Vendor?             @relation(fields: [preferredVendorId], references: [id], onDelete: SetNull)
+  inventoryBatches   InventoryBatch[]
+  prescriptionLines  PrescriptionLine[]
+  narcoticsLog       NarcoticsLogEntry[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
   @@map("inventory_items")
+}
+
+// Sub-ledger of stock by batch/lot for items with requiresBatchTracking = true.
+// warehouseStock.quantityOnHand remains the authoritative total; this table is
+// the detail layer used for FEFO (First-Expired-First-Out) dispensing.
+model InventoryBatch {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  itemId         String    @map("item_id")
+  warehouseId    String    @map("warehouse_id")
+  batchNumber    String    @map("batch_number")
+  expiryDate     DateTime? @map("expiry_date")
+  quantityOnHand Int       @default(0) @map("quantity_on_hand")
+  receivedAt     DateTime  @default(now()) @map("received_at")
+  supplierId     String?   @map("supplier_id")
+  costPrice      Decimal   @db.Decimal(15, 2) @map("cost_price")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  item      InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemId, batchNumber])
+  @@index([tenantId])
+  @@index([itemId])
+  @@index([expiryDate])
+  @@map("inventory_batches")
+}
+
+// Pharmacy prescription register - required by Ghana FDA for licensed pharmacies.
+model Prescription {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  rxNumber          String    @map("rx_number")
+  patientName       String    @map("patient_name")
+  patientAge        Int?      @map("patient_age")
+  patientPhone      String?   @map("patient_phone")
+  prescribingDoctor String    @map("prescribing_doctor")
+  prescriptionDate  DateTime  @map("prescription_date")
+  dispensedAt       DateTime? @map("dispensed_at")
+  dispensedByName   String?   @map("dispensed_by_name")
+  cashSaleId        String?   @map("cash_sale_id")
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  lines PrescriptionLine[]
+
+  @@unique([tenantId, rxNumber])
+  @@index([tenantId])
+  @@map("prescriptions")
+}
+
+model PrescriptionLine {
+  id             String   @id @default(uuid())
+  prescriptionId String   @map("prescription_id")
+  itemId         String   @map("item_id")
+  prescribedQty  Int      @map("prescribed_qty")
+  dispensedQty   Int      @default(0) @map("dispensed_qty")
+  notes          String?
+
+  prescription Prescription  @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  item         InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId])
+  @@index([itemId])
+  @@map("prescription_lines")
+}
+
+// Ghana FDA mandatory narcotics / controlled-substance register.
+model NarcoticsLogEntry {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  itemId          String   @map("item_id")
+  batchNumber     String?  @map("batch_number")
+  entryDate       DateTime @default(now()) @map("entry_date")
+  // RECEIVED | DISPENSED | DESTROYED | RETURNED
+  operationType   String   @map("operation_type")
+  quantity        Int
+  balanceAfter    Int      @map("balance_after")
+  patientName     String?  @map("patient_name")
+  prescriptionRef String?  @map("prescription_ref")
+  supplierRef     String?  @map("supplier_ref")
+  recordedByName  String   @map("recorded_by_name")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([itemId])
+  @@map("narcotics_log_entries")
 }
 
 model WarehouseStock {

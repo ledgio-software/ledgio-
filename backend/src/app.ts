@@ -64,6 +64,7 @@ import payrollRouter from './routes/payroll';
 import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
+import pharmacyRouter from './routes/pharmacy';
 
 dotenv.config();
 
@@ -183,6 +184,9 @@ app.use('/api/v1/inventory', inventoryRouter);
 
 // Cash Till & Daily Closeout endpoints
 app.use('/api/v1/tills', cashTillRouter);
+
+// Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
+app.use('/api/v1/pharmacy', pharmacyRouter);
 
 // Intelligent Analytics & Decision Engine endpoints
 app.use('/api/v1/analytics', analyticsRouter);

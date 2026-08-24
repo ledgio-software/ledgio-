@@ -80,6 +80,9 @@ const PayrollRuns = lazy(() => import("./pages/payroll/PayrollRuns").then(m => (
 const Loans = lazy(() => import("./pages/payroll/Loans").then(m => ({ default: m.Loans })));
 const Leave = lazy(() => import("./pages/payroll/Leave").then(m => ({ default: m.Leave })));
 const PaymentCallback = lazy(() => import("./pages/subscription/PaymentCallback").then(m => ({ default: m.PaymentCallback })));
+const PrescriptionRegister = lazy(() => import("./pages/pharmacy/PrescriptionRegister").then(m => ({ default: m.PrescriptionRegister })));
+const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister").then(m => ({ default: m.NarcoticsRegister })));
+const ExpiryAlerts = lazy(() => import("./pages/pharmacy/ExpiryAlerts").then(m => ({ default: m.ExpiryAlerts })));
 
 // "What happened today?" quick-action grid shown in Operations and Business modes.
 const GUIDED_ACTIONS_OPS = [
@@ -582,6 +585,9 @@ function App() {
               <Route path="/payroll/runs" element={<ProtectedRoute><MainLayout><PayrollRuns /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/loans" element={<ProtectedRoute><MainLayout><Loans /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/leave" element={<ProtectedRoute><MainLayout><Leave /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
               <Route path="/reports" element={<Navigate to="/reports/pnl" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -32,6 +32,9 @@ import {
   Anchor,
   BadgeDollarSign,
   LineChart,
+  ClipboardList,
+  ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -45,6 +48,8 @@ export interface NavItem {
 export interface NavGroup {
   sectionTitle: string;
   items: NavItem[];
+  /** When set, this group is only shown for tenants whose orgType matches this value. */
+  orgTypeOnly?: string;
 }
 
 // Hrefs hidden from unrestricted roles in simplified workspace modes.
@@ -176,6 +181,15 @@ export const navigationGroups: NavGroup[] = [
       { name: "Team Management", href: "/team", icon: Users },
     ],
   },
+  {
+    sectionTitle: "PHARMACY",
+    orgTypeOnly: "PHARMACY",
+    items: [
+      { name: "Prescription Register", href: "/pharmacy/prescriptions", icon: ClipboardList },
+      { name: "Narcotics Register", href: "/pharmacy/narcotics", icon: ShieldAlert },
+      { name: "Expiry Alerts", href: "/pharmacy/expiry", icon: AlertTriangle },
+    ],
+  },
 ];
 
 // Roles scoped to their own reduced set of screens - anything not listed
@@ -291,7 +305,10 @@ export function getVisibleNavGroups(
   orgType?: string,
   mode: WorkspaceMode = 'professional',
 ): NavGroup[] {
-  let groups = navigationGroups;
+  // Filter groups restricted to a specific org type (e.g. PHARMACY section)
+  let groups = navigationGroups.filter(
+    (group) => !group.orgTypeOnly || group.orgTypeOnly === orgType
+  );
 
   if (orgType === "NONPROFIT") {
     groups = groups

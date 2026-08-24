@@ -36,6 +36,7 @@ interface InventoryItemOption {
   wholesalePrice: number | null;
   unitOfMeasure: string;
   stockQty: number;
+  regulatoryCategory?: string;
 }
 
 interface CartLine {
@@ -47,6 +48,7 @@ interface CartLine {
   wholesalePrice: number | null;
   stockQty: number;
   quantity: number;
+  regulatoryCategory?: string;
 }
 
 interface CashSaleLine {
@@ -115,6 +117,7 @@ export function PointOfSale() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [saleType, setSaleType] = useState<"RETAIL" | "WHOLESALE">("RETAIL");
+  const [rxNumber, setRxNumber] = useState("");
   const [isRecordingSale, setIsRecordingSale] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastReceipt | null>(null);
@@ -203,6 +206,7 @@ export function PointOfSale() {
               wholesalePrice: it.wholesalePrice != null ? Number(it.wholesalePrice) : null,
               unitOfMeasure: it.unitOfMeasure,
               stockQty: stock ? stock.quantityOnHand : 0,
+              regulatoryCategory: it.regulatoryCategory,
             };
           })
           .filter((it: InventoryItemOption) => it.stockQty > 0);
@@ -354,6 +358,7 @@ export function PointOfSale() {
           wholesalePrice: item.wholesalePrice,
           stockQty: item.stockQty,
           quantity: 1,
+          regulatoryCategory: item.regulatoryCategory,
         },
       ];
     });
@@ -407,9 +412,14 @@ export function PointOfSale() {
         clientOccurredAt,
         customerPhone: customerPhone.trim() || undefined,
         customerName: customerName.trim() || undefined,
+        rxNumber: rxNumber.trim() || undefined,
       });
 
       if (res.data.success) {
+        const warnings: string[] = res.data.data.warnings || [];
+        if (warnings.length > 0) {
+          showToast(`Warning: ${warnings.join(" ")}`, "warning" as any);
+        }
         setLastReceipt({
           receiptNo: res.data.data.sale.receiptNo,
           amount: res.data.data.totalAmount,
@@ -421,6 +431,7 @@ export function PointOfSale() {
         setCashGiven("");
         setCustomerPhone("");
         setCustomerName("");
+        setRxNumber("");
         fetchTillAndItems();
       }
     } catch (err: any) {
@@ -839,6 +850,21 @@ export function PointOfSale() {
                       </div>
                     </div>
                   </details>
+
+                  {user?.orgType === "PHARMACY" && cart.some(l => l.regulatoryCategory && l.regulatoryCategory !== "GENERAL") && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                      <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 text-xs font-medium mb-2">
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        Prescription / controlled drug(s) in cart. Enter Rx number (optional):
+                      </div>
+                      <Input
+                        type="text"
+                        placeholder="Rx number e.g. RX-1720123456-A1B2"
+                        value={rxNumber}
+                        onChange={(e) => setRxNumber(e.target.value)}
+                      />
+                    </div>
+                  )}
 
                   <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || !cashGiven}>
                     {isRecordingSale ? "Recording..." : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}

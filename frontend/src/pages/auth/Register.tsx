@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../lib/api";
-import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2 } from "lucide-react";
+import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill } from "lucide-react";
 import { AuthSplitLayout } from "../../components/layout/AuthSplitLayout";
 
 const BUSINESS_PROFILES = [
@@ -39,6 +39,12 @@ const BUSINESS_PROFILES = [
     label: "Other Business",
     sub: "Manufacturing, logistics, e-commerce",
     icon: Building2,
+  },
+  {
+    value: "PHARMACY" as const,
+    label: "Licensed Pharmacy",
+    sub: "Batch tracking, Rx register, narcotics log",
+    icon: Pill,
   },
 ];
 

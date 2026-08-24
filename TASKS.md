@@ -2,6 +2,10 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Pharmacy Module (2026-08-24)
+
+- [x] **Pharmacy Module — Full Implementation** (2026-08-24) — Batch/lot tracking with FEFO dispensing, Prescription Register, Narcotics Register (with Ghana FDA PDF export), Expiry Alerts, regulatory classification per product (GENERAL|PRESCRIPTION|SCHEDULED_A|SCHEDULED_B|CONTROLLED), POS Rx warning banner. Gated behind `PHARMACY` org type. Backend: new Prisma models + migration, `pharmacy.ts` router, inventory batch endpoints, cashTill FEFO/warnings/narcotics auto-log. Frontend: 3 new pharmacy pages, WarehouseManagement batch tracking UI, POS Rx banner, App.tsx routes, navigation orgTypeOnly gating, Register.tsx PHARMACY card. Both backend and frontend `tsc --noEmit` clean.
+
 ## Security Hardening (2026-08-23)
 
 - [x] **Security Phase 1 — Strip PII from sync bootstrap** (2026-08-23) — `GET /sync/bootstrap` now sends only non-sensitive fields for customers (`id, name, customerType, creditLimit`) and inventory items (`id, sku, name, sellingPrice, wholesalePrice, reorderLevel`). `LocalCustomer` and `LocalInventoryItem` interfaces trimmed to match; `applyChangeEntry` updated to destructure only safe fields. Frontend build clean. PR #91.

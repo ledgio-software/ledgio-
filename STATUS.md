@@ -2,6 +2,42 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-24] - Pharmacy Module (Full Implementation)
+
+**What/Why:** Pharmacies are a strong fit for Ledgio's SME target market in Ghana. Ghana FDA requires licensed pharmacies to maintain a Prescription Register, a Narcotics Register, and batch/lot tracking with FEFO dispensing. This module gates all pharmacy features behind a new `PHARMACY` org type.
+
+**Changes:**
+
+- **`backend/prisma/schema.prisma`** — Added `regulatoryCategory` (GENERAL|PRESCRIPTION|SCHEDULED_A|SCHEDULED_B|CONTROLLED, default GENERAL) and `requiresBatchTracking` (boolean, default false) to `InventoryItem`. Added 4 new Prisma models: `InventoryBatch` (batch/lot tracking per warehouse), `Prescription` + `PrescriptionLine` (Ghana FDA Rx register), `NarcoticsLogEntry` (narcotics controlled-substance audit log). Added relations to `Warehouse` and `InventoryItem`.
+
+- **`backend/prisma/migrations/20260824000000_pharmacy_module/migration.sql`** (new) — SQL migration: ALTERs `inventory_items` (adds `regulatory_category`, `requires_batch_tracking`); CREATE TABLE for `inventory_batches`, `prescriptions`, `prescription_lines`, `narcotics_log_entries` with all indexes and foreign keys.
+
+- **`backend/src/routes/pharmacy.ts`** (new) — All pharmacy endpoints under `/api/v1/pharmacy`, gated by `requirePharmacyOrgType()` middleware (403 for non-PHARMACY tenants). Endpoints: `GET/POST /prescriptions`, `GET /prescriptions/:id`, `PATCH /prescriptions/:id/dispense`, `GET/POST /narcotics`, `GET /narcotics/export.pdf` (pdfkit Ghana FDA format, landscape A4), `GET /expiry-alerts` (batches expiring within N days, sorted by urgency).
+
+- **`backend/src/routes/inventory.ts`** — Extended `POST /items` and `PUT /items/:id` to accept `regulatoryCategory` and `requiresBatchTracking`. Added `GET /inventory/batches` (with `itemId`/`warehouseId`/`expiringSoon` filters) and `POST /inventory/batches` (upserts batch, increments `warehouseStock.quantityOnHand`, auto-creates `NarcoticsLogEntry` for CONTROLLED items).
+
+- **`backend/src/routes/cashTill.ts`** — Added `rxNumber` to `createSaleSchema`. Added regulatory warnings block (non-GENERAL items without Rx → `warnings[]` in response). Added FEFO batch deduction (earliest-expiry batch drawn first for `requiresBatchTracking` items). Added auto narcotics log on CONTROLLED item sale.
+
+- **`backend/src/app.ts`** — Registered `pharmacyRouter` at `/api/v1/pharmacy`.
+
+- **`frontend/src/lib/navigation.ts`** — Added `orgTypeOnly?: string` to `NavGroup`. Added PHARMACY section (Prescription Register, Narcotics Register, Expiry Alerts) with `orgTypeOnly: "PHARMACY"`. Updated `getVisibleNavGroups()` to filter groups by `orgTypeOnly`.
+
+- **`frontend/src/pages/auth/Register.tsx`** — Added PHARMACY org type card ("Licensed Pharmacy") to the registration profile picker.
+
+- **`frontend/src/pages/pharmacy/PrescriptionRegister.tsx`** (new) — Prescription list, search by patient/Rx#, New Prescription modal (patient info + doctor + date + line items), Detail modal, Dispense action.
+
+- **`frontend/src/pages/pharmacy/NarcoticsRegister.tsx`** (new) — Narcotics log table (Date/Drug/Batch/Op/Qty In/Qty Out/Balance/Patient/Ref), Add Entry modal, Export PDF button.
+
+- **`frontend/src/pages/pharmacy/ExpiryAlerts.tsx`** (new) — Expiry alert table with 30/60/90/180-day filter, color-coded urgency badges, Write Off quick action.
+
+- **`frontend/src/pages/inventory/WarehouseManagement.tsx`** — Added `regulatoryCategory` and `requiresBatchTracking` to `InventoryItem` interface. Added regulatory fields to Add Product modal (PHARMACY tenants only). Added RX/CTRL coloured badges in items table. Added "+ Batch" button per warehouse row (PHARMACY + batch-tracked items only). Added Receive Batch modal (`POST /inventory/batches`).
+
+- **`frontend/src/pages/pos/PointOfSale.tsx`** — Added `regulatoryCategory` to `InventoryItemOption` and `CartLine`. Added Rx warning amber banner when cart contains non-GENERAL items (PHARMACY tenants). Added `rxNumber` field (sent with sale payload). Shows warning toast if `response.warnings[]` non-empty after sale.
+
+- **`frontend/src/App.tsx`** — Added lazy-loaded routes for `/pharmacy/prescriptions`, `/pharmacy/narcotics`, `/pharmacy/expiry`.
+
+**Verification:** Backend `tsc --noEmit` clean. Frontend `tsc --noEmit` clean.
+
 ## [Date: 2026-08-23] - Security Phase 3: Zod Input Validation on High-Risk Write Endpoints
 
 **What/Why:** All validation was hand-rolled `if (!field)` guards — no schema library, no type coercion. Malformed or out-of-range values (negative quantities, `planTier: 999`, empty item arrays) reached business logic unchecked. Added Zod v4 to enforce types, ranges, and required fields before any handler runs.
