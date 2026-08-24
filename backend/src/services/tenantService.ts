@@ -160,7 +160,7 @@ export async function onboardTenant(
   }
 
   const tier = dto.tier !== undefined ? Number(dto.tier) : 1;
-  const orgType = dto.orgType === 'NONPROFIT' ? 'NONPROFIT' : 'BUSINESS';
+  const orgType = dto.orgType === 'NONPROFIT' ? 'NONPROFIT' : dto.orgType === 'PHARMACY' ? 'PHARMACY' : 'BUSINESS';
   const trialEndsAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
   const schemaName = sanitizeSchemaName(slug);
