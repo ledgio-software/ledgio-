@@ -195,7 +195,7 @@ router.patch(
 const createNarcoticsEntrySchema = z.object({
   itemId: z.string().uuid(),
   batchNumber: z.string().max(100).optional().nullable(),
-  operationType: z.enum(['RECEIVED', 'DISPENSED', 'DESTROYED', 'RETURNED']),
+  operationType: z.enum(['RECEIVED', 'DISPENSED', 'DESTROYED', 'RETURNED', 'DAILY_COUNT']),
   quantity: z.number().int().positive(),
   patientName: z.string().max(200).optional().nullable(),
   prescriptionRef: z.string().max(100).optional().nullable(),
@@ -247,14 +247,20 @@ router.post(
       const { tenantId } = requireTenantContext();
       const { itemId, batchNumber, operationType, quantity, patientName, prescriptionRef, supplierRef, notes, entryDate } = req.body;
 
-      // Compute balanceAfter from the last entry for this item
+      // Compute balanceAfter from the last entry for this item.
+      // DAILY_COUNT is an absolute override: balanceAfter = the counted quantity.
       const lastEntry = await (prisma as any).narcoticsLogEntry.findFirst({
         where: { tenantId, itemId },
         orderBy: { entryDate: 'desc' },
       });
       const previousBalance = lastEntry ? lastEntry.balanceAfter : 0;
-      const delta = (operationType === 'RECEIVED' || operationType === 'RETURNED') ? quantity : -quantity;
-      const balanceAfter = previousBalance + delta;
+      let balanceAfter: number;
+      if (operationType === 'DAILY_COUNT') {
+        balanceAfter = quantity;
+      } else {
+        const delta = (operationType === 'RECEIVED' || operationType === 'RETURNED') ? quantity : -quantity;
+        balanceAfter = previousBalance + delta;
+      }
 
       const entry = await (prisma as any).narcoticsLogEntry.create({
         data: {
@@ -278,6 +284,59 @@ router.post(
     } catch (error: any) {
       console.error('[Pharmacy] Error creating narcotics entry:', error);
       res.status(500).json({ success: false, error: 'Failed to create narcotics log entry.' });
+    }
+  }
+);
+
+/**
+ * POST /api/v1/pharmacy/narcotics/daily-count
+ * Records a physical end-of-day count of a controlled substance.
+ * Requires Accountant role (Ghana FDA compliance).
+ * balanceAfter is set to countedQty (absolute physical count overrides running total).
+ */
+const dailyCountSchema = z.object({
+  itemId: z.string().uuid(),
+  countedQty: z.number().int().min(0),
+  notes: z.string().min(1).max(1000),
+});
+
+router.post(
+  '/narcotics/daily-count',
+  requireRole('Accountant'),
+  validateBody(dailyCountSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { tenantId } = requireTenantContext();
+      const { itemId, countedQty, notes } = req.body;
+
+      const lastEntry = await (prisma as any).narcoticsLogEntry.findFirst({
+        where: { tenantId, itemId },
+        orderBy: { entryDate: 'desc' },
+      });
+      const previousBalance = lastEntry ? lastEntry.balanceAfter : 0;
+      const discrepancy = countedQty - previousBalance;
+      const discrepancyNote = discrepancy !== 0
+        ? ` [Discrepancy: ${discrepancy > 0 ? '+' : ''}${discrepancy}]`
+        : ' [Count matches register]';
+
+      const entry = await (prisma as any).narcoticsLogEntry.create({
+        data: {
+          tenantId,
+          itemId,
+          entryDate: new Date(),
+          operationType: 'DAILY_COUNT',
+          quantity: countedQty,
+          balanceAfter: countedQty,
+          recordedByName: req.user?.name || req.user?.email || 'Unknown',
+          notes: notes + discrepancyNote,
+        },
+        include: { item: { select: { id: true, name: true, sku: true } } },
+      });
+
+      res.status(201).json({ success: true, data: { entry } });
+    } catch (error: any) {
+      console.error('[Pharmacy] Error recording daily count:', error);
+      res.status(500).json({ success: false, error: 'Failed to record daily count.' });
     }
   }
 );
@@ -340,16 +399,30 @@ router.get('/narcotics/export.pdf', async (req: Request, res: Response): Promise
     doc.font('Helvetica').fontSize(7.5);
     for (const e of entries) {
       const y = doc.y;
-      const isIn = e.operationType === 'RECEIVED' || e.operationType === 'RETURNED';
+      const isDailyCount = e.operationType === 'DAILY_COUNT';
+      const isIn = !isDailyCount && (e.operationType === 'RECEIVED' || e.operationType === 'RETURNED');
+      const opLabel = isDailyCount ? '[COUNT]' : e.operationType;
+
+      // Shade DAILY_COUNT rows lightly to distinguish them from movement rows
+      if (isDailyCount) {
+        doc.fillColor('#f3f4f6').rect(36, y - 1, doc.page.width - 72, rowH).fill().fillColor('black');
+      }
+
       doc.text(new Date(e.entryDate).toLocaleDateString('en-GB'), cols.date, y, { width: 70 });
       doc.text(e.item.name, cols.drug, y, { width: 115 });
       doc.text(e.batchNumber || '-', cols.batch, y, { width: 80 });
-      doc.text(e.operationType, cols.op, y, { width: 70 });
-      doc.text(isIn ? String(e.quantity) : '-', cols.qtyIn, y, { width: 50 });
-      doc.text(!isIn ? String(e.quantity) : '-', cols.qtyOut, y, { width: 50 });
-      doc.text(String(e.balanceAfter), cols.balance, y, { width: 50 });
-      doc.text(e.patientName || '-', cols.patient, y, { width: 120 });
-      doc.text(e.prescriptionRef || e.supplierRef || '-', cols.ref, y, { width: 100 });
+      doc.text(opLabel, cols.op, y, { width: 70 });
+      doc.text(isDailyCount ? '—' : (isIn ? String(e.quantity) : '-'), cols.qtyIn, y, { width: 50 });
+      doc.text(isDailyCount ? '—' : (!isIn ? String(e.quantity) : '-'), cols.qtyOut, y, { width: 50 });
+
+      // For DAILY_COUNT show balance with any discrepancy annotation extracted from notes
+      const discMatch = (e.notes || '').match(/\[Discrepancy: ([^\]]+)\]/);
+      const balanceCell = isDailyCount && discMatch
+        ? `${e.balanceAfter} (Δ${discMatch[1]})`
+        : String(e.balanceAfter);
+      doc.text(balanceCell, cols.balance, y, { width: 80 });
+      doc.text(isDailyCount ? '-' : (e.patientName || '-'), cols.patient, y, { width: 120 });
+      doc.text(isDailyCount ? '-' : (e.prescriptionRef || e.supplierRef || '-'), cols.ref, y, { width: 100 });
       doc.moveDown(0.25);
     }
 

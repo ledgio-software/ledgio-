@@ -847,6 +847,9 @@ model InventoryItem {
   // auto-fills from this field; the user can still override per-line.
   wholesalePrice    Decimal? @map("wholesale_price") @db.Decimal(15, 2)
   reorderLevel      Int      @default(10) @map("reorder_level")
+  // Guards against repeat low-stock notifications within 24 hours for the same
+  // item (see lowStockAlertService.ts). Null = never alerted.
+  lastLowStockAlertAt DateTime? @map("last_low_stock_alert_at")
   // Which vendor to auto-draft a reorder PO to when this item's stock falls
   // below reorderLevel (see POST /purchase-orders/generate-for-reorder) -
   // optional; an item with no preferred vendor is simply skipped by that
@@ -1100,6 +1103,15 @@ model CashSale {
   // RETAIL (default) or WHOLESALE - stamped at sale time so revenue reports
   // can split by sales channel without re-deriving from customer records.
   saleType         String         @default("RETAIL") @map("sale_type")
+  // CASH (default) | NHIS | MOMO | CARD — recorded at sale time so that NHIS
+  // claims can be tracked, reconciled, and settled separately from cash sales.
+  // Added via raw SQL migration (same pattern as customer_name/customer_phone).
+  paymentMethod    String         @default("CASH") @map("payment_method")
+  // NHIS scheme claim reference number entered by staff at point-of-sale.
+  // Null for non-NHIS sales. Max 100 chars per NHIS claim ref format.
+  nhisClaimRef     String?        @map("nhis_claim_ref")
+  // When the NHIS claim was settled (cash received from NHIS). Null = outstanding.
+  nhisSettledAt    DateTime?      @map("nhis_settled_at")
 
   till  CashTill       @relation(fields: [tillId], references: [id], onDelete: Cascade)
   lines CashSaleLine[]

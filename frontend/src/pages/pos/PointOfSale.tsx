@@ -118,6 +118,8 @@ export function PointOfSale() {
   const [customerName, setCustomerName] = useState("");
   const [saleType, setSaleType] = useState<"RETAIL" | "WHOLESALE">("RETAIL");
   const [rxNumber, setRxNumber] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "NHIS" | "MOMO" | "CARD">("CASH");
+  const [nhisClaimRef, setNhisClaimRef] = useState("");
   const [isRecordingSale, setIsRecordingSale] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastReceipt | null>(null);
@@ -390,7 +392,7 @@ export function PointOfSale() {
     setSaleError(null);
     if (!till || cart.length === 0) return;
 
-    if (Number(cashGiven) < cartTotal) {
+    if (paymentMethod === "CASH" && Number(cashGiven) < cartTotal) {
       setSaleError(`Cash given must be at least ${formatMoney(cartTotal)}.`);
       return;
     }
@@ -406,13 +408,15 @@ export function PointOfSale() {
       const res = await api.post("/tills/sales", {
         tillId: till.id,
         items: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity })),
-        cashGiven: Number(cashGiven),
+        cashGiven: paymentMethod === "CASH" ? Number(cashGiven) : cartTotal,
         saleType,
         clientTxnId,
         clientOccurredAt,
         customerPhone: customerPhone.trim() || undefined,
         customerName: customerName.trim() || undefined,
         rxNumber: rxNumber.trim() || undefined,
+        paymentMethod,
+        nhisClaimRef: nhisClaimRef.trim() || undefined,
       });
 
       if (res.data.success) {
@@ -432,6 +436,8 @@ export function PointOfSale() {
         setCustomerPhone("");
         setCustomerName("");
         setRxNumber("");
+        setPaymentMethod("CASH");
+        setNhisClaimRef("");
         fetchTillAndItems();
       }
     } catch (err: any) {
@@ -817,23 +823,58 @@ export function PointOfSale() {
                 </div>
 
                 <form onSubmit={handleRecordSale} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs text-secondary-500">Basket Total</div>
-                      <div className="text-xl font-bold">{formatMoney(cartTotal)}</div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Cash Given</label>
-                      <Input type="number" required min={0} step="0.01" value={cashGiven} onChange={(e) => setCashGiven(e.target.value)} disabled={cart.length === 0} />
+                  <div>
+                    <div className="text-xs text-secondary-500 mb-1">Basket Total</div>
+                    <div className="text-xl font-bold">{formatMoney(cartTotal)}</div>
+                  </div>
+
+                  {/* Payment Method */}
+                  <div>
+                    <div className="text-xs text-secondary-500 mb-1">Payment Method</div>
+                    <div className="flex rounded-md border border-secondary-200 dark:border-secondary-800 p-1 text-sm">
+                      {(["CASH", "NHIS", "MOMO", "CARD"] as const).map((method) => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setPaymentMethod(method)}
+                          className={`flex-1 py-1.5 rounded text-xs font-medium ${paymentMethod === method ? "bg-primary-600 text-white" : "text-secondary-500"}`}
+                        >
+                          {method === "MOMO" ? "MoMo" : method}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="p-4 bg-secondary-50 dark:bg-secondary-900 rounded-lg">
-                    <div className="text-xs text-secondary-500">Change Due</div>
-                    <div className={`text-xl font-bold ${changeDue < 0 ? "text-red-500" : "text-emerald-600"}`}>
-                      {formatMoney(Math.max(0, changeDue))}
+                  {paymentMethod === "CASH" ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Cash Given</label>
+                        <Input type="number" required min={0} step="0.01" value={cashGiven} onChange={(e) => setCashGiven(e.target.value)} disabled={cart.length === 0} />
+                      </div>
+                      <div className="p-4 bg-secondary-50 dark:bg-secondary-900 rounded-lg">
+                        <div className="text-xs text-secondary-500">Change Due</div>
+                        <div className={`text-xl font-bold ${changeDue < 0 ? "text-red-500" : "text-emerald-600"}`}>
+                          {formatMoney(Math.max(0, changeDue))}
+                        </div>
+                      </div>
+                    </>
+                  ) : paymentMethod === "NHIS" ? (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">NHIS Claim Ref (optional)</label>
+                      <Input
+                        type="text"
+                        placeholder="e.g. NHIS-2026-00001"
+                        value={nhisClaimRef}
+                        onChange={(e) => setNhisClaimRef(e.target.value)}
+                      />
+                      <p className="text-xs text-secondary-500 mt-1">Amount: {formatMoney(cartTotal)} — no cash collected at till</p>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-4 bg-secondary-50 dark:bg-secondary-900 rounded-lg">
+                      <div className="text-xs text-secondary-500">Amount ({paymentMethod === "MOMO" ? "MoMo" : paymentMethod})</div>
+                      <div className="text-xl font-bold text-emerald-600">{formatMoney(cartTotal)}</div>
+                    </div>
+                  )}
 
                   <details className="group">
                     <summary className="text-xs text-secondary-500 cursor-pointer hover:text-secondary-700 dark:hover:text-secondary-300 select-none">
@@ -866,7 +907,7 @@ export function PointOfSale() {
                     </div>
                   )}
 
-                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || !cashGiven}>
+                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven)}>
                     {isRecordingSale ? "Recording..." : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}
                   </Button>
                 </form>

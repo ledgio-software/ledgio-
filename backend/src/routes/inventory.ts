@@ -9,6 +9,7 @@ import { assertWarehouseAccess, getAccessibleWarehouseIds, WarehouseAccessError 
 import { recordAuditLog, recordAuditLogTx, actorFromRequest } from '../services/auditLogService';
 import { applyStockAdjustment } from '../services/stockAdjustmentService';
 import { generateStockTakeSheetPdf } from '../services/pdfGenerationService';
+import { checkAndAlertLowStock } from '../services/lowStockAlertService';
 
 const router = Router();
 
@@ -534,6 +535,9 @@ router.post('/transfers', requireRole('Accountant', 'Shop Manager', 'Cashier', '
       return transfer;
     });
 
+    // Fire-and-forget low-stock alert for the source item after transfer out.
+    checkAndAlertLowStock(tenantId, itemId).catch(() => {});
+
     res.status(201).json({
       success: true,
       message: 'Stock transfer completed successfully',
@@ -625,6 +629,11 @@ router.post('/adjustments', requireRole('Accountant', 'Shop Manager', 'Cashier',
 
       return { adjustment, warehouse, item, newQty, previousQty };
     });
+
+    // Fire-and-forget low-stock alert when stock is removed or set to a low value.
+    if (mode === 'remove' || mode === 'set') {
+      checkAndAlertLowStock(tenantId, itemId).catch(() => {});
+    }
 
     res.status(201).json({
       success: true,

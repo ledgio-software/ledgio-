@@ -4,7 +4,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
-import { ShieldAlert, Plus, Download, Filter } from "lucide-react";
+import { ShieldAlert, Plus, Download, Filter, ClipboardCheck } from "lucide-react";
 
 interface NarcoticsEntry {
   id: string;
@@ -27,6 +27,7 @@ const OP_LABELS: Record<string, string> = {
   DISPENSED: "Dispensed",
   DESTROYED: "Destroyed",
   RETURNED: "Returned",
+  DAILY_COUNT: "Daily Count",
 };
 
 const OP_COLORS: Record<string, string> = {
@@ -34,6 +35,7 @@ const OP_COLORS: Record<string, string> = {
   DISPENSED: "text-blue-600 bg-blue-50 dark:bg-blue-900/20",
   DESTROYED: "text-red-600 bg-red-50 dark:bg-red-900/20",
   RETURNED: "text-amber-600 bg-amber-50 dark:bg-amber-900/20",
+  DAILY_COUNT: "text-gray-600 bg-gray-100 dark:bg-gray-700 dark:text-gray-300",
 };
 
 export function NarcoticsRegister() {
@@ -45,7 +47,14 @@ export function NarcoticsRegister() {
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [showDailyCount, setShowDailyCount] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  const [dailyCount, setDailyCount] = useState({
+    itemId: "",
+    countedQty: 0,
+    notes: "",
+  });
 
   const [form, setForm] = useState({
     itemId: "",
@@ -105,6 +114,34 @@ export function NarcoticsRegister() {
     }
   }
 
+  // Compute the expected balance (last register entry) for the selected daily-count drug
+  const expectedBalance = dailyCount.itemId
+    ? (() => {
+        const lastEntry = entries
+          .filter((e) => e.itemId === dailyCount.itemId)
+          .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime())[0];
+        return lastEntry ? lastEntry.balanceAfter : 0;
+      })()
+    : 0;
+  const discrepancy = dailyCount.countedQty - expectedBalance;
+
+  async function handleDailyCount(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await api.post("/pharmacy/narcotics/daily-count", {
+        itemId: dailyCount.itemId,
+        countedQty: Number(dailyCount.countedQty),
+        notes: dailyCount.notes,
+      });
+      showToast("Daily count recorded.", "success");
+      setShowDailyCount(false);
+      setDailyCount({ itemId: "", countedQty: 0, notes: "" });
+      load();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to record daily count.", "error");
+    }
+  }
+
   async function handleExport() {
     setExporting(true);
     try {
@@ -134,6 +171,9 @@ export function NarcoticsRegister() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport} disabled={exporting}>
             <Download className="w-4 h-4 mr-1" /> {exporting ? "Exporting…" : "Export PDF"}
+          </Button>
+          <Button variant="outline" onClick={() => setShowDailyCount(true)}>
+            <ClipboardCheck className="w-4 h-4 mr-1" /> Daily Count
           </Button>
           <Button onClick={() => setShowNew(true)}>
             <Plus className="w-4 h-4 mr-1" /> Add Entry
@@ -195,9 +235,10 @@ export function NarcoticsRegister() {
             </thead>
             <tbody className="divide-y dark:divide-gray-700">
               {entries.map((e) => {
-                const isIn = e.operationType === "RECEIVED" || e.operationType === "RETURNED";
+                const isDailyCount = e.operationType === "DAILY_COUNT";
+                const isIn = !isDailyCount && (e.operationType === "RECEIVED" || e.operationType === "RETURNED");
                 return (
-                  <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <tr key={e.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isDailyCount ? "bg-gray-50/60 dark:bg-gray-700/30" : ""}`}>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
                       {new Date(e.entryDate).toLocaleDateString()}
                     </td>
@@ -214,10 +255,10 @@ export function NarcoticsRegister() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-green-600">
-                      {isIn ? e.quantity : "—"}
+                      {isDailyCount ? "—" : isIn ? e.quantity : "—"}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-red-500">
-                      {!isIn ? e.quantity : "—"}
+                      {isDailyCount ? "—" : !isIn ? e.quantity : "—"}
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-medium text-gray-900 dark:text-white">
                       {e.balanceAfter}
@@ -234,6 +275,60 @@ export function NarcoticsRegister() {
           </table>
         </div>
       )}
+
+      <Modal isOpen={showDailyCount} onClose={() => setShowDailyCount(false)} title="End-of-Day Controlled Substance Count">
+        <form onSubmit={handleDailyCount} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Drug *</label>
+            <select
+              required
+              value={dailyCount.itemId}
+              onChange={(e) => setDailyCount({ ...dailyCount, itemId: e.target.value, countedQty: 0 })}
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            >
+              <option value="">Select controlled drug…</option>
+              {items.map((it) => <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>)}
+            </select>
+          </div>
+          {dailyCount.itemId && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-300">
+              Expected balance (last register entry): <span className="font-bold">{expectedBalance}</span> units
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium mb-1">Actual counted quantity *</label>
+            <Input
+              type="number"
+              min={0}
+              required
+              value={dailyCount.countedQty}
+              onChange={(e) => setDailyCount({ ...dailyCount, countedQty: Number(e.target.value) })}
+            />
+          </div>
+          {dailyCount.itemId && (
+            <div className={`p-3 rounded-lg text-sm font-medium ${discrepancy === 0 ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300" : "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"}`}>
+              {discrepancy === 0
+                ? "✓ Count matches register"
+                : `Discrepancy: ${discrepancy > 0 ? "+" : ""}${discrepancy} (${discrepancy > 0 ? "surplus" : "shortage"})`}
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium mb-1">Notes / reason *</label>
+            <textarea
+              required
+              value={dailyCount.notes}
+              onChange={(e) => setDailyCount({ ...dailyCount, notes: e.target.value })}
+              placeholder="Reason for discrepancy, or 'Count matches register'"
+              rows={3}
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setShowDailyCount(false)}>Cancel</Button>
+            <Button type="submit">Record Count</Button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal isOpen={showNew} onClose={() => setShowNew(false)} title="Add Narcotics Entry">
         <form onSubmit={handleCreate} className="space-y-4">
