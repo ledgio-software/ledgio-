@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [2026-08-25] - NHIS Billing Removed; TallyPrime Gap Analysis; Daybook Report
+
+**What/Why:** NHIS billing was removed entirely (not applicable to the user's market). A full TallyPrime feature-parity gap analysis identified 10 missing features. First gap shipped: the Daybook Report.
+
+**Changes:**
+
+- **`backend/src/routes/cashTill.ts`** — Removed NHIS payment method, NHIS Receivable journal routing, nhisClaimRef field, `GET /tills/nhis-claims`, and `PUT /tills/sales/:id/settle-nhis` endpoints.
+- **`backend/prisma/schema.prisma`** — Removed `nhisClaimRef` and `nhisSettledAt` from `CashSale`.
+- **`backend/prisma/migrations/20260825000002_remove_nhis_columns/migration.sql`** (new) — Drops `nhis_claim_ref` and `nhis_settled_at` from `cash_sales`.
+- **`frontend/src/pages/pos/PointOfSale.tsx`** — Payment method toggle reduced to CASH/MoMo/Card; NHIS state and UI removed.
+- **`frontend/src/pages/pharmacy/NhisClaims.tsx`** — File deleted.
+- **`frontend/src/lib/navigation.ts`** — NHIS Claims nav entry removed; Daybook added to REPORTS & ANALYTICS, auditor allowlist, and external accountant allowlist.
+- **`frontend/src/App.tsx`** — NhisClaims lazy import and route removed; Daybook lazy import and route at `/reports/daybook` added.
+- **`backend/src/routes/reports.ts`** — New `GET /reports/daybook` endpoint: queries posted journal entries with their lines and account names from the per-tenant schema, date-range filtered, paginated (up to 200/page).
+- **`frontend/src/pages/reports/Daybook.tsx`** (new) — Daybook page: date pickers, Run button, expandable voucher cards showing all debit/credit lines with account code + name, totals row, CSV export, pagination.
+- **`TASKS.md`** — Added TallyPrime feature parity section (10 tasks); marked Daybook complete.
+
+Both backend and frontend `tsc --noEmit` clean.
+
 ## [2026-08-24] - Pharmacy Module Phase 2: NHIS Billing, Low-Stock Alerts, Daily Count
 
 **What/Why:** Three must-have features for Ghana FDA-licensed pharmacies that Phase 1 left open: (1) NHIS/insurance billing — a large share of Ghana pharmacy revenue flows through NHIS, which requires separate ledger treatment; (2) low-stock reorder alerts — `reorderLevel` existed on items but no notification fired; (3) end-of-day controlled substance count — Ghana FDA requires a daily physical count of scheduled drugs to be logged.

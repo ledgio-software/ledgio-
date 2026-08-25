@@ -868,4 +868,109 @@ router.get('/analytics/top-items', requireRole('Viewer'), async (req: Request, r
   }
 });
 
+/**
+ * GET /reports/daybook?startDate=&endDate=&page=1&pageSize=50
+ * Daybook: every posted journal voucher in date order with all debit/credit lines.
+ * This is the TallyPrime "Daybook" equivalent — the chronological ledger of all
+ * financial events for a date range, showing the full double-entry breakdown per voucher.
+ * Access: Viewer role or higher.
+ */
+router.get('/daybook', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { startDate, endDate } = req.query;
+    const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt((req.query.pageSize as string) || '50', 10) || 50));
+
+    const dateFilter: string[] = [];
+    const values: any[] = [];
+    let paramIdx = 1;
+
+    if (startDate) {
+      dateFilter.push(`je.entry_date >= $${paramIdx++}`);
+      values.push(new Date(startDate as string));
+    }
+    if (endDate) {
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.push(`je.entry_date <= $${paramIdx++}`);
+      values.push(end);
+    }
+
+    const whereClause = dateFilter.length
+      ? `WHERE je.status = 'POSTED' AND ${dateFilter.join(' AND ')}`
+      : `WHERE je.status = 'POSTED'`;
+
+    // Count total vouchers for pagination
+    const countResult = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).$queryRawUnsafe(
+        `SELECT COUNT(DISTINCT je.id)::int AS total
+         FROM journal_entries je
+         ${whereClause}`,
+        ...values
+      )
+    ) as any[];
+    const total: number = countResult[0]?.total ?? 0;
+
+    // Fetch paged vouchers with all lines and account names
+    const offset = (page - 1) * pageSize;
+    const rows = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).$queryRawUnsafe(
+        `SELECT
+           je.id            AS "entryId",
+           je.entry_number  AS "entryNumber",
+           je.entry_date    AS "entryDate",
+           je.description   AS "description",
+           jel.id           AS "lineId",
+           jel.debit        AS "debit",
+           jel.credit       AS "credit",
+           jel.description  AS "lineDescription",
+           a.name           AS "accountName",
+           a.code           AS "accountCode"
+         FROM journal_entries je
+         JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id
+         JOIN accounts a ON a.id = jel.account_id
+         ${whereClause}
+         ORDER BY je.entry_date ASC, je.entry_number ASC, jel.id ASC
+         LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+        ...values, pageSize, offset
+      )
+    ) as any[];
+
+    // Group flat rows back into vouchers with lines[]
+    const voucherMap = new Map<string, any>();
+    for (const row of rows) {
+      if (!voucherMap.has(row.entryId)) {
+        voucherMap.set(row.entryId, {
+          entryId: row.entryId,
+          entryNumber: row.entryNumber,
+          entryDate: row.entryDate,
+          description: row.description,
+          lines: [],
+        });
+      }
+      voucherMap.get(row.entryId).lines.push({
+        lineId: row.lineId,
+        accountName: row.accountName,
+        accountCode: row.accountCode,
+        debit: Number(row.debit ?? 0),
+        credit: Number(row.credit ?? 0),
+        description: row.lineDescription,
+      });
+    }
+
+    const vouchers = Array.from(voucherMap.values());
+
+    res.json({
+      success: true,
+      data: {
+        vouchers,
+        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Reports] Daybook error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate daybook report.' });
+  }
+});
+
 export default router;
