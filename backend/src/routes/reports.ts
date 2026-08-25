@@ -869,6 +869,220 @@ router.get('/analytics/top-items', requireRole('Viewer'), async (req: Request, r
 });
 
 /**
+ * GET /reports/stock-movement?itemId=&warehouseId=&startDate=&endDate=
+ * Stock Movement Analysis: every stock-in and stock-out event for an item over a period,
+ * with opening and closing balances. Sources: POS sales, invoice deductions,
+ * vendor bill goods-receipts, stock adjustments, inter-warehouse transfers.
+ * Access: Viewer role or higher.
+ */
+router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { itemId, warehouseId, startDate, endDate } = req.query;
+
+    if (!itemId) {
+      res.status(400).json({ success: false, error: 'itemId is required.' });
+      return;
+    }
+
+    // Build the UNION query for stock movements, accepting up to 6 positional params:
+    // $1 = tenantId, $2 = itemId, $3 = warehouseId or null, $4 = startDate, $5 = endDate
+    // The optional filters are injected via dynamic SQL; parameterized values prevent injection.
+    const whFilter = warehouseId ? `AND wh_col = $3` : '';
+    const startFilter = startDate ? `AND event_date >= $4` : '';
+    const endFilter = endDate ? `AND event_date <= $5` : '';
+
+    const params: any[] = [tenantId, itemId as string];
+    if (warehouseId) params.push(warehouseId as string);
+    if (startDate) params.push(new Date(startDate as string));
+    if (endDate) {
+      const e = new Date(endDate as string);
+      e.setHours(23, 59, 59, 999);
+      params.push(e);
+    }
+
+    // Same UNION for opening balance (all movements BEFORE startDate)
+    const openingParams: any[] = [tenantId, itemId as string];
+    if (warehouseId) openingParams.push(warehouseId as string);
+    let openingEndFilter = '';
+    if (startDate) {
+      openingEndFilter = `AND event_date < $${openingParams.length + 1}`;
+      openingParams.push(new Date(startDate as string));
+    }
+
+    const buildUnion = (extraDateFilter: string) => `
+      SELECT event_date, event_type, reference, qty_change, warehouse_id, warehouse_name, notes
+      FROM (
+        -- POS Sales (stock OUT)
+        SELECT
+          csl.created_at::date      AS event_date,
+          'POS Sale'                AS event_type,
+          cs.receipt_no             AS reference,
+          (csl.quantity * -1)       AS qty_change,
+          ct.warehouse_id           AS warehouse_id,
+          w.name                    AS warehouse_name,
+          NULL::text                AS notes
+        FROM cash_sale_lines csl
+        JOIN cash_sales cs ON cs.id = csl.sale_id AND cs.tenant_id = $1
+        JOIN cash_tills ct ON ct.id = cs.till_id AND ct.tenant_id = $1
+        JOIN warehouses w ON w.id = ct.warehouse_id AND w.tenant_id = $1
+        WHERE csl.tenant_id = $1 AND csl.item_id = $2 AND cs.status = 'COMPLETED'
+          ${warehouseId ? `AND ct.warehouse_id = $3` : ''}
+
+        UNION ALL
+
+        -- Invoice item deductions (stock OUT at invoice issue)
+        SELECT
+          i.issue_date::date        AS event_date,
+          'Invoice'                 AS event_type,
+          i.invoice_number          AS reference,
+          (ii.quantity * -1)        AS qty_change,
+          i.warehouse_id            AS warehouse_id,
+          w.name                    AS warehouse_name,
+          NULL::text                AS notes
+        FROM invoice_items ii
+        JOIN invoices i ON i.id = ii.invoice_id AND i.tenant_id = $1
+        JOIN warehouses w ON w.id = i.warehouse_id AND w.tenant_id = $1
+        WHERE ii.tenant_id = $1 AND ii.inventory_item_id = $2 AND i.warehouse_id IS NOT NULL
+          ${warehouseId ? `AND i.warehouse_id = $3` : ''}
+
+        UNION ALL
+
+        -- Vendor bill goods-receipts (stock IN)
+        SELECT
+          vb.bill_date::date        AS event_date,
+          'Purchase Receipt'        AS event_type,
+          vb.bill_number            AS reference,
+          vbl.quantity              AS qty_change,
+          vb.warehouse_id           AS warehouse_id,
+          w.name                    AS warehouse_name,
+          NULL::text                AS notes
+        FROM vendor_bill_lines vbl
+        JOIN vendor_bills vb ON vb.id = vbl.bill_id AND vb.tenant_id = $1
+        JOIN warehouses w ON w.id = vb.warehouse_id AND w.tenant_id = $1
+        WHERE vbl.tenant_id = $1 AND vbl.item_id = $2
+          AND vb.warehouse_id IS NOT NULL AND vb.bill_type = 'STANDARD'
+          ${warehouseId ? `AND vb.warehouse_id = $3` : ''}
+
+        UNION ALL
+
+        -- Stock Adjustments (positive or negative delta)
+        SELECT
+          sa.created_at::date       AS event_date,
+          'Adjustment'              AS event_type,
+          sa.mode                   AS reference,
+          sa.delta                  AS qty_change,
+          sa.warehouse_id           AS warehouse_id,
+          w.name                    AS warehouse_name,
+          sa.reason                 AS notes
+        FROM stock_adjustments sa
+        JOIN warehouses w ON w.id = sa.warehouse_id AND w.tenant_id = $1
+        WHERE sa.tenant_id = $1 AND sa.item_id = $2
+          ${warehouseId ? `AND sa.warehouse_id = $3` : ''}
+
+        UNION ALL
+
+        -- Transfer OUT
+        SELECT
+          st.transfer_date::date    AS event_date,
+          'Transfer Out'            AS event_type,
+          st.transfer_number        AS reference,
+          (sti.quantity * -1)       AS qty_change,
+          st.from_warehouse_id      AS warehouse_id,
+          w.name                    AS warehouse_name,
+          st.notes                  AS notes
+        FROM stock_transfer_items sti
+        JOIN stock_transfers st ON st.id = sti.transfer_id AND st.tenant_id = $1
+        JOIN warehouses w ON w.id = st.from_warehouse_id AND w.tenant_id = $1
+        WHERE sti.tenant_id = $1 AND sti.item_id = $2
+          ${warehouseId ? `AND st.from_warehouse_id = $3` : ''}
+
+        UNION ALL
+
+        -- Transfer IN
+        SELECT
+          st.transfer_date::date    AS event_date,
+          'Transfer In'             AS event_type,
+          st.transfer_number        AS reference,
+          sti.quantity              AS qty_change,
+          st.to_warehouse_id        AS warehouse_id,
+          w.name                    AS warehouse_name,
+          st.notes                  AS notes
+        FROM stock_transfer_items sti
+        JOIN stock_transfers st ON st.id = sti.transfer_id AND st.tenant_id = $1
+        JOIN warehouses w ON w.id = st.to_warehouse_id AND w.tenant_id = $1
+        WHERE sti.tenant_id = $1 AND sti.item_id = $2
+          ${warehouseId ? `AND st.to_warehouse_id = $3` : ''}
+      ) t
+      WHERE TRUE ${extraDateFilter}
+      ORDER BY event_date ASC, event_type ASC
+    `;
+
+    // Opening balance (all movements before startDate)
+    let openingBalance = 0;
+    if (startDate) {
+      const openingRows = await prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
+        `SELECT COALESCE(SUM(qty_change), 0) AS total FROM (${buildUnion(openingEndFilter)}) ob`,
+        ...openingParams
+      );
+      openingBalance = Number(openingRows[0]?.total ?? 0);
+    }
+
+    // Period movements
+    const periodFilter = [
+      startDate ? `AND event_date >= $${warehouseId ? 4 : 3}` : '',
+      endDate ? `AND event_date <= $${warehouseId ? (startDate ? 5 : 4) : (startDate ? 4 : 3)}` : '',
+    ].join(' ');
+
+    const movements = await prisma.$queryRawUnsafe<Array<{
+      event_date: Date;
+      event_type: string;
+      reference: string;
+      qty_change: bigint;
+      warehouse_id: string;
+      warehouse_name: string;
+      notes: string | null;
+    }>>(buildUnion(periodFilter), ...params);
+
+    // Compute running balance
+    let runningBalance = openingBalance;
+    const rows = movements.map((m) => {
+      const delta = Number(m.qty_change);
+      runningBalance += delta;
+      return {
+        date: m.event_date,
+        type: m.event_type,
+        reference: m.reference,
+        qtyChange: delta,
+        runningBalance,
+        warehouseId: m.warehouse_id,
+        warehouseName: m.warehouse_name,
+        notes: m.notes,
+      };
+    });
+
+    // Item name lookup
+    const item = await prisma.inventoryItem.findFirst({
+      where: { id: itemId as string, tenantId },
+      select: { name: true, sku: true },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        item: item ? { id: itemId, name: item.name, sku: item.sku } : { id: itemId },
+        openingBalance,
+        closingBalance: runningBalance,
+        movements: rows,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Reports] Stock movement error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate stock movement report.' });
+  }
+});
+
+/**
  * GET /reports/daybook?startDate=&endDate=&page=1&pageSize=50
  * Daybook: every posted journal voucher in date order with all debit/credit lines.
  * This is the TallyPrime "Daybook" equivalent — the chronological ledger of all
