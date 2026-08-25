@@ -63,7 +63,7 @@ export interface NavGroup {
 const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/accounts', '/journals', '/banking',
   '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates',
-  '/pdc',
+  '/pdc', '/reports/interest-charges',
   '/fixed-assets', '/recurring-invoices', '/cost-centres', '/manufacturing',
   '/reports/ledger', '/reports/balance-sheet', '/reports/cash-flow',
   '/reports/cash-flow-forecast', '/reports/kpis', '/reports/aging',
@@ -154,6 +154,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Manufacturing", href: "/manufacturing", icon: Cog },
       { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent },
       { name: "Post-Dated Cheques", href: "/pdc", icon: CreditCard },
+      { name: "Interest Charges", href: "/reports/interest-charges", icon: TrendingUp },
     ],
   },
   {

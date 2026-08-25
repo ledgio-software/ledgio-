@@ -150,7 +150,7 @@ export async function seedChartOfAccounts(
     for (const role of [
       'CASH', 'REVENUE', 'EXPENSE', 'COGS', 'INVENTORY_ASSET',
       'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
-      'WHT_PAYABLE', 'PDC_RECEIVABLE', 'PDC_PAYABLE',
+      'WHT_PAYABLE', 'PDC_RECEIVABLE', 'PDC_PAYABLE', 'INTEREST_INCOME',
     ] as const) {
       if (freshAccounts.some((a) => a.defaultRole === role)) continue;
       const candidate = accountRepository.pickAutoDefaultCandidate(freshAccounts, role);

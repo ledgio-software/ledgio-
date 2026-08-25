@@ -58,6 +58,10 @@ const startServer = async () => {
     const { FixedAssetDepreciationCronService } = require('./services/fixedAssetDepreciationCronService');
     FixedAssetDepreciationCronService.init();
 
+    // Initialize daily interest accrual on overdue receivables
+    const { InterestChargeCronService } = require('./services/interestChargeCronService');
+    InterestChargeCronService.init();
+
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
     migrateCustomerPii().catch((err: unknown) => console.error('[CustomerPiiMigration] Backfill failed:', err));

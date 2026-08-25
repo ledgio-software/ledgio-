@@ -791,6 +791,28 @@ export const TENANT_MIGRATIONS: TenantMigration[] = [
           ));
       END $$;
     `
+  },
+  {
+    version: 22,
+    name: '022_add_interest_income_role',
+    sql: `
+      -- Widen the default_role CHECK to include INTEREST_INCOME for overdue-receivables interest accrual.
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_account_default_role' AND conrelid = 'accounts'::regclass) THEN
+          ALTER TABLE accounts DROP CONSTRAINT chk_account_default_role;
+        END IF;
+        ALTER TABLE accounts ADD CONSTRAINT chk_account_default_role
+          CHECK (default_role IN (
+            'CASH', 'REVENUE', 'EXPENSE', 'DEPRECIATION_EXPENSE', 'ACCUMULATED_DEPRECIATION',
+            'COGS', 'INVENTORY_ASSET',
+            'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+            'WHT_PAYABLE',
+            'PDC_RECEIVABLE', 'PDC_PAYABLE',
+            'INTEREST_INCOME'
+          ));
+      END $$;
+    `
   }
 ];
 

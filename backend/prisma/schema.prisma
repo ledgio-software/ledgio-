@@ -1428,6 +1428,40 @@ model WhtRate {
   @@map("wht_rates")
 }
 
+// One interest policy per tenant: daily cron charges overdue invoices.
+// account_id (optional) → Interest Income GL; falls back to INTEREST_INCOME role.
+model InterestPolicy {
+  id         String  @id @default(uuid())
+  tenantId   String  @unique @map("tenant_id")
+  annualRate Decimal @db.Decimal(5, 4) @map("annual_rate")
+  graceDays  Int     @default(0) @map("grace_days")
+  accountId  String? @map("account_id")
+  isActive   Boolean @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("interest_policies")
+}
+
+// One row per daily accrual per overdue invoice.
+// journal_id is a plain string ref to a per-tenant journal entry (cross-schema).
+model InterestCharge {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  invoiceId   String   @map("invoice_id")
+  amount      Decimal  @db.Decimal(15, 2)
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  journalId   String?  @map("journal_id")
+  status      String   @default("POSTED") // POSTED | VOIDED
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, invoiceId])
+  @@unique([tenantId, invoiceId, periodStart])
+  @@map("interest_charges")
+}
+
 // Post-Dated Cheque register. RECEIVABLE = customer gives us a future-dated
 // cheque; PAYABLE = we issue one to a supplier. receipt_journal_id and
 // deposit_journal_id are plain UUID strings referencing journal entries in

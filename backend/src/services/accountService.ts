@@ -373,6 +373,7 @@ const REASONABLE_TYPES_FOR_ROLE: Record<AccountDefaultRole, AccountType[]> = {
   WHT_PAYABLE: ['LIABILITY'],
   PDC_RECEIVABLE: ['ASSET'],
   PDC_PAYABLE: ['LIABILITY'],
+  INTEREST_INCOME: ['REVENUE'],
 };
 
 /**

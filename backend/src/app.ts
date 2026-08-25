@@ -73,6 +73,7 @@ import costCentresRouter from './routes/costCentres';
 import manufacturingRouter from './routes/manufacturing';
 import whtRatesRouter from './routes/whtRates';
 import postDatedChequesRouter from './routes/postDatedCheques';
+import interestPolicyRouter from './routes/interestPolicy';
 
 dotenv.config();
 
@@ -205,6 +206,8 @@ app.use('/api/v1/manufacturing', manufacturingRouter);
 // Withholding Tax rates (WHT) - GRA-mandated deductions on contractor/rent payments
 app.use('/api/v1/wht-rates', whtRatesRouter);
 app.use('/api/v1/pdc', postDatedChequesRouter);
+// Interest policy & charges for overdue receivables
+app.use('/api/v1/interest-policy', interestPolicyRouter);
 
 // Intelligent Analytics & Decision Engine endpoints
 app.use('/api/v1/analytics', analyticsRouter);
