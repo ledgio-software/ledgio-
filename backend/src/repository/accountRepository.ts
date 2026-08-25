@@ -194,8 +194,11 @@ export function pickAutoDefaultCandidate(
     return liabilities.find((a) => /pdc.*pay|post.dated.*pay|cheque.*pay/i.test(a.name)) || liabilities.sort(byCodeAsc)[0];
   }
   if (role === 'INTEREST_INCOME') {
+    // Only match a specifically-named interest income account — never fall back
+    // to the first REVENUE account, which would steal Sales Revenue's REVENUE
+    // designation and leave the tenant with no REVENUE default.
     const revenues = accounts.filter((a) => a.type === 'REVENUE');
-    return revenues.find((a) => /interest.*income|interest.*revenue/i.test(a.name)) || revenues.sort(byCodeAsc)[0];
+    return revenues.find((a) => /interest.*income|interest.*revenue/i.test(a.name));
   }
   const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'COST_OF_SALES');
   return expenseAccounts.find((a) => /miscellaneous/i.test(a.name)) || expenseAccounts.sort(byCodeAsc)[0];
