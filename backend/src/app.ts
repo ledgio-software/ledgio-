@@ -58,6 +58,8 @@ import helpAssistantRouter from './routes/helpAssistant';
 import pettyCashRouter from './routes/pettyCash';
 import purchaseOrdersRouter from './routes/purchaseOrders';
 import salesOrdersRouter from './routes/salesOrders';
+import deliveryNotesRouter from './routes/deliveryNotes';
+import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
 import recurringInvoicesRouter from './routes/recurringInvoices';
 import paystackRouter from './routes/paystack';
 import fixedAssetsRouter from './routes/fixedAssets';
@@ -203,6 +205,10 @@ app.use('/api/v1/purchase-orders', purchaseOrdersRouter);
 
 // Sales Order endpoints
 app.use('/api/v1/sales-orders', salesOrdersRouter);
+
+// Delivery Note & Goods Receipt Note endpoints
+app.use('/api/v1/delivery-notes', deliveryNotesRouter);
+app.use('/api/v1/goods-receipt-notes', goodsReceiptNotesRouter);
 app.use('/api/v1/recurring-invoices', recurringInvoicesRouter);
 app.use('/api/v1/paystack', paystackRouter);
 app.use('/api/v1/fixed-assets', fixedAssetsRouter);

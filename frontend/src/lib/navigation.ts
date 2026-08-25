@@ -35,6 +35,7 @@ import {
   ClipboardList,
   ShieldAlert,
   AlertTriangle,
+  Truck,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -128,6 +129,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Vendor Bills (AP)", href: "/bills", icon: Receipt },
       { name: "Purchase Orders", href: "/purchase-orders", icon: FileSpreadsheet },
       { name: "Sales Orders", href: "/sales-orders", icon: FileSpreadsheet },
+      { name: "Delivery Notes & GRN", href: "/delivery-notes", icon: Truck },
       { name: "Recurring Invoices", href: "/recurring-invoices", icon: Repeat },
       { name: "Expense Claims", href: "/expenses", icon: Wallet },
       { name: "Petty Cash", href: "/petty-cash", icon: Wallet2 },
@@ -213,8 +215,8 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
   hr: ["/dashboard", "/team", "/expenses", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave"],
   "payroll officer": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
   "payroll approver": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
-  "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/expenses", "/inventory", "/vendors"],
-  "accounts receivable clerk": ["/dashboard", "/invoices", "/sales-orders", "/recurring-invoices", "/customers", "/expenses"],
+  "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/delivery-notes", "/expenses", "/inventory", "/vendors"],
+  "accounts receivable clerk": ["/dashboard", "/invoices", "/sales-orders", "/delivery-notes", "/recurring-invoices", "/customers", "/expenses"],
   "external accountant": [
     "/dashboard",
     "/accounts",
@@ -224,6 +226,7 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/invoices",
     "/bills",
     "/sales-orders",
+    "/delivery-notes",
     "/expenses",
     "/reports/executive",
     "/reports/ledger",
@@ -253,6 +256,7 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/fixed-assets",
     "/invoices",
     "/sales-orders",
+    "/delivery-notes",
     "/bills",
     "/recurring-invoices",
     "/expenses",

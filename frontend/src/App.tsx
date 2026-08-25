@@ -77,6 +77,7 @@ const AnalyticsDashboard = lazy(() => import("./pages/reports/AnalyticsDashboard
 const PettyCash = lazy(() => import("./pages/pettycash/PettyCash").then(m => ({ default: m.PettyCash })));
 const PurchaseOrders = lazy(() => import("./pages/purchaseorders/PurchaseOrders").then(m => ({ default: m.PurchaseOrders })));
 const SalesOrders = lazy(() => import("./pages/salesorders/SalesOrders").then(m => ({ default: m.SalesOrders })));
+const DeliveryNotes = lazy(() => import("./pages/logistics/DeliveryNotes").then(m => ({ default: m.DeliveryNotes })));
 const RecurringInvoices = lazy(() => import("./pages/recurringinvoices/RecurringInvoices").then(m => ({ default: m.RecurringInvoices })));
 const FixedAssets = lazy(() => import("./pages/fixedassets/FixedAssets").then(m => ({ default: m.FixedAssets })));
 const Employees = lazy(() => import("./pages/payroll/Employees").then(m => ({ default: m.Employees })));
@@ -587,6 +588,7 @@ function App() {
               <Route path="/petty-cash" element={<ProtectedRoute><MainLayout><PettyCash /></MainLayout></ProtectedRoute>} />
               <Route path="/purchase-orders" element={<ProtectedRoute><MainLayout><PurchaseOrders /></MainLayout></ProtectedRoute>} />
               <Route path="/sales-orders" element={<ProtectedRoute><MainLayout><SalesOrders /></MainLayout></ProtectedRoute>} />
+              <Route path="/delivery-notes" element={<ProtectedRoute><MainLayout><DeliveryNotes /></MainLayout></ProtectedRoute>} />
               <Route path="/recurring-invoices" element={<ProtectedRoute><MainLayout><RecurringInvoices /></MainLayout></ProtectedRoute>} />
               <Route path="/fixed-assets" element={<ProtectedRoute><MainLayout><FixedAssets /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/employees" element={<ProtectedRoute><MainLayout><Employees /></MainLayout></ProtectedRoute>} />

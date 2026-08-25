@@ -387,6 +387,7 @@ model Customer {
   invoices          Invoice[]
   recurringInvoices RecurringInvoice[]
   salesOrders       SalesOrder[]
+  deliveryNotes     DeliveryNote[]
 
   @@index([tenantId])
   @@map("customers")
@@ -630,9 +631,10 @@ model Vendor {
   address   String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  bills             VendorBill[]
-  purchaseOrders    PurchaseOrder[]
-  preferredForItems InventoryItem[]
+  bills              VendorBill[]
+  purchaseOrders     PurchaseOrder[]
+  preferredForItems  InventoryItem[]
+  goodsReceiptNotes  GoodsReceiptNote[]
 
   @@index([tenantId])
   @@map("vendors")
@@ -1773,6 +1775,89 @@ model SalesOrderLine {
   @@index([tenantId])
   @@index([salesOrderId])
   @@map("sales_order_lines")
+}
+
+// Delivery Note (DN): formal document recording goods physically dispatched to
+// a customer, optionally linked to an Invoice or SalesOrder. DRAFT → DISPATCHED.
+// Stock deduction still happens at invoice-creation time (existing behaviour);
+// the DN is the paper/audit trail of what actually left the warehouse.
+model DeliveryNote {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  dnNumber     String    @map("dn_number")
+  customerId   String    @map("customer_id")
+  invoiceId    String?   @map("invoice_id")
+  salesOrderId String?   @map("sales_order_id")
+  status       String    @default("DRAFT")
+  dispatchDate DateTime? @map("dispatch_date")
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  customer Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lines    DeliveryNoteLine[]
+
+  @@unique([tenantId, dnNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@map("delivery_notes")
+}
+
+model DeliveryNoteLine {
+  id             String  @id @default(uuid())
+  tenantId       String  @map("tenant_id")
+  deliveryNoteId String  @map("delivery_note_id")
+  description    String
+  quantity       Decimal @db.Decimal(15, 4)
+
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([deliveryNoteId])
+  @@map("delivery_note_lines")
+}
+
+// Goods Receipt Note (GRN): formal document recording goods physically received
+// from a supplier, optionally linked to a PurchaseOrder or VendorBill.
+// DRAFT → RECEIVED. Stock increment still happens at bill-creation time
+// (existing behaviour); the GRN is the paper/audit trail of what actually
+// arrived.
+model GoodsReceiptNote {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  grnNumber       String    @map("grn_number")
+  vendorId        String    @map("vendor_id")
+  purchaseOrderId String?   @map("purchase_order_id")
+  vendorBillId    String?   @map("vendor_bill_id")
+  status          String    @default("DRAFT")
+  receiptDate     DateTime? @map("receipt_date")
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  vendor Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  lines  GoodsReceiptNoteLine[]
+
+  @@unique([tenantId, grnNumber])
+  @@index([tenantId])
+  @@index([vendorId])
+  @@index([status])
+  @@map("goods_receipt_notes")
+}
+
+model GoodsReceiptNoteLine {
+  id               String  @id @default(uuid())
+  tenantId         String  @map("tenant_id")
+  goodsReceiptNoteId String @map("goods_receipt_note_id")
+  description      String
+  quantity         Decimal @db.Decimal(15, 4)
+
+  goodsReceiptNote GoodsReceiptNote @relation(fields: [goodsReceiptNoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([goodsReceiptNoteId])
+  @@map("goods_receipt_note_lines")
 }
 
 // Platform-wide (no tenantId - the same tax/regulatory rules apply to every
