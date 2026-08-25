@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Hash, Plus, RefreshCw, AlertCircle, Search, ChevronDown } from "lucide-react";
+import { Hash, Plus, RefreshCw, AlertCircle, Search } from "lucide-react";
 import { api } from "../../lib/api";
 
 interface SerialRecord {

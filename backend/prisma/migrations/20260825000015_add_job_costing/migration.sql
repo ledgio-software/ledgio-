@@ -48,28 +48,6 @@ CREATE TABLE "job_work_orders" (
   CONSTRAINT "job_work_orders_pkey" PRIMARY KEY ("id")
 );
 
--- Add JOB_WIP and JOB_EXPENSE to accounts.default_role CHECK constraint
--- Drop the old constraint and recreate with the new values
-DO $$
-BEGIN
-  -- Find and drop the constraint by checking its definition
-  PERFORM constraint_name
-    FROM information_schema.table_constraints
-    WHERE table_name = 'accounts' AND constraint_type = 'CHECK'
-      AND constraint_name LIKE '%default_role%';
-  IF FOUND THEN
-    EXECUTE 'ALTER TABLE accounts DROP CONSTRAINT IF EXISTS "accounts_default_role_check"';
-  END IF;
-END $$;
-
-ALTER TABLE "accounts" ADD CONSTRAINT "accounts_default_role_check"
-  CHECK ("default_role" IN (
-    'CASH','REVENUE','EXPENSE','DEPRECIATION_EXPENSE','ACCUMULATED_DEPRECIATION',
-    'COGS','INVENTORY_ASSET','SALARY_EXPENSE','EMPLOYER_SSNIT_EXPENSE',
-    'PAYE_PAYABLE','SSNIT_PAYABLE','NET_PAY_PAYABLE','WHT_PAYABLE',
-    'PDC_RECEIVABLE','PDC_PAYABLE','INTEREST_INCOME','JOB_WIP','JOB_EXPENSE'
-  ));
-
 -- CreateIndex
 CREATE INDEX "jobs_tenant_id_idx" ON "jobs"("tenant_id");
 CREATE INDEX "jobs_tenant_id_status_idx" ON "jobs"("tenant_id", "status");
