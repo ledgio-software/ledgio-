@@ -199,21 +199,60 @@ model Account {
 }
 
 model JournalEntry {
-  id          String             @id @default(uuid())
-  entryNumber String             @unique @map("entry_number")
-  entryDate   DateTime           @default(now()) @map("entry_date")
-  description String?
-  status      JournalEntryStatus @default(DRAFT)
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
+  id              String             @id @default(uuid())
+  entryNumber     String             @unique @map("entry_number")
+  entryDate       DateTime           @default(now()) @map("entry_date")
+  description     String?
+  status          JournalEntryStatus @default(DRAFT)
+  voucherType     String             @default("JOURNAL") @map("voucher_type")
+  scenarioId      String?            @map("scenario_id")
+  voucherClassId  String?            @map("voucher_class_id")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  lines   JournalEntryLine[]
-  ledgers Ledger[]
+  lines        JournalEntryLine[]
+  ledgers      Ledger[]
+  scenario     Scenario?     @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+  voucherClass VoucherClass? @relation(fields: [voucherClassId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([entryDate])
   @@index([status, entryDate])
+  @@index([scenarioId])
   @@map("journal_entries")
+}
+
+model Scenario {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  entries JournalEntry[]
+
+  @@index([tenantId])
+  @@map("scenarios")
+}
+
+model VoucherClass {
+  id                     String   @id @default(uuid())
+  tenantId               String   @map("tenant_id")
+  name                   String
+  voucherType            String   @map("voucher_type")
+  defaultDebitAccountId  String?  @map("default_debit_account_id")
+  defaultCreditAccountId String?  @map("default_credit_account_id")
+  narrationTemplate      String?  @map("narration_template")
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt      @map("updated_at")
+
+  entries JournalEntry[]
+
+  @@index([tenantId])
+  @@map("voucher_classes")
 }
 
 model JournalEntryLine {

@@ -102,6 +102,8 @@ const SerialNumbers = lazy(() => import("./pages/inventory/SerialNumbers").then(
 const Jobs = lazy(() => import("./pages/manufacturing/Jobs").then(m => ({ default: m.Jobs })));
 const JobWorkOrders = lazy(() => import("./pages/manufacturing/JobWorkOrders").then(m => ({ default: m.JobWorkOrders })));
 const CostCategories = lazy(() => import("./pages/costcentres/CostCategories").then(m => ({ default: m.CostCategories })));
+const Scenarios = lazy(() => import("./pages/settings/Scenarios").then(m => ({ default: m.Scenarios })));
+const VoucherClasses = lazy(() => import("./pages/settings/VoucherClasses").then(m => ({ default: m.VoucherClasses })));
 
 // "What happened today?" quick-action grid shown in Operations and Business modes.
 const GUIDED_ACTIONS_OPS = [
@@ -626,6 +628,8 @@ function App() {
               <Route path="/manufacturing/jobs" element={<ProtectedRoute><MainLayout><Jobs /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing/job-work-orders" element={<ProtectedRoute><MainLayout><JobWorkOrders /></MainLayout></ProtectedRoute>} />
               <Route path="/cost-categories" element={<ProtectedRoute><MainLayout><CostCategories /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/scenarios" element={<ProtectedRoute><MainLayout><Scenarios /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/voucher-classes" element={<ProtectedRoute><MainLayout><VoucherClasses /></MainLayout></ProtectedRoute>} />
               <Route path="/reports" element={<Navigate to="/reports/pnl" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />

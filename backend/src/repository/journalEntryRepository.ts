@@ -45,6 +45,9 @@ export interface CreateJournalEntryData {
   description?: string;
   status?: JournalEntryStatus;
   reversalOfEntryId?: string;
+  voucherType?: string;
+  scenarioId?: string;
+  voucherClassId?: string;
   lines: CreateJournalEntryLineData[];
 }
 
@@ -85,14 +88,17 @@ export async function createJournalEntry(
 
   // 1. Insert Header
   const headerRows: any[] = await prisma.$queryRawUnsafe(
-    `INSERT INTO journal_entries (entry_number, entry_date, description, status, reversal_of_entry_id)
-     VALUES ($1, $2::date, $3, CAST($4 AS "JournalEntryStatus"), $5::uuid)
+    `INSERT INTO journal_entries (entry_number, entry_date, description, status, reversal_of_entry_id, voucher_type, scenario_id, voucher_class_id)
+     VALUES ($1, $2::date, $3, CAST($4 AS "JournalEntryStatus"), $5::uuid, $6, $7::uuid, $8::uuid)
      RETURNING id, entry_number, entry_date, description, status, created_at, updated_at, reversal_of_entry_id, reversed_by_entry_id`,
     data.entryNumber,
     data.entryDate || new Date(),
     data.description || null,
     data.status || 'DRAFT',
-    data.reversalOfEntryId || null
+    data.reversalOfEntryId || null,
+    data.voucherType || 'JOURNAL',
+    data.scenarioId || null,
+    data.voucherClassId || null
   );
   const entryHeader = headerRows[0];
   const insertedLines: JournalEntryLineRecord[] = [];
