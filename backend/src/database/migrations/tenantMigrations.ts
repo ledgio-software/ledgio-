@@ -750,6 +750,26 @@ export const TENANT_MIGRATIONS: TenantMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_cost_centre ON journal_entry_lines(cost_centre_id);
       CREATE INDEX IF NOT EXISTS idx_ledgers_cost_centre ON ledgers(cost_centre_id);
     `
+  },
+  {
+    version: 20,
+    name: '020_add_wht_payable_role',
+    sql: `
+      -- Widen the default_role CHECK to include WHT_PAYABLE for Withholding Tax.
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_account_default_role' AND conrelid = 'accounts'::regclass) THEN
+          ALTER TABLE accounts DROP CONSTRAINT chk_account_default_role;
+        END IF;
+        ALTER TABLE accounts ADD CONSTRAINT chk_account_default_role
+          CHECK (default_role IN (
+            'CASH', 'REVENUE', 'EXPENSE', 'DEPRECIATION_EXPENSE', 'ACCUMULATED_DEPRECIATION',
+            'COGS', 'INVENTORY_ASSET',
+            'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+            'WHT_PAYABLE'
+          ));
+      END $$;
+    `
   }
 ];
 

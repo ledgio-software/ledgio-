@@ -150,6 +150,7 @@ export async function seedChartOfAccounts(
     for (const role of [
       'CASH', 'REVENUE', 'EXPENSE', 'COGS', 'INVENTORY_ASSET',
       'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+      'WHT_PAYABLE',
     ] as const) {
       if (freshAccounts.some((a) => a.defaultRole === role)) continue;
       const candidate = accountRepository.pickAutoDefaultCandidate(freshAccounts, role);
@@ -160,6 +161,28 @@ export async function seedChartOfAccounts(
   }
 
   return { created, skippedExisting };
+}
+
+/**
+ * Seeds the default WHT5 rate preset used in Ghana (5% on service payments).
+ * Idempotent - skips creation if the code already exists for this tenant.
+ */
+export async function seedWhtRateDefaults(tenantId: string, actor?: AuditActor): Promise<{ created: number }> {
+  const existing = await (prisma as any).whtRate.findFirst({ where: { tenantId, code: 'WHT5' } });
+  if (existing) return { created: 0 };
+
+  await (prisma as any).whtRate.create({
+    data: {
+      tenantId,
+      name: 'WHT on Services',
+      code: 'WHT5',
+      rate: 0.05,
+      isActive: true,
+      description: 'GRA 5% withholding tax on payments to service providers and contractors.',
+    },
+  });
+
+  return { created: 1 };
 }
 
 export interface OpeningBalanceLineInput {

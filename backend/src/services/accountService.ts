@@ -370,6 +370,7 @@ const REASONABLE_TYPES_FOR_ROLE: Record<AccountDefaultRole, AccountType[]> = {
   PAYE_PAYABLE: ['LIABILITY'],
   SSNIT_PAYABLE: ['LIABILITY'],
   NET_PAY_PAYABLE: ['LIABILITY'],
+  WHT_PAYABLE: ['LIABILITY'],
 };
 
 /**

@@ -696,11 +696,18 @@ model VendorBill {
   // manual action.
   scheduledPaymentDate DateTime? @map("scheduled_payment_date")
 
+  // Optional Withholding Tax rate applied to this bill. When set, paying the
+  // bill deducts whtAmount from the cash outflow and posts it to the WHT
+  // Payable liability account instead (see vendorBillPaymentService.ts).
+  whtRateId  String?  @map("wht_rate_id")
+  whtAmount  Decimal? @map("wht_amount") @db.Decimal(15, 2)
+
   vendor        Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   warehouse     Warehouse?       @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   fund          Fund?            @relation(fields: [fundId], references: [id], onDelete: SetNull)
   costCentre    CostCentre?      @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
   purchaseOrder PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  whtRate       WhtRate?         @relation(fields: [whtRateId], references: [id], onDelete: SetNull)
   lines         VendorBillLine[]
   debitNotes    DebitNote[]
 
@@ -1391,6 +1398,29 @@ model TaxRate {
   @@index([tenantId])
   @@index([isActive, effectiveFrom, effectiveTo])
   @@map("tax_rates")
+}
+
+// Withholding Tax (WHT) rates. Ghana GRA requires WHT deductions (5–15%) on
+// payments to contractors, rent, dividends, and professional fees. When a
+// VendorBill references a WhtRate, paying the bill deducts whtAmount from
+// the cash outflow and credits a WHT Payable liability account instead.
+model WhtRate {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  code        String
+  rate        Decimal  @db.Decimal(5, 4)
+  accountId   String?  @map("account_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  bills VendorBill[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("wht_rates")
 }
 
 // Restricted/unrestricted fund for nonprofit-tenant fund accounting (e.g.

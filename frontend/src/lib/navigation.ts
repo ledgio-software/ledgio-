@@ -62,7 +62,7 @@ export interface NavGroup {
 // Professional = unrestricted (full accounting view).
 const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/accounts', '/journals', '/banking',
-  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions',
+  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates',
   '/fixed-assets', '/recurring-invoices', '/cost-centres', '/manufacturing',
   '/reports/ledger', '/reports/balance-sheet', '/reports/cash-flow',
   '/reports/cash-flow-forecast', '/reports/kpis', '/reports/aging',
@@ -151,6 +151,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Fixed Assets", href: "/fixed-assets", icon: Building2 },
       { name: "Cost Centres", href: "/cost-centres", icon: Layers },
       { name: "Manufacturing", href: "/manufacturing", icon: Cog },
+      { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent },
     ],
   },
   {

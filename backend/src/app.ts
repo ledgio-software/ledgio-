@@ -71,6 +71,7 @@ import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
 import costCentresRouter from './routes/costCentres';
 import manufacturingRouter from './routes/manufacturing';
+import whtRatesRouter from './routes/whtRates';
 
 dotenv.config();
 
@@ -199,6 +200,9 @@ app.use('/api/v1/cost-centres', costCentresRouter);
 
 // Manufacturing / Bill of Materials (BOM templates + production orders)
 app.use('/api/v1/manufacturing', manufacturingRouter);
+
+// Withholding Tax rates (WHT) - GRA-mandated deductions on contractor/rent payments
+app.use('/api/v1/wht-rates', whtRatesRouter);
 
 // Intelligent Analytics & Decision Engine endpoints
 app.use('/api/v1/analytics', analyticsRouter);
