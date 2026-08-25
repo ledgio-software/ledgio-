@@ -181,7 +181,7 @@ router.get('/items', async (req: Request, res: Response): Promise<void> => {
 router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
+    const { name, sku, category = 'General', unitOfMeasure = 'pcs', secondaryUnitOfMeasure, conversionFactor, costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
 
     if (!name || !costPrice || !sellingPrice) {
       res.status(400).json({ success: false, error: 'Item name, cost price, and selling price are required.' });
@@ -212,6 +212,8 @@ router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Ware
           name: name.trim(),
           category,
           unitOfMeasure,
+          ...(secondaryUnitOfMeasure !== undefined && { secondaryUnitOfMeasure: secondaryUnitOfMeasure || null }),
+          ...(conversionFactor !== undefined && conversionFactor !== null && conversionFactor !== '' && { conversionFactor: Number(conversionFactor) }),
           costPrice: Number(costPrice),
           sellingPrice: Number(sellingPrice),
           wholesalePrice: wholesalePrice !== undefined && wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null,
@@ -268,7 +270,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
-    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId, requiresBatchTracking } = req.body;
+    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId, requiresBatchTracking, secondaryUnitOfMeasure, conversionFactor } = req.body;
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).inventoryItem.findFirst({ where: { id, tenantId } });
@@ -291,6 +293,8 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           ...(preferredVendorId !== undefined && { preferredVendorId: preferredVendorId || null }),
           ...(requiresBatchTracking !== undefined && { requiresBatchTracking: Boolean(requiresBatchTracking) }),
+          ...(secondaryUnitOfMeasure !== undefined && { secondaryUnitOfMeasure: secondaryUnitOfMeasure || null }),
+          ...(conversionFactor !== undefined && { conversionFactor: conversionFactor !== null && conversionFactor !== '' ? Number(conversionFactor) : null }),
         },
       });
     });

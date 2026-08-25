@@ -267,7 +267,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
           client,
           tenantId,
           warehouseId,
-          items.map((l: any) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost }))
+          items.map((l: any) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost, purchaseUoM: l.purchaseUoM }))
         );
 
         await recordAuditLogTx(client, {

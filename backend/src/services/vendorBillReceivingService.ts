@@ -2,6 +2,9 @@ export interface ReceivingLineInput {
   itemId: string;
   quantity: number;
   unitCost: number;
+  // When purchaseUoM is 'secondary', quantity is in the secondary unit of measure
+  // and is multiplied by conversionFactor before writing to WarehouseStock.
+  purchaseUoM?: 'primary' | 'secondary';
 }
 
 export interface ReceivingLineResult {
@@ -39,20 +42,27 @@ export async function receiveInventoryForBill(
       throw new Error(`Inventory item ${line.itemId} not found.`);
     }
 
+    // Apply secondary UoM conversion if the line was entered in secondary units.
+    const conversionFactor = item.conversionFactor ? Number(item.conversionFactor) : 1;
+    const receivedQty =
+      line.purchaseUoM === 'secondary' && conversionFactor > 0
+        ? Math.round(line.quantity * conversionFactor)
+        : line.quantity;
+
     const existingStock = await client.warehouseStock.findUnique({
       where: { warehouseId_itemId: { warehouseId, itemId: line.itemId } },
     });
     const previousQtyOnHand = existingStock?.quantityOnHand || 0;
     const previousCostPrice = Number(item.costPrice);
 
-    const newQtyOnHand = previousQtyOnHand + line.quantity;
+    const newQtyOnHand = previousQtyOnHand + receivedQty;
     const newCostPrice =
-      (previousQtyOnHand * previousCostPrice + line.quantity * line.unitCost) / newQtyOnHand;
+      (previousQtyOnHand * previousCostPrice + receivedQty * line.unitCost) / newQtyOnHand;
 
     await client.warehouseStock.upsert({
       where: { warehouseId_itemId: { warehouseId, itemId: line.itemId } },
-      update: { quantityOnHand: { increment: line.quantity } },
-      create: { tenantId, warehouseId, itemId: line.itemId, quantityOnHand: line.quantity },
+      update: { quantityOnHand: { increment: receivedQty } },
+      create: { tenantId, warehouseId, itemId: line.itemId, quantityOnHand: receivedQty },
     });
 
     await client.inventoryItem.update({
@@ -62,7 +72,7 @@ export async function receiveInventoryForBill(
 
     results.push({
       itemId: line.itemId,
-      quantity: line.quantity,
+      quantity: receivedQty,
       unitCost: line.unitCost,
       previousCostPrice,
       newCostPrice,

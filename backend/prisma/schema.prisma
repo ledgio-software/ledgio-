@@ -863,7 +863,12 @@ model InventoryItem {
   sku               String
   name              String
   category          String   @default("General")
-  unitOfMeasure     String   @default("pcs") @map("unit_of_measure")
+  unitOfMeasure             String   @default("pcs") @map("unit_of_measure")
+  // Dual UoM: e.g. primary = "pcs", secondary = "Carton", conversionFactor = 12
+  // means 1 Carton = 12 pcs. Purchase orders / bill receiving can choose secondary
+  // UoM and the system multiplies qty × conversionFactor before writing to stock.
+  secondaryUnitOfMeasure    String?  @map("secondary_unit_of_measure")
+  conversionFactor          Decimal? @db.Decimal(10, 4) @map("conversion_factor")
   costPrice         Decimal  @map("cost_price") @db.Decimal(15, 2)
   sellingPrice      Decimal  @map("selling_price") @db.Decimal(15, 2)
   // Optional lower price for bulk/trade buyers - null means this item has
