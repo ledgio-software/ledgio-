@@ -176,6 +176,9 @@ export const navigationGroups: NavGroup[] = [
       { name: "Daybook", href: "/reports/daybook", icon: BookOpen },
       { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp },
       { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet },
+      { name: "VAT Return", href: "/reports/vat-return", icon: Percent },
+      { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock },
+      { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3 },
     ],
   },
   {
