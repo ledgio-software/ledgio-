@@ -70,9 +70,15 @@ const AgingReport = lazy(() => import("./pages/reports/AgingReport").then(m => (
 const SalesChannelReport = lazy(() => import("./pages/reports/SalesChannelReport").then(m => ({ default: m.SalesChannelReport })));
 const BranchComparisonReport = lazy(() => import("./pages/reports/BranchComparisonReport").then(m => ({ default: m.BranchComparisonReport })));
 const LandedCostReport = lazy(() => import("./pages/reports/LandedCostReport").then(m => ({ default: m.LandedCostReport })));
+const Daybook = lazy(() => import("./pages/reports/Daybook").then(m => ({ default: m.Daybook })));
+const StockMovement = lazy(() => import("./pages/reports/StockMovement").then(m => ({ default: m.StockMovement })));
+const Registers = lazy(() => import("./pages/reports/Registers").then(m => ({ default: m.Registers })));
 const AnalyticsDashboard = lazy(() => import("./pages/reports/AnalyticsDashboard").then(m => ({ default: m.AnalyticsDashboard })));
 const PettyCash = lazy(() => import("./pages/pettycash/PettyCash").then(m => ({ default: m.PettyCash })));
 const PurchaseOrders = lazy(() => import("./pages/purchaseorders/PurchaseOrders").then(m => ({ default: m.PurchaseOrders })));
+const SalesOrders = lazy(() => import("./pages/salesorders/SalesOrders").then(m => ({ default: m.SalesOrders })));
+const DeliveryNotes = lazy(() => import("./pages/logistics/DeliveryNotes").then(m => ({ default: m.DeliveryNotes })));
+const PaymentMatching = lazy(() => import("./pages/payments/PaymentMatching").then(m => ({ default: m.PaymentMatching })));
 const RecurringInvoices = lazy(() => import("./pages/recurringinvoices/RecurringInvoices").then(m => ({ default: m.RecurringInvoices })));
 const FixedAssets = lazy(() => import("./pages/fixedassets/FixedAssets").then(m => ({ default: m.FixedAssets })));
 const Employees = lazy(() => import("./pages/payroll/Employees").then(m => ({ default: m.Employees })));
@@ -83,6 +89,8 @@ const PaymentCallback = lazy(() => import("./pages/subscription/PaymentCallback"
 const PrescriptionRegister = lazy(() => import("./pages/pharmacy/PrescriptionRegister").then(m => ({ default: m.PrescriptionRegister })));
 const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister").then(m => ({ default: m.NarcoticsRegister })));
 const ExpiryAlerts = lazy(() => import("./pages/pharmacy/ExpiryAlerts").then(m => ({ default: m.ExpiryAlerts })));
+const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m => ({ default: m.CostCentres })));
+const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
 
 // "What happened today?" quick-action grid shown in Operations and Business modes.
 const GUIDED_ACTIONS_OPS = [
@@ -577,8 +585,14 @@ function App() {
               <Route path="/reports/branch-comparison" element={<ProtectedRoute><MainLayout><BranchComparisonReport /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/landed-costs" element={<ProtectedRoute><MainLayout><LandedCostReport /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/analytics" element={<ProtectedRoute><MainLayout><AnalyticsDashboard /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/daybook" element={<ProtectedRoute><MainLayout><Daybook /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/stock-movement" element={<ProtectedRoute><MainLayout><StockMovement /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/registers" element={<ProtectedRoute><MainLayout><Registers /></MainLayout></ProtectedRoute>} />
               <Route path="/petty-cash" element={<ProtectedRoute><MainLayout><PettyCash /></MainLayout></ProtectedRoute>} />
               <Route path="/purchase-orders" element={<ProtectedRoute><MainLayout><PurchaseOrders /></MainLayout></ProtectedRoute>} />
+              <Route path="/sales-orders" element={<ProtectedRoute><MainLayout><SalesOrders /></MainLayout></ProtectedRoute>} />
+              <Route path="/delivery-notes" element={<ProtectedRoute><MainLayout><DeliveryNotes /></MainLayout></ProtectedRoute>} />
+              <Route path="/payment-matching" element={<ProtectedRoute><MainLayout><PaymentMatching /></MainLayout></ProtectedRoute>} />
               <Route path="/recurring-invoices" element={<ProtectedRoute><MainLayout><RecurringInvoices /></MainLayout></ProtectedRoute>} />
               <Route path="/fixed-assets" element={<ProtectedRoute><MainLayout><FixedAssets /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/employees" element={<ProtectedRoute><MainLayout><Employees /></MainLayout></ProtectedRoute>} />
@@ -588,6 +602,8 @@ function App() {
               <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
+              <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />
+              <Route path="/manufacturing" element={<ProtectedRoute><MainLayout><Manufacturing /></MainLayout></ProtectedRoute>} />
               <Route path="/reports" element={<Navigate to="/reports/pnl" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />

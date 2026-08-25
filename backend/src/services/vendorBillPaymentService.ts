@@ -5,6 +5,7 @@ import * as journalService from './journalEntryService';
 import * as approvalWorkflowService from './approvalWorkflowService';
 import * as fxRateService from './fxRateService';
 import { recordAuditLogTx, diffFields, AuditActor } from './auditLogService';
+import * as fiscalPeriodService from './fiscalPeriodService';
 
 export class VendorBillPaymentServiceError extends Error {
   statusCode: number;
@@ -39,6 +40,7 @@ export async function payVendorBill(tenantId: string, billId: string, actor?: Au
 
   // Opt-in approval gate: only blocks if approval was actually requested for this bill.
   await approvalWorkflowService.assertApprovedOrNoWorkflow(tenantId, 'VendorBill', billId);
+  await fiscalPeriodService.assertPeriodOpenForDate(tenantId, new Date());
 
   const accounts = await withCurrentTenantDb(prisma, (client) => accountRepository.listAccounts(client));
   const expenseAcc = accountRepository.resolveDefaultAccount(accounts, 'EXPENSE') || accounts[0];

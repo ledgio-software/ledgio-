@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Download, Printer, FileText, FileType } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Download, Printer, FileText, FileType, Columns2 } from "lucide-react";
 import { useProfitAndLoss } from "../../hooks/useProfitAndLoss";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { Button } from "../../components/ui/Button";
@@ -14,12 +14,112 @@ interface FundOption {
   code: string;
 }
 
+interface PnLData {
+  revenues: Array<{ id: string; code: string; name: string; amount: number }>;
+  costOfSales: Array<{ id: string; code: string; name: string; amount: number }>;
+  expenses: Array<{ id: string; code: string; name: string; amount: number }>;
+  totalRevenue: number;
+  totalCostOfSales: number;
+  grossProfit: number;
+  totalExpenses: number;
+  netProfit: number;
+}
+
+function fmtVariance(v: number, currency: string) {
+  const sign = v > 0 ? "+" : "";
+  return sign + new Intl.NumberFormat("en-US", { style: "currency", currency }).format(v);
+}
+
+function variancePct(current: number, prior: number) {
+  if (prior === 0) return current === 0 ? "—" : "N/A";
+  const pct = ((current - prior) / Math.abs(prior)) * 100;
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct.toFixed(1)}%`;
+}
+
+interface CompareRowProps {
+  label: string;
+  p1: number;
+  p2: number;
+  currency: string;
+  isBold?: boolean;
+  isTotal?: boolean;
+  isProfit?: boolean;
+}
+
+function fmt(n: number, currency: string) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(n);
+}
+
+function CompareRow({ label, p1, p2, currency, isBold, isTotal, isProfit }: CompareRowProps) {
+  const variance = p1 - p2;
+  const rowClass = [
+    "grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 py-1.5 items-center",
+    isTotal ? "border-t border-secondary-200 dark:border-secondary-700 mt-1 pt-2" : "",
+    isProfit ? "border-t-2 border-secondary-900 dark:border-secondary-50 mt-2 pt-3" : "",
+  ].join(" ");
+
+  const numClass = [
+    "text-right tabular-nums w-28",
+    isBold || isTotal || isProfit ? "font-bold" : "",
+    isProfit ? (p1 >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400") : "",
+  ].join(" ");
+
+  const vClass = [
+    "text-right tabular-nums w-28",
+    variance > 0 ? "text-emerald-600 dark:text-emerald-400" : variance < 0 ? "text-red-600 dark:text-red-400" : "text-secondary-500",
+  ].join(" ");
+
+  return (
+    <div className={rowClass}>
+      <span className={`text-sm ${isBold || isTotal || isProfit ? "font-bold uppercase tracking-wide text-xs" : "text-secondary-700 dark:text-secondary-300"}`}>
+        {label}
+      </span>
+      <span className={numClass + " text-sm"}>{fmt(p1, currency)}</span>
+      <span className={numClass + " text-sm"}>{fmt(p2, currency)}</span>
+      <span className={vClass + " text-sm"}>{fmtVariance(variance, currency)}</span>
+      <span className="text-right tabular-nums w-20 text-sm text-secondary-500">{variancePct(p1, p2)}</span>
+    </div>
+  );
+}
+
 export function ProfitAndLoss() {
   const { settings } = useTenantSettings();
   const { showToast } = useToast();
   const [isExporting, setIsExporting] = useState<"pdf" | "docx" | null>(null);
   const [funds, setFunds] = useState<FundOption[]>([]);
   const [selectedFundId, setSelectedFundId] = useState<string>("");
+
+  // Compare-periods state
+  const [compareMode, setCompareMode] = useState(false);
+  const [p1Start, setP1Start] = useState("");
+  const [p1End, setP1End] = useState("");
+  const [p2Start, setP2Start] = useState("");
+  const [p2End, setP2End] = useState("");
+  const [p1Label, setP1Label] = useState("Period 1");
+  const [p2Label, setP2Label] = useState("Period 2");
+  const [compareData, setCompareData] = useState<{ p1: PnLData; p2: PnLData } | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+
+  const fetchCompare = useCallback(async () => {
+    if (!p1Start || !p1End || !p2Start || !p2End) {
+      setCompareError("Please set all four dates before comparing.");
+      return;
+    }
+    setCompareLoading(true); setCompareError(null); setCompareData(null);
+    try {
+      const [r1, r2] = await Promise.all([
+        api.get("/reports/profit-loss", { params: { startDate: p1Start, endDate: p1End, ...(selectedFundId ? { fundId: selectedFundId } : {}) } }),
+        api.get("/reports/profit-loss", { params: { startDate: p2Start, endDate: p2End, ...(selectedFundId ? { fundId: selectedFundId } : {}) } }),
+      ]);
+      setCompareData({ p1: r1.data.data, p2: r2.data.data });
+    } catch (e: any) {
+      setCompareError(e.response?.data?.error || "Failed to fetch comparison data.");
+    } finally {
+      setCompareLoading(false);
+    }
+  }, [p1Start, p1End, p2Start, p2End, selectedFundId]);
 
   useEffect(() => {
     api.get("/funds").then((res) => {
@@ -76,7 +176,7 @@ export function ProfitAndLoss() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-secondary-900 dark:text-secondary-50">
@@ -86,23 +186,34 @@ export function ProfitAndLoss() {
             Review your income and expenses to determine net profit.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={compareMode ? "primary" : "outline"}
+            onClick={() => { setCompareMode((m) => !m); setCompareData(null); setCompareError(null); }}
+          >
+            <Columns2 className="mr-2 h-4 w-4" />
+            {compareMode ? "Single Period" : "Compare Periods"}
           </Button>
-          <Button variant="outline" disabled={isExporting === "pdf"} onClick={() => handleExportFile("pdf")}>
-            <FileText className="mr-2 h-4 w-4 text-primary-600" />
-            {isExporting === "pdf" ? "Exporting..." : "Export PDF"}
-          </Button>
-          <Button variant="outline" disabled={isExporting === "docx"} onClick={() => handleExportFile("docx")}>
-            <FileType className="mr-2 h-4 w-4 text-blue-600" />
-            {isExporting === "docx" ? "Exporting..." : "Export Word"}
-          </Button>
-          <Button variant="primary" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
+          {!compareMode && (
+            <>
+              <Button variant="outline" onClick={() => window.print()}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </Button>
+              <Button variant="outline" disabled={isExporting === "pdf"} onClick={() => handleExportFile("pdf")}>
+                <FileText className="mr-2 h-4 w-4 text-primary-600" />
+                {isExporting === "pdf" ? "Exporting..." : "Export PDF"}
+              </Button>
+              <Button variant="outline" disabled={isExporting === "docx"} onClick={() => handleExportFile("docx")}>
+                <FileType className="mr-2 h-4 w-4 text-blue-600" />
+                {isExporting === "docx" ? "Exporting..." : "Export Word"}
+              </Button>
+              <Button variant="primary" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -126,7 +237,120 @@ export function ProfitAndLoss() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-secondary-950 shadow-sm border border-secondary-200 dark:border-secondary-800 rounded-xl p-8 sm:p-12 print:shadow-none print:border-none print:p-0">
+      {/* ── Compare Periods UI ─────────────────────────────────── */}
+      {compareMode && (
+        <div className="print:hidden space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Period 1 */}
+            <div className="border rounded-lg p-4 space-y-3 bg-secondary-50 dark:bg-secondary-900">
+              <div>
+                <label className="block text-xs font-semibold mb-1 uppercase tracking-wide">Period 1 Label</label>
+                <input
+                  className="w-full border rounded px-3 py-1.5 text-sm bg-background"
+                  value={p1Label}
+                  onChange={(e) => setP1Label(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium mb-1">From</label>
+                  <input type="date" className="w-full border rounded px-2 py-1.5 text-sm bg-background" value={p1Start} onChange={(e) => setP1Start(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">To</label>
+                  <input type="date" className="w-full border rounded px-2 py-1.5 text-sm bg-background" value={p1End} onChange={(e) => setP1End(e.target.value)} />
+                </div>
+              </div>
+            </div>
+            {/* Period 2 */}
+            <div className="border rounded-lg p-4 space-y-3 bg-secondary-50 dark:bg-secondary-900">
+              <div>
+                <label className="block text-xs font-semibold mb-1 uppercase tracking-wide">Period 2 Label</label>
+                <input
+                  className="w-full border rounded px-3 py-1.5 text-sm bg-background"
+                  value={p2Label}
+                  onChange={(e) => setP2Label(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium mb-1">From</label>
+                  <input type="date" className="w-full border rounded px-2 py-1.5 text-sm bg-background" value={p2Start} onChange={(e) => setP2Start(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">To</label>
+                  <input type="date" className="w-full border rounded px-2 py-1.5 text-sm bg-background" value={p2End} onChange={(e) => setP2End(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {compareError && (
+            <p className="text-sm text-destructive">{compareError}</p>
+          )}
+
+          <Button onClick={fetchCompare} disabled={compareLoading}>
+            {compareLoading ? "Loading…" : "Run Comparison"}
+          </Button>
+
+          {compareData && (
+            <div className="bg-white dark:bg-secondary-950 shadow-sm border border-secondary-200 dark:border-secondary-800 rounded-xl p-6 overflow-x-auto">
+              {/* Column headers */}
+              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 pb-3 mb-3 border-b border-secondary-200 dark:border-secondary-700">
+                <span className="text-xs font-bold uppercase tracking-wide text-secondary-500">Account</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-right w-28 text-secondary-700">{p1Label}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-right w-28 text-secondary-700">{p2Label}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-right w-28 text-secondary-500">Variance</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-right w-20 text-secondary-500">%</span>
+              </div>
+
+              <div className="space-y-1">
+                {/* Income */}
+                <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-3 mb-1">Income</p>
+                {compareData.p1.revenues.map((r) => {
+                  const p2row = compareData.p2.revenues.find((x) => x.id === r.id);
+                  return <CompareRow key={r.id} label={r.name} p1={r.amount} p2={p2row?.amount ?? 0} currency={settings.baseCurrency} />;
+                })}
+                {compareData.p2.revenues.filter((r) => !compareData.p1.revenues.find((x) => x.id === r.id)).map((r) => (
+                  <CompareRow key={r.id} label={r.name} p1={0} p2={r.amount} currency={settings.baseCurrency} />
+                ))}
+                <CompareRow label="Total Income" p1={compareData.p1.totalRevenue} p2={compareData.p2.totalRevenue} currency={settings.baseCurrency} isTotal isBold />
+
+                {/* Cost of Sales */}
+                {(compareData.p1.costOfSales.length > 0 || compareData.p2.costOfSales.length > 0) && (
+                  <>
+                    <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-4 mb-1">Cost of Sales</p>
+                    {compareData.p1.costOfSales.map((r) => {
+                      const p2row = compareData.p2.costOfSales.find((x) => x.id === r.id);
+                      return <CompareRow key={r.id} label={r.name} p1={r.amount} p2={p2row?.amount ?? 0} currency={settings.baseCurrency} />;
+                    })}
+                    {compareData.p2.costOfSales.filter((r) => !compareData.p1.costOfSales.find((x) => x.id === r.id)).map((r) => (
+                      <CompareRow key={r.id} label={r.name} p1={0} p2={r.amount} currency={settings.baseCurrency} />
+                    ))}
+                    <CompareRow label="Gross Profit" p1={compareData.p1.grossProfit} p2={compareData.p2.grossProfit} currency={settings.baseCurrency} isTotal isBold />
+                  </>
+                )}
+
+                {/* Expenses */}
+                <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-4 mb-1">Expenses</p>
+                {compareData.p1.expenses.map((r) => {
+                  const p2row = compareData.p2.expenses.find((x) => x.id === r.id);
+                  return <CompareRow key={r.id} label={r.name} p1={r.amount} p2={p2row?.amount ?? 0} currency={settings.baseCurrency} />;
+                })}
+                {compareData.p2.expenses.filter((r) => !compareData.p1.expenses.find((x) => x.id === r.id)).map((r) => (
+                  <CompareRow key={r.id} label={r.name} p1={0} p2={r.amount} currency={settings.baseCurrency} />
+                ))}
+                <CompareRow label="Total Expenses" p1={compareData.p1.totalExpenses} p2={compareData.p2.totalExpenses} currency={settings.baseCurrency} isTotal isBold />
+
+                {/* Net Profit */}
+                <CompareRow label={compareData.p1.netProfit >= 0 ? "Net Profit" : "Net Loss"} p1={compareData.p1.netProfit} p2={compareData.p2.netProfit} currency={settings.baseCurrency} isProfit />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!compareMode && <div className="bg-white dark:bg-secondary-950 shadow-sm border border-secondary-200 dark:border-secondary-800 rounded-xl p-8 sm:p-12 print:shadow-none print:border-none print:p-0">
 
         {/* Report Header */}
         <div className="text-center mb-10 border-b border-secondary-200 dark:border-secondary-800 pb-6">
@@ -236,7 +460,7 @@ export function ProfitAndLoss() {
           </section>
 
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

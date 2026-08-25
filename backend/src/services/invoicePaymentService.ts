@@ -7,6 +7,7 @@ import * as approvalWorkflowService from './approvalWorkflowService';
 import * as fxRateService from './fxRateService';
 import { recordAuditLogTx, diffFields, AuditActor } from './auditLogService';
 import { recordChange, notifyChange, invoiceToSyncPayload } from './syncChangeLogService';
+import * as fiscalPeriodService from './fiscalPeriodService';
 
 export class InvoicePaymentServiceError extends Error {
   statusCode: number;
@@ -69,6 +70,7 @@ export async function recordInvoicePayment(
   }
 
   await approvalWorkflowService.assertApprovedOrNoWorkflow(tenantId, 'Invoice', invoiceId);
+  await fiscalPeriodService.assertPeriodOpenForDate(tenantId, new Date());
 
   const invoiceTotal = Number(invoice.total);
   const alreadyPaid = Number(invoice.amountPaid);

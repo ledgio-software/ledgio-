@@ -57,6 +57,10 @@ import onboardingWizardRouter from './routes/onboardingWizard';
 import helpAssistantRouter from './routes/helpAssistant';
 import pettyCashRouter from './routes/pettyCash';
 import purchaseOrdersRouter from './routes/purchaseOrders';
+import salesOrdersRouter from './routes/salesOrders';
+import deliveryNotesRouter from './routes/deliveryNotes';
+import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
+import paymentBatchesRouter from './routes/paymentBatches';
 import recurringInvoicesRouter from './routes/recurringInvoices';
 import paystackRouter from './routes/paystack';
 import fixedAssetsRouter from './routes/fixedAssets';
@@ -65,6 +69,8 @@ import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
+import costCentresRouter from './routes/costCentres';
+import manufacturingRouter from './routes/manufacturing';
 
 dotenv.config();
 
@@ -188,6 +194,12 @@ app.use('/api/v1/tills', cashTillRouter);
 // Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
 app.use('/api/v1/pharmacy', pharmacyRouter);
 
+// Cost Centres / Profit Centres (departmental/branch P&L segmentation)
+app.use('/api/v1/cost-centres', costCentresRouter);
+
+// Manufacturing / Bill of Materials (BOM templates + production orders)
+app.use('/api/v1/manufacturing', manufacturingRouter);
+
 // Intelligent Analytics & Decision Engine endpoints
 app.use('/api/v1/analytics', analyticsRouter);
 
@@ -199,6 +211,16 @@ app.use('/api/v1/petty-cash', pettyCashRouter);
 
 // Purchase Order endpoints
 app.use('/api/v1/purchase-orders', purchaseOrdersRouter);
+
+// Sales Order endpoints
+app.use('/api/v1/sales-orders', salesOrdersRouter);
+
+// Delivery Note & Goods Receipt Note endpoints
+app.use('/api/v1/delivery-notes', deliveryNotesRouter);
+app.use('/api/v1/goods-receipt-notes', goodsReceiptNotesRouter);
+
+// Payment Batch (bill-by-bill settlement / payment matching) endpoints
+app.use('/api/v1/payment-batches', paymentBatchesRouter);
 app.use('/api/v1/recurring-invoices', recurringInvoicesRouter);
 app.use('/api/v1/paystack', paystackRouter);
 app.use('/api/v1/fixed-assets', fixedAssetsRouter);
