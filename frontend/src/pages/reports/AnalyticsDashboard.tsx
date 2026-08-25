@@ -212,7 +212,7 @@ export function AnalyticsDashboard() {
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
   const [isLoadingItems, setIsLoadingItems] = useState(true);
 
-  const currency = settings.baseCurrency || "USD";
+  const currency = settings.baseCurrency || "GHS";
 
   const fmt = (v: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency }).format(v);

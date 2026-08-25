@@ -24,7 +24,7 @@ model Tenant {
   acceptedTermsVersion    String?   @map("accepted_terms_version")
   termsAcceptedAt         DateTime? @map("terms_accepted_at")
   tier                    Int       @default(1)
-  baseCurrency            String    @default("USD") @map("base_currency")
+  baseCurrency            String    @default("GHS") @map("base_currency")
   // "BUSINESS" | "NONPROFIT" - chosen once at onboarding, drives which nav
   // sections the frontend shows (hides POS/Inventory for nonprofits, shows
   // Funds). Immutable after onboarding this pass - not editable via
