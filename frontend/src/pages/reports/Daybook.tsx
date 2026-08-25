@@ -113,7 +113,7 @@ export function Daybook() {
         });
       }
     }
-    exportToCsv(rows, `daybook_${startDate}_${endDate}.csv`);
+    exportToCsv(`daybook_${startDate}_${endDate}.csv`, rows);
   }
 
   return (

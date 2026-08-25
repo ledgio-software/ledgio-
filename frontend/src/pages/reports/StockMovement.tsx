@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { TrendingUp, TrendingDown, RefreshCw, Download, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, RefreshCw, Download, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
@@ -107,7 +107,7 @@ export function StockMovement() {
       Balance: String(m.runningBalance),
       Notes: m.notes || "",
     }));
-    exportToCsv(rows, `stock-movement-${result.item.name || itemId}.csv`);
+    exportToCsv(`stock-movement-${result.item.name || itemId}.csv`, rows);
   }
 
   const netChange = result ? result.closingBalance - result.openingBalance : 0;
