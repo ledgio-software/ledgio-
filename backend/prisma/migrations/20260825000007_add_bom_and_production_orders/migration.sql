@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS bom_templates (
   tenant_id        UUID        NOT NULL,
   name             TEXT        NOT NULL,
   description      TEXT,
-  finished_item_id UUID        NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
+  finished_item_id TEXT        NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
   output_qty       NUMERIC(15,4) NOT NULL DEFAULT 1,
   is_active        BOOLEAN     NOT NULL DEFAULT true,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS bom_lines (
   id                UUID        NOT NULL DEFAULT gen_random_uuid(),
   tenant_id         UUID        NOT NULL,
   bom_template_id   UUID        NOT NULL REFERENCES bom_templates(id) ON DELETE CASCADE,
-  component_item_id UUID        NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
+  component_item_id TEXT        NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
   quantity          NUMERIC(15,4) NOT NULL,
   CONSTRAINT pk_bom_lines PRIMARY KEY (id)
 );
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS production_orders (
   tenant_id       UUID          NOT NULL,
   order_number    TEXT          NOT NULL,
   bom_template_id UUID          NOT NULL REFERENCES bom_templates(id) ON DELETE RESTRICT,
-  warehouse_id    UUID          NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+  warehouse_id    TEXT          NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
   planned_qty     NUMERIC(15,4) NOT NULL,
   completed_qty   NUMERIC(15,4),
   status          TEXT          NOT NULL DEFAULT 'DRAFT',
