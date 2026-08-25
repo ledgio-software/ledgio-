@@ -60,6 +60,7 @@ import purchaseOrdersRouter from './routes/purchaseOrders';
 import salesOrdersRouter from './routes/salesOrders';
 import deliveryNotesRouter from './routes/deliveryNotes';
 import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
+import paymentBatchesRouter from './routes/paymentBatches';
 import recurringInvoicesRouter from './routes/recurringInvoices';
 import paystackRouter from './routes/paystack';
 import fixedAssetsRouter from './routes/fixedAssets';
@@ -209,6 +210,9 @@ app.use('/api/v1/sales-orders', salesOrdersRouter);
 // Delivery Note & Goods Receipt Note endpoints
 app.use('/api/v1/delivery-notes', deliveryNotesRouter);
 app.use('/api/v1/goods-receipt-notes', goodsReceiptNotesRouter);
+
+// Payment Batch (bill-by-bill settlement / payment matching) endpoints
+app.use('/api/v1/payment-batches', paymentBatchesRouter);
 app.use('/api/v1/recurring-invoices', recurringInvoicesRouter);
 app.use('/api/v1/paystack', paystackRouter);
 app.use('/api/v1/fixed-assets', fixedAssetsRouter);

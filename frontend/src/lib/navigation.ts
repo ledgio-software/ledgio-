@@ -36,6 +36,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   Truck,
+  CreditCard,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -130,6 +131,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Purchase Orders", href: "/purchase-orders", icon: FileSpreadsheet },
       { name: "Sales Orders", href: "/sales-orders", icon: FileSpreadsheet },
       { name: "Delivery Notes & GRN", href: "/delivery-notes", icon: Truck },
+      { name: "Payment Matching", href: "/payment-matching", icon: CreditCard },
       { name: "Recurring Invoices", href: "/recurring-invoices", icon: Repeat },
       { name: "Expense Claims", href: "/expenses", icon: Wallet },
       { name: "Petty Cash", href: "/petty-cash", icon: Wallet2 },
@@ -215,8 +217,8 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
   hr: ["/dashboard", "/team", "/expenses", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave"],
   "payroll officer": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
   "payroll approver": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
-  "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/delivery-notes", "/expenses", "/inventory", "/vendors"],
-  "accounts receivable clerk": ["/dashboard", "/invoices", "/sales-orders", "/delivery-notes", "/recurring-invoices", "/customers", "/expenses"],
+  "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/delivery-notes", "/payment-matching", "/expenses", "/inventory", "/vendors"],
+  "accounts receivable clerk": ["/dashboard", "/invoices", "/sales-orders", "/delivery-notes", "/payment-matching", "/recurring-invoices", "/customers", "/expenses"],
   "external accountant": [
     "/dashboard",
     "/accounts",
@@ -227,6 +229,7 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/bills",
     "/sales-orders",
     "/delivery-notes",
+    "/payment-matching",
     "/expenses",
     "/reports/executive",
     "/reports/ledger",

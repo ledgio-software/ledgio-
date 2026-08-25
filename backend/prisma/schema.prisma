@@ -1777,6 +1777,52 @@ model SalesOrderLine {
   @@map("sales_order_lines")
 }
 
+// Payment Batch: one payment event from a customer (or to a vendor) that is
+// explicitly allocated across multiple outstanding invoices/bills. Stores the
+// master record; individual InvoicePayment / VendorBill.status rows are still
+// written by the existing recordInvoicePayment / payVendorBill services so all
+// downstream logic (journal entries, status transitions, audit log) stays
+// unchanged. The batch is purely an allocation record.
+model PaymentBatch {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  batchNumber String   @map("batch_number")
+  // CUSTOMER = payment received from a customer covering ≥1 invoices
+  // VENDOR   = payment made to a vendor covering ≥1 bills
+  batchType   String   @map("batch_type")
+  // customerId for CUSTOMER batches, vendorId for VENDOR batches
+  entityId    String   @map("entity_id")
+  currency    String   @default("USD")
+  paymentDate DateTime @default(now()) @map("payment_date")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  allocations PaymentBatchAllocation[]
+
+  @@unique([tenantId, batchNumber])
+  @@index([tenantId])
+  @@index([entityId])
+  @@map("payment_batches")
+}
+
+// One row per invoice/bill covered by a PaymentBatch.
+model PaymentBatchAllocation {
+  id              String  @id @default(uuid())
+  tenantId        String  @map("tenant_id")
+  batchId         String  @map("batch_id")
+  invoiceId       String? @map("invoice_id")
+  vendorBillId    String? @map("vendor_bill_id")
+  allocatedAmount Decimal @map("allocated_amount") @db.Decimal(15, 2)
+
+  batch PaymentBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([batchId])
+  @@index([invoiceId])
+  @@index([vendorBillId])
+  @@map("payment_batch_allocations")
+}
+
 // Delivery Note (DN): formal document recording goods physically dispatched to
 // a customer, optionally linked to an Invoice or SalesOrder. DRAFT → DISPATCHED.
 // Stock deduction still happens at invoice-creation time (existing behaviour);
