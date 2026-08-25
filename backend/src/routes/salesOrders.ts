@@ -15,6 +15,7 @@ const lineSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive(),
   unitPrice: z.number().min(0),
+  inventoryItemId: z.string().uuid().optional().nullable(),
 });
 
 const createSchema = z.object({
@@ -89,13 +90,37 @@ router.post('/', requireRole('Accountant'), async (req, res) => {
     const body = createSchema.parse(req.body);
     const soNumber = await nextSoNumber(tenantId);
     const orderDate = body.orderDate ? new Date(body.orderDate) : new Date();
-    const lines = body.lines.map((l) => ({
-      tenantId,
-      description: l.description,
-      quantity: l.quantity,
-      unitPrice: l.unitPrice,
-      amount: Math.round(l.quantity * l.unitPrice * 100) / 100,
-    }));
+
+    // Load customer's price list for auto-pricing (same logic as invoices.ts)
+    let priceListEntries: Map<string, { unitPrice: number; minQty: number }[]> = new Map();
+    const customer = await (prisma as any).customer.findFirst({ where: { id: body.customerId, tenantId }, select: { priceListId: true } });
+    if (customer?.priceListId) {
+      const entries: any[] = await (prisma as any).priceListEntry.findMany({
+        where: { priceListId: customer.priceListId, tenantId },
+        orderBy: { minQty: 'asc' },
+      });
+      for (const e of entries) {
+        const key = e.inventoryItemId as string;
+        if (!priceListEntries.has(key)) priceListEntries.set(key, []);
+        priceListEntries.get(key)!.push({ unitPrice: Number(e.unitPrice), minQty: e.minQty });
+      }
+    }
+
+    const lines = body.lines.map((l: any) => {
+      let unitPrice = l.unitPrice as number;
+      if (unitPrice === 0 && l.inventoryItemId && priceListEntries.has(l.inventoryItemId)) {
+        const tiers = priceListEntries.get(l.inventoryItemId)!;
+        const applicable = tiers.filter((t) => l.quantity >= t.minQty);
+        if (applicable.length > 0) unitPrice = applicable[applicable.length - 1].unitPrice;
+      }
+      return {
+        tenantId,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice,
+        amount: Math.round(l.quantity * unitPrice * 100) / 100,
+      };
+    });
 
     const order = await (prisma as any).salesOrder.create({
       data: {

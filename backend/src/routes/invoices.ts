@@ -286,10 +286,34 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createI
       }
     }
 
+    // Load the customer's assigned price list entries for auto-pricing.
+    // The caller-supplied unitPrice is always used when provided and non-zero;
+    // the price list only fills in a price when the caller sends 0 or omits it.
+    let priceListEntries: Map<string, { unitPrice: number; minQty: number }[]> = new Map();
+    const customer = await (prisma as any).customer.findFirst({ where: { id: customerId, tenantId }, select: { priceListId: true } });
+    if (customer?.priceListId) {
+      const entries: any[] = await (prisma as any).priceListEntry.findMany({
+        where: { priceListId: customer.priceListId, tenantId },
+        orderBy: { minQty: 'asc' },
+      });
+      for (const e of entries) {
+        const key = e.inventoryItemId;
+        if (!priceListEntries.has(key)) priceListEntries.set(key, []);
+        priceListEntries.get(key)!.push({ unitPrice: Number(e.unitPrice), minQty: e.minQty });
+      }
+    }
+
     let subtotal = 0;
     const itemData = items.map((it: any) => {
       const qty = Number(it.quantity) || 1;
-      const price = Number(it.unitPrice) || 0;
+      // Auto-fill from price list when caller sends no price and an item is linked
+      let price = Number(it.unitPrice) || 0;
+      if (price === 0 && it.inventoryItemId && priceListEntries.has(it.inventoryItemId)) {
+        const tiers = priceListEntries.get(it.inventoryItemId)!;
+        // Find the highest minQty tier that the quantity satisfies
+        const applicable = tiers.filter((t) => qty >= t.minQty);
+        if (applicable.length > 0) price = applicable[applicable.length - 1].unitPrice;
+      }
       const amt = qty * price;
       subtotal += amt;
       return {

@@ -58,6 +58,7 @@ import helpAssistantRouter from './routes/helpAssistant';
 import pettyCashRouter from './routes/pettyCash';
 import purchaseOrdersRouter from './routes/purchaseOrders';
 import salesOrdersRouter from './routes/salesOrders';
+import priceListsRouter from './routes/priceLists';
 import deliveryNotesRouter from './routes/deliveryNotes';
 import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
 import paymentBatchesRouter from './routes/paymentBatches';
@@ -223,6 +224,9 @@ app.use('/api/v1/purchase-orders', purchaseOrdersRouter);
 
 // Sales Order endpoints
 app.use('/api/v1/sales-orders', salesOrdersRouter);
+
+// Price List endpoints
+app.use('/api/v1/price-lists', priceListsRouter);
 
 // Delivery Note & Goods Receipt Note endpoints
 app.use('/api/v1/delivery-notes', deliveryNotesRouter);

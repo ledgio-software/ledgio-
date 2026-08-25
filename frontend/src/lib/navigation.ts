@@ -62,7 +62,7 @@ export interface NavGroup {
 // Professional = unrestricted (full accounting view).
 const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/accounts', '/journals', '/banking',
-  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates',
+  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates', '/settings/price-lists',
   '/pdc', '/reports/interest-charges',
   '/fixed-assets', '/recurring-invoices', '/cost-centres', '/manufacturing',
   '/reports/ledger', '/reports/balance-sheet', '/reports/cash-flow',
@@ -153,6 +153,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Cost Centres", href: "/cost-centres", icon: Layers },
       { name: "Manufacturing", href: "/manufacturing", icon: Cog },
       { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent },
+      { name: "Price Lists", href: "/settings/price-lists", icon: BadgeDollarSign },
       { name: "Post-Dated Cheques", href: "/pdc", icon: CreditCard },
       { name: "Interest Charges", href: "/reports/interest-charges", icon: TrendingUp },
     ],

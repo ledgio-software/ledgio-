@@ -385,6 +385,9 @@ model Customer {
   customerType String   @default("RETAIL") @map("customer_type")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  priceListId       String?  @map("price_list_id")
+  priceList         PriceList? @relation(fields: [priceListId], references: [id])
+
   invoices          Invoice[]
   recurringInvoices RecurringInvoice[]
   salesOrders       SalesOrder[]
@@ -392,6 +395,38 @@ model Customer {
 
   @@index([tenantId])
   @@map("customers")
+}
+
+model PriceList {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  currency    String   @default("GHS")
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true)  @map("is_active")
+  entries     PriceListEntry[]
+  customers   Customer[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  @@index([tenantId])
+  @@map("price_lists")
+}
+
+model PriceListEntry {
+  id              String    @id @default(uuid())
+  priceListId     String    @map("price_list_id")
+  priceList       PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  tenantId        String    @map("tenant_id")
+  inventoryItemId String    @map("inventory_item_id")
+  unitPrice       Decimal   @db.Decimal(15, 2) @map("unit_price")
+  minQty          Int       @default(1) @map("min_qty")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, priceListId])
+  @@index([tenantId, inventoryItemId])
+  @@map("price_list_entries")
 }
 
 // NOT_REQUESTED: default, no GRA clearance has ever been attempted.
