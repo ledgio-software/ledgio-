@@ -237,6 +237,7 @@ router.put('/current', authenticateJwt, tenantContextMiddleware, requireRole('Ad
       vatRegistered,
       graDeviceNumber,
       graSecurityKey,
+      stockValuationMethod,
     } = req.body;
     const newName = (companyName || name || '').trim();
 
@@ -303,6 +304,9 @@ router.put('/current', authenticateJwt, tenantContextMiddleware, requireRole('Ad
           ...(vatRegistered !== undefined && { vatRegistered: Boolean(vatRegistered) }),
           ...(normalizedGraDeviceNumber !== undefined && { graDeviceNumber: normalizedGraDeviceNumber }),
           ...(normalizedGraSecurityKeyEncrypted !== undefined && { graSecurityKeyEncrypted: normalizedGraSecurityKeyEncrypted }),
+          ...(stockValuationMethod && ['AVERAGE', 'FIFO'].includes(stockValuationMethod)
+            ? { stockValuationMethod }
+            : {}),
         },
       });
 

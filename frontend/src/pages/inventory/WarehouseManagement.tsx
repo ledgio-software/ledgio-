@@ -72,6 +72,8 @@ interface InventoryItem {
   name: string;
   category: string;
   unitOfMeasure: string;
+  secondaryUnitOfMeasure?: string | null;
+  conversionFactor?: number | null;
   costPrice: number;
   sellingPrice: number;
   wholesalePrice?: number | null;
@@ -159,6 +161,8 @@ export function WarehouseManagement() {
   const [itemSku, setItemSku] = useState("");
   const [category, setCategory] = useState("General");
   const [unitOfMeasure, setUnitOfMeasure] = useState("pcs");
+  const [secondaryUnitOfMeasure, setSecondaryUnitOfMeasure] = useState("");
+  const [conversionFactor, setConversionFactor] = useState("");
   const [costPrice, setCostPrice] = useState("150");
   const [sellingPrice, setSellingPrice] = useState("250");
   const [wholesalePrice, setWholesalePrice] = useState("");
@@ -242,6 +246,8 @@ export function WarehouseManagement() {
         sku: itemSku,
         category,
         unitOfMeasure,
+        ...(secondaryUnitOfMeasure ? { secondaryUnitOfMeasure } : {}),
+        ...(secondaryUnitOfMeasure && conversionFactor ? { conversionFactor: Number(conversionFactor) } : {}),
         costPrice: Number(costPrice),
         sellingPrice: Number(sellingPrice),
         wholesalePrice: wholesalePrice !== "" ? Number(wholesalePrice) : undefined,
@@ -256,6 +262,8 @@ export function WarehouseManagement() {
         setItemName("");
         setItemSku("");
         setPreferredVendorId("");
+        setSecondaryUnitOfMeasure("");
+        setConversionFactor("");
         setIsItemModalOpen(false);
         fetchData();
       }
@@ -906,7 +914,7 @@ export function WarehouseManagement() {
                       <TableCell className="text-right">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${isLowStock ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400 border border-rose-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
                           {isLowStock && <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
-                          {totalQty} {it.unitOfMeasure}
+                          {totalQty} {it.unitOfMeasure}{it.secondaryUnitOfMeasure && it.conversionFactor ? ` (${it.secondaryUnitOfMeasure} = ${it.conversionFactor} ${it.unitOfMeasure})` : ''}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -959,6 +967,32 @@ export function WarehouseManagement() {
             <div>
               <label className="block text-sm font-medium mb-1">Unit of Measure</label>
               <Input placeholder="pcs, kg, boxes" value={unitOfMeasure} onChange={(e) => setUnitOfMeasure(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Secondary UoM <span className="text-secondary-400 font-normal">optional</span>
+              </label>
+              <Input
+                placeholder="Carton, Dozen, Box…"
+                value={secondaryUnitOfMeasure}
+                onChange={(e) => setSecondaryUnitOfMeasure(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Conversion Factor <span className="text-secondary-400 font-normal">1 secondary = ? primary</span>
+              </label>
+              <Input
+                type="number"
+                step="0.0001"
+                min="0.0001"
+                placeholder="e.g. 12 for Carton of 12 pcs"
+                value={conversionFactor}
+                disabled={!secondaryUnitOfMeasure}
+                onChange={(e) => setConversionFactor(e.target.value)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">

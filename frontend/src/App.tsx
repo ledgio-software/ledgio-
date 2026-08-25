@@ -38,6 +38,9 @@ const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts").th
 const OnboardingWizard = lazy(() => import("./pages/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
 const Settings = lazy(() => import("./pages/settings/Settings").then(m => ({ default: m.Settings })));
 const TaxRates = lazy(() => import("./pages/settings/TaxRates").then(m => ({ default: m.TaxRates })));
+const WhtRates = lazy(() => import("./pages/settings/WhtRates").then(m => ({ default: m.WhtRates })));
+const PostDatedCheques = lazy(() => import("./pages/banking/PostDatedCheques").then(m => ({ default: m.PostDatedCheques })));
+const InterestCharges = lazy(() => import("./pages/reports/InterestCharges").then(m => ({ default: m.InterestCharges })));
 const Funds = lazy(() => import("./pages/settings/Funds").then(m => ({ default: m.Funds })));
 const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m => ({ default: m.FiscalPeriods })));
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
@@ -552,6 +555,7 @@ function App() {
               <Route path="/onboarding" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><OnboardingWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/tax-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><TaxRates /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/wht-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><WhtRates /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/funds" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Funds /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/fiscal-periods" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><FiscalPeriods /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/recurring-transactions" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><RecurringTransactions /></MainLayout></ProtectedRoute>} />
@@ -564,6 +568,8 @@ function App() {
               <Route path="/feedback" element={<ProtectedRoute><MainLayout><FeedbackInbox /></MainLayout></ProtectedRoute>} />
               <Route path="/import" element={<ProtectedRoute><MainLayout><BulkImportWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/banking" element={<ProtectedRoute><MainLayout><BankReconciliation /></MainLayout></ProtectedRoute>} />
+              <Route path="/pdc" element={<ProtectedRoute><MainLayout><PostDatedCheques /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/interest-charges" element={<ProtectedRoute><MainLayout><InterestCharges /></MainLayout></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><MainLayout><Invoices /></MainLayout></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><MainLayout><Customers /></MainLayout></ProtectedRoute>} />
               <Route path="/bills" element={<ProtectedRoute><MainLayout><VendorBills /></MainLayout></ProtectedRoute>} />

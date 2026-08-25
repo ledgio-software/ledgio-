@@ -131,7 +131,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { vendorId, dueDate, currency = 'USD', items, warehouseId, fundId, purchaseOrderId } = req.body;
+    const { vendorId, dueDate, currency = 'USD', items, warehouseId, fundId, purchaseOrderId, whtRateId } = req.body;
 
     if (!vendorId) {
       res.status(400).json({ success: false, error: 'Vendor ID is required.' });
@@ -224,6 +224,14 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
         await assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, warehouseId);
       }
 
+      // Validate whtRateId if provided (must exist and belong to this tenant)
+      if (whtRateId) {
+        const whtRate = await (prisma as any).whtRate.findFirst({ where: { id: whtRateId, tenantId } });
+        if (!whtRate) {
+          throw new Error('WHT rate not found.');
+        }
+      }
+
       const bill = await (client as any).vendorBill.create({
         data: {
           tenantId,
@@ -237,6 +245,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
           warehouseId: isItemized ? warehouseId : null,
           fundId: fundId || null,
           purchaseOrderId: purchaseOrderId || null,
+          whtRateId: whtRateId || null,
           ...(isItemized && {
             lines: {
               create: items.map((l: any) => ({
@@ -258,7 +267,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
           client,
           tenantId,
           warehouseId,
-          items.map((l: any) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost }))
+          items.map((l: any) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost, purchaseUoM: l.purchaseUoM }))
         );
 
         await recordAuditLogTx(client, {
@@ -302,7 +311,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
       res.status(error.statusCode).json({ success: false, error: error.message });
       return;
     }
-    if (error.message === 'Vendor not found.' || error.message === 'Warehouse not found.') {
+    if (error.message === 'Vendor not found.' || error.message === 'Warehouse not found.' || error.message === 'WHT rate not found.') {
       res.status(404).json({ success: false, error: error.message });
       return;
     }

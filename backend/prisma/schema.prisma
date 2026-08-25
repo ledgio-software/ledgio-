@@ -79,6 +79,7 @@ model Tenant {
   // summaries, cash shortage warnings) go to. Optional - alerts are skipped
   // (not sent to a shared/hardcoded fallback) when unset for this tenant.
   bossPhone               String?   @map("boss_phone")
+  stockValuationMethod    String    @default("AVERAGE") @map("stock_valuation_method")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
@@ -696,11 +697,18 @@ model VendorBill {
   // manual action.
   scheduledPaymentDate DateTime? @map("scheduled_payment_date")
 
+  // Optional Withholding Tax rate applied to this bill. When set, paying the
+  // bill deducts whtAmount from the cash outflow and posts it to the WHT
+  // Payable liability account instead (see vendorBillPaymentService.ts).
+  whtRateId  String?  @map("wht_rate_id")
+  whtAmount  Decimal? @map("wht_amount") @db.Decimal(15, 2)
+
   vendor        Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   warehouse     Warehouse?       @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   fund          Fund?            @relation(fields: [fundId], references: [id], onDelete: SetNull)
   costCentre    CostCentre?      @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
   purchaseOrder PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  whtRate       WhtRate?         @relation(fields: [whtRateId], references: [id], onDelete: SetNull)
   lines         VendorBillLine[]
   debitNotes    DebitNote[]
 
@@ -856,7 +864,12 @@ model InventoryItem {
   sku               String
   name              String
   category          String   @default("General")
-  unitOfMeasure     String   @default("pcs") @map("unit_of_measure")
+  unitOfMeasure             String   @default("pcs") @map("unit_of_measure")
+  // Dual UoM: e.g. primary = "pcs", secondary = "Carton", conversionFactor = 12
+  // means 1 Carton = 12 pcs. Purchase orders / bill receiving can choose secondary
+  // UoM and the system multiplies qty × conversionFactor before writing to stock.
+  secondaryUnitOfMeasure    String?  @map("secondary_unit_of_measure")
+  conversionFactor          Decimal? @db.Decimal(10, 4) @map("conversion_factor")
   costPrice         Decimal  @map("cost_price") @db.Decimal(15, 2)
   sellingPrice      Decimal  @map("selling_price") @db.Decimal(15, 2)
   // Optional lower price for bulk/trade buyers - null means this item has
@@ -1391,6 +1404,112 @@ model TaxRate {
   @@index([tenantId])
   @@index([isActive, effectiveFrom, effectiveTo])
   @@map("tax_rates")
+}
+
+// Withholding Tax (WHT) rates. Ghana GRA requires WHT deductions (5–15%) on
+// payments to contractors, rent, dividends, and professional fees. When a
+// VendorBill references a WhtRate, paying the bill deducts whtAmount from
+// the cash outflow and credits a WHT Payable liability account instead.
+model WhtRate {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  code        String
+  rate        Decimal  @db.Decimal(5, 4)
+  accountId   String?  @map("account_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  bills VendorBill[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("wht_rates")
+}
+
+// One interest policy per tenant: daily cron charges overdue invoices.
+// account_id (optional) → Interest Income GL; falls back to INTEREST_INCOME role.
+model InterestPolicy {
+  id         String  @id @default(uuid())
+  tenantId   String  @unique @map("tenant_id")
+  annualRate Decimal @db.Decimal(5, 4) @map("annual_rate")
+  graceDays  Int     @default(0) @map("grace_days")
+  accountId  String? @map("account_id")
+  isActive   Boolean @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("interest_policies")
+}
+
+// One row per daily accrual per overdue invoice.
+// journal_id is a plain string ref to a per-tenant journal entry (cross-schema).
+model InterestCharge {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  invoiceId   String   @map("invoice_id")
+  amount      Decimal  @db.Decimal(15, 2)
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  journalId   String?  @map("journal_id")
+  status      String   @default("POSTED") // POSTED | VOIDED
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, invoiceId])
+  @@unique([tenantId, invoiceId, periodStart])
+  @@map("interest_charges")
+}
+
+// Post-Dated Cheque register. RECEIVABLE = customer gives us a future-dated
+// cheque; PAYABLE = we issue one to a supplier. receipt_journal_id and
+// deposit_journal_id are plain UUID strings referencing journal entries in
+// the per-tenant schema (no FK — cross-schema boundary, same constraint
+// pattern as TaxRate.accountId).
+model PostDatedCheque {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  type             String   // 'RECEIVABLE' | 'PAYABLE'
+  partyName        String   @map("party_name")
+  chequeNumber     String   @map("cheque_number")
+  bankName         String   @map("bank_name")
+  amount           Decimal  @db.Decimal(15, 2)
+  currency         String   @default("GHS")
+  dueDate          DateTime @map("due_date")
+  status           String   @default("PENDING") // PENDING | DEPOSITED | BOUNCED | CANCELLED
+  invoiceId        String?  @map("invoice_id")
+  billId           String?  @map("bill_id")
+  receiptJournalId String?  @map("receipt_journal_id")
+  depositJournalId String?  @map("deposit_journal_id")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@map("post_dated_cheques")
+}
+
+// FIFO stock valuation: one row per purchase lot. remainingQty decrements
+// as stock is sold (FIFO depletion). Only populated when the tenant's
+// stockValuationMethod = 'FIFO'; AVERAGE-cost tenants never touch this table.
+model StockLayer {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  warehouseId  String   @map("warehouse_id")
+  itemId       String   @map("item_id")
+  unitCost     Decimal  @db.Decimal(15, 4) @map("unit_cost")
+  originalQty  Int      @map("original_qty")
+  remainingQty Int      @map("remaining_qty")
+  purchasedAt  DateTime @default(now()) @map("purchased_at")
+  sourceRef    String?  @map("source_ref")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, itemId, purchasedAt])
+  @@map("stock_layers")
 }
 
 // Restricted/unrestricted fund for nonprofit-tenant fund accounting (e.g.

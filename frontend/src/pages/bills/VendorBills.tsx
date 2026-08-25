@@ -66,6 +66,14 @@ interface FundOption {
   code: string;
 }
 
+interface WhtRateOption {
+  id: string;
+  name: string;
+  code: string;
+  rate: string;
+  isActive: boolean;
+}
+
 interface DebitNote {
   id: string;
   debitNoteNumber: string;
@@ -84,6 +92,7 @@ export function VendorBills() {
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [items, setItems] = useState<InventoryItemOption[]>([]);
   const [funds, setFunds] = useState<FundOption[]>([]);
+  const [whtRates, setWhtRates] = useState<WhtRateOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Modals
@@ -102,6 +111,7 @@ export function VendorBills() {
   const [currency, setCurrency] = useState("USD");
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
   const [selectedFundId, setSelectedFundId] = useState("");
+  const [selectedWhtRateId, setSelectedWhtRateId] = useState("");
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLine[]>([{ itemId: "", quantity: "", unitCost: "" }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -125,12 +135,13 @@ export function VendorBills() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [billRes, venRes, whRes, itemsRes, fundsRes] = await Promise.all([
+      const [billRes, venRes, whRes, itemsRes, fundsRes, whtRes] = await Promise.all([
         api.get("/bills"),
         api.get("/bills/vendors"),
         api.get("/inventory/warehouses"),
         api.get("/inventory/items"),
         api.get("/funds"),
+        api.get("/wht-rates").catch(() => ({ data: { data: { whtRates: [] } } })),
       ]);
 
       if (billRes.data.success) setBills(billRes.data.data.bills);
@@ -140,6 +151,7 @@ export function VendorBills() {
         setItems(itemsRes.data.data.items.map((it: any) => ({ id: it.id, sku: it.sku, name: it.name, costPrice: Number(it.costPrice) })));
       }
       if (fundsRes.data.success) setFunds(fundsRes.data.data.funds.filter((f: any) => f.isActive));
+      setWhtRates((whtRes.data?.data?.whtRates || []).filter((r: WhtRateOption) => r.isActive));
     } catch (err) {
       console.error("Failed to load bills data:", err);
     } finally {
@@ -184,6 +196,7 @@ export function VendorBills() {
     setCurrency(settings.baseCurrency);
     setSelectedWarehouse("");
     setSelectedFundId("");
+    setSelectedWhtRateId("");
     setPurchaseLines([{ itemId: "", quantity: "", unitCost: "" }]);
   };
 
@@ -217,8 +230,15 @@ export function VendorBills() {
               .filter((l) => l.itemId && Number(l.quantity) > 0)
               .map((l) => ({ itemId: l.itemId, quantity: Number(l.quantity), unitCost: Number(l.unitCost) })),
             ...(selectedFundId ? { fundId: selectedFundId } : {}),
+            ...(selectedWhtRateId ? { whtRateId: selectedWhtRateId } : {}),
           }
-        : { vendorId: selectedVendor, amount: Number(billAmount), currency, ...(selectedFundId ? { fundId: selectedFundId } : {}) };
+        : {
+            vendorId: selectedVendor,
+            amount: Number(billAmount),
+            currency,
+            ...(selectedFundId ? { fundId: selectedFundId } : {}),
+            ...(selectedWhtRateId ? { whtRateId: selectedWhtRateId } : {}),
+          };
 
       const res = await api.post("/bills", payload);
 
@@ -588,6 +608,35 @@ export function VendorBills() {
               </select>
             </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Withholding Tax (optional)</label>
+            <select
+              className="w-full h-10 px-3 rounded-md border border-secondary-300 bg-white dark:bg-secondary-800 text-secondary-900 dark:text-secondary-50"
+              value={selectedWhtRateId}
+              onChange={(e) => setSelectedWhtRateId(e.target.value)}
+            >
+              <option value="">No WHT deduction</option>
+              {whtRates.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} — {(Number(r.rate) * 100).toFixed(2)}% ({r.code})
+                </option>
+              ))}
+            </select>
+            {selectedWhtRateId && (() => {
+              const rate = whtRates.find((r) => r.id === selectedWhtRateId);
+              const gross = isItemized ? 0 : Number(billAmount) || 0;
+              if (!rate || (!isItemized && gross <= 0)) return null;
+              const deducted = isItemized ? null : Math.round(gross * Number(rate.rate) * 100) / 100;
+              return (
+                <p className="text-xs text-secondary-500 mt-1">
+                  {deducted !== null
+                    ? `GHS ${deducted.toFixed(2)} will be withheld — net cash payment: GHS ${(gross - deducted).toFixed(2)}`
+                    : `${(Number(rate.rate) * 100).toFixed(2)}% will be withheld at payment`}
+                </p>
+              );
+            })()}
+          </div>
 
           {!isItemized ? (
             <div className="grid grid-cols-2 gap-4">

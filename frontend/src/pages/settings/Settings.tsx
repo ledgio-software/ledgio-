@@ -193,7 +193,8 @@ export function Settings() {
   const [regionalData, setRegionalData] = useState({
     baseCurrency: settings.baseCurrency,
     financialYearStart: settings.financialYearStart,
-    timezone: settings.timezone
+    timezone: settings.timezone,
+    stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
   });
 
   const [smsData, setSmsData] = useState({
@@ -263,6 +264,7 @@ export function Settings() {
         baseCurrency: settings.baseCurrency,
         financialYearStart: settings.financialYearStart,
         timezone: settings.timezone,
+        stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
       });
       setSmsData((prev) => ({ ...prev, bossPhone: settings.bossPhone || "" }));
       setGraData((prev) => ({
@@ -709,6 +711,22 @@ export function Settings() {
                   <option value="GBP">GBP - British Pound (£)</option>
                   <option value="NGN">NGN - Nigerian Naira (₦)</option>
                 </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-secondary-700 dark:text-secondary-300">Stock Valuation Method</label>
+                <select
+                  value={regionalData.stockValuationMethod}
+                  onChange={(e) => setRegionalData({ ...regionalData, stockValuationMethod: e.target.value })}
+                  className="w-full h-10 px-3 rounded-lg border border-secondary-300 dark:border-secondary-700 bg-white dark:bg-secondary-900 text-sm"
+                >
+                  <option value="AVERAGE">Average Cost (Weighted Moving Average)</option>
+                  <option value="FIFO">FIFO — First In, First Out</option>
+                </select>
+                {regionalData.stockValuationMethod === 'FIFO' && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    FIFO records purchase lots on receiving. Switching from Average to FIFO does not convert historical stock; new purchases will create lots going forward.
+                  </p>
+                )}
               </div>
             </CardContent>
             <CardFooter>
