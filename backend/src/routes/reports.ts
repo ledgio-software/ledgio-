@@ -1527,4 +1527,36 @@ router.get('/financial-ratios', requireRole('Viewer'), async (req: Request, res:
   }
 });
 
+/**
+ * GET /api/v1/reports/cost-category-pnl?costCategoryId=&startDate=&endDate=
+ * P&L breakdown for a single cost category (journal lines tagged with the category).
+ * Access: Viewer role or higher.
+ */
+router.get('/cost-category-pnl', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { costCategoryId, startDate, endDate } = req.query;
+    if (!costCategoryId) { res.status(400).json({ success: false, error: 'costCategoryId is required.' }); return; }
+    const params = { costCategoryId: costCategoryId as string, startDate: startDate as string, endDate: endDate as string };
+
+    const cached = await getCachedReport(tenantId, 'cost-category-pnl', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getCostCategoryPnl(
+      costCategoryId as string,
+      startDate ? (startDate as string) : undefined,
+      endDate ? (endDate as string) : undefined
+    );
+    void setCachedReport(tenantId, 'cost-category-pnl', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] Cost Category P&L error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate Cost Category P&L report.' });
+  }
+});
+
 export default router;

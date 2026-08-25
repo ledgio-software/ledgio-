@@ -160,6 +160,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Price Lists", href: "/settings/price-lists", icon: BadgeDollarSign },
       { name: "Job Costing", href: "/manufacturing/jobs", icon: ClipboardList },
       { name: "Job Work Orders", href: "/manufacturing/job-work-orders", icon: Truck },
+      { name: "Cost Categories", href: "/cost-categories", icon: Layers },
       { name: "Post-Dated Cheques", href: "/pdc", icon: CreditCard },
       { name: "Interest Charges", href: "/reports/interest-charges", icon: TrendingUp },
     ],

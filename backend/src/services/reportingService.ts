@@ -315,3 +315,54 @@ export async function getFinancialRatios(startDate?: string, endDate?: string, a
     note: 'Current vs non-current classification is not tracked — liquidity ratios (Current Ratio, Quick Ratio) require that classification and cannot be computed from available data.',
   };
 }
+
+export async function getCostCategoryPnl(costCategoryId: string, startDate?: string, endDate?: string) {
+  if (startDate) validateDateFormat(startDate, 'startDate');
+  if (endDate) validateDateFormat(endDate, 'endDate');
+  const { tenantId } = requireTenantContext();
+
+  return withCurrentTenantDb(prisma, async (client) => {
+    const dateFilter: any = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.lte = end;
+    }
+
+    const category = await (client as any).costCategory.findFirst({ where: { id: costCategoryId, tenantId } });
+    if (!category) throw new Error('Cost category not found.');
+
+    const lines = await (client as any).journalEntryLine.findMany({
+      where: {
+        costCategoryId,
+        journalEntry: {
+          status: 'POSTED',
+          ...(Object.keys(dateFilter).length ? { entryDate: dateFilter } : {}),
+        },
+      },
+      include: { account: true, journalEntry: { select: { entryDate: true, description: true, entryNumber: true } } },
+      orderBy: { journalEntry: { entryDate: 'asc' } },
+    });
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    const rows = lines.map((l: any) => {
+      const debit = Number(l.debit);
+      const credit = Number(l.credit);
+      totalDebit += debit;
+      totalCredit += credit;
+      return {
+        date: l.journalEntry.entryDate,
+        entryNumber: l.journalEntry.entryNumber,
+        description: l.journalEntry.description ?? l.account.name,
+        accountName: l.account.name,
+        accountType: l.account.type,
+        debit,
+        credit,
+      };
+    });
+
+    return { category: { id: category.id, name: category.name }, lines: rows, totalDebit, totalCredit, net: totalCredit - totalDebit };
+  });
+}

@@ -217,21 +217,39 @@ model JournalEntry {
 }
 
 model JournalEntryLine {
-  id             String   @id @default(uuid())
-  journalEntryId String   @map("journal_entry_id")
-  accountId      String   @map("account_id")
-  debit          Decimal  @default(0.00) @db.Decimal(15, 2)
-  credit         Decimal  @default(0.00) @db.Decimal(15, 2)
-  description    String?
-  createdAt      DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid())
+  journalEntryId   String   @map("journal_entry_id")
+  accountId        String   @map("account_id")
+  debit            Decimal  @default(0.00) @db.Decimal(15, 2)
+  credit           Decimal  @default(0.00) @db.Decimal(15, 2)
+  description      String?
+  costCategoryId   String?  @map("cost_category_id")
+  createdAt        DateTime @default(now()) @map("created_at")
 
-  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCategory CostCategory? @relation(fields: [costCategoryId], references: [id], onDelete: SetNull)
 
   @@index([journalEntryId])
   @@index([accountId])
+  @@index([costCategoryId])
   @@index([journalEntryId, createdAt])
   @@map("journal_entry_lines")
+}
+
+model CostCategory {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  journalLines JournalEntryLine[]
+
+  @@index([tenantId])
+  @@map("cost_categories")
 }
 
 model Ledger {

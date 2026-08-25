@@ -74,6 +74,7 @@ import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
 import costCentresRouter from './routes/costCentres';
+import costCategoriesRouter from './routes/costCategories';
 import manufacturingRouter from './routes/manufacturing';
 import whtRatesRouter from './routes/whtRates';
 import postDatedChequesRouter from './routes/postDatedCheques';
@@ -203,6 +204,7 @@ app.use('/api/v1/pharmacy', pharmacyRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);
+app.use('/api/v1/cost-categories', costCategoriesRouter);
 
 // Manufacturing / Bill of Materials (BOM templates + production orders)
 app.use('/api/v1/manufacturing', manufacturingRouter);

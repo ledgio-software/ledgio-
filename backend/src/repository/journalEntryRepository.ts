@@ -36,6 +36,7 @@ export interface CreateJournalEntryLineData {
   credit: number;
   description?: string;
   fundId?: string | null;
+  costCategoryId?: string | null;
 }
 
 export interface CreateJournalEntryData {
@@ -99,15 +100,16 @@ export async function createJournalEntry(
   // Insert lines
   for (const line of data.lines) {
     const lineRows: any[] = await prisma.$queryRawUnsafe(
-      `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, description, fund_id)
-       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid)
+      `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, description, fund_id, cost_category_id)
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7::uuid)
        RETURNING id, journal_entry_id, account_id, debit, credit, description, created_at, fund_id`,
       entryHeader.id,
       line.accountId,
       line.debit || 0.00,
       line.credit || 0.00,
       line.description || null,
-      line.fundId || null
+      line.fundId || null,
+      line.costCategoryId || null
     );
     insertedLines.push(mapJournalEntryLineRow(lineRows[0]));
   }
