@@ -72,6 +72,7 @@ const BranchComparisonReport = lazy(() => import("./pages/reports/BranchComparis
 const LandedCostReport = lazy(() => import("./pages/reports/LandedCostReport").then(m => ({ default: m.LandedCostReport })));
 const Daybook = lazy(() => import("./pages/reports/Daybook").then(m => ({ default: m.Daybook })));
 const StockMovement = lazy(() => import("./pages/reports/StockMovement").then(m => ({ default: m.StockMovement })));
+const Registers = lazy(() => import("./pages/reports/Registers").then(m => ({ default: m.Registers })));
 const AnalyticsDashboard = lazy(() => import("./pages/reports/AnalyticsDashboard").then(m => ({ default: m.AnalyticsDashboard })));
 const PettyCash = lazy(() => import("./pages/pettycash/PettyCash").then(m => ({ default: m.PettyCash })));
 const PurchaseOrders = lazy(() => import("./pages/purchaseorders/PurchaseOrders").then(m => ({ default: m.PurchaseOrders })));
@@ -581,6 +582,7 @@ function App() {
               <Route path="/reports/analytics" element={<ProtectedRoute><MainLayout><AnalyticsDashboard /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/daybook" element={<ProtectedRoute><MainLayout><Daybook /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/stock-movement" element={<ProtectedRoute><MainLayout><StockMovement /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/registers" element={<ProtectedRoute><MainLayout><Registers /></MainLayout></ProtectedRoute>} />
               <Route path="/petty-cash" element={<ProtectedRoute><MainLayout><PettyCash /></MainLayout></ProtectedRoute>} />
               <Route path="/purchase-orders" element={<ProtectedRoute><MainLayout><PurchaseOrders /></MainLayout></ProtectedRoute>} />
               <Route path="/recurring-invoices" element={<ProtectedRoute><MainLayout><RecurringInvoices /></MainLayout></ProtectedRoute>} />

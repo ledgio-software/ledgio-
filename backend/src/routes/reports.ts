@@ -1083,6 +1083,145 @@ router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: R
 });
 
 /**
+ * GET /reports/sales-register?startDate=&endDate=&page=1&pageSize=100
+ * Sales Register: one row per invoice in date order for a period.
+ * Returns: invoice number, date, customer, subtotal, tax, total, currency, payment status.
+ * Standard statutory report used by VAT filers to reconcile output tax.
+ * Access: Viewer role or higher.
+ */
+router.get('/sales-register', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { startDate, endDate } = req.query;
+    const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+    const pageSize = Math.min(500, Math.max(1, parseInt((req.query.pageSize as string) || '100', 10) || 100));
+
+    const dateFilter: { gte?: Date; lte?: Date } = {};
+    if (startDate) dateFilter.gte = new Date(startDate as string);
+    if (endDate) {
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.lte = end;
+    }
+
+    const where = {
+      tenantId,
+      ...(Object.keys(dateFilter).length ? { issueDate: dateFilter } : {}),
+    };
+
+    const [total, invoices] = await Promise.all([
+      prisma.invoice.count({ where }),
+      prisma.invoice.findMany({
+        where,
+        include: { customer: { select: { id: true, name: true } } },
+        orderBy: { issueDate: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    const rows = invoices.map((inv) => ({
+      invoiceId: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      date: inv.issueDate,
+      dueDate: inv.dueDate,
+      customerName: (inv as any).customer?.name ?? 'Unknown',
+      currency: inv.currency,
+      subtotal: Number(inv.subtotal),
+      tax: Number(inv.tax),
+      total: Number(inv.total),
+      status: inv.status,
+    }));
+
+    const totals = {
+      subtotal: Math.round(rows.reduce((s, r) => s + r.subtotal, 0) * 100) / 100,
+      tax: Math.round(rows.reduce((s, r) => s + r.tax, 0) * 100) / 100,
+      total: Math.round(rows.reduce((s, r) => s + r.total, 0) * 100) / 100,
+    };
+
+    res.json({
+      success: true,
+      data: {
+        rows,
+        totals,
+        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Reports] Sales register error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate sales register.' });
+  }
+});
+
+/**
+ * GET /reports/purchase-register?startDate=&endDate=&page=1&pageSize=100
+ * Purchase Register: one row per vendor bill in date order for a period.
+ * Returns: bill number, date, vendor name, amount, currency, payment status.
+ * Standard statutory report used by VAT filers to reconcile input tax.
+ * Access: Viewer role or higher.
+ */
+router.get('/purchase-register', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { startDate, endDate } = req.query;
+    const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
+    const pageSize = Math.min(500, Math.max(1, parseInt((req.query.pageSize as string) || '100', 10) || 100));
+
+    const dateFilter: { gte?: Date; lte?: Date } = {};
+    if (startDate) dateFilter.gte = new Date(startDate as string);
+    if (endDate) {
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.lte = end;
+    }
+
+    const where = {
+      tenantId,
+      billType: 'STANDARD',
+      ...(Object.keys(dateFilter).length ? { billDate: dateFilter } : {}),
+    };
+
+    const [total, bills] = await Promise.all([
+      prisma.vendorBill.count({ where }),
+      prisma.vendorBill.findMany({
+        where,
+        include: { vendor: { select: { id: true, name: true } } },
+        orderBy: { billDate: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    const rows = bills.map((bill) => ({
+      billId: bill.id,
+      billNumber: bill.billNumber,
+      date: bill.billDate,
+      dueDate: bill.dueDate,
+      vendorName: (bill as any).vendor?.name ?? 'Unknown',
+      currency: bill.currency,
+      amount: Number(bill.amount),
+      status: bill.status,
+    }));
+
+    const totals = {
+      amount: Math.round(rows.reduce((s, r) => s + r.amount, 0) * 100) / 100,
+    };
+
+    res.json({
+      success: true,
+      data: {
+        rows,
+        totals,
+        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Reports] Purchase register error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate purchase register.' });
+  }
+});
+
+/**
  * GET /reports/daybook?startDate=&endDate=&page=1&pageSize=50
  * Daybook: every posted journal voucher in date order with all debit/credit lines.
  * This is the TallyPrime "Daybook" equivalent — the chronological ledger of all

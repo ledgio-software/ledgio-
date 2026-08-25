@@ -162,6 +162,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Analytics Dashboard", href: "/reports/analytics", icon: LineChart },
       { name: "Daybook", href: "/reports/daybook", icon: BookOpen },
       { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp },
+      { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet },
     ],
   },
   {
@@ -232,6 +233,7 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/reports/budgets",
     "/reports/daybook",
     "/reports/stock-movement",
+    "/reports/registers",
   ],
   viewer: [
     "/dashboard",
@@ -266,6 +268,7 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/reports/analytics",
     "/reports/daybook",
     "/reports/stock-movement",
+    "/reports/registers",
     "/audit-logs",
     "/help-assistant/activity",
     "/feedback",
