@@ -79,6 +79,7 @@ model Tenant {
   // summaries, cash shortage warnings) go to. Optional - alerts are skipped
   // (not sent to a shared/hardcoded fallback) when unset for this tenant.
   bossPhone               String?   @map("boss_phone")
+  stockValuationMethod    String    @default("AVERAGE") @map("stock_valuation_method")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
@@ -1490,6 +1491,25 @@ model PostDatedCheque {
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
   @@map("post_dated_cheques")
+}
+
+// FIFO stock valuation: one row per purchase lot. remainingQty decrements
+// as stock is sold (FIFO depletion). Only populated when the tenant's
+// stockValuationMethod = 'FIFO'; AVERAGE-cost tenants never touch this table.
+model StockLayer {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  warehouseId  String   @map("warehouse_id")
+  itemId       String   @map("item_id")
+  unitCost     Decimal  @db.Decimal(15, 4) @map("unit_cost")
+  originalQty  Int      @map("original_qty")
+  remainingQty Int      @map("remaining_qty")
+  purchasedAt  DateTime @default(now()) @map("purchased_at")
+  sourceRef    String?  @map("source_ref")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, itemId, purchasedAt])
+  @@map("stock_layers")
 }
 
 // Restricted/unrestricted fund for nonprofit-tenant fund accounting (e.g.

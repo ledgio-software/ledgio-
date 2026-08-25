@@ -32,6 +32,7 @@ import * as accountRepository from '../repository/accountRepository';
 import * as journalService from '../services/journalEntryService';
 import { sendWhatsAppReceipt } from '../services/whatsAppReceiptService';
 import { checkAndAlertLowStock } from '../services/lowStockAlertService';
+import { consumeLayers } from '../services/stockLayerService';
 import PDFDocument from 'pdfkit';
 
 /**
@@ -99,11 +100,28 @@ async function postCashSaleRevenue(
     const cogsAcc = accountRepository.resolveDefaultAccount(accounts, 'COGS');
     const invAcc = accountRepository.resolveDefaultAccount(accounts, 'INVENTORY_ASSET');
     if (cogsAcc && invAcc && Array.isArray(saleLines) && saleLines.length > 0) {
-      const totalCost = (saleLines as any[]).reduce((sum: number, l: any) => {
-        const cost = costByItemId.get(l.itemId) ?? 0;
-        return sum + cost * Number(l.quantity);
-      }, 0);
-      const cogs = Math.round(totalCost * 100) / 100;
+      const { tenantId } = requireTenantContext();
+      const tenantForFifo = await (prisma as any).tenant.findUnique({
+        where: { id: tenantId },
+        select: { stockValuationMethod: true },
+      });
+
+      let cogs = 0;
+      if (tenantForFifo?.stockValuationMethod === 'FIFO') {
+        for (const l of (saleLines as any[])) {
+          if (!l.itemId || !l.quantity) continue;
+          const { totalCost } = await consumeLayers({ tenantId, itemId: l.itemId, qty: Number(l.quantity) });
+          cogs += totalCost;
+        }
+        cogs = Math.round(cogs * 100) / 100;
+      } else {
+        const totalCost = (saleLines as any[]).reduce((sum: number, l: any) => {
+          const cost = costByItemId.get(l.itemId) ?? 0;
+          return sum + cost * Number(l.quantity);
+        }, 0);
+        cogs = Math.round(totalCost * 100) / 100;
+      }
+
       if (cogs > 0) {
         lines.push({ accountId: cogsAcc.id, debit: cogs, credit: 0, description: `COGS - ${sale.receiptNo}` });
         lines.push({ accountId: invAcc.id, debit: 0, credit: cogs, description: `Inventory - ${sale.receiptNo}` });

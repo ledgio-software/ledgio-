@@ -8,6 +8,7 @@ import * as fxRateService from './fxRateService';
 import { recordAuditLogTx, diffFields, AuditActor } from './auditLogService';
 import { recordChange, notifyChange, invoiceToSyncPayload } from './syncChangeLogService';
 import * as fiscalPeriodService from './fiscalPeriodService';
+import { consumeLayers } from './stockLayerService';
 
 export class InvoicePaymentServiceError extends Error {
   statusCode: number;
@@ -192,12 +193,25 @@ export async function recordInvoicePayment(
 
     // COGS: recognize cost proportional to this payment's share of the invoice.
     // Scaled by fxScale to convert native cost prices into base currency.
+    // For FIFO tenants, consume stock layers for actual lot-level costs.
     if (cogsAcc && invAcc && Array.isArray(invoice.items) && invoice.items.length > 0) {
-      const totalNativeCost = (invoice.items as any[]).reduce((sum: number, item: any) => {
-        if (!item.inventoryItemId || item.inventoryItem?.costPrice == null) return sum;
-        return sum + Number(item.inventoryItem.costPrice) * Number(item.quantity);
-      }, 0);
-      const cogsCost = Math.round(totalNativeCost * paymentShare * fxScale * 100) / 100;
+      let cogsCost = 0;
+      if ((tenant as any)?.stockValuationMethod === 'FIFO') {
+        for (const item of (invoice.items as any[])) {
+          if (!item.inventoryItemId || !item.quantity) continue;
+          const consumeQty = Math.round(Number(item.quantity) * paymentShare);
+          if (consumeQty <= 0) continue;
+          const { totalCost } = await consumeLayers({ tenantId, itemId: item.inventoryItemId, qty: consumeQty });
+          cogsCost += totalCost;
+        }
+        cogsCost = Math.round(cogsCost * fxScale * 100) / 100;
+      } else {
+        const totalNativeCost = (invoice.items as any[]).reduce((sum: number, item: any) => {
+          if (!item.inventoryItemId || item.inventoryItem?.costPrice == null) return sum;
+          return sum + Number(item.inventoryItem.costPrice) * Number(item.quantity);
+        }, 0);
+        cogsCost = Math.round(totalNativeCost * paymentShare * fxScale * 100) / 100;
+      }
       if (cogsCost > 0.001) {
         lines.push({ accountId: cogsAcc.id, debit: cogsCost, credit: 0, description: `COGS - ${invoice.invoiceNumber}`, fundId: invoice.fundId || undefined });
         lines.push({ accountId: invAcc.id, debit: 0, credit: cogsCost, description: `Inventory - ${invoice.invoiceNumber}`, fundId: invoice.fundId || undefined });

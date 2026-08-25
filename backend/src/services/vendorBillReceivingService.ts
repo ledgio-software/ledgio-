@@ -1,3 +1,6 @@
+import { prisma } from '../config/db';
+import { addLayer } from './stockLayerService';
+
 export interface ReceivingLineInput {
   itemId: string;
   quantity: number;
@@ -36,6 +39,13 @@ export async function receiveInventoryForBill(
 ): Promise<ReceivingLineResult[]> {
   const results: ReceivingLineResult[] = [];
 
+  // Fetch stock valuation method once before the loop — public schema.
+  const tenant = await (prisma as any).tenant.findUnique({
+    where: { id: tenantId },
+    select: { stockValuationMethod: true },
+  });
+  const isFifo = tenant?.stockValuationMethod === 'FIFO';
+
   for (const line of lines) {
     const item = await client.inventoryItem.findFirst({ where: { id: line.itemId, tenantId } });
     if (!item) {
@@ -69,6 +79,11 @@ export async function receiveInventoryForBill(
       where: { id: line.itemId },
       data: { costPrice: newCostPrice },
     });
+
+    // Record a FIFO lot for this receipt so consumeLayers can deplete it on sale.
+    if (isFifo) {
+      await addLayer({ tenantId, warehouseId, itemId: line.itemId, qty: receivedQty, unitCost: line.unitCost });
+    }
 
     results.push({
       itemId: line.itemId,
