@@ -86,6 +86,7 @@ interface CashTill {
 }
 
 interface LastReceipt {
+  id: string;
   receiptNo: string;
   amount: number;
   changeGiven: number;
@@ -425,6 +426,7 @@ export function PointOfSale() {
           showToast(`Warning: ${warnings.join(" ")}`, "warning" as any);
         }
         setLastReceipt({
+          id: res.data.data.sale.id,
           receiptNo: res.data.data.sale.receiptNo,
           amount: res.data.data.totalAmount,
           changeGiven: res.data.data.changeGiven,
@@ -914,9 +916,18 @@ export function PointOfSale() {
 
                 {lastReceipt && (
                   <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
-                    <div className="flex items-center text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-1">
-                      <Receipt className="mr-1.5 h-4 w-4" />
-                      Sale recorded — Receipt {lastReceipt.receiptNo}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-1">
+                        <Receipt className="mr-1.5 h-4 w-4" />
+                        Sale recorded — Receipt {lastReceipt.receiptNo}
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs text-emerald-700 dark:text-emerald-400 underline hover:text-emerald-900"
+                        onClick={() => window.open(`/api/v1/tills/sales/${lastReceipt.id}/receipt.pdf`, '_blank')}
+                      >
+                        Print Receipt
+                      </button>
                     </div>
                     <p className="text-xs text-emerald-700 dark:text-emerald-400">
                       {lastReceipt.lines.map((l) => `${l.quantity} × ${l.itemName}`).join(", ")} — Total {formatMoney(lastReceipt.amount)} — Change given {formatMoney(lastReceipt.changeGiven)}
@@ -992,21 +1003,31 @@ export function PointOfSale() {
                           </span>
                           <span>{new Date(sale.createdAt).toLocaleTimeString()}</span>
                         </div>
-                        {sale.status === "VOIDED" ? (
-                          <div className="mt-1 flex items-center text-red-600 dark:text-red-400 font-medium">
-                            <Ban className="h-3 w-3 mr-1" />
-                            Voided by {sale.voidedByName}{sale.voidReason ? ` — ${sale.voidReason}` : ""}
-                          </div>
-                        ) : (
+                        <div className="mt-1 flex items-center gap-3">
                           <button
                             type="button"
-                            onClick={() => openVoidModal(sale)}
-                            className="mt-1 flex items-center text-secondary-400 hover:text-red-500 font-medium"
+                            onClick={() => window.open(`/api/v1/tills/sales/${sale.id}/receipt.pdf`, '_blank')}
+                            className="flex items-center text-secondary-400 hover:text-primary-600 font-medium"
                           >
-                            <Ban className="h-3 w-3 mr-1" />
-                            Void this sale
+                            <Receipt className="h-3 w-3 mr-1" />
+                            Print
                           </button>
-                        )}
+                          {sale.status === "VOIDED" ? (
+                            <span className="flex items-center text-red-600 dark:text-red-400 font-medium">
+                              <Ban className="h-3 w-3 mr-1" />
+                              Voided by {sale.voidedByName}{sale.voidReason ? ` — ${sale.voidReason}` : ""}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openVoidModal(sale)}
+                              className="flex items-center text-secondary-400 hover:text-red-500 font-medium"
+                            >
+                              <Ban className="h-3 w-3 mr-1" />
+                              Void this sale
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

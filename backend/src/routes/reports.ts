@@ -431,6 +431,7 @@ router.get('/sales-channel', requireRole('Viewer'), async (req: Request, res: Re
         where,
         select: {
           id: true,
+          receiptNo: true,
           saleType: true,
           amount: true,
           createdAt: true,
@@ -448,11 +449,17 @@ router.get('/sales-channel', requireRole('Viewer'), async (req: Request, res: Re
       })
     )) as any[];
 
-    const summary = { RETAIL: 0, WHOLESALE: 0, TOTAL: 0 };
+    const summary = {
+      RETAIL: { totalAmount: 0, count: 0 },
+      WHOLESALE: { totalAmount: 0, count: 0 },
+      TOTAL: { totalAmount: 0, count: 0 },
+    };
     for (const sale of sales) {
       const type = sale.saleType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
-      summary[type] += Number(sale.amount);
-      summary.TOTAL += Number(sale.amount);
+      summary[type].totalAmount += Number(sale.amount);
+      summary[type].count += 1;
+      summary.TOTAL.totalAmount += Number(sale.amount);
+      summary.TOTAL.count += 1;
     }
 
     res.status(200).json({
@@ -461,6 +468,7 @@ router.get('/sales-channel', requireRole('Viewer'), async (req: Request, res: Re
         summary,
         sales: sales.map((s: any) => ({
           id: s.id,
+          receiptNo: s.receiptNo,
           saleType: s.saleType,
           amount: Number(s.amount),
           createdAt: s.createdAt,

@@ -33,6 +33,7 @@ import * as accountRepository from '../repository/accountRepository';
 import * as journalService from '../services/journalEntryService';
 import { sendWhatsAppReceipt } from '../services/whatsAppReceiptService';
 import { checkAndAlertLowStock } from '../services/lowStockAlertService';
+import PDFDocument from 'pdfkit';
 
 /**
  * Posts the real Cash/Revenue journal entry for a completed POS cash sale
@@ -853,6 +854,131 @@ router.post('/sales/:id/void', async (req: Request, res: Response): Promise<void
     }
     const status = error.message?.includes('not found') ? 404 : 400;
     res.status(status).json({ success: false, error: error.message || 'Failed to void sale.' });
+  }
+});
+
+/**
+ * GET /api/v1/tills/sales/:id/receipt.pdf
+ * Generates a printable thermal-style PDF receipt for a completed (or voided)
+ * POS sale. Accessible by Cashier and above so the cashier can reprint.
+ */
+router.get('/sales/:id/receipt.pdf', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId, tenantName } = requireTenantContext();
+    const { id } = req.params;
+
+    // Fetch sale header (with raw columns not in Prisma schema) + lines
+    const rows: any[] = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).$queryRawUnsafe(
+        `SELECT cs.id, cs.receipt_no AS "receiptNo", cs.amount, cs.cash_given AS "cashGiven",
+                cs.change_given AS "changeGiven", cs.status, cs.payment_method AS "paymentMethod",
+                cs.nhis_claim_ref AS "nhisClaimRef", cs.created_at AS "createdAt",
+                cs.created_by_name AS "createdByName",
+                cs.customer_name AS "customerName", cs.customer_phone AS "customerPhone"
+         FROM cash_sales cs
+         WHERE cs.id = $1 AND cs.tenant_id = $2`,
+        id, tenantId
+      )
+    );
+    if (!rows || rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Sale not found.' });
+      return;
+    }
+    const sale = rows[0];
+
+    const lines: any[] = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).cashSaleLine.findMany({
+        where: { saleId: id, tenantId },
+        orderBy: { createdAt: 'asc' },
+      })
+    );
+
+    // Build receipt PDF (80 mm thermal roll width = 226.77 pt)
+    const W = 226;
+    const MARGIN = 12;
+    const COL = W - MARGIN * 2;
+
+    const buf: Buffer[] = [];
+    const doc = new PDFDocument({ size: [W, 700], margin: MARGIN, bufferPages: true, compress: false, autoFirstPage: true });
+    doc.on('data', (c: Buffer) => buf.push(c));
+
+    const fmt = (n: number) => Number(n).toFixed(2);
+
+    // Header
+    doc.fontSize(10).font('Helvetica-Bold').text(tenantName || 'Store', { align: 'center' });
+    doc.fontSize(7).font('Helvetica').text('POS Receipt', { align: 'center' });
+    doc.moveDown(0.3);
+
+    const dateStr = new Date(sale.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+    doc.text(`Receipt: ${sale.receiptNo}`, { align: 'left' });
+    doc.text(`Date:    ${dateStr}`);
+    if (sale.createdByName) doc.text(`Cashier: ${sale.createdByName}`);
+    if (sale.customerName)  doc.text(`Customer: ${sale.customerName}`);
+    if (sale.customerPhone) doc.text(`Phone:   ${sale.customerPhone}`);
+    doc.text(`Payment: ${sale.paymentMethod}${sale.nhisClaimRef ? ` (${sale.nhisClaimRef})` : ''}`);
+    if (sale.status === 'VOIDED') {
+      doc.moveDown(0.2).fontSize(8).font('Helvetica-Bold').fillColor('red').text('*** VOIDED ***', { align: 'center' });
+      doc.font('Helvetica').fillColor('black');
+    }
+
+    // Divider
+    doc.moveDown(0.3).moveTo(MARGIN, doc.y).lineTo(W - MARGIN, doc.y).lineWidth(0.5).stroke().moveDown(0.3);
+
+    // Line items
+    doc.fontSize(7).font('Helvetica-Bold');
+    const QW = 22, PW = 38, TW = 38;
+    const DW = COL - QW - PW - TW;
+    const x0 = MARGIN;
+    doc.text('Item', x0, doc.y, { width: DW, continued: true });
+    doc.text('Qty', { width: QW, align: 'right', continued: true });
+    doc.text('Price', { width: PW, align: 'right', continued: true });
+    doc.text('Total', { width: TW, align: 'right' });
+
+    doc.font('Helvetica');
+    for (const l of lines) {
+      const y = doc.y;
+      doc.text(l.itemName, x0, y, { width: DW, continued: true });
+      doc.text(String(l.quantity), { width: QW, align: 'right', continued: true });
+      doc.text(fmt(Number(l.unitPrice)), { width: PW, align: 'right', continued: true });
+      doc.text(fmt(Number(l.lineTotal)), { width: TW, align: 'right' });
+    }
+
+    // Divider
+    doc.moveDown(0.3).moveTo(MARGIN, doc.y).lineTo(W - MARGIN, doc.y).stroke().moveDown(0.3);
+
+    // Totals
+    const totX = x0 + DW + QW;
+    const totW = PW + TW;
+    doc.font('Helvetica-Bold').text('TOTAL', totX, doc.y, { width: PW, continued: true });
+    doc.text(fmt(Number(sale.amount)), { width: TW, align: 'right' });
+    doc.font('Helvetica');
+    if (sale.paymentMethod === 'CASH') {
+      doc.text('Cash given', totX, doc.y, { width: PW, continued: true });
+      doc.text(fmt(Number(sale.cashGiven)), { width: TW, align: 'right' });
+      doc.text('Change', totX, doc.y, { width: PW, continued: true });
+      doc.text(fmt(Number(sale.changeGiven)), { width: TW, align: 'right' });
+    }
+
+    // Footer
+    doc.moveDown(0.5).fontSize(7).text('Thank you for your purchase!', { align: 'center' });
+    doc.moveDown(0.3).text('* * *', { align: 'center' });
+
+    // Trim page height to content
+    const pages = (doc as any).bufferedPageRange();
+    for (let i = pages.start; i < pages.start + pages.count; i++) {
+      (doc as any).switchToPage(i);
+    }
+
+    doc.end();
+    await new Promise<void>((resolve) => doc.on('end', resolve));
+
+    const pdfBuffer = Buffer.concat(buf);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Receipt-${sale.receiptNo}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to generate receipt.' });
   }
 });
 
