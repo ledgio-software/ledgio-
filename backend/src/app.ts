@@ -57,6 +57,7 @@ import onboardingWizardRouter from './routes/onboardingWizard';
 import helpAssistantRouter from './routes/helpAssistant';
 import pettyCashRouter from './routes/pettyCash';
 import purchaseOrdersRouter from './routes/purchaseOrders';
+import salesOrdersRouter from './routes/salesOrders';
 import recurringInvoicesRouter from './routes/recurringInvoices';
 import paystackRouter from './routes/paystack';
 import fixedAssetsRouter from './routes/fixedAssets';
@@ -199,6 +200,9 @@ app.use('/api/v1/petty-cash', pettyCashRouter);
 
 // Purchase Order endpoints
 app.use('/api/v1/purchase-orders', purchaseOrdersRouter);
+
+// Sales Order endpoints
+app.use('/api/v1/sales-orders', salesOrdersRouter);
 app.use('/api/v1/recurring-invoices', recurringInvoicesRouter);
 app.use('/api/v1/paystack', paystackRouter);
 app.use('/api/v1/fixed-assets', fixedAssetsRouter);

@@ -386,6 +386,7 @@ model Customer {
 
   invoices          Invoice[]
   recurringInvoices RecurringInvoice[]
+  salesOrders       SalesOrder[]
 
   @@index([tenantId])
   @@map("customers")
@@ -480,7 +481,10 @@ model Invoice {
   // can safely replay-and-return-existing instead of creating a duplicate
   // invoice (the old `INV-${Date.now()}-${random}` number alone offered no
   // such guarantee).
-  clientTxnId String?  @map("client_txn_id")
+  clientTxnId  String?  @map("client_txn_id")
+  // Back-link to the Sales Order this invoice was converted from (null for
+  // invoices created directly, not from a sales order).
+  salesOrderId String?  @map("sales_order_id")
 
   customer         Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
   taxRate          TaxRate?                 @relation(fields: [taxRateId], references: [id], onDelete: SetNull)
@@ -1725,6 +1729,50 @@ model ExpenseClaim {
   @@index([status])
   @@index([submittedBy])
   @@map("expense_claims")
+}
+
+// Sales Orders (SO): a customer's confirmed purchase request, upstream of
+// invoice creation. Status flow: DRAFT -> CONFIRMED -> INVOICED (or CANCELLED
+// at any pre-INVOICED stage). Converting to invoice creates a real Invoice row
+// and flips status to INVOICED; the salesOrderId on the Invoice back-links them.
+model SalesOrder {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  soNumber    String   @map("so_number")
+  customerId  String   @map("customer_id")
+  orderDate   DateTime @default(now()) @map("order_date")
+  expectedDate DateTime? @map("expected_date")
+  currency    String   @default("USD")
+  notes       String?
+  status      String   @default("DRAFT")
+  invoiceId   String?  @map("invoice_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  customer Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lines    SalesOrderLine[]
+
+  @@unique([tenantId, soNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@map("sales_orders")
+}
+
+model SalesOrderLine {
+  id           String  @id @default(uuid())
+  tenantId     String  @map("tenant_id")
+  salesOrderId String  @map("sales_order_id")
+  description  String
+  quantity     Decimal @db.Decimal(15, 4)
+  unitPrice    Decimal @map("unit_price") @db.Decimal(15, 2)
+  amount       Decimal @db.Decimal(15, 2)
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([salesOrderId])
+  @@map("sales_order_lines")
 }
 
 // Platform-wide (no tenantId - the same tax/regulatory rules apply to every

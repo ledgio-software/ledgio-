@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [2026-08-25] - TallyPrime Gaps #2–5: Stock Movement, Registers, Fiscal Period Lock, Sales Orders
+
+**What/Why:** Continued TallyPrime feature-parity implementation from TASKS.md gaps #2–5.
+
+**Changes:**
+
+- **Gap #2 — Stock Movement Analysis**: `GET /reports/stock-movement` (UNION of 6 sources); `StockMovement.tsx` frontend page at `/reports/stock-movement` with item/warehouse dropdowns, 4 summary tiles, colored type badges, CSV export. Added to nav, auditor + external accountant allowlists.
+- **Gap #3 — Purchase & Sales Registers**: `GET /reports/sales-register` + `GET /reports/purchase-register` in `backend/src/routes/reports.ts` (paginated, date-ranged). `Registers.tsx` frontend with Sales/Purchase tab toggle, summary tiles, status badges, CSV export, pagination.
+- **Gap #4 — Fiscal Period Lock**: Wired `assertPeriodOpenForDate(tenantId, new Date())` into `invoicePaymentService.recordInvoicePayment()` and `vendorBillPaymentService.payVendorBill()` — paying an invoice or bill in a LOCKED period now returns 400. Schema + endpoints were already in place.
+- **Gap #5 — Sales Orders**: New `SalesOrder` + `SalesOrderLine` Prisma models; `salesOrderId` back-link on `Invoice`; migration `20260825000003_add_sales_orders`. Backend routes at `/api/v1/sales-orders`: `GET /`, `GET /:id`, `POST /`, `PUT /:id/confirm`, `PUT /:id/cancel`, `POST /:id/convert-to-invoice`. Frontend: `SalesOrders.tsx` at `/sales-orders` with status filter, inline create form, per-row actions. Nav entry in SALES & PURCHASES; AR Clerk, External Accountant, and Auditor allowlists updated.
+- **`TASKS.md`** — Gaps #2–5 marked `[x]`.
+
 ## [2026-08-25] - NHIS Billing Removed; TallyPrime Gap Analysis; Daybook Report
 
 **What/Why:** NHIS billing was removed entirely (not applicable to the user's market). A full TallyPrime feature-parity gap analysis identified 10 missing features. First gap shipped: the Daybook Report.
