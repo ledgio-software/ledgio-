@@ -1423,6 +1423,36 @@ model WhtRate {
   @@map("wht_rates")
 }
 
+// Post-Dated Cheque register. RECEIVABLE = customer gives us a future-dated
+// cheque; PAYABLE = we issue one to a supplier. receipt_journal_id and
+// deposit_journal_id are plain UUID strings referencing journal entries in
+// the per-tenant schema (no FK — cross-schema boundary, same constraint
+// pattern as TaxRate.accountId).
+model PostDatedCheque {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  type             String   // 'RECEIVABLE' | 'PAYABLE'
+  partyName        String   @map("party_name")
+  chequeNumber     String   @map("cheque_number")
+  bankName         String   @map("bank_name")
+  amount           Decimal  @db.Decimal(15, 2)
+  currency         String   @default("GHS")
+  dueDate          DateTime @map("due_date")
+  status           String   @default("PENDING") // PENDING | DEPOSITED | BOUNCED | CANCELLED
+  invoiceId        String?  @map("invoice_id")
+  billId           String?  @map("bill_id")
+  receiptJournalId String?  @map("receipt_journal_id")
+  depositJournalId String?  @map("deposit_journal_id")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@map("post_dated_cheques")
+}
+
 // Restricted/unrestricted fund for nonprofit-tenant fund accounting (e.g.
 // "Building Fund", "General Fund"). Invoice.fundId/VendorBill.fundId are
 // real FKs to this table (same shared schema). journal_entry_lines.fund_id

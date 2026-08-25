@@ -39,6 +39,7 @@ const OnboardingWizard = lazy(() => import("./pages/onboarding/OnboardingWizard"
 const Settings = lazy(() => import("./pages/settings/Settings").then(m => ({ default: m.Settings })));
 const TaxRates = lazy(() => import("./pages/settings/TaxRates").then(m => ({ default: m.TaxRates })));
 const WhtRates = lazy(() => import("./pages/settings/WhtRates").then(m => ({ default: m.WhtRates })));
+const PostDatedCheques = lazy(() => import("./pages/banking/PostDatedCheques").then(m => ({ default: m.PostDatedCheques })));
 const Funds = lazy(() => import("./pages/settings/Funds").then(m => ({ default: m.Funds })));
 const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m => ({ default: m.FiscalPeriods })));
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
@@ -566,6 +567,7 @@ function App() {
               <Route path="/feedback" element={<ProtectedRoute><MainLayout><FeedbackInbox /></MainLayout></ProtectedRoute>} />
               <Route path="/import" element={<ProtectedRoute><MainLayout><BulkImportWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/banking" element={<ProtectedRoute><MainLayout><BankReconciliation /></MainLayout></ProtectedRoute>} />
+              <Route path="/pdc" element={<ProtectedRoute><MainLayout><PostDatedCheques /></MainLayout></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><MainLayout><Invoices /></MainLayout></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><MainLayout><Customers /></MainLayout></ProtectedRoute>} />
               <Route path="/bills" element={<ProtectedRoute><MainLayout><VendorBills /></MainLayout></ProtectedRoute>} />
