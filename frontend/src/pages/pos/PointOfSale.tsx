@@ -119,8 +119,7 @@ export function PointOfSale() {
   const [customerName, setCustomerName] = useState("");
   const [saleType, setSaleType] = useState<"RETAIL" | "WHOLESALE">("RETAIL");
   const [rxNumber, setRxNumber] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "NHIS" | "MOMO" | "CARD">("CASH");
-  const [nhisClaimRef, setNhisClaimRef] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOMO" | "CARD">("CASH");
   const [isRecordingSale, setIsRecordingSale] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastReceipt | null>(null);
@@ -417,7 +416,6 @@ export function PointOfSale() {
         customerName: customerName.trim() || undefined,
         rxNumber: rxNumber.trim() || undefined,
         paymentMethod,
-        nhisClaimRef: nhisClaimRef.trim() || undefined,
       });
 
       if (res.data.success) {
@@ -439,7 +437,6 @@ export function PointOfSale() {
         setCustomerName("");
         setRxNumber("");
         setPaymentMethod("CASH");
-        setNhisClaimRef("");
         fetchTillAndItems();
       }
     } catch (err: any) {
@@ -834,7 +831,7 @@ export function PointOfSale() {
                   <div>
                     <div className="text-xs text-secondary-500 mb-1">Payment Method</div>
                     <div className="flex rounded-md border border-secondary-200 dark:border-secondary-800 p-1 text-sm">
-                      {(["CASH", "NHIS", "MOMO", "CARD"] as const).map((method) => (
+                      {(["CASH", "MOMO", "CARD"] as const).map((method) => (
                         <button
                           key={method}
                           type="button"
@@ -860,17 +857,6 @@ export function PointOfSale() {
                         </div>
                       </div>
                     </>
-                  ) : paymentMethod === "NHIS" ? (
-                    <div>
-                      <label className="block text-sm font-medium mb-1">NHIS Claim Ref (optional)</label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. NHIS-2026-00001"
-                        value={nhisClaimRef}
-                        onChange={(e) => setNhisClaimRef(e.target.value)}
-                      />
-                      <p className="text-xs text-secondary-500 mt-1">Amount: {formatMoney(cartTotal)} — no cash collected at till</p>
-                    </div>
                   ) : (
                     <div className="p-4 bg-secondary-50 dark:bg-secondary-900 rounded-lg">
                       <div className="text-xs text-secondary-500">Amount ({paymentMethod === "MOMO" ? "MoMo" : paymentMethod})</div>

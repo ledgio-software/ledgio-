@@ -23,8 +23,7 @@ const createSaleSchema = z.object({
   customerPhone: z.string().max(30).optional().nullable(),
   customerName: z.string().max(200).optional().nullable(),
   rxNumber: z.string().min(1).max(100).optional().nullable(),
-  paymentMethod: z.enum(['CASH', 'NHIS', 'MOMO', 'CARD']).default('CASH'),
-  nhisClaimRef: z.string().max(100).optional().nullable(),
+  paymentMethod: z.enum(['CASH', 'MOMO', 'CARD']).default('CASH'),
 });
 import { verifyPassword } from '../utils/password';
 import { recordAuditLog, recordAuditLogTx, actorFromRequest, AuditActor } from '../services/auditLogService';
@@ -83,35 +82,9 @@ async function postCashSaleRevenue(
       return null;
     }
 
-    // For non-CASH sales (NHIS, MoMo, Card) debit a receivable account instead
-    // of the Cash account so the ledger reflects outstanding claims correctly.
-    let debitAcc = cashAcc;
-    if (paymentMethod !== 'CASH') {
-      // Look up or auto-create NHIS Receivable (code 1020) for the tenant.
-      let receivableAcc: any = accounts.find((a: any) => a.code === '1020');
-      if (!receivableAcc) {
-        try {
-          receivableAcc = await withCurrentTenantDb(prisma, (client) =>
-            (client as any).account.create({
-              data: {
-                code: '1020',
-                name: 'NHIS Receivable',
-                type: 'ASSET',
-              },
-            })
-          );
-        } catch {
-          // If auto-create failed (e.g. concurrent request), fall back to cash account
-          receivableAcc = null;
-        }
-      }
-      if (receivableAcc) debitAcc = receivableAcc;
-    }
-
+    const debitAcc = cashAcc;
     const amount = Number(sale.amount);
-    const debitDesc = paymentMethod === 'NHIS'
-      ? `NHIS claim receivable - ${sale.receiptNo}`
-      : paymentMethod === 'CASH'
+    const debitDesc = paymentMethod === 'CASH'
       ? `Cash received - ${sale.receiptNo}`
       : `${paymentMethod} payment received - ${sale.receiptNo}`;
     const lines: { accountId: string; debit: number; credit: number; description: string }[] = [
@@ -297,7 +270,7 @@ router.post('/open', async (req: Request, res: Response): Promise<void> => {
 router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName, rxNumber, paymentMethod, nhisClaimRef } = req.body;
+    const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName, rxNumber, paymentMethod } = req.body;
     const resolvedSaleType = saleType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
     const resolvedPaymentMethod: string = paymentMethod || 'CASH';
 
@@ -471,13 +444,11 @@ router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: 
             },
           });
 
-          // customer_name / customer_phone (migration 016) and nhis_claim_ref
-          // (migration 20260825000000) are raw SQL columns not in schema.prisma.
+          // customer_name / customer_phone (migration 016) are raw SQL columns not in schema.prisma.
           await (client as any).$executeRawUnsafe(
-            `UPDATE cash_sales SET customer_name = $1, customer_phone = $2, nhis_claim_ref = $3 WHERE id = $4`,
+            `UPDATE cash_sales SET customer_name = $1, customer_phone = $2 WHERE id = $3`,
             customerName ? String(customerName).trim() : null,
             customerPhone ? String(customerPhone).trim() : null,
-            nhisClaimRef ? String(nhisClaimRef).trim() : null,
             sale.id
           );
         } catch (createError: any) {
@@ -872,7 +843,7 @@ router.get('/sales/:id/receipt.pdf', async (req: Request, res: Response): Promis
       (client as any).$queryRawUnsafe(
         `SELECT cs.id, cs.receipt_no AS "receiptNo", cs.amount, cs.cash_given AS "cashGiven",
                 cs.change_given AS "changeGiven", cs.status, cs.payment_method AS "paymentMethod",
-                cs.nhis_claim_ref AS "nhisClaimRef", cs.created_at AS "createdAt",
+                cs.created_at AS "createdAt",
                 cs.created_by_name AS "createdByName",
                 cs.customer_name AS "customerName", cs.customer_phone AS "customerPhone"
          FROM cash_sales cs
@@ -915,7 +886,7 @@ router.get('/sales/:id/receipt.pdf', async (req: Request, res: Response): Promis
     if (sale.createdByName) doc.text(`Cashier: ${sale.createdByName}`);
     if (sale.customerName)  doc.text(`Customer: ${sale.customerName}`);
     if (sale.customerPhone) doc.text(`Phone:   ${sale.customerPhone}`);
-    doc.text(`Payment: ${sale.paymentMethod}${sale.nhisClaimRef ? ` (${sale.nhisClaimRef})` : ''}`);
+    doc.text(`Payment: ${sale.paymentMethod}`);
     if (sale.status === 'VOIDED') {
       doc.moveDown(0.2).fontSize(8).font('Helvetica-Bold').fillColor('red').text('*** VOIDED ***', { align: 'center' });
       doc.font('Helvetica').fillColor('black');
@@ -1238,111 +1209,5 @@ router.get('/closeouts', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-/**
- * GET /api/v1/tills/nhis-claims
- * Returns CashSale rows where paymentMethod = 'NHIS'.
- * Optional ?settled=true to show settled claims instead of outstanding ones.
- */
-router.get('/nhis-claims', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { tenantId } = requireTenantContext();
-    const showSettled = req.query.settled === 'true';
-
-    const claims = await withCurrentTenantDb(prisma, (client) =>
-      (client as any).$queryRawUnsafe(
-        `SELECT cs.id, cs.receipt_no AS "receiptNo", cs.amount, cs.created_at AS "createdAt",
-                cs.nhis_claim_ref AS "nhisClaimRef", cs.nhis_settled_at AS "nhisSettledAt",
-                cs.customer_name AS "customerName", cs.tenant_id AS "tenantId"
-         FROM cash_sales cs
-         WHERE cs.tenant_id = $1
-           AND cs.payment_method = 'NHIS'
-           AND cs.status = 'COMPLETED'
-           ${showSettled ? 'AND cs.nhis_settled_at IS NOT NULL' : 'AND cs.nhis_settled_at IS NULL'}
-         ORDER BY cs.created_at ASC`,
-        tenantId
-      )
-    );
-
-    res.status(200).json({ success: true, data: { claims } });
-  } catch (error: any) {
-    console.error('[CashTill] Error fetching NHIS claims:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch NHIS claims.' });
-  }
-});
-
-/**
- * PUT /api/v1/tills/sales/:id/settle-nhis
- * Marks an NHIS claim as settled and posts a journal reversal entry
- * (Debit Cash / Credit NHIS Receivable).
- */
-router.put(
-  '/sales/:id/settle-nhis',
-  requireRole('Accountant'),
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { tenantId } = requireTenantContext();
-      const saleId = req.params.id;
-
-      const [saleRows] = await withCurrentTenantDb(prisma, (client) =>
-        (client as any).$queryRawUnsafe(
-          `SELECT id, receipt_no AS "receiptNo", amount, payment_method AS "paymentMethod",
-                  nhis_settled_at AS "nhisSettledAt"
-           FROM cash_sales
-           WHERE id = $1 AND tenant_id = $2`,
-          saleId,
-          tenantId
-        )
-      ) as any[];
-
-      if (!saleRows) {
-        res.status(404).json({ success: false, error: 'Sale not found.' });
-        return;
-      }
-
-      if (saleRows.paymentMethod !== 'NHIS') {
-        res.status(400).json({ success: false, error: 'Only NHIS sales can be settled via this endpoint.' });
-        return;
-      }
-
-      if (saleRows.nhisSettledAt) {
-        res.status(400).json({ success: false, error: 'This claim has already been settled.' });
-        return;
-      }
-
-      await withCurrentTenantDb(prisma, (client) =>
-        (client as any).$executeRawUnsafe(
-          `UPDATE cash_sales SET nhis_settled_at = NOW() WHERE id = $1`,
-          saleId
-        )
-      );
-
-      // Journal: Debit Cash (1010), Credit NHIS Receivable (1020)
-      const accounts = await withCurrentTenantDb(prisma, (client) =>
-        accountRepository.listAccounts(client)
-      );
-      const cashAcc = accountRepository.resolveDefaultAccount(accounts, 'CASH') || accounts.find((a: any) => a.code === '1010');
-      const receivableAcc = accounts.find((a: any) => a.code === '1020');
-      if (cashAcc && receivableAcc) {
-        await journalService.createJournalEntry(
-          {
-            description: `NHIS claim settled - ${saleRows.receiptNo}`,
-            entryDate: new Date().toISOString().split('T')[0],
-            status: 'POSTED',
-            lines: [
-              { accountId: cashAcc.id, debit: Number(saleRows.amount), credit: 0, description: `NHIS settlement received - ${saleRows.receiptNo}` },
-              { accountId: receivableAcc.id, debit: 0, credit: Number(saleRows.amount), description: `Clear NHIS receivable - ${saleRows.receiptNo}` },
-            ],
-          },
-          actorFromRequest(req)
-        ).catch((err: any) => console.error('[CashTill] Failed to post NHIS settlement journal:', err));
-      }
-
-      res.status(200).json({ success: true, message: 'NHIS claim marked as settled.' });
-    } catch (error: any) {
-      console.error('[CashTill] Error settling NHIS claim:', error);
-      res.status(500).json({ success: false, error: 'Failed to settle NHIS claim.' });
-    }
-  }
-);
 
 export default router;
