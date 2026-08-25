@@ -437,7 +437,6 @@ export function PointOfSale() {
         setCustomerName("");
         setRxNumber("");
         setPaymentMethod("CASH");
-        setNhisClaimRef("");
         fetchTillAndItems();
       }
     } catch (err: any) {
