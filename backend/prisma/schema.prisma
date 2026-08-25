@@ -1103,15 +1103,9 @@ model CashSale {
   // RETAIL (default) or WHOLESALE - stamped at sale time so revenue reports
   // can split by sales channel without re-deriving from customer records.
   saleType         String         @default("RETAIL") @map("sale_type")
-  // CASH (default) | NHIS | MOMO | CARD — recorded at sale time so that NHIS
-  // claims can be tracked, reconciled, and settled separately from cash sales.
+  // CASH (default) | MOMO | CARD — recorded at sale time for reporting.
   // Added via raw SQL migration (same pattern as customer_name/customer_phone).
   paymentMethod    String         @default("CASH") @map("payment_method")
-  // NHIS scheme claim reference number entered by staff at point-of-sale.
-  // Null for non-NHIS sales. Max 100 chars per NHIS claim ref format.
-  nhisClaimRef     String?        @map("nhis_claim_ref")
-  // When the NHIS claim was settled (cash received from NHIS). Null = outstanding.
-  nhisSettledAt    DateTime?      @map("nhis_settled_at")
 
   till  CashTill       @relation(fields: [tillId], references: [id], onDelete: Cascade)
   lines CashSaleLine[]

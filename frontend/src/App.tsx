@@ -83,7 +83,6 @@ const PaymentCallback = lazy(() => import("./pages/subscription/PaymentCallback"
 const PrescriptionRegister = lazy(() => import("./pages/pharmacy/PrescriptionRegister").then(m => ({ default: m.PrescriptionRegister })));
 const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister").then(m => ({ default: m.NarcoticsRegister })));
 const ExpiryAlerts = lazy(() => import("./pages/pharmacy/ExpiryAlerts").then(m => ({ default: m.ExpiryAlerts })));
-const NhisClaims = lazy(() => import("./pages/pharmacy/NhisClaims").then(m => ({ default: m.NhisClaims })));
 
 // "What happened today?" quick-action grid shown in Operations and Business modes.
 const GUIDED_ACTIONS_OPS = [
@@ -589,7 +588,6 @@ function App() {
               <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
-              <Route path="/pharmacy/nhis-claims" element={<ProtectedRoute><MainLayout><NhisClaims /></MainLayout></ProtectedRoute>} />
               <Route path="/reports" element={<Navigate to="/reports/pnl" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
