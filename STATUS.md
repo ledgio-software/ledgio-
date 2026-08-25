@@ -2,6 +2,79 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [2026-08-25] - TallyPrime Parity Batch 2: WHT, Post-Dated Cheques, Dual UoM, Interest on Overdue, FIFO Stock Valuation
+
+**What/Why:** Closed the 5 remaining TallyPrime feature-parity gaps identified after PR #96 merged (10 gaps). All 5 gaps shipped on branch `claude/chat-session-k4pf3d`, PR #97.
+
+**Changes:**
+
+**Gap 1 — Withholding Tax (WHT)**
+- **`backend/prisma/schema.prisma`** — New `WhtRate` model; `whtRateId`/`whtAmount` optional FK on `VendorBill`.
+- **`backend/prisma/migrations/20260825000008_add_wht_rates/migration.sql`** (new) — `wht_rates` table; `wht_rate_id`/`wht_amount` columns on `vendor_bills`.
+- **`backend/src/repository/accountRepository.ts`** — Added `'WHT_PAYABLE'` to `AccountDefaultRole` union and lookup maps.
+- **`backend/src/services/accountService.ts`** — Added `WHT_PAYABLE: ['LIABILITY']` to `REASONABLE_TYPES_FOR_ROLE`.
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration v20 adds `'WHT_PAYABLE'` to CHECK constraint.
+- **`backend/src/routes/whtRates.ts`** (new) — CRUD route; soft-deactivate on delete when bills reference the rate.
+- **`backend/src/services/vendorBillPaymentService.ts`** — 3-line journal on WHT bill payment: Debit EXPENSE full, Credit CASH net, Credit WHT_PAYABLE deducted.
+- **`backend/src/routes/bills.ts`** — `POST/PUT` accept optional `whtRateId`.
+- **`backend/src/services/onboardingWizardService.ts`** — Seeds WHT Payable account (role `WHT_PAYABLE`) and starter WHT5 rate (5%).
+- **`backend/src/app.ts`** — Registered `whtRatesRouter` at `/api/v1/wht-rates`.
+- **`frontend/src/pages/settings/WhtRates.tsx`** (new) — List + create/edit modal; account picker (Liability accounts first).
+- **`frontend/src/pages/bills/VendorBills.tsx`** — WHT rate selector in New Bill form; deducted WHT and net payable in bill summary.
+- **`frontend/src/lib/navigation.ts`** — Added `/settings/wht-rates` to OPERATIONS_HIDDEN; nav entry in FINANCE & BANKING.
+- **`frontend/src/App.tsx`** — Lazy import + route for `/settings/wht-rates`.
+
+**Gap 2 — Post-Dated Cheques (PDC)**
+- **`backend/prisma/schema.prisma`** — New `PostDatedCheque` model (PENDING/DEPOSITED/BOUNCED/CANCELLED).
+- **`backend/prisma/migrations/20260825000009_add_post_dated_cheques/migration.sql`** (new) — `post_dated_cheques` table.
+- **`backend/src/repository/accountRepository.ts`** — Added `'PDC_RECEIVABLE'` and `'PDC_PAYABLE'` to `AccountDefaultRole`.
+- **`backend/src/services/accountService.ts`** — Added `PDC_RECEIVABLE: ['ASSET']`, `PDC_PAYABLE: ['LIABILITY']`.
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration v21 adds both PDC roles to CHECK constraint.
+- **`backend/src/routes/postDatedCheques.ts`** (new) — GET list, POST create (optional journal on receipt), PATCH deposit/bounce/cancel (each posts the appropriate journal entry).
+- **`backend/src/services/onboardingWizardService.ts`** — Seeds PDC Receivable (asset) and PDC Payable (liability) accounts.
+- **`backend/src/app.ts`** — Registered `postDatedChequesRouter` at `/api/v1/post-dated-cheques`.
+- **`frontend/src/pages/banking/PostDatedCheques.tsx`** (new) — Receivable/Payable tabs, status filter pills, summary tiles, Deposit/Bounce/Cancel actions, create modal.
+- **`frontend/src/lib/navigation.ts`** — `/pdc` in FINANCE & BANKING; Operations mode hidden.
+- **`frontend/src/App.tsx`** — Lazy import + route for `/pdc`.
+
+**Gap 3 — Dual Units of Measure**
+- **`backend/prisma/migrations/20260825000010_add_secondary_uom/migration.sql`** (new) — `secondary_unit_of_measure TEXT`, `conversion_factor NUMERIC(10,4)` on `inventory_items`.
+- **`backend/prisma/schema.prisma`** — `secondaryUnitOfMeasure` and `conversionFactor` optional fields on `InventoryItem`.
+- **`backend/src/routes/inventory.ts`** — Item create/update accept new fields.
+- **`backend/src/routes/purchaseOrders.ts`** and **`backend/src/routes/bills.ts`** — Line items accept optional `purchaseUoM: "primary" | "secondary"`; quantity multiplied by `conversionFactor` before writing to WarehouseStock when secondary.
+- **`backend/src/services/vendorBillReceivingService.ts`** — UoM conversion applied on receiving.
+- **`frontend/src/pages/inventory/WarehouseManagement.tsx`** — Item create/edit: Secondary UoM and Conversion Factor fields (shown only when Secondary UoM is set); list shows both units.
+- Purchase order and vendor bill form line rows: UoM toggle (Primary/Secondary) when item has `conversionFactor`.
+
+**Gap 4 — Interest on Overdue Receivables**
+- **`backend/prisma/schema.prisma`** — New `InterestPolicy` (unique per tenant) and `InterestCharge` models.
+- **`backend/prisma/migrations/20260825000011_add_interest_policy/migration.sql`** (new) — `interest_policies` and `interest_charges` tables; unique index on `(tenant_id, invoice_id, period_start)` for idempotency.
+- **`backend/src/repository/accountRepository.ts`** — Added `'INTEREST_INCOME'` to `AccountDefaultRole`.
+- **`backend/src/services/accountService.ts`** — Added `INTEREST_INCOME: ['REVENUE']` to `REASONABLE_TYPES_FOR_ROLE`.
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration v22 (after v21) adds `INTEREST_INCOME` to CHECK constraint.
+- **`backend/src/routes/interestPolicy.ts`** (new) — `GET/PUT /` (upsert policy), `GET /charges` (list), `PATCH /charges/:id/void`.
+- **`backend/src/services/interestChargeCronService.ts`** (new) — Daily cron at `0 7 * * *`: per tenant, finds overdue invoices (status SENT/PARTIALLY_PAID, dueDate < today − graceDays), posts Dr CASH / Cr INTEREST_INCOME journal, creates `InterestCharge` row.
+- **`backend/src/services/onboardingWizardService.ts`** — Added `INTEREST_INCOME` to auto-designate roles; seeds "Interest Income" revenue account.
+- **`backend/src/app.ts`** — Registered `interestPolicyRouter` at `/api/v1/interest-policy`.
+- **`backend/src/index.ts`** — `InterestChargeCronService.init()` called alongside other daily crons.
+- **`frontend/src/pages/reports/InterestCharges.tsx`** (new) — Policy config card (annual rate %, grace days, active toggle, account picker) + charges table (date, invoice, period, amount, status pill, void button).
+- **`frontend/src/lib/navigation.ts`** — `/reports/interest-charges` in FINANCE & BANKING; Operations mode hidden.
+- **`frontend/src/App.tsx`** — Lazy import + route for `/reports/interest-charges`.
+
+**Gap 5 — FIFO Stock Valuation**
+- **`backend/prisma/schema.prisma`** — New `StockLayer` model; `stockValuationMethod String @default("AVERAGE")` on `Tenant`.
+- **`backend/prisma/migrations/20260825000012_add_fifo_stock_layers/migration.sql`** (new) — `stock_valuation_method` column on `tenants`; `stock_layers` table with partial index on `(tenant_id, item_id, purchased_at) WHERE remaining_qty > 0`.
+- **`backend/src/services/stockLayerService.ts`** (new) — `addLayer()`: inserts a StockLayer on purchase receipt. `consumeLayers()`: FIFO depletion (oldest layers first), updates `remainingQty`, returns `{ totalCost }`. `warehouseId` optional for cross-warehouse FIFO.
+- **`backend/src/services/vendorBillReceivingService.ts`** — Calls `addLayer()` after receiving stock when tenant is FIFO; moving-average `costPrice` maintained in parallel.
+- **`backend/src/services/invoicePaymentService.ts`** — COGS block: if FIFO, calls `consumeLayers()` per line item scaled to payment share; if AVERAGE, existing moving-average logic unchanged.
+- **`backend/src/routes/cashTill.ts`** — POS COGS: if FIFO, calls `consumeLayers()` per sale line; if AVERAGE, existing calculation unchanged. Void reversal deferred (FIFO layer restoration is complex; average-cost reversal preserved for now).
+- **`backend/src/routes/tenants.ts`** — `PUT /current` accepts `stockValuationMethod` (validates AVERAGE | FIFO).
+- **`frontend/src/pages/settings/Settings.tsx`** — "Inventory" section in Currency & Financial Preferences card: stock valuation method selector (Average Cost / FIFO) with non-retroactive warning.
+
+Both backend and frontend TypeScript compile clean (cast workarounds for stale Prisma generated types: `(prisma as any).stockLayer`, `(tenant as any)?.stockValuationMethod`). `TASKS.md` updated.
+
+---
+
 ## [2026-08-25] - TallyPrime Gaps #2–5: Stock Movement, Registers, Fiscal Period Lock, Sales Orders
 
 **What/Why:** Continued TallyPrime feature-parity implementation from TASKS.md gaps #2–5.
