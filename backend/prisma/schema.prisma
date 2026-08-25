@@ -843,6 +843,7 @@ model Warehouse {
   invoices         Invoice[]
   purchaseOrders   PurchaseOrder[]
   inventoryBatches InventoryBatch[]
+  productionOrders ProductionOrder[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -892,6 +893,8 @@ model InventoryItem {
   inventoryBatches   InventoryBatch[]
   prescriptionLines  PrescriptionLine[]
   narcoticsLog       NarcoticsLogEntry[]
+  bomFinishedIn      BomTemplate[]       @relation("BomFinishedItem")
+  bomComponentIn     BomLine[]           @relation("BomComponentItem")
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -922,6 +925,70 @@ model InventoryBatch {
   @@index([itemId])
   @@index([expiryDate])
   @@map("inventory_batches")
+}
+
+// ── Manufacturing / Bill of Materials ────────────────────────────────────────
+// BomTemplate: defines a finished product and its component items/quantities.
+// ProductionOrder: an actual manufacturing run that consumes component stock
+// and produces finished-goods stock, with a journal entry posting cost.
+model BomTemplate {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  name           String
+  description    String?
+  finishedItemId String   @map("finished_item_id")
+  outputQty      Decimal  @default(1) @map("output_qty") @db.Decimal(15, 4)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  finishedItem     InventoryItem    @relation("BomFinishedItem", fields: [finishedItemId], references: [id], onDelete: Restrict)
+  lines            BomLine[]
+  productionOrders ProductionOrder[]
+
+  @@index([tenantId])
+  @@index([finishedItemId])
+  @@map("bom_templates")
+}
+
+model BomLine {
+  id               String  @id @default(uuid())
+  tenantId         String  @map("tenant_id")
+  bomTemplateId    String  @map("bom_template_id")
+  componentItemId  String  @map("component_item_id")
+  quantity         Decimal @db.Decimal(15, 4)
+
+  bomTemplate    BomTemplate   @relation(fields: [bomTemplateId], references: [id], onDelete: Cascade)
+  componentItem  InventoryItem @relation("BomComponentItem", fields: [componentItemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([bomTemplateId])
+  @@map("bom_lines")
+}
+
+model ProductionOrder {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  orderNumber   String    @map("order_number")
+  bomTemplateId String    @map("bom_template_id")
+  warehouseId   String    @map("warehouse_id")
+  plannedQty    Decimal   @map("planned_qty") @db.Decimal(15, 4)
+  completedQty  Decimal?  @map("completed_qty") @db.Decimal(15, 4)
+  status        String    @default("DRAFT")
+  notes         String?
+  journalId     String?   @map("journal_id")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  bomTemplate BomTemplate @relation(fields: [bomTemplateId], references: [id], onDelete: Restrict)
+  warehouse   Warehouse   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([bomTemplateId])
+  @@index([status])
+  @@map("production_orders")
 }
 
 // Pharmacy prescription register - required by Ghana FDA for licensed pharmacies.

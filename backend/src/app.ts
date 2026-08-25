@@ -70,6 +70,7 @@ import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
 import costCentresRouter from './routes/costCentres';
+import manufacturingRouter from './routes/manufacturing';
 
 dotenv.config();
 
@@ -195,6 +196,9 @@ app.use('/api/v1/pharmacy', pharmacyRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);
+
+// Manufacturing / Bill of Materials (BOM templates + production orders)
+app.use('/api/v1/manufacturing', manufacturingRouter);
 
 // Intelligent Analytics & Decision Engine endpoints
 app.use('/api/v1/analytics', analyticsRouter);
