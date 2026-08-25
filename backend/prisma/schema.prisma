@@ -80,6 +80,10 @@ model Tenant {
   // (not sent to a shared/hardcoded fallback) when unset for this tenant.
   bossPhone               String?   @map("boss_phone")
   stockValuationMethod    String    @default("AVERAGE") @map("stock_valuation_method")
+  // When false (default), selling more units than on-hand throws a 400.
+  // When true, stock is allowed to go negative and quantityOnHand may become
+  // negative. Useful for businesses that fulfil before receiving stock.
+  allowNegativeStock      Boolean   @default(false) @map("allow_negative_stock")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
@@ -930,6 +934,9 @@ model InventoryItem {
   // Pharmacy: whether this item must be dispensed from a tracked batch (FEFO).
   // When true, every POS sale and batch receipt must link to an InventoryBatch row.
   requiresBatchTracking Boolean @default(false) @map("requires_batch_tracking")
+  // When true, each unit of this item must be assigned a serial number at
+  // point of sale / invoice, and received with a serial number on bills/GRNs.
+  trackSerials      Boolean  @default(false) @map("track_serials")
   createdAt         DateTime @default(now()) @map("created_at")
 
   warehouseStocks    WarehouseStock[]
@@ -943,6 +950,7 @@ model InventoryItem {
   narcoticsLog       NarcoticsLogEntry[]
   bomFinishedIn      BomTemplate[]       @relation("BomFinishedItem")
   bomComponentIn     BomLine[]           @relation("BomComponentItem")
+  serialNumbers      SerialNumber[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -1101,6 +1109,26 @@ model NarcoticsLogEntry {
   @@index([tenantId])
   @@index([itemId])
   @@map("narcotics_log_entries")
+}
+
+model SerialNumber {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  inventoryItemId String   @map("inventory_item_id")
+  warehouseId     String   @map("warehouse_id")
+  serialNumber    String   @map("serial_number")
+  // AVAILABLE | SOLD | RETURNED | DAMAGED
+  status          String   @default("AVAILABLE")
+  invoiceId       String?  @map("invoice_id")
+  billId          String?  @map("bill_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, inventoryItemId, serialNumber])
+  @@index([tenantId, warehouseId, inventoryItemId, status])
+  @@map("serial_numbers")
 }
 
 model WarehouseStock {

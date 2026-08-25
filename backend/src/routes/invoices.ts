@@ -482,30 +482,44 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createI
             });
             const stockByItemId = new Map(stocks.map((s: any) => [s.itemId, s]));
 
+            // Check tenant setting for negative stock allowance
+            const tenantSettings = await (client as any).tenant.findUnique({ where: { id: tenantId }, select: { allowNegativeStock: true } });
+            const allowNegStock = tenantSettings?.allowNegativeStock ?? false;
+
             // Friendly pre-check for every line before touching anything - the
             // actual deduction below is still atomically guarded per line to
             // protect against a genuine concurrent race (mirrors
             // cashTill.ts's POST /tills/sales stock-deduction pattern).
-            for (const line of stockLines) {
-              const item = itemsById.get(line.inventoryItemId) as any;
-              const stock = stockByItemId.get(line.inventoryItemId) as any;
-              if (!stock || stock.quantityOnHand < line.quantity) {
-                throw new InvoiceStockError(
-                  `Insufficient stock for ${item.name} in ${warehouse.name} (Available: ${stock?.quantityOnHand || 0} ${item.unitOfMeasure}).`,
-                  400
-                );
+            if (!allowNegStock) {
+              for (const line of stockLines) {
+                const item = itemsById.get(line.inventoryItemId) as any;
+                const stock = stockByItemId.get(line.inventoryItemId) as any;
+                if (!stock || stock.quantityOnHand < line.quantity) {
+                  throw new InvoiceStockError(
+                    `Insufficient stock for ${item.name} in ${warehouse.name} (Available: ${stock?.quantityOnHand || 0} ${item.unitOfMeasure}).`,
+                    400
+                  );
+                }
               }
             }
 
             for (const line of stockLines) {
               const stock = stockByItemId.get(line.inventoryItemId) as any;
-              const deduction = await (client as any).warehouseStock.updateMany({
-                where: { id: stock.id, quantityOnHand: { gte: line.quantity } },
-                data: { quantityOnHand: { decrement: line.quantity } },
-              });
-              if (deduction.count === 0) {
-                const item = itemsById.get(line.inventoryItemId) as any;
-                throw new InvoiceStockError(`Insufficient stock for ${item?.name || line.inventoryItemId} - another sale just took the remaining units.`, 409);
+              if (allowNegStock) {
+                // When negative stock is allowed, deduct unconditionally
+                await (client as any).warehouseStock.updateMany({
+                  where: { id: stock?.id, ...(stock ? {} : { itemId: line.inventoryItemId, warehouseId }) },
+                  data: { quantityOnHand: { decrement: line.quantity } },
+                });
+              } else {
+                const deduction = await (client as any).warehouseStock.updateMany({
+                  where: { id: stock.id, quantityOnHand: { gte: line.quantity } },
+                  data: { quantityOnHand: { decrement: line.quantity } },
+                });
+                if (deduction.count === 0) {
+                  const item = itemsById.get(line.inventoryItemId) as any;
+                  throw new InvoiceStockError(`Insufficient stock for ${item?.name || line.inventoryItemId} - another sale just took the remaining units.`, 409);
+                }
               }
             }
             stockDeducted = true;

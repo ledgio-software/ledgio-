@@ -98,6 +98,7 @@ const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ de
 const StockAging = lazy(() => import("./pages/reports/StockAging").then(m => ({ default: m.StockAging })));
 const FinancialRatios = lazy(() => import("./pages/reports/FinancialRatios").then(m => ({ default: m.FinancialRatios })));
 const PriceLists = lazy(() => import("./pages/settings/PriceLists").then(m => ({ default: m.PriceLists })));
+const SerialNumbers = lazy(() => import("./pages/inventory/SerialNumbers").then(m => ({ default: m.SerialNumbers })));
 
 // "What happened today?" quick-action grid shown in Operations and Business modes.
 const GUIDED_ACTIONS_OPS = [
@@ -602,6 +603,7 @@ function App() {
               <Route path="/reports/stock-aging" element={<ProtectedRoute><MainLayout><StockAging /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/financial-ratios" element={<ProtectedRoute><MainLayout><FinancialRatios /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/price-lists" element={<ProtectedRoute><MainLayout><PriceLists /></MainLayout></ProtectedRoute>} />
+              <Route path="/inventory/serial-numbers" element={<ProtectedRoute><MainLayout><SerialNumbers /></MainLayout></ProtectedRoute>} />
               <Route path="/petty-cash" element={<ProtectedRoute><MainLayout><PettyCash /></MainLayout></ProtectedRoute>} />
               <Route path="/purchase-orders" element={<ProtectedRoute><MainLayout><PurchaseOrders /></MainLayout></ProtectedRoute>} />
               <Route path="/sales-orders" element={<ProtectedRoute><MainLayout><SalesOrders /></MainLayout></ProtectedRoute>} />

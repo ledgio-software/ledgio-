@@ -195,6 +195,7 @@ export function Settings() {
     financialYearStart: settings.financialYearStart,
     timezone: settings.timezone,
     stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
+    allowNegativeStock: (settings as any).allowNegativeStock ?? false,
   });
 
   const [smsData, setSmsData] = useState({
@@ -265,6 +266,7 @@ export function Settings() {
         financialYearStart: settings.financialYearStart,
         timezone: settings.timezone,
         stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
+        allowNegativeStock: (settings as any).allowNegativeStock ?? false,
       });
       setSmsData((prev) => ({ ...prev, bossPhone: settings.bossPhone || "" }));
       setGraData((prev) => ({
@@ -727,6 +729,28 @@ export function Settings() {
                     FIFO records purchase lots on receiving. Switching from Average to FIFO does not convert historical stock; new purchases will create lots going forward.
                   </p>
                 )}
+                {/* LIFO intentionally not offered — prohibited under IFRS (Ghana) */}
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 italic">
+                  LIFO (Last In, First Out) is not available — it is prohibited under IFRS as adopted in Ghana.
+                </p>
+              </div>
+
+              {/* Negative Stock */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-secondary-700 dark:text-secondary-300">Negative Stock</label>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={(regionalData as any).allowNegativeStock ?? false}
+                    onChange={(e) => setRegionalData({ ...regionalData, allowNegativeStock: e.target.checked } as any)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Allow stock to go below zero</span>
+                </label>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  When enabled, invoices and POS sales can fulfil orders even when on-hand quantity is insufficient.
+                  Useful for businesses that ship before receiving stock. Disable to enforce strict stock availability.
+                </p>
               </div>
             </CardContent>
             <CardFooter>

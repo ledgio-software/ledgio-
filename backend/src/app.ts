@@ -59,6 +59,7 @@ import pettyCashRouter from './routes/pettyCash';
 import purchaseOrdersRouter from './routes/purchaseOrders';
 import salesOrdersRouter from './routes/salesOrders';
 import priceListsRouter from './routes/priceLists';
+import serialNumbersRouter from './routes/serialNumbers';
 import deliveryNotesRouter from './routes/deliveryNotes';
 import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
 import paymentBatchesRouter from './routes/paymentBatches';
@@ -227,6 +228,9 @@ app.use('/api/v1/sales-orders', salesOrdersRouter);
 
 // Price List endpoints
 app.use('/api/v1/price-lists', priceListsRouter);
+
+// Serial Number endpoints
+app.use('/api/v1/serial-numbers', serialNumbersRouter);
 
 // Delivery Note & Goods Receipt Note endpoints
 app.use('/api/v1/delivery-notes', deliveryNotesRouter);

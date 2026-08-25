@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileSpreadsheet,
   PieChart,
+  Hash,
   Users,
   ShieldCheck,
   FileUp,
@@ -63,6 +64,7 @@ export interface NavGroup {
 const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/accounts', '/journals', '/banking',
   '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates', '/settings/price-lists',
+  '/inventory/serial-numbers',
   '/pdc', '/reports/interest-charges',
   '/fixed-assets', '/recurring-invoices', '/cost-centres', '/manufacturing',
   '/reports/ledger', '/reports/balance-sheet', '/reports/cash-flow',
@@ -122,6 +124,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Warehouses & Stock", href: "/inventory", icon: Warehouse },
       { name: "Stock Intelligence", href: "/analytics/inventory", icon: Lightbulb },
+      { name: "Serial Numbers", href: "/inventory/serial-numbers", icon: Hash },
     ],
   },
   {

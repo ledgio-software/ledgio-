@@ -238,6 +238,7 @@ router.put('/current', authenticateJwt, tenantContextMiddleware, requireRole('Ad
       graDeviceNumber,
       graSecurityKey,
       stockValuationMethod,
+      allowNegativeStock,
     } = req.body;
     const newName = (companyName || name || '').trim();
 
@@ -307,6 +308,7 @@ router.put('/current', authenticateJwt, tenantContextMiddleware, requireRole('Ad
           ...(stockValuationMethod && ['AVERAGE', 'FIFO'].includes(stockValuationMethod)
             ? { stockValuationMethod }
             : {}),
+          ...(allowNegativeStock !== undefined && { allowNegativeStock: Boolean(allowNegativeStock) }),
         },
       });
 
