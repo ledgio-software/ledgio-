@@ -37,6 +37,7 @@ import {
   AlertTriangle,
   Truck,
   CreditCard,
+  Layers,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -61,7 +62,7 @@ export interface NavGroup {
 const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/accounts', '/journals', '/banking',
   '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions',
-  '/fixed-assets', '/recurring-invoices',
+  '/fixed-assets', '/recurring-invoices', '/cost-centres',
   '/reports/ledger', '/reports/balance-sheet', '/reports/cash-flow',
   '/reports/cash-flow-forecast', '/reports/kpis', '/reports/aging',
   '/reports/landed-costs', '/reports/budgets', '/reports/analytics', '/reports/branch-comparison',
@@ -147,6 +148,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Fiscal Periods", href: "/settings/fiscal-periods", icon: CalendarClock },
       { name: "Recurring Transactions", href: "/settings/recurring-transactions", icon: Repeat },
       { name: "Fixed Assets", href: "/fixed-assets", icon: Building2 },
+      { name: "Cost Centres", href: "/cost-centres", icon: Layers },
     ],
   },
   {
@@ -231,6 +233,7 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/delivery-notes",
     "/payment-matching",
     "/expenses",
+    "/cost-centres",
     "/reports/executive",
     "/reports/ledger",
     "/reports/pnl",

@@ -1326,4 +1326,113 @@ router.get('/daybook', requireRole('Viewer'), async (req: Request, res: Response
   }
 });
 
+/**
+ * GET /api/v1/reports/cost-centre-pnl?costCentreId=&startDate=&endDate=
+ * Cost-centre filtered P&L: filters ledger rows tagged to the given cost_centre_id.
+ * Access: Viewer role or higher.
+ */
+router.get('/cost-centre-pnl', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { costCentreId, startDate, endDate } = req.query;
+
+    if (!costCentreId) {
+      res.status(400).json({ success: false, error: 'costCentreId is required.' });
+      return;
+    }
+
+    // Validate cost centre belongs to this tenant
+    const cc = await (prisma as any).costCentre.findFirst({
+      where: { id: costCentreId as string, tenantId },
+    });
+    if (!cc) {
+      res.status(404).json({ success: false, error: 'Cost centre not found.' });
+      return;
+    }
+
+    const report = await withCurrentTenantDb(prisma, async (client) => {
+      const conditions: string[] = [`a.type IN ('REVENUE', 'EXPENSE', 'COST_OF_SALES')`];
+      const params: any[] = [costCentreId as string];
+      let paramIdx = 2;
+
+      const ledgerConditions: string[] = [`l.cost_centre_id = $1::uuid`];
+
+      if (startDate) {
+        ledgerConditions.push(`l.transaction_date >= $${paramIdx++}::date`);
+        params.push(startDate as string);
+      }
+      if (endDate) {
+        ledgerConditions.push(`l.transaction_date <= $${paramIdx++}::date`);
+        params.push(endDate as string);
+      }
+
+      const joinWhere = `AND ${ledgerConditions.join(' AND ')}`;
+
+      const sql = `
+        SELECT
+          a.id,
+          a.code,
+          a.name,
+          a.type,
+          COALESCE(SUM(l.debit), 0)  AS total_debit,
+          COALESCE(SUM(l.credit), 0) AS total_credit
+        FROM accounts a
+        LEFT JOIN ledgers l ON a.id = l.account_id ${joinWhere}
+        WHERE ${conditions.join(' AND ')}
+        GROUP BY a.id, a.code, a.name, a.type
+        ORDER BY a.code ASC
+      `;
+
+      const rows: any[] = await (client as any).$queryRawUnsafe(sql, ...params);
+
+      const revenues: any[] = [];
+      const costOfSales: any[] = [];
+      const expenses: any[] = [];
+      let totalRevenue = 0;
+      let totalCostOfSales = 0;
+      let totalExpenses = 0;
+
+      for (const r of rows) {
+        const debit = parseFloat(r.total_debit);
+        const credit = parseFloat(r.total_credit);
+        if (r.type === 'REVENUE') {
+          const amount = Math.round((credit - debit) * 100) / 100;
+          totalRevenue += amount;
+          revenues.push({ id: r.id, code: r.code, name: r.name, type: r.type, amount });
+        } else if (r.type === 'COST_OF_SALES') {
+          const amount = Math.round((debit - credit) * 100) / 100;
+          totalCostOfSales += amount;
+          costOfSales.push({ id: r.id, code: r.code, name: r.name, type: r.type, amount });
+        } else if (r.type === 'EXPENSE') {
+          const amount = Math.round((debit - credit) * 100) / 100;
+          totalExpenses += amount;
+          expenses.push({ id: r.id, code: r.code, name: r.name, type: r.type, amount });
+        }
+      }
+
+      const grossProfit = Math.round((totalRevenue - totalCostOfSales) * 100) / 100;
+      const netProfit = Math.round((grossProfit - totalExpenses) * 100) / 100;
+
+      return {
+        costCentre: { id: cc.id, code: cc.code, name: cc.name },
+        startDate: startDate || null,
+        endDate: endDate || null,
+        revenues,
+        costOfSales,
+        expenses,
+        totalRevenue,
+        totalCostOfSales,
+        grossProfit,
+        totalExpenses,
+        netProfit,
+      };
+    });
+
+    res.json({ success: true, data: report });
+  } catch (err: any) {
+    console.error('[Reports] cost-centre-pnl error:', err);
+    res.status(500).json({ success: false, error: 'Failed to generate cost centre P&L report.' });
+  }
+});
+
 export default router;

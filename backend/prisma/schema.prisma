@@ -450,6 +450,10 @@ model Invoice {
   // posted at payment time (see invoicePaymentService.markInvoicePaid), so
   // the whole payment stays within one fund by construction.
   fundId             String?   @map("fund_id")
+  // Cost centre dimension for departmental/branch P&L segmentation -
+  // bare nullable UUID (FK to public.cost_centres validated at write time,
+  // not a native FK, same cross-schema pattern as fundId).
+  costCentreId       String?   @map("cost_centre_id")
   // Set together, only on an itemized invoice (mirrors VendorBill's
   // warehouseId/lines shape for the purchase side) - the shop/warehouse
   // stock is deducted from at issue time. Null/false on a plain "Simple
@@ -490,6 +494,7 @@ model Invoice {
   customer         Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
   taxRate          TaxRate?                 @relation(fields: [taxRateId], references: [id], onDelete: SetNull)
   fund             Fund?                    @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  costCentre       CostCentre?              @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
   warehouse        Warehouse?               @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   items            InvoiceItem[]
   creditNotes      CreditNote[]
@@ -504,6 +509,7 @@ model Invoice {
   @@index([taxRateId])
   @@index([warehouseId])
   @@index([fundId])
+  @@index([costCentreId])
   @@index([tenantId, status, issueDate])
   @@map("invoices")
 }
@@ -670,6 +676,9 @@ model VendorBill {
   // posted at payment time (see routes/bills.ts POST /:id/pay).
   fundId String? @map("fund_id")
 
+  // Cost centre dimension for departmental/branch P&L segmentation.
+  costCentreId String? @map("cost_centre_id")
+
   // Optional link back to the Purchase Order this bill fulfills - set when
   // a bill is created via "Create Bill from PO" (see purchaseOrders.ts).
   // Nothing here blocks creating a bill without a PO (most bills still
@@ -690,6 +699,7 @@ model VendorBill {
   vendor        Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   warehouse     Warehouse?       @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   fund          Fund?            @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  costCentre    CostCentre?      @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
   purchaseOrder PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
   lines         VendorBillLine[]
   debitNotes    DebitNote[]
@@ -704,6 +714,7 @@ model VendorBill {
   @@index([warehouseId])
   @@index([landedCostForBillId])
   @@index([fundId])
+  @@index([costCentreId])
   @@index([purchaseOrderId])
   @@index([status, scheduledPaymentDate])
   @@map("vendor_bills")
@@ -1723,13 +1734,18 @@ model ExpenseClaim {
   approvalWorkflowId String?   @map("approval_workflow_id")
   journalId          String?   @map("journal_id")
   reimbursedAt       DateTime? @map("reimbursed_at")
+  // Cost centre dimension for departmental/branch P&L segmentation.
+  costCentreId       String?   @map("cost_centre_id")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  costCentre CostCentre? @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, claimNumber])
   @@index([tenantId])
   @@index([status])
   @@index([submittedBy])
+  @@index([costCentreId])
   @@map("expense_claims")
 }
 
@@ -1904,6 +1920,30 @@ model GoodsReceiptNoteLine {
   @@index([tenantId])
   @@index([goodsReceiptNoteId])
   @@map("goods_receipt_note_lines")
+}
+
+// Cost centre dimension for departmental/branch/project P&L segmentation.
+// Follows the same cross-schema pattern as Fund: real FKs from public schema
+// models (Invoice, VendorBill, ExpenseClaim); bare UUID columns on per-tenant
+// journal_entry_lines and ledgers (tenant migration v19) validated at write
+// time, not native FKs across schemas.
+model CostCentre {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  code        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  invoices      Invoice[]
+  vendorBills   VendorBill[]
+  expenseClaims ExpenseClaim[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("cost_centres")
 }
 
 // Platform-wide (no tenantId - the same tax/regulatory rules apply to every

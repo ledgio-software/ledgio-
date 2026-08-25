@@ -69,6 +69,7 @@ import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
+import costCentresRouter from './routes/costCentres';
 
 dotenv.config();
 
@@ -191,6 +192,9 @@ app.use('/api/v1/tills', cashTillRouter);
 
 // Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
 app.use('/api/v1/pharmacy', pharmacyRouter);
+
+// Cost Centres / Profit Centres (departmental/branch P&L segmentation)
+app.use('/api/v1/cost-centres', costCentresRouter);
 
 // Intelligent Analytics & Decision Engine endpoints
 app.use('/api/v1/analytics', analyticsRouter);

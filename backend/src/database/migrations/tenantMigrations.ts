@@ -732,6 +732,24 @@ export const TENANT_MIGRATIONS: TenantMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_notifications_tenant_created
         ON notifications(tenant_id, created_at DESC);
     `
+  },
+  {
+    version: 19,
+    name: '019_add_cost_centre_id_to_journal_lines_and_ledgers',
+    sql: `
+      -- Cost centre dimension for departmental/branch/project P&L segmentation.
+      -- cost_centre_id is a bare nullable UUID column, not a real FK -
+      -- CostCentre lives in the shared public.cost_centres table (tenantId-scoped
+      -- Prisma model), not this tenant's own schema, so it can't be a native FK
+      -- across schemas. Existence/tenant-ownership is validated at the service
+      -- layer before every write, the same cross-schema-reference pattern
+      -- fund_id already uses (tenantMigrations v7).
+      ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS cost_centre_id UUID;
+      ALTER TABLE ledgers ADD COLUMN IF NOT EXISTS cost_centre_id UUID;
+
+      CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_cost_centre ON journal_entry_lines(cost_centre_id);
+      CREATE INDEX IF NOT EXISTS idx_ledgers_cost_centre ON ledgers(cost_centre_id);
+    `
   }
 ];
 
