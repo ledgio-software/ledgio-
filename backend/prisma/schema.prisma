@@ -2088,6 +2088,71 @@ model PaymentBatchAllocation {
   @@map("payment_batch_allocations")
 }
 
+// Job Costing: tracks material, labour, overhead, and subcontract costs per job.
+// Status: OPEN → IN_PROGRESS → COMPLETED | CANCELLED
+model Job {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  jobNumber   String   @map("job_number")
+  name        String
+  customerId  String?  @map("customer_id")
+  status      String   @default("OPEN")
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+  description String?
+  invoiceId   String?  @map("invoice_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  costLines   JobCostLine[]
+  workOrders  JobWorkOrder[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("jobs")
+}
+
+model JobCostLine {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  jobId       String   @map("job_id")
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  // MATERIAL | LABOUR | OVERHEAD | SUBCONTRACT
+  type        String
+  description String
+  quantity    Decimal  @db.Decimal(15, 4)
+  unitCost    Decimal  @db.Decimal(15, 4) @map("unit_cost")
+  amount      Decimal  @db.Decimal(15, 2)
+  accountId   String?  @map("account_id")
+  journalId   String?  @map("journal_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, jobId])
+  @@map("job_cost_lines")
+}
+
+model JobWorkOrder {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  jobId           String?  @map("job_id")
+  job             Job?     @relation(fields: [jobId], references: [id])
+  // IN | OUT  (OUT = goods sent to sub-contractor; IN = goods received from sub-contractor)
+  type            String
+  vendorId        String?  @map("vendor_id")
+  itemId          String?  @map("item_id")
+  quantity        Decimal  @db.Decimal(15, 4)
+  dueDate         DateTime? @map("due_date")
+  // PENDING | SENT | RECEIVED | CANCELLED
+  status          String   @default("PENDING")
+  billId          String?  @map("bill_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, jobId])
+  @@map("job_work_orders")
+}
+
 // Delivery Note (DN): formal document recording goods physically dispatched to
 // a customer, optionally linked to an Invoice or SalesOrder. DRAFT → DISPATCHED.
 // Stock deduction still happens at invoice-creation time (existing behaviour);

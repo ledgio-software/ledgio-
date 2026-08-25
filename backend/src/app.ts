@@ -60,6 +60,8 @@ import purchaseOrdersRouter from './routes/purchaseOrders';
 import salesOrdersRouter from './routes/salesOrders';
 import priceListsRouter from './routes/priceLists';
 import serialNumbersRouter from './routes/serialNumbers';
+import jobsRouter from './routes/jobs';
+import jobWorkOrdersRouter from './routes/jobWorkOrders';
 import deliveryNotesRouter from './routes/deliveryNotes';
 import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
 import paymentBatchesRouter from './routes/paymentBatches';
@@ -231,6 +233,10 @@ app.use('/api/v1/price-lists', priceListsRouter);
 
 // Serial Number endpoints
 app.use('/api/v1/serial-numbers', serialNumbersRouter);
+
+// Job Costing endpoints
+app.use('/api/v1/jobs', jobsRouter);
+app.use('/api/v1/job-work-orders', jobWorkOrdersRouter);
 
 // Delivery Note & Goods Receipt Note endpoints
 app.use('/api/v1/delivery-notes', deliveryNotesRouter);
