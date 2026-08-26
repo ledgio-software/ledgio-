@@ -538,7 +538,7 @@ router.get(
             where: { tenantId },
             select: {
               warehouseId: true,
-              quantity: true,
+              quantityOnHand: true,
               item: { select: { costPrice: true } },
             },
           }),
@@ -565,7 +565,7 @@ router.get(
       // Sum stock value per warehouse
       const stockValue: Record<string, number> = {};
       for (const s of stocksRaw) {
-        stockValue[s.warehouseId] = (stockValue[s.warehouseId] ?? 0) + s.quantity * Number(s.item.costPrice ?? 0);
+        stockValue[s.warehouseId] = (stockValue[s.warehouseId] ?? 0) + s.quantityOnHand * Number(s.item.costPrice ?? 0);
       }
 
       const branches = warehouses.map((w: any) => ({

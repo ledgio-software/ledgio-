@@ -402,7 +402,7 @@ export function Manufacturing() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Factory size={24} className="text-muted-foreground" />
-        <h1 className="text-2xl font-semibold">Manufacturing</h1>
+        <h1 className="text-2xl font-semibold text-secondary-900 dark:text-secondary-50">Manufacturing</h1>
       </div>
 
       <div className="flex gap-2 border-b">

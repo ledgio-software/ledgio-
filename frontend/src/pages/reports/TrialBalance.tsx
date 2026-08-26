@@ -71,7 +71,7 @@ export function TrialBalance() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Trial Balance</h1>
+          <h1 className="text-2xl font-semibold text-secondary-900 dark:text-secondary-50">Trial Balance</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             All account debit and credit balances — total debits must equal total credits
           </p>

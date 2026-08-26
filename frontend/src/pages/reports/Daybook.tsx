@@ -122,7 +122,7 @@ export function Daybook() {
         <div className="flex items-center gap-2">
           <BookMarked className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-xl font-semibold">Daybook</h1>
+            <h1 className="text-xl font-semibold text-secondary-900 dark:text-secondary-50">Daybook</h1>
             <p className="text-sm text-muted-foreground">
               All posted vouchers in chronological order
             </p>
