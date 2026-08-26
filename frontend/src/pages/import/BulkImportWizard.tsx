@@ -7,15 +7,93 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft } from "lucide-react";
 
+type ImportType = "accounts" | "customers" | "inventory-items";
+
+const IMPORT_CONFIGS: Record<ImportType, {
+  label: string;
+  description: string;
+  headers: string[];
+  sample: string;
+  endpoint: string;
+  payloadKey: string;
+  buildPayload: (rows: any[]) => any[];
+  previewColumns: { key: string; label: string }[];
+  successNav: { label: string; href: string };
+}> = {
+  accounts: {
+    label: "Chart of Accounts",
+    description: "Import accounts with Code, Name, and Type.",
+    headers: ["Code", "Name", "Type"],
+    sample: `Code,Name,Type\n1010,Petty Cash,Asset\n2010,Accounts Payable,Liability\n4010,Consulting Income,Revenue\n5010,Office Rent,Expense`,
+    endpoint: "/import/accounts",
+    payloadKey: "accounts",
+    buildPayload: (rows) => rows.map((r) => ({ code: r.code, name: r.name, type: r.type || "Asset" })),
+    previewColumns: [
+      { key: "code", label: "Code" },
+      { key: "name", label: "Name" },
+      { key: "type", label: "Type" },
+    ],
+    successNav: { label: "View Chart of Accounts", href: "/accounts" },
+  },
+  customers: {
+    label: "Customers",
+    description: "Import customers. Email is optional — a placeholder is used if omitted.",
+    headers: ["Name", "Email", "Phone", "Address", "CreditLimit", "TIN", "Type"],
+    sample: `Name,Email,Phone,Address,CreditLimit,TIN,Type\nKofi Agyeman,kofi@example.com,0244000001,Accra,,GH123456,RETAIL\nAkosua Trading,akosua@biz.gh,0244000002,Kumasi,5000,,WHOLESALE`,
+    endpoint: "/import/customers",
+    payloadKey: "customers",
+    buildPayload: (rows) => rows.map((r) => ({
+      name: r.name,
+      email: r.email || "",
+      phone: r.phone || "",
+      address: r.address || "",
+      creditlimit: r.creditlimit || "",
+      tin: r.tin || "",
+      type: r.type || "RETAIL",
+    })),
+    previewColumns: [
+      { key: "name", label: "Name" },
+      { key: "email", label: "Email" },
+      { key: "phone", label: "Phone" },
+      { key: "type", label: "Type" },
+    ],
+    successNav: { label: "View Customers", href: "/invoices" },
+  },
+  "inventory-items": {
+    label: "Inventory Items",
+    description: "Import products/items with pricing. SKU is auto-generated if blank.",
+    headers: ["Name", "SKU", "Category", "Unit", "CostPrice", "SellingPrice", "WholesalePrice", "ReorderLevel"],
+    sample: `Name,SKU,Category,Unit,CostPrice,SellingPrice,WholesalePrice,ReorderLevel\nTest Widget,TW-001,General,pcs,50,80,70,10\nOffice Chair,CH-001,Furniture,each,200,350,,5`,
+    endpoint: "/import/inventory-items",
+    payloadKey: "items",
+    buildPayload: (rows) => rows.map((r) => ({
+      name: r.name,
+      sku: r.sku || "",
+      category: r.category || "General",
+      unit: r.unit || "pcs",
+      costprice: r.costprice,
+      sellingprice: r.sellingprice,
+      wholesaleprice: r.wholesaleprice || "",
+      reorderlevel: r.reorderlevel || "",
+    })),
+    previewColumns: [
+      { key: "name", label: "Name" },
+      { key: "sku", label: "SKU" },
+      { key: "costprice", label: "Cost Price" },
+      { key: "sellingprice", label: "Selling Price" },
+    ],
+    successNav: { label: "View Inventory", href: "/inventory/items" },
+  },
+};
+
 export function BulkImportWizard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [importType] = useState<"accounts">("accounts");
+  const [importType, setImportType] = useState<ImportType>("accounts");
+  const config = IMPORT_CONFIGS[importType];
 
-  const sampleCsvAccounts = `Code, Name, Type\n1010, Petty Cash, Asset\n2010, Accounts Payable, Liability\n4010, Consulting Income, Revenue\n5010, Office Rent, Expense`;
-
-  const [rawCsv, setRawCsv] = useState(sampleCsvAccounts);
+  const [rawCsv, setRawCsv] = useState(config.sample);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultSummary, setResultSummary] = useState<{
@@ -23,6 +101,14 @@ export function BulkImportWizard() {
     errorCount: number;
     errors: any[];
   } | null>(null);
+
+  const handleTypeChange = (type: ImportType) => {
+    setImportType(type);
+    setRawCsv(IMPORT_CONFIGS[type].sample);
+    setParsedRows([]);
+    setResultSummary(null);
+    setStep(1);
+  };
 
   const handleParseCsv = () => {
     const lines = rawCsv.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -35,9 +121,7 @@ export function BulkImportWizard() {
     const dataRows = lines.slice(1).map((line) => {
       const parts = line.split(",").map((p) => p.trim());
       const rowObj: any = {};
-      headers.forEach((h, idx) => {
-        rowObj[h] = parts[idx] || "";
-      });
+      headers.forEach((h, idx) => { rowObj[h] = parts[idx] || ""; });
       return rowObj;
     });
 
@@ -48,20 +132,12 @@ export function BulkImportWizard() {
   const handleExecuteImport = async () => {
     setIsSubmitting(true);
     setResultSummary(null);
-
     try {
-      if (importType === "accounts") {
-        const payload = parsedRows.map((r) => ({
-          code: r.code,
-          name: r.name,
-          type: r.type || "Asset",
-        }));
-
-        const response = await api.post("/import/accounts", { accounts: payload });
-        if (response.data.success) {
-          setResultSummary(response.data.data);
-          setStep(3);
-        }
+      const payload = { [config.payloadKey]: config.buildPayload(parsedRows) };
+      const response = await api.post(config.endpoint, payload);
+      if (response.data.success) {
+        setResultSummary(response.data.data);
+        setStep(3);
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || "Import execution failed.", "error");
@@ -77,55 +153,56 @@ export function BulkImportWizard() {
           Bulk Data Import Wizard
         </h2>
         <p className="text-secondary-500 dark:text-secondary-400 mt-1">
-          Import your legacy accounts and financial transactions directly from Tally, Excel, or CSV files.
+          Import accounts, customers, or inventory items from CSV or Excel exports.
         </p>
       </div>
 
-      {/* Stepper Header */}
+      {/* Stepper */}
       <div className="flex items-center justify-between p-4 bg-white dark:bg-secondary-900 rounded-lg border border-secondary-200 dark:border-secondary-800">
-        <div className={`flex items-center space-x-2 ${step >= 1 ? 'text-primary-600 dark:text-primary-400 font-semibold' : 'text-secondary-400'}`}>
-          <span className="h-7 w-7 rounded-full bg-primary-100 dark:bg-primary-950 flex items-center justify-center text-sm">1</span>
-          <span>Select Type</span>
-        </div>
-        <ArrowRight className="h-4 w-4 text-secondary-400" />
-        <div className={`flex items-center space-x-2 ${step >= 2 ? 'text-primary-600 dark:text-primary-400 font-semibold' : 'text-secondary-400'}`}>
-          <span className="h-7 w-7 rounded-full bg-primary-100 dark:bg-primary-950 flex items-center justify-center text-sm">2</span>
-          <span>Preview & Map</span>
-        </div>
-        <ArrowRight className="h-4 w-4 text-secondary-400" />
-        <div className={`flex items-center space-x-2 ${step === 3 ? 'text-primary-600 dark:text-primary-400 font-semibold' : 'text-secondary-400'}`}>
-          <span className="h-7 w-7 rounded-full bg-primary-100 dark:bg-primary-950 flex items-center justify-center text-sm">3</span>
-          <span>Complete</span>
-        </div>
+        {["Select & Paste", "Preview & Map", "Complete"].map((label, idx) => (
+          <>
+            <div key={label} className={`flex items-center space-x-2 ${step >= idx + 1 ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-secondary-400"}`}>
+              <span className="h-7 w-7 rounded-full bg-primary-100 dark:bg-primary-950 flex items-center justify-center text-sm">{idx + 1}</span>
+              <span>{label}</span>
+            </div>
+            {idx < 2 && <ArrowRight key={`arrow-${idx}`} className="h-4 w-4 text-secondary-400" />}
+          </>
+        ))}
       </div>
 
-      {/* Step 1: Select Type & Input Data */}
+      {/* Step 1 */}
       {step === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>1. Upload or Paste CSV Data</CardTitle>
-            <CardDescription>Select what you are importing and provide comma-separated value data.</CardDescription>
+            <CardTitle>1. Select Type & Paste CSV</CardTitle>
+            <CardDescription>Choose what you are importing, then paste your comma-separated data below.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">
-                Data Category
-              </label>
+              <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Data Category</label>
               <select
                 value={importType}
-                disabled
+                onChange={(e) => handleTypeChange(e.target.value as ImportType)}
                 className="w-full h-10 px-3 rounded-md border border-secondary-300 dark:border-secondary-700 bg-white dark:bg-secondary-900 text-secondary-900 dark:text-secondary-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="accounts">Chart of Accounts (Code, Name, Type)</option>
+                <option value="customers">Customers (Name, Email, Phone, Address, CreditLimit, TIN, Type)</option>
+                <option value="inventory-items">Inventory Items (Name, SKU, Category, Unit, CostPrice, SellingPrice, ...)</option>
               </select>
+            </div>
+
+            <div className="p-3 bg-secondary-50 dark:bg-secondary-950 rounded-md border border-secondary-200 dark:border-secondary-800 text-xs text-secondary-600 dark:text-secondary-400">
+              <span className="font-semibold">Required columns:</span> {config.headers.join(", ")}
+              <br />
+              {config.description}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">
-                CSV Data (First line must be headers: Code, Name, Type)
+                CSV Data (first line must be column headers)
               </label>
               <textarea
-                rows={8}
+                rows={10}
                 value={rawCsv}
                 onChange={(e) => setRawCsv(e.target.value)}
                 className="w-full p-3 font-mono text-xs rounded-md border border-secondary-300 dark:border-secondary-700 bg-secondary-50 dark:bg-secondary-950 text-secondary-900 dark:text-secondary-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -142,34 +219,36 @@ export function BulkImportWizard() {
         </Card>
       )}
 
-      {/* Step 2: Preview & Confirm */}
+      {/* Step 2 */}
       {step === 2 && (
         <Card>
           <CardHeader>
             <CardTitle>2. Preview & Confirm Import ({parsedRows.length} Rows)</CardTitle>
-            <CardDescription>Review mapped rows before inserting into your tenant database.</CardDescription>
+            <CardDescription>Review mapped rows before inserting into your database.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Row #</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {parsedRows.map((r, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{idx + 1}</TableCell>
-                    <TableCell className="font-mono font-medium">{r.code}</TableCell>
-                    <TableCell>{r.name}</TableCell>
-                    <TableCell>{r.type}</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Row #</TableHead>
+                    {config.previewColumns.map((col) => (
+                      <TableHead key={col.key}>{col.label}</TableHead>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {parsedRows.map((r, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{idx + 1}</TableCell>
+                      {config.previewColumns.map((col) => (
+                        <TableCell key={col.key} className="font-mono text-sm">{r[col.key]}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
 
             <div className="flex justify-between pt-4">
               <Button variant="outline" onClick={() => setStep(1)} className="flex items-center">
@@ -177,37 +256,32 @@ export function BulkImportWizard() {
                 Back to Edit
               </Button>
               <Button variant="primary" onClick={handleExecuteImport} disabled={isSubmitting}>
-                {isSubmitting ? "Importing Data..." : `Execute Import (${parsedRows.length} items)`}
+                {isSubmitting ? "Importing..." : `Execute Import (${parsedRows.length} items)`}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 3: Complete */}
+      {/* Step 3 */}
       {step === 3 && resultSummary && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center text-emerald-600 dark:text-emerald-400">
               <CheckCircle className="mr-2 h-6 w-6" />
-              Import Completed Successfully
+              Import Completed
             </CardTitle>
-            <CardDescription>Results summary of your bulk import batch.</CardDescription>
+            <CardDescription>Results summary for your {config.label} import.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg text-center">
                 <p className="text-sm text-emerald-700 dark:text-emerald-300">Successfully Imported</p>
-                <p className="text-3xl font-bold text-emerald-800 dark:text-emerald-200 mt-1">
-                  {resultSummary.importedCount}
-                </p>
+                <p className="text-3xl font-bold text-emerald-800 dark:text-emerald-200 mt-1">{resultSummary.importedCount}</p>
               </div>
-
               <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-center">
-                <p className="text-sm text-amber-700 dark:text-amber-300">Errors Encountered</p>
-                <p className="text-3xl font-bold text-amber-800 dark:text-amber-200 mt-1">
-                  {resultSummary.errorCount}
-                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">Errors</p>
+                <p className="text-3xl font-bold text-amber-800 dark:text-amber-200 mt-1">{resultSummary.errorCount}</p>
               </div>
             </div>
 
@@ -217,21 +291,19 @@ export function BulkImportWizard() {
                   <AlertTriangle className="mr-1 h-3.5 w-3.5" /> Error Details:
                 </p>
                 <ul className="text-xs text-red-600 dark:text-red-400 space-y-1">
-                  {resultSummary.errors.map((err, i) => (
-                    <li key={i}>
-                      Row {err.row} (Code: {err.code}): {err.error}
-                    </li>
+                  {resultSummary.errors.map((err: any, i: number) => (
+                    <li key={i}>Row {err.row} ({err.name || err.code}): {err.error}</li>
                   ))}
                 </ul>
               </div>
             )}
 
             <div className="flex justify-end space-x-3 pt-4">
-              <Button variant="outline" onClick={() => setStep(1)}>
+              <Button variant="outline" onClick={() => { setStep(1); setResultSummary(null); }}>
                 Import Another File
               </Button>
-              <Button variant="primary" onClick={() => navigate("/accounts")}>
-                View Chart of Accounts
+              <Button variant="primary" onClick={() => navigate(config.successNav.href)}>
+                {config.successNav.label}
               </Button>
             </div>
           </CardContent>
