@@ -1081,7 +1081,7 @@ router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: R
     res.json({
       success: true,
       data: {
-        item: item ? { id: itemId, name: item.name, sku: item.sku } : { id: itemId },
+        item: item ? { id: itemId, name: (item as any).name, sku: (item as any).sku } : { id: itemId },
         openingBalance,
         closingBalance: runningBalance,
         movements: rows,

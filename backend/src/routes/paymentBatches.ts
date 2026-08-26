@@ -120,7 +120,7 @@ router.get('/outstanding-bills', requireRole('Viewer'), async (req, res) => {
         take: 200,
       })
     );
-    res.json(bills.map((b) => ({
+    res.json((bills as any[]).map((b) => ({
       id: b.id,
       billNumber: b.billNumber,
       vendorName: (b as any).vendor.name,
