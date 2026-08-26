@@ -2,6 +2,23 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [2026-08-26] - Fix: Two inventory page bugs (SerialNumbers wrong API path + bulk import freeze)
+
+**What/Why:** Two bugs reported by the user:
+
+1. **Serial Numbers page showed "Failed to load serial numbers."** — `SerialNumbers.tsx` line 54 called `api.get("/inventory")` instead of `api.get("/inventory/items")`. The wrong path caused the `Promise.all` to throw, hitting the catch block before any serials were fetched. Fixed: one-char path correction. (PR #108)
+
+2. **Bulk inventory import froze the browser** — `POST /api/v1/import/inventory-items` processed each row inside its own `withCurrentTenantDb` call, which opens a separate Prisma `$transaction` (BEGIN → SET LOCAL search_path → INSERT → COMMIT) per item. Under Render's connection pooler each round-trip is 300–500ms, making 50 items × 4 round-trips ≈ 80 seconds per chunk — long enough to hit browser/proxy timeouts and appear as a freeze. Fixed by restructuring into two phases:
+   - **Phase 1**: synchronous pre-validation (required fields, in-batch SKU deduplication) — no DB needed
+   - **Phase 2**: ONE `withCurrentTenantDb` call for the entire batch:
+     - Resolve all unique warehouse names in one loop
+     - `inventoryItem.createManyAndReturn({ skipDuplicates: true })` — one SQL `INSERT … RETURNING` for all items
+     - `warehouseStock.createMany()` — one SQL for all opening stock rows
+
+**Files changed:**
+- `frontend/src/pages/inventory/SerialNumbers.tsx` — `/inventory` → `/inventory/items`
+- `backend/src/routes/import.ts` — replaced per-row loop with batch-insert approach
+
 ## [2026-08-25] - TallyPrime Parity Batch 3 PR 1: VAT Return, Stock Aging, Financial Ratios Reports
 
 **What/Why:** Closed 3 of the 12 remaining TallyPrime parity gaps (PR 1 of 6). All are pure reporting additions with no schema changes.
