@@ -388,6 +388,8 @@ router.post('/:id/landed-cost', requireRole('Accountant'), async (req: Request, 
       return { landedCostBill, allocations };
     });
 
+    const { tenantId: lcTenantId } = requireTenantContext();
+    invalidateCachedList(lcTenantId, 'inventory-items').catch(() => {});
     res.status(201).json({
       success: true,
       message: 'Landed cost recorded and allocated across the purchase.',
