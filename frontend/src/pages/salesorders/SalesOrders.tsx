@@ -78,8 +78,8 @@ export function SalesOrders() {
 
   const loadCustomers = useCallback(async () => {
     try {
-      const res = await api.get("/customers?pageSize=500");
-      setCustomers(res.data.customers || res.data || []);
+      const res = await api.get("/invoices/customers");
+      setCustomers(res.data.data?.customers || []);
     } catch {
       // ignore
     }

@@ -60,8 +60,8 @@ function CustomerPaymentTab() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
-    api.get("/customers?pageSize=500")
-      .then((r) => setCustomers(r.data.customers || r.data || []))
+    api.get("/invoices/customers")
+      .then((r) => setCustomers(r.data.data?.customers || []))
       .catch(() => {});
   }, []);
 
@@ -243,8 +243,8 @@ function VendorPaymentTab() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
-    api.get("/vendors?pageSize=500")
-      .then((r) => setVendors(r.data.vendors || r.data || []))
+    api.get("/bills/vendors")
+      .then((r) => setVendors(r.data.data?.vendors || []))
       .catch(() => {});
   }, []);
 

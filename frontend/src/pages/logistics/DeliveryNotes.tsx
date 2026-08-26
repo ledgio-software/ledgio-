@@ -66,8 +66,8 @@ function DeliveryNotesTab() {
 
   const openForm = async () => {
     try {
-      const res = await api.get("/customers?pageSize=500");
-      setCustomers(res.data.customers || res.data || []);
+      const res = await api.get("/invoices/customers");
+      setCustomers(res.data.data?.customers || []);
     } catch { /* ignore */ }
     setFormCustomerId(""); setFormInvoiceId(""); setFormDispatchDate("");
     setFormNotes(""); setFormLines([{ description: "", quantity: 1 }]);
@@ -259,8 +259,8 @@ function GoodsReceiptNotesTab() {
 
   const openForm = async () => {
     try {
-      const res = await api.get("/vendors?pageSize=500");
-      setVendors(res.data.vendors || res.data || []);
+      const res = await api.get("/bills/vendors");
+      setVendors(res.data.data?.vendors || []);
     } catch { /* ignore */ }
     setFormVendorId(""); setFormPOId(""); setFormReceiptDate("");
     setFormNotes(""); setFormLines([{ description: "", quantity: 1 }]);
