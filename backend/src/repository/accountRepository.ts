@@ -23,6 +23,7 @@ export interface AccountRecord {
   // migration 010. Unlike defaultRole, multiple accounts can hold this flag.
   isFixedAsset: boolean;
   defaultRole: AccountDefaultRole | null;
+  clientTxnId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,12 +54,13 @@ function mapAccountRow(row: any): AccountRecord {
     isCashEquivalent: Boolean(row.is_cash_equivalent),
     isFixedAsset: Boolean(row.is_fixed_asset),
     defaultRole: (row.default_role as AccountDefaultRole) || null,
+    clientTxnId: row.client_txn_id || null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
 }
 
-const ACCOUNT_COLUMNS = 'id, code, name, type, parent_id, currency, is_active, is_cash_equivalent, is_fixed_asset, default_role, created_at, updated_at';
+const ACCOUNT_COLUMNS = 'id, code, name, type, parent_id, currency, is_active, is_cash_equivalent, is_fixed_asset, default_role, client_txn_id, created_at, updated_at';
 
 /**
  * Default for isCashEquivalent when not explicitly supplied: ASSET accounts

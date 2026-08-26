@@ -107,6 +107,14 @@ export async function createAccount(data: CreateAccountData, actor?: AuditActor)
       // 1. Check duplicate code
       const existingCode = await accountRepository.getAccountByCode(client, data.code);
       if (existingCode) {
+        // If we got here via a race where the winner committed before we reached
+        // the INSERT (but after our clientTxnId fast-path at line 100), the
+        // winner's account will share the same clientTxnId — treat it as an
+        // idempotency replay rather than a genuine conflict.
+        if (data.clientTxnId && existingCode.clientTxnId === data.clientTxnId) {
+          replayed = true;
+          return existingCode;
+        }
         throw new AccountServiceError(`Account code "${data.code.trim()}" already exists.`, 409);
       }
 

@@ -11,6 +11,28 @@ import {
   invalidateAllNotificationCaches,
 } from '../cache/notificationCache';
 
+// In-process fallback cache so notification polls are fast even when Redis is unavailable.
+// TTL is 30 s — matches the frontend poll interval with a comfortable buffer.
+const MEM_TTL_MS = 30_000;
+const memCache = new Map<string, { data: unknown; expiresAt: number }>();
+
+function memGet<T>(key: string): T | null {
+  const entry = memCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) return null;
+  return entry.data as T;
+}
+function memSet(key: string, data: unknown): void {
+  memCache.set(key, { data, expiresAt: Date.now() + MEM_TTL_MS });
+}
+function memDel(key: string): void {
+  memCache.delete(key);
+}
+function memDelPattern(prefix: string): void {
+  for (const k of memCache.keys()) {
+    if (k.startsWith(prefix)) memCache.delete(k);
+  }
+}
+
 const router = Router();
 
 router.use(authenticateJwt);
@@ -24,14 +46,25 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const userId = (req as any).user?.id;
+    const cacheKey = `notif:${tenantId}:${userId}`;
 
     type NotifPayload = { notifications: any[]; unreadCount: number };
-    const cached = await getCachedNotifications<NotifPayload>(tenantId, userId);
-    if (cached) {
-      res.status(200).json({ success: true, data: cached });
+
+    // 1. Try Redis cache
+    const redisCached = await getCachedNotifications<NotifPayload>(tenantId, userId);
+    if (redisCached) {
+      res.status(200).json({ success: true, data: redisCached });
       return;
     }
 
+    // 2. Try in-process fallback (fast path when Redis is unavailable)
+    const memCached = memGet<NotifPayload>(cacheKey);
+    if (memCached) {
+      res.status(200).json({ success: true, data: memCached });
+      return;
+    }
+
+    // 3. DB query — only on cache miss
     const notifications = await withCurrentTenantDb(prisma, async (client) => {
       return (client as any).notification.findMany({
         where: {
@@ -47,6 +80,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const payload: NotifPayload = { notifications, unreadCount };
 
     void setCachedNotifications(tenantId, userId, payload);
+    memSet(cacheKey, payload);
     res.status(200).json({ success: true, data: payload });
   } catch (error: any) {
     console.error('[Notifications] Error fetching notifications:', error);
@@ -83,6 +117,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     // Broadcast notification: wipe all per-user caches for this tenant
     void invalidateAllNotificationCaches(tenantId);
+    memDelPattern(`notif:${tenantId}:`);
     res.status(201).json({ success: true, message: 'Notification created', data: { notification: created } });
   } catch (error: any) {
     console.error('[Notifications] Error creating notification:', error);
@@ -115,6 +150,7 @@ router.put('/:id/read', async (req: Request, res: Response): Promise<void> => {
     });
 
     void invalidateNotificationCache(tenantId, userId);
+    memDel(`notif:${tenantId}:${userId}`);
     res.status(200).json({ success: true, data: { notification: updated } });
   } catch (error: any) {
     console.error('[Notifications] Error marking notification as read:', error);
@@ -147,6 +183,7 @@ router.put('/read-all', async (req: Request, res: Response): Promise<void> => {
     });
 
     void invalidateNotificationCache(tenantId, userId);
+    memDel(`notif:${tenantId}:${userId}`);
     res.status(200).json({ success: true, message: 'All notifications marked as read' });
   } catch (error: any) {
     console.error('[Notifications] Error marking all as read:', error);

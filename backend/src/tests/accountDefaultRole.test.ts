@@ -21,6 +21,7 @@ function makeAccount(overrides: Partial<AccountRecord>): AccountRecord {
     isCashEquivalent: false,
     isFixedAsset: false,
     defaultRole: null,
+    clientTxnId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

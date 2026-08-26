@@ -198,8 +198,8 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
       res.status(400).json({ success: false, error: 'An array of inventory items is required for import.' });
       return;
     }
-    if (items.length > 2000) {
-      res.status(400).json({ success: false, error: 'Maximum 2000 items per import batch. The wizard sends 500 at a time, so a 16,000-item CSV imports in 32 automatic batches.' });
+    if (items.length > 10_000) {
+      res.status(400).json({ success: false, error: 'Maximum 10,000 items per import batch.' });
       return;
     }
 
