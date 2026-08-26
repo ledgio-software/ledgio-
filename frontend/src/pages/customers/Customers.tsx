@@ -29,7 +29,8 @@ interface Invoice {
   id: string;
   invoiceNumber?: string;
   status: string;
-  totalAmount: number;
+  total: number;
+  amountPaid: number;
   dueDate?: string | null;
   createdAt: string;
 }
@@ -180,7 +181,7 @@ export function Customers() {
 
   const outstandingTotal = customerInvoices
     .filter((inv) => ["DRAFT", "SENT", "PARTIALLY_PAID", "OVERDUE"].includes(inv.status))
-    .reduce((sum, inv) => sum + (inv.totalAmount ?? 0), 0);
+    .reduce((sum, inv) => sum + (Number(inv.total ?? 0) - Number(inv.amountPaid ?? 0)), 0);
 
   return (
     <div className="flex h-full gap-4 p-6">
@@ -465,7 +466,7 @@ export function Customers() {
                           {inv.status}
                         </span>
                         <span className="text-xs font-medium text-secondary-900 dark:text-secondary-50 tabular-nums">
-                          GHS {Number(inv.totalAmount ?? 0).toLocaleString("en-GH", { minimumFractionDigits: 2 })}
+                          GHS {Number(inv.total ?? 0).toLocaleString("en-GH", { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>

@@ -759,45 +759,54 @@ router.get('/analytics/top-customers', requireRole('Viewer'), async (req: Reques
       dateFilter.lte = end;
     }
 
-    // Group invoices by customer in SQL and fetch only the top-N customer records.
-    const grouped = await withCurrentTenantDb(prisma, (client) =>
-      (client as any).invoice.groupBy({
-        by: ['customerId'],
+    // Fetch invoice summaries and group in JS (avoids groupBy + tenant search_path issues).
+    const invoiceRows = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).invoice.findMany({
         where: {
           tenantId,
           customerId: { not: null },
           amountPaid: { gt: 0 },
           ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
         },
-        _sum: { amountPaid: true },
-        _count: { id: true },
-        orderBy: { _sum: { amountPaid: 'desc' } },
-        take: limit,
+        select: { customerId: true, amountPaid: true },
       })
     ) as any[];
 
-    const customerIds = grouped.map((g: any) => g.customerId).filter(Boolean);
-    const customerRecords = customerIds.length
+    const revenueMap: Record<string, { revenue: number; count: number }> = {};
+    for (const row of invoiceRows) {
+      if (!row.customerId) continue;
+      if (!revenueMap[row.customerId]) revenueMap[row.customerId] = { revenue: 0, count: 0 };
+      revenueMap[row.customerId].revenue += Number(row.amountPaid ?? 0);
+      revenueMap[row.customerId].count += 1;
+    }
+
+    const topIds = Object.entries(revenueMap)
+      .sort(([, a], [, b]) => b.revenue - a.revenue)
+      .slice(0, limit)
+      .map(([id]) => id);
+
+    const customerRecords = topIds.length
       ? await withCurrentTenantDb(prisma, (client) =>
           (client as any).customer.findMany({
-            where: { id: { in: customerIds } },
+            where: { id: { in: topIds } },
             select: { id: true, name: true, email: true, customerType: true },
           })
         ) as any[]
       : [];
 
     const customerMap = Object.fromEntries(customerRecords.map((c: any) => [c.id, c]));
-    const customers = grouped
-      .map((g: any) => {
-        const c = customerMap[g.customerId];
+    const customers = topIds
+      .map((id) => {
+        const c = customerMap[id];
         if (!c) return null;
+        const stats = revenueMap[id];
         return {
           id: c.id,
           name: c.name,
           email: c.email ?? '',
           customerType: c.customerType ?? 'RETAIL',
-          revenue: Number(g._sum.amountPaid ?? 0),
-          invoiceCount: g._count.id,
+          revenue: stats.revenue,
+          invoiceCount: stats.count,
         };
       })
       .filter(Boolean);
