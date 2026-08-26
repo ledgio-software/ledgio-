@@ -96,6 +96,7 @@ const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m 
 const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
 const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ default: m.VatReturn })));
 const StockAging = lazy(() => import("./pages/reports/StockAging").then(m => ({ default: m.StockAging })));
+const TrialBalance = lazy(() => import("./pages/reports/TrialBalance").then(m => ({ default: m.TrialBalance })));
 const FinancialRatios = lazy(() => import("./pages/reports/FinancialRatios").then(m => ({ default: m.FinancialRatios })));
 const PriceLists = lazy(() => import("./pages/settings/PriceLists").then(m => ({ default: m.PriceLists })));
 const SerialNumbers = lazy(() => import("./pages/inventory/SerialNumbers").then(m => ({ default: m.SerialNumbers })));
@@ -606,6 +607,7 @@ function App() {
               <Route path="/reports/registers" element={<ProtectedRoute><MainLayout><Registers /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/vat-return" element={<ProtectedRoute><MainLayout><VatReturn /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/stock-aging" element={<ProtectedRoute><MainLayout><StockAging /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/trial-balance" element={<ProtectedRoute><MainLayout><TrialBalance /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/financial-ratios" element={<ProtectedRoute><MainLayout><FinancialRatios /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/price-lists" element={<ProtectedRoute><MainLayout><PriceLists /></MainLayout></ProtectedRoute>} />
               <Route path="/inventory/serial-numbers" element={<ProtectedRoute><MainLayout><SerialNumbers /></MainLayout></ProtectedRoute>} />
