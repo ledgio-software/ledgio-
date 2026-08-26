@@ -466,9 +466,14 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
         });
         created.push(...inserted);
 
-        const skippedCount = okRows.length - inserted.length;
-        if (skippedCount > 0) {
-          failed.push({ index: -1, name: '(multiple)', error: `${skippedCount} item(s) skipped — SKU already exists in this business.` });
+        // Attribute each skipped row to the specific row so callers get per-row error details
+        if (inserted.length < okRows.length) {
+          const insertedSkus = new Set(inserted.map((it: any) => it.sku));
+          for (const row of okRows) {
+            if (!insertedSkus.has(row.sku)) {
+              failed.push({ index: row.index, name: row.name, error: `SKU "${row.sku}" already exists in this business.` });
+            }
+          }
         }
 
         // Stock rows for inserted items that had a warehouse + qty
