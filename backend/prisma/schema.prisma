@@ -476,14 +476,15 @@ model PriceList {
 }
 
 model PriceListEntry {
-  id              String    @id @default(uuid())
-  priceListId     String    @map("price_list_id")
-  priceList       PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
-  tenantId        String    @map("tenant_id")
-  inventoryItemId String    @map("inventory_item_id")
-  unitPrice       Decimal   @db.Decimal(15, 2) @map("unit_price")
-  minQty          Int       @default(1) @map("min_qty")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  id              String        @id @default(uuid())
+  priceListId     String        @map("price_list_id")
+  priceList       PriceList     @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  tenantId        String        @map("tenant_id")
+  inventoryItemId String        @map("inventory_item_id")
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  unitPrice       Decimal       @db.Decimal(15, 2) @map("unit_price")
+  minQty          Int           @default(1) @map("min_qty")
+  createdAt       DateTime      @default(now()) @map("created_at")
 
   @@index([tenantId, priceListId])
   @@index([tenantId, inventoryItemId])
@@ -1008,6 +1009,7 @@ model InventoryItem {
   bomFinishedIn      BomTemplate[]       @relation("BomFinishedItem")
   bomComponentIn     BomLine[]           @relation("BomComponentItem")
   serialNumbers      SerialNumber[]
+  priceListEntries   PriceListEntry[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
