@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, FileText, AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react";
 import { api } from "../../lib/api";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
@@ -34,7 +34,7 @@ export function TrialBalance() {
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: settings.baseCurrency || "GHS" }).format(n);
 
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -48,7 +48,9 @@ export function TrialBalance() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [startDate, endDate]);
+
+  useEffect(() => { fetchReport(); }, []);
 
   const handleExport = () => {
     if (!report) return;
@@ -115,7 +117,7 @@ export function TrialBalance() {
 
       {!report && !loading && (
         <div className="text-center py-16 text-gray-400 text-sm">
-          Select a date range and click <strong>Run</strong> to generate the Trial Balance.
+          No data found. Adjust the date range and click <strong>Run</strong>.
         </div>
       )}
 
