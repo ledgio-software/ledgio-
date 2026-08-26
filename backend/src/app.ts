@@ -81,6 +81,8 @@ import manufacturingRouter from './routes/manufacturing';
 import whtRatesRouter from './routes/whtRates';
 import postDatedChequesRouter from './routes/postDatedCheques';
 import interestPolicyRouter from './routes/interestPolicy';
+import apiKeysRouter from './routes/apiKeys';
+import externalApiRouter from './routes/externalApi';
 
 dotenv.config();
 
@@ -271,6 +273,12 @@ app.use('/api/v1/audit-logs', auditLogsRouter);
 
 // Bulk data import API endpoints
 app.use('/api/v1/import', importRouter);
+
+// API key management (generate/revoke keys for machine-to-machine integration)
+app.use('/api/v1/api-keys', apiKeysRouter);
+
+// External API endpoints — authenticated by X-API-Key, no JWT required
+app.use('/api/external/v1', externalApiRouter);
 
 // Migration admin endpoints
 app.use('/api/v1/admin/migrations', migrationsRouter);

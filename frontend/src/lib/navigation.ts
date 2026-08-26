@@ -40,6 +40,7 @@ import {
   CreditCard,
   Layers,
   Cog,
+  Key,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -209,6 +210,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "AI Assistant Activity", href: "/help-assistant/activity", icon: Bot },
       { name: "Bulk Data Import", href: "/import", icon: FileUp },
       { name: "Team Management", href: "/team", icon: Users },
+      { name: "API Keys", href: "/settings/api-keys", icon: Key },
     ],
   },
   {

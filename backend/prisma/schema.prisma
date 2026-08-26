@@ -89,6 +89,7 @@ model Tenant {
 
   users       User[]
   invitations Invitation[]
+  apiKeys     ApiKey[]
 
   @@index([acceptedTermsVersion, termsAcceptedAt])
   @@map("tenants")
@@ -2354,4 +2355,25 @@ model ComplianceUpdate {
 
   @@index([verifiedAt(sort: Desc)])
   @@map("compliance_updates")
+}
+
+// Public-schema API key for machine-to-machine integration (external systems
+// posting invoices/payments via X-API-Key authentication). Stored in the
+// public schema (alongside Tenant) so the auth middleware can look up which
+// tenant a key belongs to before setting tenant context for the request.
+model ApiKey {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  keyHash     String    @map("key_hash")
+  keyPrefix   String    @map("key_prefix")
+  lastUsedAt  DateTime? @map("last_used_at")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([keyPrefix])
+  @@map("api_keys")
 }
