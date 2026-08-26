@@ -465,7 +465,7 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
     if (created.length > 0) {
       invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
     }
-    res.status(created.length > 0 ? 201 : 400).json({
+    res.status(201).json({
       success: created.length > 0,
       message: `${created.length} item(s) created${failed.length > 0 ? `, ${failed.length} failed` : ''}.`,
       data: { importedCount: created.length, errorCount: failed.length, errors: failed, failed, created },
