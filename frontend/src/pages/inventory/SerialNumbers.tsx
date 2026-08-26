@@ -61,7 +61,7 @@ export function SerialNumbers() {
       }
       setRecords(data);
       setTotal(srRes.data.pagination?.total || data.length);
-      setItems(itemsRes.data.items || itemsRes.data || []);
+      setItems(itemsRes.data.data?.items || []);
       setWarehouses(whRes.data.data?.warehouses || []);
     } catch (e: any) {
       setError(e?.response?.data?.error || "Failed to load serial numbers.");

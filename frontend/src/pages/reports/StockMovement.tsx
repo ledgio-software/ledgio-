@@ -75,8 +75,8 @@ export function StockMovement() {
       api.get("/inventory/items"),
       api.get("/inventory/warehouses"),
     ]).then(([itemsRes, whRes]) => {
-      setItems(itemsRes.data.items || itemsRes.data.data || []);
-      setWarehouses(whRes.data.warehouses || whRes.data.data || []);
+      setItems(itemsRes.data.data?.items || []);
+      setWarehouses(whRes.data.data?.warehouses || []);
     }).catch(() => {});
   }, []);
 

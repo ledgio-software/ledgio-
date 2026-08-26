@@ -59,8 +59,8 @@ export function Jobs() {
         api.get("/accounts"),
       ]);
       setJobs(jRes.data.data || []);
-      setCustomers(cRes.data.customers || cRes.data || []);
-      setAccounts(aRes.data.accounts || aRes.data || []);
+      setCustomers(cRes.data.data?.customers || []);
+      setAccounts(aRes.data.data?.accounts || []);
     } catch (e: any) {
       setError(e?.response?.data?.error || "Failed to load jobs.");
     } finally { setLoading(false); }
@@ -110,7 +110,7 @@ export function Jobs() {
     } catch (e: any) { setError(e?.response?.data?.error || "Failed to cancel job."); }
   };
 
-  const totalCost = (job: Job) => job.costLines.reduce((s, l) => s + Number(l.amount), 0);
+  const totalCost = (job: Job) => (job.costLines || []).reduce((s, l) => s + Number(l.amount), 0);
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
