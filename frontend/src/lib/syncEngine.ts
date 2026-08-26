@@ -373,9 +373,13 @@ export function disconnectSyncSocket(): void {
  * every-page-visit behavior since it only runs on these specific actions.
  */
 export async function resyncInvoicesFromServer(): Promise<void> {
-  const res = await api.get('/invoices');
-  if (!res.data.success) return;
-  await syncDb.invoices.bulkPut(res.data.data.invoices);
+  try {
+    const res = await api.get('/invoices');
+    if (!res.data.success) return;
+    await syncDb.invoices.bulkPut(res.data.data.invoices);
+  } catch {
+    // Background sync — network/server errors are non-fatal
+  }
 }
 
 // --- Optimistic local-first writes -------------------------------------
