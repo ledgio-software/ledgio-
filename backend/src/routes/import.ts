@@ -8,6 +8,7 @@ import { requireTenantContext } from '../context/tenantContext';
 import { encryptCredential } from '../utils/credentialEncryption';
 import * as accountService from '../services/accountService';
 import * as journalService from '../services/journalEntryService';
+import { invalidateCachedList } from '../cache/listCache';
 
 const router = Router();
 
@@ -274,6 +275,9 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
       }
     }
 
+    if (created.length > 0) {
+      invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
+    }
     res.status(200).json({
       success: true,
       data: { importedCount: created.length, errorCount: errors.length, errors },

@@ -8,6 +8,7 @@ import { requireTenantContext } from '../context/tenantContext';
 import { assertWarehouseAccess, getAccessibleWarehouseIds, WarehouseAccessError } from '../services/warehouseAccessService';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validateBody';
+import { invalidateCachedList } from '../cache/listCache';
 
 const saleLineSchema = z.object({
   itemId: z.string().uuid(),
@@ -585,6 +586,8 @@ router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: 
       });
     }
 
+    const { tenantId: saleTenantId } = requireTenantContext();
+    invalidateCachedList(saleTenantId, 'inventory-items').catch(() => {});
     res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: { ...result, warnings: (result as any).warnings || [] } });
   } catch (error: any) {
     console.error('[CashTill] Error recording cash sale:', error);
@@ -834,6 +837,8 @@ router.post('/sales/:id/void', async (req: Request, res: Response): Promise<void
       if (voidJournalId) result.voided.voidJournalId = voidJournalId;
     }
 
+    const { tenantId: voidTenantId } = requireTenantContext();
+    invalidateCachedList(voidTenantId, 'inventory-items').catch(() => {});
     res.status(200).json({ success: true, message: 'Sale voided and stock restored.', data: { sale: result.voided } });
   } catch (error: any) {
     console.error('[CashTill] Error voiding sale:', error);

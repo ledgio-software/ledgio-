@@ -30,6 +30,7 @@ import { assertWarehouseAccess, WarehouseAccessError } from '../services/warehou
 import { encryptCredential, decryptCredential } from '../utils/credentialEncryption';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validateBody';
+import { invalidateCachedList } from '../cache/listCache';
 
 const createCustomerSchema = z.object({
   name: z.string().min(1).max(200),
@@ -608,6 +609,9 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createI
       });
     }
 
+    if (created?.stockDeducted) {
+      invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
+    }
     res.status(replayed ? 200 : 201).json({ success: true, message: 'Invoice created successfully', data: { invoice: created } });
   } catch (error: any) {
     console.error('[Invoices] Error creating invoice:', error);
@@ -875,6 +879,8 @@ router.post('/:id/credit-notes', requireRole('Accountant'), async (req: Request,
   try {
     const actor = actorFromRequest(req);
     const note = await creditDebitNoteService.createCreditNote(req.params.id, req.body, actor);
+    const { tenantId: cnTenantId } = requireTenantContext();
+    invalidateCachedList(cnTenantId, 'inventory-items').catch(() => {});
     res.status(201).json({ success: true, message: 'Credit note issued successfully.', data: { creditNote: note } });
   } catch (error: any) {
     if (error instanceof CreditDebitNoteServiceError || error instanceof JournalEntryServiceError) {

@@ -21,6 +21,7 @@ import { CreditDebitNoteServiceError } from '../services/creditDebitNoteService'
 import { JournalEntryServiceError } from '../services/journalEntryService';
 import * as purchaseOrderService from '../services/purchaseOrderService';
 import * as vendorBillPaymentService from '../services/vendorBillPaymentService';
+import { invalidateCachedList } from '../cache/listCache';
 
 const router = Router();
 
@@ -300,6 +301,10 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
       );
     }
 
+    if (isItemized) {
+      const { tenantId: billTenantId } = requireTenantContext();
+      invalidateCachedList(billTenantId, 'inventory-items').catch(() => {});
+    }
     res.status(201).json({
       success: true,
       message: isItemized ? 'Vendor bill recorded and stock received.' : 'Vendor bill recorded',
@@ -383,6 +388,8 @@ router.post('/:id/landed-cost', requireRole('Accountant'), async (req: Request, 
       return { landedCostBill, allocations };
     });
 
+    const { tenantId: lcTenantId } = requireTenantContext();
+    invalidateCachedList(lcTenantId, 'inventory-items').catch(() => {});
     res.status(201).json({
       success: true,
       message: 'Landed cost recorded and allocated across the purchase.',
