@@ -9,7 +9,7 @@ import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Loader2 } from "luci
 
 type ImportType = "accounts" | "customers" | "inventory-items";
 
-const CHUNK_SIZE = 500;
+const CHUNK_SIZE = 1_000;
 const PREVIEW_LIMIT = 10;
 
 const IMPORT_CONFIGS: Record<ImportType, {

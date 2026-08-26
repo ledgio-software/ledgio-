@@ -364,8 +364,8 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
       res.status(400).json({ success: false, error: 'Provide a non-empty array of items to create.' });
       return;
     }
-    if (items.length > 500) {
-      res.status(400).json({ success: false, error: 'A maximum of 500 items can be created per bulk request.' });
+    if (items.length > 10_000) {
+      res.status(400).json({ success: false, error: 'A maximum of 10,000 items can be created per bulk request.' });
       return;
     }
 
