@@ -118,7 +118,7 @@ export function StockMovement() {
         <div className="flex items-center gap-2">
           <TrendingUp className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-xl font-semibold">Stock Movement Analysis</h1>
+            <h1 className="text-xl font-semibold text-secondary-900 dark:text-secondary-50">Stock Movement Analysis</h1>
             <p className="text-sm text-muted-foreground">
               Every stock-in and stock-out event for an item over a period
             </p>

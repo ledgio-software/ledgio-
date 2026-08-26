@@ -82,7 +82,7 @@ export function StockAging() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Stock Aging</h1>
+          <h1 className="text-2xl font-semibold text-secondary-900 dark:text-secondary-50">Stock Aging</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Inventory age analysis by days on hand</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

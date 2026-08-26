@@ -153,7 +153,7 @@ export function Registers() {
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-xl font-semibold">Purchase & Sales Registers</h1>
+            <h1 className="text-xl font-semibold text-secondary-900 dark:text-secondary-50">Purchase & Sales Registers</h1>
             <p className="text-sm text-muted-foreground">Statutory register of all purchases and sales for a period</p>
           </div>
         </div>
