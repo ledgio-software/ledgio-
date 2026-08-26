@@ -149,8 +149,13 @@ export async function createAccount(data: CreateAccountData, actor?: AuditActor)
         // (uq_accounts_client_txn_id locally, accounts_code_key under CI's
         // timing). Both must be treated as "go look up the real winner",
         // not just the client_txn_id one.
+        // Prisma wraps raw-query errors as P2010 (not the Postgres code 23505
+        // directly), but embeds the full Postgres error in the message, so
+        // the constraint name is always present regardless of which code field
+        // the runtime exposes. Check message alone — it's reliable in both
+        // local (native Postgres error bubbled as 23505) and CI (P2010 wrapper).
         const message = String(error.message || '');
-        if (error.code === '23505' && data.clientTxnId &&
+        if (data.clientTxnId &&
           (message.includes('uq_accounts_client_txn_id') || message.includes('accounts_code_key'))) {
           throw new DuplicateAccountReplayError();
         }
