@@ -62,6 +62,7 @@ export function ExpenseClaims() {
     expenseAccountId: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reimbursingId, setReibursingId] = useState<string | null>(null);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,6 +139,8 @@ export function ExpenseClaims() {
   };
 
   const handleReimburse = async (id: string) => {
+    if (reimbursingId) return;
+    setReibursingId(id);
     try {
       const res = await api.post(`/expense-claims/${id}/reimburse`);
       if (res.data.success) {
@@ -146,6 +149,8 @@ export function ExpenseClaims() {
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to reimburse claim.", "error");
+    } finally {
+      setReibursingId(null);
     }
   };
 
@@ -264,8 +269,8 @@ export function ExpenseClaims() {
                   )}
                   {canDecide && c.status === "APPROVED" && (
                     <div className="flex justify-end pt-1">
-                      <Button variant="primary" size="sm" className="text-xs" onClick={() => handleReimburse(c.id)}>
-                        <Wallet className="mr-1 h-3 w-3" /> Reimburse
+                      <Button variant="primary" size="sm" className="text-xs" onClick={() => handleReimburse(c.id)} disabled={reimbursingId === c.id}>
+                        <Wallet className="mr-1 h-3 w-3" /> {reimbursingId === c.id ? "Posting…" : "Reimburse"}
                       </Button>
                     </div>
                   )}
