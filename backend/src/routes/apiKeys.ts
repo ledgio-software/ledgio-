@@ -6,11 +6,13 @@ import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { hashPassword } from '../utils/password';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'API Key Management'));
 
 /**
  * GET /api/v1/api-keys

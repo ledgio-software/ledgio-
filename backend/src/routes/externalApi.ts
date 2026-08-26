@@ -5,10 +5,12 @@ import { requireTenantContext } from '../context/tenantContext';
 import { encryptCredential } from '../utils/credentialEncryption';
 import * as invoicePaymentService from '../services/invoicePaymentService';
 import { authenticateApiKey } from '../middleware/apiKeyMiddleware';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 router.use(authenticateApiKey);
+router.use(requireTier(2, 'External API Integration'));
 
 /**
  * POST /api/external/v1/invoices

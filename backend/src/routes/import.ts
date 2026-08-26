@@ -4,6 +4,7 @@ import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { encryptCredential } from '../utils/credentialEncryption';
 import * as accountService from '../services/accountService';
@@ -353,7 +354,7 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
  * (case-insensitive) and auto-created if not found.
  * Access: Accountant role or higher.
  */
-router.post('/invoices', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.post('/invoices', requireRole('Accountant'), requireTier(2, 'Bulk Invoice Import'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { invoices } = req.body;
@@ -458,7 +459,7 @@ router.post('/invoices', requireRole('Accountant'), async (req: Request, res: Re
  * entry posting, balance updates, and status transitions.
  * Access: Accountant role or higher.
  */
-router.post('/payments', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.post('/payments', requireRole('Accountant'), requireTier(2, 'Bulk Payment Import'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const actor = actorFromRequest(req);
