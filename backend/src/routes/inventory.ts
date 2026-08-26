@@ -369,21 +369,25 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
       return;
     }
 
-    const created: any[] = [];
+    // ── Phase 1: synchronous pre-validation (no DB) ─────────────────────────
+    type ValidRow = {
+      index: number;
+      name: string;
+      sku: string;
+      category: string;
+      unitOfMeasure: string;
+      costPrice: number;
+      sellingPrice: number;
+      initialWarehouseId: string | null;
+      initialQty: number;
+    };
+
+    const validRows: ValidRow[] = [];
     const failed: { index: number; name?: string; error: string }[] = [];
-    const warehouseValidityCache = new Map<string, boolean>();
     const usedSkusThisBatch = new Set<string>();
 
-    // Each row gets its OWN transaction - a Postgres constraint violation
-    // (e.g. duplicate SKU) aborts the enclosing transaction at the DB level,
-    // not just the JS try/catch around it, so a shared transaction across
-    // rows would silently roll back every already-"succeeded" row too (a
-    // COMMIT on an aborted transaction is a silent no-op, not an error) the
-    // moment a later row failed. A per-row transaction is what actually
-    // makes "one bad row doesn't discard the others" true at the DB level.
     for (let i = 0; i < items.length; i++) {
       const row = items[i] || {};
-      let itemSku = '';
       try {
         const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, initialWarehouseId, initialQty = 0 } = row;
 
@@ -391,62 +395,102 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
         if (costPrice === undefined || costPrice === null || costPrice === '') throw new Error('Cost price is required.');
         if (sellingPrice === undefined || sellingPrice === null || sellingPrice === '') throw new Error('Selling price is required.');
 
-        itemSku = sku ? String(sku).trim().toUpperCase() : '';
+        let itemSku = sku ? String(sku).trim().toUpperCase() : '';
         if (!itemSku) {
           do {
             itemSku = `SKU-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
           } while (usedSkusThisBatch.has(itemSku));
         }
-        if (usedSkusThisBatch.has(itemSku)) {
-          throw new Error(`Duplicate SKU "${itemSku}" within this batch.`);
-        }
-
-        if (initialWarehouseId && !warehouseValidityCache.has(initialWarehouseId)) {
-          const wh = await withCurrentTenantDb(prisma, (client) => (client as any).warehouse.findFirst({ where: { id: initialWarehouseId, tenantId } }));
-          warehouseValidityCache.set(initialWarehouseId, !!wh);
-        }
-        if (initialWarehouseId && !warehouseValidityCache.get(initialWarehouseId)) {
-          throw new Error('Initial warehouse not found.');
-        }
-        if (initialWarehouseId) {
-          await withCurrentTenantDb(prisma, (client) => assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, initialWarehouseId));
-        }
-
-        const newItem = await withCurrentTenantDb(prisma, async (client) => {
-          const newItem = await (client as any).inventoryItem.create({
-            data: {
-              tenantId,
-              sku: itemSku,
-              name: String(name).trim(),
-              category,
-              unitOfMeasure,
-              costPrice: Number(costPrice),
-              sellingPrice: Number(sellingPrice),
-            },
-          });
-
-          if (initialWarehouseId && Number(initialQty) > 0) {
-            await (client as any).warehouseStock.create({
-              data: {
-                tenantId,
-                warehouseId: initialWarehouseId,
-                itemId: newItem.id,
-                quantityOnHand: Number(initialQty),
-              },
-            });
-          }
-
-          return newItem;
-        });
-
+        if (usedSkusThisBatch.has(itemSku)) throw new Error(`Duplicate SKU "${itemSku}" within this batch.`);
         usedSkusThisBatch.add(itemSku);
-        created.push(newItem);
+
+        validRows.push({
+          index: i,
+          name: String(name).trim(),
+          sku: itemSku,
+          category,
+          unitOfMeasure,
+          costPrice: Number(costPrice),
+          sellingPrice: Number(sellingPrice),
+          initialWarehouseId: initialWarehouseId || null,
+          initialQty: Number(initialQty) > 0 ? Number(initialQty) : 0,
+        });
       } catch (rowError: any) {
-        const message = rowError.code === 'P2002'
-          ? `SKU "${itemSku}" already exists for this business.`
-          : (rowError.message || 'Failed to create this item.');
-        failed.push({ index: i, name: row?.name, error: message });
+        failed.push({ index: i, name: row?.name, error: rowError.message || 'Failed to create this item.' });
       }
+    }
+
+    // ── Phase 2: single DB session ────────────────────────────────────────────
+    const created: any[] = [];
+
+    if (validRows.length > 0) {
+      await withCurrentTenantDb(prisma, async (client) => {
+        // Validate unique warehouse IDs once (not once per row)
+        const uniqueWarehouseIds = [...new Set(validRows.map(r => r.initialWarehouseId).filter(Boolean) as string[])];
+        const validWarehouseIds = new Set<string>();
+        for (const wid of uniqueWarehouseIds) {
+          const wh = await (client as any).warehouse.findFirst({ where: { id: wid, tenantId } });
+          if (!wh) continue;
+          try {
+            await assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, wid);
+            validWarehouseIds.add(wid);
+          } catch {
+            // access denied — rows referencing this warehouse will error below
+          }
+        }
+
+        // Filter rows whose warehouse didn't pass validation
+        const okRows: ValidRow[] = [];
+        for (const row of validRows) {
+          if (row.initialWarehouseId && !validWarehouseIds.has(row.initialWarehouseId)) {
+            failed.push({ index: row.index, name: row.name, error: 'Warehouse not found or access denied.' });
+          } else {
+            okRows.push(row);
+          }
+        }
+
+        if (okRows.length === 0) return;
+
+        // Single INSERT … RETURNING for all valid rows
+        const inserted: any[] = await (client as any).inventoryItem.createManyAndReturn({
+          data: okRows.map(r => ({
+            tenantId,
+            sku: r.sku,
+            name: r.name,
+            category: r.category,
+            unitOfMeasure: r.unitOfMeasure,
+            costPrice: r.costPrice,
+            sellingPrice: r.sellingPrice,
+          })),
+          skipDuplicates: true,
+        });
+        created.push(...inserted);
+
+        // Attribute each skipped row to the specific row so callers get per-row error details
+        if (inserted.length < okRows.length) {
+          const insertedSkus = new Set(inserted.map((it: any) => it.sku));
+          for (const row of okRows) {
+            if (!insertedSkus.has(row.sku)) {
+              failed.push({ index: row.index, name: row.name, error: `SKU "${row.sku}" already exists in this business.` });
+            }
+          }
+        }
+
+        // Stock rows for inserted items that had a warehouse + qty
+        const skuToItem = new Map(inserted.map((it: any) => [it.sku, it]));
+        const stockData = okRows
+          .filter(r => r.initialWarehouseId && r.initialQty > 0 && skuToItem.has(r.sku))
+          .map(r => ({
+            tenantId,
+            warehouseId: r.initialWarehouseId!,
+            itemId: skuToItem.get(r.sku)!.id,
+            quantityOnHand: r.initialQty,
+          }));
+
+        if (stockData.length > 0) {
+          await (client as any).warehouseStock.createMany({ data: stockData, skipDuplicates: true });
+        }
+      });
     }
 
     if (created.length > 0) {
