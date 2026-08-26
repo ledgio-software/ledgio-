@@ -183,10 +183,11 @@ router.post('/customers', requireRole('Accountant'), async (req: Request, res: R
 /**
  * POST /api/v1/import/inventory-items
  * Bulk-creates inventory items from CSV data.
- * Accepts both short column names (unit, costprice) and camelCase variants
- * (unitofmeasure / unitOfMeasure, costPrice) so the wizard works with any
- * CSV header casing. Also resolves warehouseName → warehouseId for seeding
- * initial stock, matching the Ledgio export template format.
+ *
+ * Performance: all valid rows are inserted in ONE withCurrentTenantDb call
+ * using createManyAndReturn (single SQL INSERT … RETURNING), avoiding the
+ * 50× BEGIN/SET LOCAL/COMMIT overhead that caused the "freeze" with the old
+ * per-row loop.
  */
 router.post('/inventory-items', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
   try {
@@ -197,27 +198,40 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
       res.status(400).json({ success: false, error: 'An array of inventory items is required for import.' });
       return;
     }
-    if (items.length > 500) {
-      res.status(400).json({ success: false, error: 'Maximum 500 items per import batch.' });
+    if (items.length > 2000) {
+      res.status(400).json({ success: false, error: 'Maximum 2000 items per import batch. The wizard sends 500 at a time, so a 16,000-item CSV imports in 32 automatic batches.' });
       return;
     }
 
-    const created: any[] = [];
+    // ── Phase 1: synchronous pre-validation (no DB) ──────────────────────
+    type ValidRow = {
+      rowNum: number;
+      name: string;
+      sku: string;
+      category: string;
+      unitOfMeasure: string;
+      costPrice: number;
+      sellingPrice: number;
+      wholesalePrice: number | null;
+      reorderLevel: number | null;
+      warehouseName: string;
+      initialQty: number;
+    };
+
+    const validRows: ValidRow[] = [];
     const errors: any[] = [];
     const usedSkus = new Set<string>();
-    const warehouseNameCache = new Map<string, string | null>();
 
     for (let i = 0; i < items.length; i++) {
       const row = items[i];
       try {
         if (!row.name || !String(row.name).trim()) throw new Error('Item name is required.');
 
-        // Accept both camelCase and lowercase column names
         const costPrice = row.costprice ?? row['costPrice'];
         const sellingPrice = row.sellingprice ?? row['sellingPrice'];
         const wholesalePrice = row.wholesaleprice ?? row['wholesalePrice'];
         const reorderLevel = row.reorderlevel ?? row['reorderLevel'];
-        const unitOfMeasure = row.unit ?? row.unitofmeasure ?? row['unitOfMeasure'] ?? 'pcs';
+        const unitOfMeasure = (row.unit ?? row.unitofmeasure ?? row['unitOfMeasure'] ?? 'pcs') as string;
         const warehouseName: string = (row.warehousename ?? row['warehouseName'] ?? '').trim();
         const initialQty = row.initialqty ?? row['initialQty'];
 
@@ -226,61 +240,104 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
 
         let sku = row.sku ? String(row.sku).trim().toUpperCase() : '';
         if (!sku) {
-          sku = `SKU-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+          sku = `SKU-${Date.now().toString(36).toUpperCase()}-${i}-${Math.floor(1000 + Math.random() * 9000)}`;
         }
         if (usedSkus.has(sku)) throw new Error(`Duplicate SKU "${sku}" in this batch.`);
         usedSkus.add(sku);
 
-        // Resolve warehouseName → warehouseId (cached per batch)
-        let warehouseId: string | null = null;
-        if (warehouseName) {
-          if (!warehouseNameCache.has(warehouseName)) {
-            const wh = await withCurrentTenantDb(prisma, (client) =>
-              (client as any).warehouse.findFirst({ where: { tenantId, name: warehouseName } })
-            );
-            warehouseNameCache.set(warehouseName, (wh as any)?.id ?? null);
-          }
-          warehouseId = warehouseNameCache.get(warehouseName) ?? null;
-          if (warehouseName && !warehouseId) {
-            throw new Error(`Warehouse "${warehouseName}" not found. Create it first.`);
-          }
-        }
-
-        const result = await withCurrentTenantDb(prisma, async (client) => {
-          const item = await (client as any).inventoryItem.create({
-            data: {
-              tenantId,
-              name: String(row.name).trim(),
-              sku,
-              category: row.category || 'General',
-              unitOfMeasure,
-              costPrice: Number(costPrice),
-              sellingPrice: Number(sellingPrice),
-              wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null,
-              reorderLevel: reorderLevel ? Number(reorderLevel) : null,
-            },
-          });
-
-          if (warehouseId && initialQty && Number(initialQty) > 0) {
-            await (client as any).warehouseStock.create({
-              data: { tenantId, warehouseId, itemId: item.id, quantityOnHand: Number(initialQty) },
-            });
-          }
-
-          return item;
+        validRows.push({
+          rowNum: i + 1,
+          name: String(row.name).trim(),
+          sku,
+          category: row.category || 'General',
+          unitOfMeasure,
+          costPrice: Number(costPrice),
+          sellingPrice: Number(sellingPrice),
+          wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null,
+          reorderLevel: reorderLevel ? Number(reorderLevel) : null,
+          warehouseName,
+          initialQty: initialQty && Number(initialQty) > 0 ? Number(initialQty) : 0,
         });
-        created.push(result);
       } catch (err: any) {
         errors.push({ row: i + 1, name: row.name, error: err.message });
       }
     }
 
-    if (created.length > 0) {
+    if (validRows.length === 0) {
+      res.status(200).json({ success: true, data: { importedCount: 0, errorCount: errors.length, errors } });
+      return;
+    }
+
+    // ── Phase 2: single DB session — resolve warehouses + bulk insert ────
+    let importedCount = 0;
+    let skippedDuplicates = 0;
+
+    await withCurrentTenantDb(prisma, async (client) => {
+      // Resolve all unique warehouse names in one pass
+      const uniqueWarehouseNames = [...new Set(validRows.map(r => r.warehouseName).filter(Boolean))];
+      const warehouseMap = new Map<string, string>();
+      for (const wname of uniqueWarehouseNames) {
+        const wh = await (client as any).warehouse.findFirst({ where: { tenantId, name: wname } });
+        if (wh) warehouseMap.set(wname, (wh as any).id);
+      }
+
+      // Filter out rows where warehouse wasn't found
+      const okRows: ValidRow[] = [];
+      for (const row of validRows) {
+        if (row.warehouseName && !warehouseMap.has(row.warehouseName)) {
+          errors.push({ row: row.rowNum, name: row.name, error: `Warehouse "${row.warehouseName}" not found. Create it first.` });
+        } else {
+          okRows.push(row);
+        }
+      }
+
+      if (okRows.length === 0) return;
+
+      // createManyAndReturn: one SQL INSERT … RETURNING for all rows
+      const created: any[] = await (client as any).inventoryItem.createManyAndReturn({
+        data: okRows.map(r => ({
+          tenantId,
+          name: r.name,
+          sku: r.sku,
+          category: r.category,
+          unitOfMeasure: r.unitOfMeasure,
+          costPrice: r.costPrice,
+          sellingPrice: r.sellingPrice,
+          wholesalePrice: r.wholesalePrice,
+          reorderLevel: r.reorderLevel,
+        })),
+        skipDuplicates: true,
+      });
+
+      importedCount = created.length;
+      skippedDuplicates = okRows.length - created.length;
+
+      // Build warehouse stock rows for items that actually got inserted
+      const skuToCreated = new Map(created.map((c: any) => [c.sku, c]));
+      const stockData = okRows
+        .filter(r => r.warehouseName && r.initialQty > 0 && skuToCreated.has(r.sku))
+        .map(r => ({
+          tenantId,
+          warehouseId: warehouseMap.get(r.warehouseName)!,
+          itemId: skuToCreated.get(r.sku)!.id,
+          quantityOnHand: r.initialQty,
+        }));
+
+      if (stockData.length > 0) {
+        await (client as any).warehouseStock.createMany({ data: stockData, skipDuplicates: true });
+      }
+    });
+
+    if (skippedDuplicates > 0) {
+      errors.push({ row: 0, name: '(multiple)', error: `${skippedDuplicates} item(s) skipped — SKU already exists in this tenant.` });
+    }
+
+    if (importedCount > 0) {
       invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
     }
     res.status(200).json({
       success: true,
-      data: { importedCount: created.length, errorCount: errors.length, errors },
+      data: { importedCount, errorCount: errors.length, errors },
     });
   } catch (error: any) {
     console.error('[Import] Inventory item import error:', error);

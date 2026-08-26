@@ -9,7 +9,7 @@ import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Loader2 } from "luci
 
 type ImportType = "accounts" | "customers" | "inventory-items";
 
-const CHUNK_SIZE = 50;
+const CHUNK_SIZE = 500;
 const PREVIEW_LIMIT = 10;
 
 const IMPORT_CONFIGS: Record<ImportType, {
@@ -258,8 +258,8 @@ export function BulkImportWizard() {
           <CardHeader>
             <CardTitle>2. Preview & Confirm Import ({parsedRows.length} Rows)</CardTitle>
             <CardDescription>
-              Showing first {Math.min(PREVIEW_LIMIT, parsedRows.length)} of {parsedRows.length} rows.
-              All rows will be imported in batches of {CHUNK_SIZE}.
+              Showing first {Math.min(PREVIEW_LIMIT, parsedRows.length)} of {parsedRows.length.toLocaleString()} rows.
+              Importing in batches of {CHUNK_SIZE} — up to 16,000 rows supported.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -316,7 +316,7 @@ export function BulkImportWizard() {
                 Back to Edit
               </Button>
               <Button variant="primary" onClick={handleExecuteImport} disabled={isSubmitting}>
-                {isSubmitting ? "Importing…" : `Execute Import (${parsedRows.length} items)`}
+                {isSubmitting ? "Importing…" : `Execute Import (${parsedRows.length.toLocaleString()} items)`}
               </Button>
             </div>
           </CardContent>
