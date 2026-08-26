@@ -52,7 +52,7 @@ export function SerialNumbers() {
       const [srRes, itemsRes, whRes] = await Promise.all([
         api.get(`/serial-numbers?${params.toString()}`),
         api.get("/inventory"),
-        api.get("/warehouses"),
+        api.get("/inventory/warehouses"),
       ]);
       let data: SerialRecord[] = srRes.data.data || [];
       if (search) {
@@ -62,7 +62,7 @@ export function SerialNumbers() {
       setRecords(data);
       setTotal(srRes.data.pagination?.total || data.length);
       setItems(itemsRes.data.items || itemsRes.data || []);
-      setWarehouses(whRes.data.warehouses || whRes.data || []);
+      setWarehouses(whRes.data.data?.warehouses || []);
     } catch (e: any) {
       setError(e?.response?.data?.error || "Failed to load serial numbers.");
     } finally {
