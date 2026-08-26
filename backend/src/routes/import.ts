@@ -237,7 +237,7 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
             const wh = await withCurrentTenantDb(prisma, (client) =>
               (client as any).warehouse.findFirst({ where: { tenantId, name: warehouseName } })
             );
-            warehouseNameCache.set(warehouseName, wh?.id ?? null);
+            warehouseNameCache.set(warehouseName, (wh as any)?.id ?? null);
           }
           warehouseId = warehouseNameCache.get(warehouseName) ?? null;
           if (warehouseName && !warehouseId) {
