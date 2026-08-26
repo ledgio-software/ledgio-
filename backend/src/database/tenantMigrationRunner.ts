@@ -128,7 +128,7 @@ export async function runMigrationsForSchema(
       // 6. Always reset search path back to public
       await tx.$executeRawUnsafe(`SET search_path TO public;`);
     }
-  }, { timeout: 30000, maxWait: 10000 });
+  }, { timeout: 120000, maxWait: 30000 });
 
   return {
     tenantId,
