@@ -69,16 +69,12 @@ const BUSINESS_TYPES = [
   "NGO / Nonprofit",
 ];
 
-// Steps shown to NGO / Nonprofit workspaces (full accounting setup).
-const STEPS_FULL = [
+// All business types see all four steps; Chart of Accounts and Opening
+// Balances are optional (skippable) for non-nonprofits.
+const STEPS_ALL = [
   { key: "profile", label: "Business Profile", icon: Building2 },
   { key: "accounts", label: "Chart of Accounts", icon: BookOpen },
   { key: "balances", label: "Opening Balances", icon: Scale },
-] as const;
-
-// Steps shown to retail / business workspaces (simplified quick-start).
-const STEPS_SIMPLE = [
-  { key: "profile", label: "Business Profile", icon: Building2 },
   { key: "ready", label: "Ready to Go", icon: Rocket },
 ] as const;
 
@@ -89,10 +85,8 @@ export function OnboardingWizard() {
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  // NONPROFIT orgType gets the full wizard (accounts + balances).
-  // All other org types (BUSINESS) get the quick-start path.
   const isNonprofit = user?.orgType === "NONPROFIT";
-  const steps = isNonprofit ? STEPS_FULL : STEPS_SIMPLE;
+  const steps = STEPS_ALL;
 
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [activeStep, setActiveStep] = useState<StepKey>("profile");
@@ -161,9 +155,7 @@ export function OnboardingWizard() {
       const res = await api.put("/onboarding/business-profile", { businessType, vatRegistered, graTin });
       setStatus(res.data.data);
       showToast("Business profile saved.", "success");
-      // Nonprofits need a chart of accounts and opening balances before going
-      // live. Retail/business workspaces can start selling immediately.
-      setActiveStep(isNonprofit ? "accounts" : "ready");
+      setActiveStep("accounts");
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to save business profile.", "error");
     } finally {
@@ -461,11 +453,16 @@ export function OnboardingWizard() {
               Add Account
             </Button>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex gap-3">
             <Button type="button" variant="primary" onClick={handleSeedAccounts} disabled={seedingAccounts || templateAccounts.length === 0}>
               {seedingAccounts ? "Creating..." : `Create ${templateAccounts.length} Account(s) & Continue`}
               <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
             </Button>
+            {!isNonprofit && (
+              <Button type="button" variant="outline" onClick={() => setActiveStep("balances")}>
+                Skip this step
+              </Button>
+            )}
           </CardFooter>
         </Card>
       )}
@@ -540,6 +537,11 @@ export function OnboardingWizard() {
             <Button type="button" variant="primary" onClick={handlePostOpeningBalances} disabled={postingBalances || !isBalanced}>
               {postingBalances ? "Posting..." : "Post Opening Balances & Go Live"}
             </Button>
+            {!isNonprofit && (
+              <Button type="button" variant="outline" onClick={() => setActiveStep("ready")}>
+                Skip this step
+              </Button>
+            )}
           </CardFooter>
         </Card>
       )}
