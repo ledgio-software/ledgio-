@@ -51,7 +51,7 @@ export function SerialNumbers() {
       if (filterStatus) params.set("status", filterStatus);
       const [srRes, itemsRes, whRes] = await Promise.all([
         api.get(`/serial-numbers?${params.toString()}`),
-        api.get("/inventory"),
+        api.get("/inventory/items"),
         api.get("/inventory/warehouses"),
       ]);
       let data: SerialRecord[] = srRes.data.data || [];
