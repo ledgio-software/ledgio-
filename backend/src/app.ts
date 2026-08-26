@@ -58,6 +58,10 @@ import helpAssistantRouter from './routes/helpAssistant';
 import pettyCashRouter from './routes/pettyCash';
 import purchaseOrdersRouter from './routes/purchaseOrders';
 import salesOrdersRouter from './routes/salesOrders';
+import priceListsRouter from './routes/priceLists';
+import serialNumbersRouter from './routes/serialNumbers';
+import jobsRouter from './routes/jobs';
+import jobWorkOrdersRouter from './routes/jobWorkOrders';
 import deliveryNotesRouter from './routes/deliveryNotes';
 import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
 import paymentBatchesRouter from './routes/paymentBatches';
@@ -70,6 +74,9 @@ import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
 import costCentresRouter from './routes/costCentres';
+import costCategoriesRouter from './routes/costCategories';
+import scenariosRouter from './routes/scenarios';
+import voucherClassesRouter from './routes/voucherClasses';
 import manufacturingRouter from './routes/manufacturing';
 import whtRatesRouter from './routes/whtRates';
 import postDatedChequesRouter from './routes/postDatedCheques';
@@ -199,6 +206,9 @@ app.use('/api/v1/pharmacy', pharmacyRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);
+app.use('/api/v1/cost-categories', costCategoriesRouter);
+app.use('/api/v1/scenarios', scenariosRouter);
+app.use('/api/v1/voucher-classes', voucherClassesRouter);
 
 // Manufacturing / Bill of Materials (BOM templates + production orders)
 app.use('/api/v1/manufacturing', manufacturingRouter);
@@ -223,6 +233,16 @@ app.use('/api/v1/purchase-orders', purchaseOrdersRouter);
 
 // Sales Order endpoints
 app.use('/api/v1/sales-orders', salesOrdersRouter);
+
+// Price List endpoints
+app.use('/api/v1/price-lists', priceListsRouter);
+
+// Serial Number endpoints
+app.use('/api/v1/serial-numbers', serialNumbersRouter);
+
+// Job Costing endpoints
+app.use('/api/v1/jobs', jobsRouter);
+app.use('/api/v1/job-work-orders', jobWorkOrdersRouter);
 
 // Delivery Note & Goods Receipt Note endpoints
 app.use('/api/v1/delivery-notes', deliveryNotesRouter);

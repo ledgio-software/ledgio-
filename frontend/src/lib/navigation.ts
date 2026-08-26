@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileSpreadsheet,
   PieChart,
+  Hash,
   Users,
   ShieldCheck,
   FileUp,
@@ -62,7 +63,9 @@ export interface NavGroup {
 // Professional = unrestricted (full accounting view).
 const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/accounts', '/journals', '/banking',
-  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates',
+  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates', '/settings/price-lists',
+  '/inventory/serial-numbers',
+  '/manufacturing/jobs', '/manufacturing/job-work-orders',
   '/pdc', '/reports/interest-charges',
   '/fixed-assets', '/recurring-invoices', '/cost-centres', '/manufacturing',
   '/reports/ledger', '/reports/balance-sheet', '/reports/cash-flow',
@@ -122,6 +125,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Warehouses & Stock", href: "/inventory", icon: Warehouse },
       { name: "Stock Intelligence", href: "/analytics/inventory", icon: Lightbulb },
+      { name: "Serial Numbers", href: "/inventory/serial-numbers", icon: Hash },
     ],
   },
   {
@@ -153,6 +157,12 @@ export const navigationGroups: NavGroup[] = [
       { name: "Cost Centres", href: "/cost-centres", icon: Layers },
       { name: "Manufacturing", href: "/manufacturing", icon: Cog },
       { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent },
+      { name: "Price Lists", href: "/settings/price-lists", icon: BadgeDollarSign },
+      { name: "Job Costing", href: "/manufacturing/jobs", icon: ClipboardList },
+      { name: "Job Work Orders", href: "/manufacturing/job-work-orders", icon: Truck },
+      { name: "Cost Categories", href: "/cost-categories", icon: Layers },
+      { name: "Scenarios", href: "/settings/scenarios", icon: GitBranch },
+      { name: "Voucher Classes", href: "/settings/voucher-classes", icon: FileSpreadsheet },
       { name: "Post-Dated Cheques", href: "/pdc", icon: CreditCard },
       { name: "Interest Charges", href: "/reports/interest-charges", icon: TrendingUp },
     ],
@@ -176,6 +186,9 @@ export const navigationGroups: NavGroup[] = [
       { name: "Daybook", href: "/reports/daybook", icon: BookOpen },
       { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp },
       { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet },
+      { name: "VAT Return", href: "/reports/vat-return", icon: Percent },
+      { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock },
+      { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3 },
     ],
   },
   {

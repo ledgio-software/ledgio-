@@ -42,6 +42,9 @@ export interface CreateJournalEntryInput {
   entryDate?: string | Date;
   description?: string;
   status?: JournalEntryStatus;
+  voucherType?: string;
+  scenarioId?: string | null;
+  voucherClassId?: string | null;
   lines: CreateJournalEntryLineData[];
 }
 
@@ -106,9 +109,14 @@ export async function createJournalEntry(data: CreateJournalEntryInput, actor?: 
     throw new JournalEntryServiceError('Journal entry total debit/credit amount must be greater than 0.', 400);
   }
 
-  // 4. Validate status
-  const status: JournalEntryStatus = data.status || 'DRAFT';
-  if (!['DRAFT', 'POSTED'].includes(status)) {
+  // 4. Validate status & voucher type
+  const voucherType = data.voucherType || 'JOURNAL';
+  const isNonPosting = voucherType === 'PROVISIONAL' || voucherType === 'MEMO';
+  // Non-posting vouchers (PROVISIONAL/MEMO) are always stored as DRAFT so they
+  // never affect the GL. Callers may still pass status='POSTED' — we downgrade
+  // it silently to DRAFT for these voucher types.
+  const status: JournalEntryStatus = isNonPosting ? 'DRAFT' : (data.status || 'DRAFT');
+  if (!isNonPosting && !['DRAFT', 'POSTED'].includes(status)) {
     throw new JournalEntryServiceError(`Invalid status "${data.status}". Creation allowed status: DRAFT, POSTED.`, 400);
   }
 
@@ -178,17 +186,21 @@ export async function createJournalEntry(data: CreateJournalEntryInput, actor?: 
       entryDate,
       description: data.description,
       status,
+      voucherType,
+      scenarioId: data.scenarioId || undefined,
+      voucherClassId: data.voucherClassId || undefined,
       lines: data.lines.map((l) => ({
         accountId: l.accountId,
         debit: Number(l.debit || 0),
         credit: Number(l.credit || 0),
         description: l.description,
         fundId: l.fundId || undefined,
+        costCategoryId: l.costCategoryId || undefined,
       })),
     });
 
-    // If created with status POSTED, post to ledger
-    if (status === 'POSTED') {
+    // If created with status POSTED and not a non-posting voucher, post to ledger
+    if (status === 'POSTED' && !isNonPosting) {
       await ledgerRepository.postJournalEntryToLedger(client, entry.id);
     }
 

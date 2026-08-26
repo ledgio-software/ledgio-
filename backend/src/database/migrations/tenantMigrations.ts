@@ -813,6 +813,52 @@ export const TENANT_MIGRATIONS: TenantMigration[] = [
           ));
       END $$;
     `
+  },
+  {
+    version: 23,
+    name: '023_add_cost_category_to_journal_lines',
+    sql: `
+      -- cost_category_id cross-schema reference (same pattern as cost_centre_id in v19:
+      -- CostCategory lives in public.cost_categories, not the tenant schema, so no native FK).
+      ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS cost_category_id UUID;
+      CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_cost_category ON journal_entry_lines(cost_category_id);
+    `
+  },
+  {
+    version: 24,
+    name: '024_add_voucher_fields_to_journal_entries',
+    sql: `
+      -- Provisional/Memo vouchers and Voucher Classes (TallyPrime parity).
+      -- scenario_id and voucher_class_id are cross-schema references to public.scenarios
+      -- and public.voucher_classes respectively (same pattern as cost_centre_id v19).
+      ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS voucher_type TEXT NOT NULL DEFAULT 'JOURNAL';
+      ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS scenario_id UUID;
+      ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS voucher_class_id UUID;
+      CREATE INDEX IF NOT EXISTS idx_journal_entries_scenario ON journal_entries(scenario_id);
+    `
+  },
+  {
+    version: 25,
+    name: '025_add_job_account_roles',
+    sql: `
+      -- Widen the default_role CHECK to include JOB_WIP and JOB_EXPENSE for job costing.
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_account_default_role' AND conrelid = 'accounts'::regclass) THEN
+          ALTER TABLE accounts DROP CONSTRAINT chk_account_default_role;
+        END IF;
+        ALTER TABLE accounts ADD CONSTRAINT chk_account_default_role
+          CHECK (default_role IN (
+            'CASH', 'REVENUE', 'EXPENSE', 'DEPRECIATION_EXPENSE', 'ACCUMULATED_DEPRECIATION',
+            'COGS', 'INVENTORY_ASSET',
+            'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+            'WHT_PAYABLE',
+            'PDC_RECEIVABLE', 'PDC_PAYABLE',
+            'INTEREST_INCOME',
+            'JOB_WIP', 'JOB_EXPENSE'
+          ));
+      END $$;
+    `
   }
 ];
 

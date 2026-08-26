@@ -2,6 +2,37 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [2026-08-25] - TallyPrime Parity Batch 3 PR 1: VAT Return, Stock Aging, Financial Ratios Reports
+
+**What/Why:** Closed 3 of the 12 remaining TallyPrime parity gaps (PR 1 of 6). All are pure reporting additions with no schema changes.
+
+**Changes:**
+
+**Backend — `backend/src/services/reportingService.ts`**
+- Added `import { requireTenantContext }` to support tenant-scoped inline queries.
+- `getVatReturn(startDate?, endDate?)` — queries `InvoicePayment` records in the date range, computes output VAT proportionally (payment.amount / invoice.total × invoice.tax), grouped by tax rate name. Notes input VAT is not separately tracked on bills.
+- `_buildStockAgingResult()` — helper buckets inventory rows into 0–30 / 31–60 / 61–90 / 90+ day buckets by `daysOnHand`.
+- `getStockAging(asOfDate?)` — FIFO tenants: queries `StockLayer` (remainingQty > 0, purchasedAt ≤ asOfDate). Average-cost tenants: queries `WarehouseStock` + oldest `StockAdjustment` date per item-warehouse as age proxy.
+- `getFinancialRatios(startDate?, endDate?, asOfDate?)` — calls existing `getBalanceSheet()` + `getProfitAndLoss()`, then computes solvency (Debt-to-Equity, Debt-to-Assets, Equity Ratio), profitability (Net Profit Margin, ROA, ROE), efficiency (Asset Turnover). Notes liquidity ratios unavailable without current/non-current classification.
+
+**Backend — `backend/src/routes/reports.ts`**
+- `GET /api/v1/reports/vat-return?startDate=&endDate=` — with `getCachedReport`/`setCachedReport`.
+- `GET /api/v1/reports/stock-aging?asOfDate=` — cached.
+- `GET /api/v1/reports/financial-ratios?startDate=&endDate=&asOfDate=` — cached.
+
+**Frontend — new pages**
+- `frontend/src/pages/reports/VatReturn.tsx` — period picker, output VAT table grouped by rate, 3 summary tiles (taxable sales, output VAT, net payable), input VAT limitation note, CSV export.
+- `frontend/src/pages/reports/StockAging.tsx` — as-of date picker, bucket summary cards (clickable filter), full item table with days-on-hand column and slow-mover highlight (90+d rows), CSV export.
+- `frontend/src/pages/reports/FinancialRatios.tsx` — date range picker, ratio cards per category (green/red indicators, higher/lower is better labels), limitation note on liquidity ratios.
+
+**Frontend — navigation & routing**
+- `frontend/src/lib/navigation.ts` — Added "VAT Return", "Stock Aging", "Financial Ratios" to REPORTS & ANALYTICS section.
+- `frontend/src/App.tsx` — Lazy imports + protected routes for `/reports/vat-return`, `/reports/stock-aging`, `/reports/financial-ratios`.
+
+**Verified:** `tsc --noEmit` passes clean on both backend and frontend.
+
+---
+
 ## [2026-08-25] - TallyPrime Parity Batch 2: WHT, Post-Dated Cheques, Dual UoM, Interest on Overdue, FIFO Stock Valuation
 
 **What/Why:** Closed the 5 remaining TallyPrime feature-parity gaps identified after PR #96 merged (10 gaps). All 5 gaps shipped on branch `claude/chat-session-k4pf3d`, PR #97.

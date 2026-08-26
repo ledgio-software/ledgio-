@@ -80,6 +80,10 @@ model Tenant {
   // (not sent to a shared/hardcoded fallback) when unset for this tenant.
   bossPhone               String?   @map("boss_phone")
   stockValuationMethod    String    @default("AVERAGE") @map("stock_valuation_method")
+  // When false (default), selling more units than on-hand throws a 400.
+  // When true, stock is allowed to go negative and quantityOnHand may become
+  // negative. Useful for businesses that fulfil before receiving stock.
+  allowNegativeStock      Boolean   @default(false) @map("allow_negative_stock")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
@@ -195,39 +199,96 @@ model Account {
 }
 
 model JournalEntry {
-  id          String             @id @default(uuid())
-  entryNumber String             @unique @map("entry_number")
-  entryDate   DateTime           @default(now()) @map("entry_date")
-  description String?
-  status      JournalEntryStatus @default(DRAFT)
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
+  id              String             @id @default(uuid())
+  entryNumber     String             @unique @map("entry_number")
+  entryDate       DateTime           @default(now()) @map("entry_date")
+  description     String?
+  status          JournalEntryStatus @default(DRAFT)
+  voucherType     String             @default("JOURNAL") @map("voucher_type")
+  scenarioId      String?            @map("scenario_id")
+  voucherClassId  String?            @map("voucher_class_id")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  lines   JournalEntryLine[]
-  ledgers Ledger[]
+  lines        JournalEntryLine[]
+  ledgers      Ledger[]
+  scenario     Scenario?     @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+  voucherClass VoucherClass? @relation(fields: [voucherClassId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([entryDate])
   @@index([status, entryDate])
+  @@index([scenarioId])
   @@map("journal_entries")
 }
 
-model JournalEntryLine {
-  id             String   @id @default(uuid())
-  journalEntryId String   @map("journal_entry_id")
-  accountId      String   @map("account_id")
-  debit          Decimal  @default(0.00) @db.Decimal(15, 2)
-  credit         Decimal  @default(0.00) @db.Decimal(15, 2)
-  description    String?
-  createdAt      DateTime @default(now()) @map("created_at")
+model Scenario {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
 
-  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  entries JournalEntry[]
+
+  @@index([tenantId])
+  @@map("scenarios")
+}
+
+model VoucherClass {
+  id                     String   @id @default(uuid())
+  tenantId               String   @map("tenant_id")
+  name                   String
+  voucherType            String   @map("voucher_type")
+  defaultDebitAccountId  String?  @map("default_debit_account_id")
+  defaultCreditAccountId String?  @map("default_credit_account_id")
+  narrationTemplate      String?  @map("narration_template")
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt      @map("updated_at")
+
+  entries JournalEntry[]
+
+  @@index([tenantId])
+  @@map("voucher_classes")
+}
+
+model JournalEntryLine {
+  id               String   @id @default(uuid())
+  journalEntryId   String   @map("journal_entry_id")
+  accountId        String   @map("account_id")
+  debit            Decimal  @default(0.00) @db.Decimal(15, 2)
+  credit           Decimal  @default(0.00) @db.Decimal(15, 2)
+  description      String?
+  costCategoryId   String?  @map("cost_category_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  journalEntry JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCategory CostCategory? @relation(fields: [costCategoryId], references: [id], onDelete: SetNull)
 
   @@index([journalEntryId])
   @@index([accountId])
+  @@index([costCategoryId])
   @@index([journalEntryId, createdAt])
   @@map("journal_entry_lines")
+}
+
+model CostCategory {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  journalLines JournalEntryLine[]
+
+  @@index([tenantId])
+  @@map("cost_categories")
 }
 
 model Ledger {
@@ -385,6 +446,9 @@ model Customer {
   customerType String   @default("RETAIL") @map("customer_type")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  priceListId       String?  @map("price_list_id")
+  priceList         PriceList? @relation(fields: [priceListId], references: [id])
+
   invoices          Invoice[]
   recurringInvoices RecurringInvoice[]
   salesOrders       SalesOrder[]
@@ -392,6 +456,38 @@ model Customer {
 
   @@index([tenantId])
   @@map("customers")
+}
+
+model PriceList {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  currency    String   @default("GHS")
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true)  @map("is_active")
+  entries     PriceListEntry[]
+  customers   Customer[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  @@index([tenantId])
+  @@map("price_lists")
+}
+
+model PriceListEntry {
+  id              String    @id @default(uuid())
+  priceListId     String    @map("price_list_id")
+  priceList       PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  tenantId        String    @map("tenant_id")
+  inventoryItemId String    @map("inventory_item_id")
+  unitPrice       Decimal   @db.Decimal(15, 2) @map("unit_price")
+  minQty          Int       @default(1) @map("min_qty")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, priceListId])
+  @@index([tenantId, inventoryItemId])
+  @@map("price_list_entries")
 }
 
 // NOT_REQUESTED: default, no GRA clearance has ever been attempted.
@@ -895,6 +991,9 @@ model InventoryItem {
   // Pharmacy: whether this item must be dispensed from a tracked batch (FEFO).
   // When true, every POS sale and batch receipt must link to an InventoryBatch row.
   requiresBatchTracking Boolean @default(false) @map("requires_batch_tracking")
+  // When true, each unit of this item must be assigned a serial number at
+  // point of sale / invoice, and received with a serial number on bills/GRNs.
+  trackSerials      Boolean  @default(false) @map("track_serials")
   createdAt         DateTime @default(now()) @map("created_at")
 
   warehouseStocks    WarehouseStock[]
@@ -908,6 +1007,7 @@ model InventoryItem {
   narcoticsLog       NarcoticsLogEntry[]
   bomFinishedIn      BomTemplate[]       @relation("BomFinishedItem")
   bomComponentIn     BomLine[]           @relation("BomComponentItem")
+  serialNumbers      SerialNumber[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -1066,6 +1166,26 @@ model NarcoticsLogEntry {
   @@index([tenantId])
   @@index([itemId])
   @@map("narcotics_log_entries")
+}
+
+model SerialNumber {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  inventoryItemId String   @map("inventory_item_id")
+  warehouseId     String   @map("warehouse_id")
+  serialNumber    String   @map("serial_number")
+  // AVAILABLE | SOLD | RETURNED | DAMAGED
+  status          String   @default("AVAILABLE")
+  invoiceId       String?  @map("invoice_id")
+  billId          String?  @map("bill_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, inventoryItemId, serialNumber])
+  @@index([tenantId, warehouseId, inventoryItemId, status])
+  @@map("serial_numbers")
 }
 
 model WarehouseStock {
@@ -2023,6 +2143,71 @@ model PaymentBatchAllocation {
   @@index([invoiceId])
   @@index([vendorBillId])
   @@map("payment_batch_allocations")
+}
+
+// Job Costing: tracks material, labour, overhead, and subcontract costs per job.
+// Status: OPEN → IN_PROGRESS → COMPLETED | CANCELLED
+model Job {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  jobNumber   String   @map("job_number")
+  name        String
+  customerId  String?  @map("customer_id")
+  status      String   @default("OPEN")
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+  description String?
+  invoiceId   String?  @map("invoice_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  costLines   JobCostLine[]
+  workOrders  JobWorkOrder[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("jobs")
+}
+
+model JobCostLine {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  jobId       String   @map("job_id")
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  // MATERIAL | LABOUR | OVERHEAD | SUBCONTRACT
+  type        String
+  description String
+  quantity    Decimal  @db.Decimal(15, 4)
+  unitCost    Decimal  @db.Decimal(15, 4) @map("unit_cost")
+  amount      Decimal  @db.Decimal(15, 2)
+  accountId   String?  @map("account_id")
+  journalId   String?  @map("journal_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, jobId])
+  @@map("job_cost_lines")
+}
+
+model JobWorkOrder {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  jobId           String?  @map("job_id")
+  job             Job?     @relation(fields: [jobId], references: [id])
+  // IN | OUT  (OUT = goods sent to sub-contractor; IN = goods received from sub-contractor)
+  type            String
+  vendorId        String?  @map("vendor_id")
+  itemId          String?  @map("item_id")
+  quantity        Decimal  @db.Decimal(15, 4)
+  dueDate         DateTime? @map("due_date")
+  // PENDING | SENT | RECEIVED | CANCELLED
+  status          String   @default("PENDING")
+  billId          String?  @map("bill_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, jobId])
+  @@map("job_work_orders")
 }
 
 // Delivery Note (DN): formal document recording goods physically dispatched to

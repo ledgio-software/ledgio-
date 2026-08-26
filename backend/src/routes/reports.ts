@@ -1435,4 +1435,128 @@ router.get('/cost-centre-pnl', requireRole('Viewer'), async (req: Request, res: 
   }
 });
 
+/**
+ * GET /api/v1/reports/vat-return?startDate=&endDate=
+ * VAT Return: output VAT collected on invoices (via invoice payments) for a period,
+ * grouped by tax rate. Input VAT from bills is not separately tracked — note is returned.
+ * Access: Viewer role or higher.
+ */
+router.get('/vat-return', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { startDate, endDate } = req.query;
+    const params = { startDate: startDate as string, endDate: endDate as string };
+
+    const cached = await getCachedReport(tenantId, 'vat-return', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getVatReturn(
+      startDate ? (startDate as string) : undefined,
+      endDate ? (endDate as string) : undefined
+    );
+    void setCachedReport(tenantId, 'vat-return', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] VAT Return error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate VAT Return.' });
+  }
+});
+
+/**
+ * GET /api/v1/reports/stock-aging?asOfDate=
+ * Stock Aging: inventory bucketed by days on hand (0-30, 31-60, 61-90, 90+).
+ * FIFO tenants use actual stock lots; Average-cost tenants use warehouse stock + oldest adjustment date.
+ * Access: Viewer role or higher.
+ */
+router.get('/stock-aging', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { asOfDate } = req.query;
+    const params = { asOfDate: asOfDate as string };
+
+    const cached = await getCachedReport(tenantId, 'stock-aging', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getStockAging(asOfDate ? (asOfDate as string) : undefined);
+    void setCachedReport(tenantId, 'stock-aging', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] Stock Aging error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate Stock Aging report.' });
+  }
+});
+
+/**
+ * GET /api/v1/reports/financial-ratios?startDate=&endDate=&asOfDate=
+ * Financial Ratio Analysis: solvency, profitability, and efficiency ratios
+ * derived from Balance Sheet + P&L totals. Current/quick ratios are omitted
+ * because current vs non-current classification is not tracked in the schema.
+ * Access: Viewer role or higher.
+ */
+router.get('/financial-ratios', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { startDate, endDate, asOfDate } = req.query;
+    const params = { startDate: startDate as string, endDate: endDate as string, asOfDate: asOfDate as string };
+
+    const cached = await getCachedReport(tenantId, 'financial-ratios', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getFinancialRatios(
+      startDate ? (startDate as string) : undefined,
+      endDate ? (endDate as string) : undefined,
+      asOfDate ? (asOfDate as string) : undefined
+    );
+    void setCachedReport(tenantId, 'financial-ratios', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] Financial Ratios error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate Financial Ratios report.' });
+  }
+});
+
+/**
+ * GET /api/v1/reports/cost-category-pnl?costCategoryId=&startDate=&endDate=
+ * P&L breakdown for a single cost category (journal lines tagged with the category).
+ * Access: Viewer role or higher.
+ */
+router.get('/cost-category-pnl', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { costCategoryId, startDate, endDate } = req.query;
+    if (!costCategoryId) { res.status(400).json({ success: false, error: 'costCategoryId is required.' }); return; }
+    const params = { costCategoryId: costCategoryId as string, startDate: startDate as string, endDate: endDate as string };
+
+    const cached = await getCachedReport(tenantId, 'cost-category-pnl', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getCostCategoryPnl(
+      costCategoryId as string,
+      startDate ? (startDate as string) : undefined,
+      endDate ? (endDate as string) : undefined
+    );
+    void setCachedReport(tenantId, 'cost-category-pnl', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] Cost Category P&L error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate Cost Category P&L report.' });
+  }
+});
+
 export default router;
