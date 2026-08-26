@@ -108,16 +108,18 @@ router.get('/outstanding-bills', requireRole('Viewer'), async (req, res) => {
   const { tenantId } = requireTenantContext();
   const { vendorId } = req.query as Record<string, string>;
   try {
-    const bills = await prisma.vendorBill.findMany({
-      where: {
-        tenantId,
-        ...(vendorId ? { vendorId } : {}),
-        status: 'UNPAID',
-      },
-      include: { vendor: { select: { id: true, name: true } } },
-      orderBy: { billDate: 'asc' },
-      take: 200,
-    });
+    const bills = await withCurrentTenantDb(prisma, async (client) =>
+      (client as any).vendorBill.findMany({
+        where: {
+          tenantId,
+          ...(vendorId ? { vendorId } : {}),
+          status: 'UNPAID',
+        },
+        include: { vendor: { select: { id: true, name: true } } },
+        orderBy: { billDate: 'asc' },
+        take: 200,
+      })
+    );
     res.json(bills.map((b) => ({
       id: b.id,
       billNumber: b.billNumber,

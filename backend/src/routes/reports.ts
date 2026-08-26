@@ -1071,10 +1071,12 @@ router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: R
     });
 
     // Item name lookup
-    const item = await prisma.inventoryItem.findFirst({
-      where: { id: itemId as string, tenantId },
-      select: { name: true, sku: true },
-    });
+    const item = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).inventoryItem.findFirst({
+        where: { id: itemId as string, tenantId },
+        select: { name: true, sku: true },
+      })
+    );
 
     res.json({
       success: true,
