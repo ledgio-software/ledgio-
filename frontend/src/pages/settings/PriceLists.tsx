@@ -64,8 +64,8 @@ export function PriceLists() {
         api.get("/invoices/customers"),
       ]);
       setLists(listsRes.data.data || []);
-      setItems(itemsRes.data.items || itemsRes.data || []);
-      setCustomers(custRes.data.customers || custRes.data || []);
+      setItems(itemsRes.data.data?.items || []);
+      setCustomers(custRes.data.data?.customers || []);
     } catch (e: any) {
       setError(e?.response?.data?.error || "Failed to load data.");
     } finally {
