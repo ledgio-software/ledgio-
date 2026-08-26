@@ -182,7 +182,10 @@ router.post('/customers', requireRole('Accountant'), async (req: Request, res: R
 /**
  * POST /api/v1/import/inventory-items
  * Bulk-creates inventory items from CSV data.
- * CSV columns: Name, SKU, Category, Unit, CostPrice, SellingPrice, WholesalePrice, ReorderLevel
+ * Accepts both short column names (unit, costprice) and camelCase variants
+ * (unitofmeasure / unitOfMeasure, costPrice) so the wizard works with any
+ * CSV header casing. Also resolves warehouseName → warehouseId for seeding
+ * initial stock, matching the Ledgio export template format.
  */
 router.post('/inventory-items', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
   try {
@@ -201,13 +204,24 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
     const created: any[] = [];
     const errors: any[] = [];
     const usedSkus = new Set<string>();
+    const warehouseNameCache = new Map<string, string | null>();
 
     for (let i = 0; i < items.length; i++) {
       const row = items[i];
       try {
         if (!row.name || !String(row.name).trim()) throw new Error('Item name is required.');
-        if (!row.costprice && row.costprice !== 0) throw new Error('Cost price is required.');
-        if (!row.sellingprice && row.sellingprice !== 0) throw new Error('Selling price is required.');
+
+        // Accept both camelCase and lowercase column names
+        const costPrice = row.costprice ?? row['costPrice'];
+        const sellingPrice = row.sellingprice ?? row['sellingPrice'];
+        const wholesalePrice = row.wholesaleprice ?? row['wholesalePrice'];
+        const reorderLevel = row.reorderlevel ?? row['reorderLevel'];
+        const unitOfMeasure = row.unit ?? row.unitofmeasure ?? row['unitOfMeasure'] ?? 'pcs';
+        const warehouseName: string = (row.warehousename ?? row['warehouseName'] ?? '').trim();
+        const initialQty = row.initialqty ?? row['initialQty'];
+
+        if (costPrice === undefined || costPrice === null || costPrice === '') throw new Error('Cost price is required.');
+        if (sellingPrice === undefined || sellingPrice === null || sellingPrice === '') throw new Error('Selling price is required.');
 
         let sku = row.sku ? String(row.sku).trim().toUpperCase() : '';
         if (!sku) {
@@ -216,21 +230,44 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
         if (usedSkus.has(sku)) throw new Error(`Duplicate SKU "${sku}" in this batch.`);
         usedSkus.add(sku);
 
-        const result = await withCurrentTenantDb(prisma, (client) =>
-          (client as any).inventoryItem.create({
+        // Resolve warehouseName → warehouseId (cached per batch)
+        let warehouseId: string | null = null;
+        if (warehouseName) {
+          if (!warehouseNameCache.has(warehouseName)) {
+            const wh = await withCurrentTenantDb(prisma, (client) =>
+              (client as any).warehouse.findFirst({ where: { tenantId, name: warehouseName } })
+            );
+            warehouseNameCache.set(warehouseName, (wh as any)?.id ?? null);
+          }
+          warehouseId = warehouseNameCache.get(warehouseName) ?? null;
+          if (warehouseName && !warehouseId) {
+            throw new Error(`Warehouse "${warehouseName}" not found. Create it first.`);
+          }
+        }
+
+        const result = await withCurrentTenantDb(prisma, async (client) => {
+          const item = await (client as any).inventoryItem.create({
             data: {
               tenantId,
               name: String(row.name).trim(),
               sku,
               category: row.category || 'General',
-              unitOfMeasure: row.unit || 'pcs',
-              costPrice: Number(row.costprice),
-              sellingPrice: Number(row.sellingprice),
-              wholesalePrice: row.wholesaleprice ? Number(row.wholesaleprice) : null,
-              reorderLevel: row.reorderlevel ? Number(row.reorderlevel) : null,
+              unitOfMeasure,
+              costPrice: Number(costPrice),
+              sellingPrice: Number(sellingPrice),
+              wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null,
+              reorderLevel: reorderLevel ? Number(reorderLevel) : null,
             },
-          })
-        );
+          });
+
+          if (warehouseId && initialQty && Number(initialQty) > 0) {
+            await (client as any).warehouseStock.create({
+              data: { tenantId, warehouseId, itemId: item.id, quantityOnHand: Number(initialQty) },
+            });
+          }
+
+          return item;
+        });
         created.push(result);
       } catch (err: any) {
         errors.push({ row: i + 1, name: row.name, error: err.message });
