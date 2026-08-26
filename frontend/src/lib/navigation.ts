@@ -172,6 +172,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Executive Reports", href: "/reports/executive", icon: BarChart3 },
       { name: "General Ledger", href: "/reports/ledger", icon: BookOpen },
+      { name: "Trial Balance", href: "/reports/trial-balance", icon: Scale },
       { name: "Profit & Loss", href: "/reports/pnl", icon: PieChart },
       { name: "Balance Sheet", href: "/reports/balance-sheet", icon: Scale },
       { name: "Cash Flow Statement", href: "/reports/cash-flow", icon: Waves },
