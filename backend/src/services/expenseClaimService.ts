@@ -196,6 +196,17 @@ export async function reimburseExpenseClaim(
     throw new ExpenseClaimServiceError(`This claim must be APPROVED before it can be reimbursed (currently ${claim.status}).`, 400);
   }
 
+  // Atomically flip status to REIMBURSED before posting the journal so that
+  // concurrent reimburse requests (e.g. double-click) are rejected here and
+  // cannot each create their own duplicate journal entry.
+  const locked = await (prisma as any).expenseClaim.updateMany({
+    where: { id: claimId, tenantId, status: 'APPROVED' },
+    data: { status: 'REIMBURSED' },
+  });
+  if (locked.count === 0) {
+    throw new ExpenseClaimServiceError('This claim is no longer APPROVED — it may have already been reimbursed.', 409);
+  }
+
   const accounts = await withCurrentTenantDb(prisma, (client) => accountRepository.listAccounts(client));
   const cashAcc = accountRepository.resolveDefaultAccount(accounts, 'CASH') || accounts[0];
   const expenseAcc = claim.expenseAccountId
@@ -203,27 +214,35 @@ export async function reimburseExpenseClaim(
     : accountRepository.resolveDefaultAccount(accounts, 'EXPENSE');
 
   if (!cashAcc || !expenseAcc) {
+    // Roll back the status flip so the claim can be retried after accounts are set up.
+    await (prisma as any).expenseClaim.updateMany({ where: { id: claimId, tenantId }, data: { status: 'APPROVED' } });
     throw new ExpenseClaimServiceError('No Cash/Bank or Expense account exists to post this reimbursement to.', 400);
   }
 
   const amount = Number(claim.amount);
 
-  const journal = await journalService.createJournalEntry(
-    {
-      description: `Reimbursement for Expense Claim ${claim.claimNumber} (${claim.submittedByName}) - ${claim.category}`,
-      entryDate: new Date().toISOString().split('T')[0],
-      status: 'POSTED',
-      lines: [
-        { accountId: expenseAcc.id, debit: amount, credit: 0, description: `Expense - ${claim.claimNumber}` },
-        { accountId: cashAcc.id, debit: 0, credit: amount, description: `Cash paid out - ${claim.claimNumber}` },
-      ],
-    },
-    actor
-  );
+  let journal: any;
+  try {
+    journal = await journalService.createJournalEntry(
+      {
+        description: `Reimbursement for Expense Claim ${claim.claimNumber} (${claim.submittedByName}) - ${claim.category}`,
+        entryDate: new Date().toISOString().split('T')[0],
+        status: 'POSTED',
+        lines: [
+          { accountId: expenseAcc.id, debit: amount, credit: 0, description: `Expense - ${claim.claimNumber}` },
+          { accountId: cashAcc.id, debit: 0, credit: amount, description: `Cash paid out - ${claim.claimNumber}` },
+        ],
+      },
+      actor
+    );
+  } catch (err) {
+    // Roll back so the claim remains actionable.
+    await (prisma as any).expenseClaim.updateMany({ where: { id: claimId, tenantId }, data: { status: 'APPROVED' } });
+    throw err;
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const updated = await expenseClaimRepository.updateExpenseClaim(tx as any, claimId, {
-      status: 'REIMBURSED',
       journalId: journal.id,
       reimbursedAt: new Date(),
     });

@@ -2,6 +2,69 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [2026-08-26] - Feat: Bulk Invoice/Payment Import + External API Key Integration
+
+**What/Why:** Two new integration paths for high-volume clients (e.g. phone installment companies) who need to push invoices and payments from their own systems into Ledgio automatically.
+
+**Changes:**
+
+**Schema — `backend/prisma/schema.prisma`**
+- Added `ApiKey` model in the public schema: `id`, `tenantId`, `name`, `keyHash` (PBKDF2), `keyPrefix` (first 8 chars for efficient lookup), `lastUsedAt`, `isActive`, `createdAt`. Relation to `Tenant`.
+- Added `apiKeys ApiKey[]` relation to `Tenant`.
+
+**Migration — `backend/prisma/migrations/20260826000001_add_api_keys/migration.sql`**
+- Creates `api_keys` table with indexes on `tenant_id` and `key_prefix`. FK to `tenants` with CASCADE delete.
+
+**Backend — `backend/src/routes/import.ts`**
+- Added `POST /api/v1/import/invoices`: accepts array of invoice rows (customerName, invoiceDate, dueDate, currency, description, quantity, unitPrice, notes). Auto-creates customers not found. Per-row error collection, up to 5,000 rows.
+- Added `POST /api/v1/import/payments`: accepts array of payment rows (invoiceNumber, amount, paymentDate, paymentMethod, reference). Delegates to `recordInvoicePayment` service. Per-row error collection.
+
+**Backend — `backend/src/middleware/apiKeyMiddleware.ts`** (new)
+- `authenticateApiKey` middleware: reads `X-API-Key` header, finds active keys by prefix (8-char prefix stored in plaintext to avoid full-table scan), verifies with `verifyPassword` (PBKDF2), sets AsyncLocalStorage tenant context via `runWithTenantContext`, updates `lastUsedAt` asynchronously.
+
+**Backend — `backend/src/routes/apiKeys.ts`** (new)
+- `GET /api/v1/api-keys`: list keys for tenant (id, name, keyPrefix, lastUsedAt, isActive, createdAt — never returns hash or raw key).
+- `POST /api/v1/api-keys`: generate key (`ledgio_<32 hex chars>`), hash with `hashPassword`, return raw key once in response.
+- `DELETE /api/v1/api-keys/:id`: soft-revoke (sets `isActive=false`).
+- All routes: `authenticateJwt` + `tenantContextMiddleware` + `requireRole('Accountant')`.
+
+**Backend — `backend/src/routes/externalApi.ts`** (new)
+- `POST /api/external/v1/invoices`: accepts single object or array (≤100). Idempotency via `externalRef`→`clientTxnId`. Auto-creates customer by name. Creates invoice with status `SENT`. Returns 201/207.
+- `POST /api/external/v1/payments`: accepts single object or array (≤100). Delegates to `recordInvoicePayment`. Returns 200/207.
+- Authentication: `authenticateApiKey` only (no JWT needed).
+
+**Backend — `backend/src/app.ts`**
+- Registered `apiKeysRouter` at `/api/v1/api-keys` and `externalApiRouter` at `/api/external/v1`.
+
+**Frontend — `frontend/src/pages/import/BulkImportWizard.tsx`**
+- Extended `ImportType` union to include `"invoices"` and `"payments"`.
+- Added `IMPORT_CONFIGS` entries for both types (sample CSV, buildPayload, previewColumns, endpoint, successNav).
+- Added two new `<option>` elements to the type dropdown.
+
+**Frontend — `frontend/src/pages/settings/ApiKeys.tsx`** (new)
+- Full settings page: table of API keys with prefix, last-used, status; "Generate New Key" form; copy-to-clipboard raw key reveal (amber warning, shown once); "Revoke" button with confirmation; code examples section for both external endpoints.
+
+**Frontend — `frontend/src/lib/navigation.ts`**
+- Added `Key` import. Added `{ name: "API Keys", href: "/settings/api-keys", icon: Key }` to ADMINISTRATION section.
+
+**Frontend — `frontend/src/App.tsx`**
+- Added lazy import for `ApiKeys`. Added route `/settings/api-keys` gated to `SETTINGS_RESTRICTED_ROLES`.
+
+**Files changed:**
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/20260826000001_add_api_keys/migration.sql` (new)
+- `backend/src/app.ts`
+- `backend/src/middleware/apiKeyMiddleware.ts` (new)
+- `backend/src/routes/apiKeys.ts` (new)
+- `backend/src/routes/externalApi.ts` (new)
+- `backend/src/routes/import.ts`
+- `frontend/src/App.tsx`
+- `frontend/src/lib/navigation.ts`
+- `frontend/src/pages/import/BulkImportWizard.tsx`
+- `frontend/src/pages/settings/ApiKeys.tsx` (new)
+
+---
+
 ## [2026-08-26] - Fix: Two inventory page bugs (SerialNumbers wrong API path + bulk import freeze)
 
 **What/Why:** Two bugs reported by the user:

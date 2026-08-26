@@ -4,10 +4,13 @@ import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { encryptCredential } from '../utils/credentialEncryption';
 import * as accountService from '../services/accountService';
 import * as journalService from '../services/journalEntryService';
+import * as invoicePaymentService from '../services/invoicePaymentService';
+import { actorFromRequest } from '../services/auditLogService';
 import { invalidateCachedList } from '../cache/listCache';
 
 const router = Router();
@@ -342,6 +345,171 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
   } catch (error: any) {
     console.error('[Import] Inventory item import error:', error);
     res.status(500).json({ success: false, error: 'Failed to complete inventory item import.' });
+  }
+});
+
+/**
+ * POST /api/v1/import/invoices
+ * Bulk-creates invoices from CSV data. Customers are matched by name
+ * (case-insensitive) and auto-created if not found.
+ * Access: Accountant role or higher.
+ */
+router.post('/invoices', requireRole('Accountant'), requireTier(2, 'Bulk Invoice Import'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { invoices } = req.body;
+
+    if (!Array.isArray(invoices) || invoices.length === 0) {
+      res.status(400).json({ success: false, error: 'An array of invoices is required for import.' });
+      return;
+    }
+    if (invoices.length > 5_000) {
+      res.status(400).json({ success: false, error: 'Maximum 5,000 invoices per import batch.' });
+      return;
+    }
+
+    const created: any[] = [];
+    const errors: any[] = [];
+
+    for (let i = 0; i < invoices.length; i++) {
+      const inv = invoices[i];
+      try {
+        if (!inv.customerName || !String(inv.customerName).trim()) throw new Error('customerName is required.');
+        if (!inv.description || !String(inv.description).trim()) throw new Error('description is required.');
+        const qty = Number(inv.quantity);
+        if (!qty || qty <= 0) throw new Error('quantity must be a positive number.');
+        const price = Number(inv.unitPrice);
+        if (isNaN(price) || price < 0) throw new Error('unitPrice must be a non-negative number.');
+
+        const customerName = String(inv.customerName).trim();
+
+        // Find or create customer
+        let customer: any = await withCurrentTenantDb(prisma, (client) =>
+          (client as any).customer.findFirst({
+            where: { tenantId, name: { equals: customerName, mode: 'insensitive' } },
+          })
+        );
+
+        if (!customer) {
+          const phone = inv.customerPhone ? String(inv.customerPhone).trim() : null;
+          customer = await withCurrentTenantDb(prisma, (client) =>
+            (client as any).customer.create({
+              data: {
+                tenantId,
+                name: customerName,
+                email: encryptCredential(`import-${Date.now()}-${i}@placeholder.local`),
+                phone: phone ? encryptCredential(phone) : null,
+                customerType: 'RETAIL',
+              },
+            })
+          );
+        }
+
+        const invoiceNumber = `INV-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const subtotal = Math.round(qty * price * 100) / 100;
+        const issueDate = inv.invoiceDate ? new Date(inv.invoiceDate) : new Date();
+        const dueDate = inv.dueDate ? new Date(inv.dueDate) : new Date(issueDate.getTime() + 30 * 86_400_000);
+        const currency = inv.currency || 'GHS';
+
+        const result = await withCurrentTenantDb(prisma, (client) =>
+          (client as any).invoice.create({
+            data: {
+              tenantId,
+              invoiceNumber,
+              customerId: customer.id,
+              issueDate,
+              dueDate,
+              currency,
+              subtotal,
+              tax: 0,
+              total: subtotal,
+              status: 'SENT',
+              items: {
+                create: [{
+                  tenantId,
+                  description: String(inv.description).trim(),
+                  quantity: qty,
+                  unitPrice: price,
+                  total: subtotal,
+                }],
+              },
+            },
+          })
+        );
+        created.push(result);
+      } catch (err: any) {
+        errors.push({ row: i + 1, name: inv.customerName, error: err.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { importedCount: created.length, errorCount: errors.length, errors },
+    });
+  } catch (error: any) {
+    console.error('[Import] Invoice import error:', error);
+    res.status(500).json({ success: false, error: 'Failed to complete invoice import.' });
+  }
+});
+
+/**
+ * POST /api/v1/import/payments
+ * Bulk-posts payments against existing open invoices by invoice number.
+ * Calls the existing recordInvoicePayment service to ensure proper journal
+ * entry posting, balance updates, and status transitions.
+ * Access: Accountant role or higher.
+ */
+router.post('/payments', requireRole('Accountant'), requireTier(2, 'Bulk Payment Import'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const actor = actorFromRequest(req);
+    const { payments } = req.body;
+
+    if (!Array.isArray(payments) || payments.length === 0) {
+      res.status(400).json({ success: false, error: 'An array of payments is required for import.' });
+      return;
+    }
+    if (payments.length > 5_000) {
+      res.status(400).json({ success: false, error: 'Maximum 5,000 payments per import batch.' });
+      return;
+    }
+
+    let importedCount = 0;
+    const errors: any[] = [];
+
+    for (let i = 0; i < payments.length; i++) {
+      const p = payments[i];
+      try {
+        if (!p.invoiceNumber || !String(p.invoiceNumber).trim()) throw new Error('invoiceNumber is required.');
+
+        const invoiceNumber = String(p.invoiceNumber).trim();
+
+        const invoice: any = await withCurrentTenantDb(prisma, (client) =>
+          (client as any).invoice.findFirst({ where: { tenantId, invoiceNumber } })
+        );
+
+        if (!invoice) throw new Error(`Invoice "${invoiceNumber}" not found.`);
+        if (invoice.status === 'PAID') throw new Error(`Invoice "${invoiceNumber}" is already fully paid.`);
+        if (invoice.status === 'DRAFT') throw new Error(`Invoice "${invoiceNumber}" is in DRAFT — send it first.`);
+
+        await invoicePaymentService.recordInvoicePayment(invoice.id, actor, {
+          amount: p.amount ? Number(p.amount) : undefined,
+          description: p.reference ? `Bulk import payment — ref: ${p.reference}` : undefined,
+        });
+
+        importedCount++;
+      } catch (err: any) {
+        errors.push({ row: i + 1, invoiceNumber: p.invoiceNumber, error: err.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { importedCount, errorCount: errors.length, errors },
+    });
+  } catch (error: any) {
+    console.error('[Import] Payment import error:', error);
+    res.status(500).json({ success: false, error: 'Failed to complete payment import.' });
   }
 });
 

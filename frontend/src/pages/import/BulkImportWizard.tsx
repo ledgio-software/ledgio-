@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 
-type ImportType = "accounts" | "customers" | "inventory-items";
+type ImportType = "accounts" | "customers" | "inventory-items" | "invoices" | "payments";
 
 const CHUNK_SIZE = 1_000;
 const PREVIEW_LIMIT = 10;
@@ -88,6 +88,56 @@ const IMPORT_CONFIGS: Record<ImportType, {
       { key: "initialqty", label: "Opening Qty" },
     ],
     successNav: { label: "View Inventory", href: "/inventory/items" },
+  },
+  invoices: {
+    label: "Invoices",
+    description: "Import bulk invoices. Customers are matched by name and auto-created if not found.",
+    headers: ["customername", "customerphone", "invoicedate", "duedate", "currency", "description", "quantity", "unitprice"],
+    sample: `customername,customerphone,invoicedate,duedate,currency,description,quantity,unitprice\nKofi Mensah,0244123456,2026-08-01,2026-09-01,GHS,Samsung A15 (Installment Plan),1,1200.00\nAkosua Boateng,0208765432,2026-08-02,2026-09-02,GHS,iPhone 15 (Installment Plan),1,3500.00`,
+    endpoint: "/import/invoices",
+    payloadKey: "invoices",
+    buildPayload: (rows) => rows.map((r) => ({
+      customerName: r.customername,
+      customerPhone: r.customerphone || null,
+      invoiceDate: r.invoicedate || null,
+      dueDate: r.duedate || null,
+      currency: r.currency || "GHS",
+      description: r.description,
+      quantity: Number(r.quantity) || 1,
+      unitPrice: Number(r.unitprice) || 0,
+    })),
+    previewColumns: [
+      { key: "customername", label: "Customer" },
+      { key: "invoicedate", label: "Invoice Date" },
+      { key: "duedate", label: "Due Date" },
+      { key: "description", label: "Description" },
+      { key: "quantity", label: "Qty" },
+      { key: "unitprice", label: "Unit Price" },
+    ],
+    successNav: { label: "View Invoices", href: "/invoices" },
+  },
+  payments: {
+    label: "Payments",
+    description: "Post payments against existing open invoices by invoice number. Amount defaults to full remaining balance if omitted.",
+    headers: ["invoicenumber", "amount", "paymentdate", "paymentmethod", "reference"],
+    sample: `invoicenumber,amount,paymentdate,paymentmethod,reference\nINV-1234567890-1001,500.00,2026-08-26,Mobile Money,MoMo-TX-GH-001\nINV-1234567890-1002,1200.00,2026-08-26,Cash,CASH-REC-002`,
+    endpoint: "/import/payments",
+    payloadKey: "payments",
+    buildPayload: (rows) => rows.map((r) => ({
+      invoiceNumber: r.invoicenumber,
+      amount: r.amount ? Number(r.amount) : null,
+      paymentDate: r.paymentdate || null,
+      paymentMethod: r.paymentmethod || null,
+      reference: r.reference || null,
+    })),
+    previewColumns: [
+      { key: "invoicenumber", label: "Invoice #" },
+      { key: "amount", label: "Amount" },
+      { key: "paymentdate", label: "Payment Date" },
+      { key: "paymentmethod", label: "Method" },
+      { key: "reference", label: "Reference" },
+    ],
+    successNav: { label: "View Invoices", href: "/invoices" },
   },
 };
 
@@ -186,7 +236,7 @@ export function BulkImportWizard() {
           Bulk Data Import Wizard
         </h2>
         <p className="text-secondary-500 dark:text-secondary-400 mt-1">
-          Import accounts, customers, or inventory items from CSV or Excel exports.
+          Import accounts, customers, inventory items, invoices, or payments from CSV.
         </p>
       </div>
 
@@ -221,6 +271,8 @@ export function BulkImportWizard() {
                 <option value="accounts">Chart of Accounts (Code, Name, Type)</option>
                 <option value="customers">Customers (Name, Email, Phone, Address, CreditLimit, TIN, Type)</option>
                 <option value="inventory-items">Inventory Items (Name, SKU, Category, Unit, CostPrice, SellingPrice, ...)</option>
+                <option value="invoices">Invoices (CustomerName, InvoiceDate, DueDate, Description, Qty, UnitPrice)</option>
+                <option value="payments">Payments (InvoiceNumber, Amount, PaymentDate, Method, Reference)</option>
               </select>
             </div>
 

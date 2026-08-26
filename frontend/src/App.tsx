@@ -105,6 +105,7 @@ const JobWorkOrders = lazy(() => import("./pages/manufacturing/JobWorkOrders").t
 const CostCategories = lazy(() => import("./pages/costcentres/CostCategories").then(m => ({ default: m.CostCategories })));
 const Scenarios = lazy(() => import("./pages/settings/Scenarios").then(m => ({ default: m.Scenarios })));
 const VoucherClasses = lazy(() => import("./pages/settings/VoucherClasses").then(m => ({ default: m.VoucherClasses })));
+const ApiKeys = lazy(() => import("./pages/settings/ApiKeys").then(m => ({ default: m.ApiKeys })));
 
 // "What happened today?" quick-action grid shown in Operations and Business modes.
 const GUIDED_ACTIONS_OPS = [
@@ -632,6 +633,7 @@ function App() {
               <Route path="/cost-categories" element={<ProtectedRoute><MainLayout><CostCategories /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/scenarios" element={<ProtectedRoute><MainLayout><Scenarios /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/voucher-classes" element={<ProtectedRoute><MainLayout><VoucherClasses /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/api-keys" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><ApiKeys /></MainLayout></ProtectedRoute>} />
               <Route path="/reports" element={<Navigate to="/reports/pnl" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
