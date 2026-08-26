@@ -1,15 +1,37 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { validateBody } from '../middleware/validateBody';
 import { requireTenantContext } from '../context/tenantContext';
 import { assertWarehouseAccess, getAccessibleWarehouseIds, WarehouseAccessError } from '../services/warehouseAccessService';
 import { recordAuditLog, recordAuditLogTx, actorFromRequest } from '../services/auditLogService';
 import { applyStockAdjustment } from '../services/stockAdjustmentService';
 import { generateStockTakeSheetPdf } from '../services/pdfGenerationService';
 import { checkAndAlertLowStock } from '../services/lowStockAlertService';
+import { getCachedList, setCachedList, invalidateCachedList } from '../cache/listCache';
+
+const createItemSchema = z.object({
+  name: z.string().min(1, 'Item name is required').max(200),
+  sku: z.string().max(100).optional(),
+  category: z.string().max(100).default('General'),
+  unitOfMeasure: z.string().max(50).default('pcs'),
+  secondaryUnitOfMeasure: z.string().max(50).optional().nullable(),
+  conversionFactor: z.union([z.number().positive(), z.string().transform(Number)]).optional().nullable(),
+  costPrice: z.union([z.number().nonnegative('Cost price must be ≥ 0'), z.string().transform(Number)]),
+  sellingPrice: z.union([z.number().nonnegative('Selling price must be ≥ 0'), z.string().transform(Number)]),
+  wholesalePrice: z.union([z.number().nonnegative(), z.string().transform(Number)]).optional().nullable(),
+  initialWarehouseId: z.string().uuid().optional().nullable(),
+  initialQty: z.union([z.number().nonnegative(), z.string().transform(Number)]).default(0),
+  reorderLevel: z.union([z.number().int().nonnegative(), z.string().transform(Number)]).default(10),
+  preferredVendorId: z.string().uuid().optional().nullable(),
+  regulatoryCategory: z.string().optional(),
+  requiresBatchTracking: z.boolean().default(false),
+  trackSerials: z.boolean().default(false),
+});
 
 const router = Router();
 
@@ -147,18 +169,24 @@ router.get('/warehouses/:id/stock-sheet.pdf', async (req: Request, res: Response
 router.get('/items', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
+
     const items = await withCurrentTenantDb(prisma, async (client) => {
       const accessibleIds = await getAccessibleWarehouseIds(client, tenantId, req.user!.id, req.user!.role);
 
-      const allItems = await (client as any).inventoryItem.findMany({
-        where: { tenantId },
-        include: { warehouseStocks: { include: { warehouse: true } } },
-        orderBy: { name: 'asc' },
-      });
+      // Cache the full catalog (all warehouses) per tenant and serve it to
+      // all roles. Warehouse-scoped filtering happens in memory after the
+      // cache hit — nearly free vs. a second round-trip to the DB.
+      let allItems: any[] = (await getCachedList<any[]>(tenantId, 'inventory-items')) ?? [];
+      if (allItems.length === 0) {
+        allItems = await (client as any).inventoryItem.findMany({
+          where: { tenantId },
+          include: { warehouseStocks: { include: { warehouse: true } } },
+          orderBy: { name: 'asc' },
+        });
+        // Fire-and-forget; a failed cache write falls back to DB next request
+        if (allItems.length > 0) setCachedList(tenantId, 'inventory-items', allItems).catch(() => {});
+      }
 
-      // A location-scoped user (Shop Manager/Cashier) sees the same product
-      // catalog as everyone else, but only the stock levels for warehouses
-      // they're assigned to - not every shop's stock.
       if (accessibleIds === null) return allItems;
       const accessibleSet = new Set(accessibleIds);
       return allItems.map((item: any) => ({
@@ -178,7 +206,7 @@ router.get('/items', async (req: Request, res: Response): Promise<void> => {
  * POST /api/v1/inventory/items
  * Creates a new inventory item and assigns initial stock to a warehouse.
  */
-router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), validateBody(createItemSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { name, sku, category = 'General', unitOfMeasure = 'pcs', secondaryUnitOfMeasure, conversionFactor, costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
@@ -247,6 +275,7 @@ router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Ware
       return item;
     });
 
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
     res.status(201).json({ success: true, message: 'Item created successfully', data: { item: createdItem } });
   } catch (error: any) {
     console.error('[Inventory] Error creating item:', error);
@@ -304,6 +333,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
       return;
     }
 
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
     res.status(200).json({ success: true, data: { item: updated } });
   } catch (error: any) {
     if (error.message === 'Preferred vendor not found.') {
@@ -432,10 +462,13 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
       });
     }
 
+    if (created.length > 0) {
+      invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
+    }
     res.status(created.length > 0 ? 201 : 400).json({
       success: created.length > 0,
       message: `${created.length} item(s) created${failed.length > 0 ? `, ${failed.length} failed` : ''}.`,
-      data: { created, failed },
+      data: { importedCount: created.length, errorCount: failed.length, errors: failed, created },
     });
   } catch (error: any) {
     console.error('[Inventory] Error bulk-creating items:', error);
@@ -541,6 +574,8 @@ router.post('/transfers', requireRole('Accountant', 'Shop Manager', 'Cashier', '
 
     // Fire-and-forget low-stock alert for the source item after transfer out.
     checkAndAlertLowStock(tenantId, itemId).catch(() => {});
+    // Stock levels changed — invalidate cached item list so next read reflects new quantities
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -638,6 +673,7 @@ router.post('/adjustments', requireRole('Accountant', 'Shop Manager', 'Cashier',
     if (mode === 'remove' || mode === 'set') {
       checkAndAlertLowStock(tenantId, itemId).catch(() => {});
     }
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
 
     res.status(201).json({
       success: true,

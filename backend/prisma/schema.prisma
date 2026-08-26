@@ -416,6 +416,7 @@ model BankTransaction {
   @@index([tenantId])
   @@index([bankAccountId])
   @@index([status])
+  @@index([tenantId, bankAccountId, status])
   @@map("bank_transactions")
 }
 
@@ -455,6 +456,8 @@ model Customer {
   deliveryNotes     DeliveryNote[]
 
   @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, customerType])
   @@map("customers")
 }
 
@@ -741,6 +744,7 @@ model Vendor {
   goodsReceiptNotes  GoodsReceiptNote[]
 
   @@index([tenantId])
+  @@index([tenantId, name])
   @@map("vendors")
 }
 
@@ -822,6 +826,7 @@ model VendorBill {
   @@index([costCentreId])
   @@index([purchaseOrderId])
   @@index([status, scheduledPaymentDate])
+  @@index([tenantId, status, dueDate])
   @@map("vendor_bills")
 }
 
@@ -860,6 +865,7 @@ model PurchaseOrder {
   @@index([tenantId])
   @@index([vendorId])
   @@index([status])
+  @@index([tenantId, status, createdAt])
   @@map("purchase_orders")
 }
 
@@ -1013,6 +1019,8 @@ model InventoryItem {
 
   @@unique([tenantId, sku])
   @@index([tenantId])
+  @@index([tenantId, category])
+  @@index([tenantId, name])
   @@map("inventory_items")
 }
 
@@ -1202,6 +1210,7 @@ model WarehouseStock {
 
   @@unique([warehouseId, itemId])
   @@index([tenantId])
+  @@index([tenantId, itemId, warehouseId])
   @@map("warehouse_stocks")
 }
 
@@ -1257,6 +1266,7 @@ model StockAdjustment {
   @@index([tenantId])
   @@index([itemId])
   @@index([warehouseId])
+  @@index([tenantId, itemId, createdAt])
   @@map("stock_adjustments")
 }
 
@@ -1392,6 +1402,7 @@ model Notification {
   @@index([tenantId])
   @@index([userId])
   @@index([read])
+  @@index([tenantId, userId, read])
   @@map("notifications")
 }
 
@@ -2054,6 +2065,7 @@ model ExpenseClaim {
   @@index([status])
   @@index([submittedBy])
   @@index([costCentreId])
+  @@index([tenantId, status, createdAt])
   @@map("expense_claims")
 }
 
@@ -2082,6 +2094,7 @@ model SalesOrder {
   @@index([tenantId])
   @@index([customerId])
   @@index([status])
+  @@index([tenantId, status, createdAt])
   @@map("sales_orders")
 }
 
@@ -2236,6 +2249,7 @@ model DeliveryNote {
   @@index([tenantId])
   @@index([customerId])
   @@index([status])
+  @@index([tenantId, status, createdAt])
   @@map("delivery_notes")
 }
 
@@ -2278,6 +2292,7 @@ model GoodsReceiptNote {
   @@index([tenantId])
   @@index([vendorId])
   @@index([status])
+  @@index([tenantId, status, createdAt])
   @@map("goods_receipt_notes")
 }
 
