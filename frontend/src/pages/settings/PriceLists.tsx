@@ -60,7 +60,7 @@ export function PriceLists() {
     try {
       const [listsRes, itemsRes, custRes] = await Promise.all([
         api.get("/price-lists"),
-        api.get("/inventory"),
+        api.get("/inventory/items"),
         api.get("/invoices/customers"),
       ]);
       setLists(listsRes.data.data || []);
