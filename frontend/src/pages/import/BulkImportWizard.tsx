@@ -5,9 +5,12 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
-import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft } from "lucide-react";
+import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 
 type ImportType = "accounts" | "customers" | "inventory-items";
+
+const CHUNK_SIZE = 50;
+const PREVIEW_LIMIT = 10;
 
 const IMPORT_CONFIGS: Record<ImportType, {
   label: string;
@@ -98,6 +101,7 @@ export function BulkImportWizard() {
   const [rawCsv, setRawCsv] = useState(config.sample);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [resultSummary, setResultSummary] = useState<{
     importedCount: number;
     errorCount: number;
@@ -109,6 +113,7 @@ export function BulkImportWizard() {
     setRawCsv(IMPORT_CONFIGS[type].sample);
     setParsedRows([]);
     setResultSummary(null);
+    setProgress(null);
     setStep(1);
   };
 
@@ -134,19 +139,45 @@ export function BulkImportWizard() {
   const handleExecuteImport = async () => {
     setIsSubmitting(true);
     setResultSummary(null);
+
+    const allBuilt = config.buildPayload(parsedRows);
+    const chunks: any[][] = [];
+    for (let i = 0; i < allBuilt.length; i += CHUNK_SIZE) {
+      chunks.push(allBuilt.slice(i, i + CHUNK_SIZE));
+    }
+
+    let totalImported = 0;
+    let totalErrors = 0;
+    const allErrors: any[] = [];
+
     try {
-      const payload = { [config.payloadKey]: config.buildPayload(parsedRows) };
-      const response = await api.post(config.endpoint, payload);
-      if (response.data.success) {
-        setResultSummary(response.data.data);
-        setStep(3);
+      for (let c = 0; c < chunks.length; c++) {
+        setProgress({ done: c * CHUNK_SIZE, total: allBuilt.length });
+        const payload = { [config.payloadKey]: chunks[c] };
+        const response = await api.post(config.endpoint, payload);
+        if (response.data.success) {
+          totalImported += response.data.data.importedCount;
+          totalErrors += response.data.data.errorCount;
+          // Offset row numbers to reflect position in full dataset
+          const offset = c * CHUNK_SIZE;
+          response.data.data.errors.forEach((e: any) => {
+            allErrors.push({ ...e, row: e.row + offset });
+          });
+        }
       }
+
+      setProgress({ done: allBuilt.length, total: allBuilt.length });
+      setResultSummary({ importedCount: totalImported, errorCount: totalErrors, errors: allErrors });
+      setStep(3);
     } catch (err: any) {
       showToast(err.response?.data?.error || "Import execution failed.", "error");
     } finally {
       setIsSubmitting(false);
+      setProgress(null);
     }
   };
+
+  const progressPct = progress ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -226,7 +257,10 @@ export function BulkImportWizard() {
         <Card>
           <CardHeader>
             <CardTitle>2. Preview & Confirm Import ({parsedRows.length} Rows)</CardTitle>
-            <CardDescription>Review mapped rows before inserting into your database.</CardDescription>
+            <CardDescription>
+              Showing first {Math.min(PREVIEW_LIMIT, parsedRows.length)} of {parsedRows.length} rows.
+              All rows will be imported in batches of {CHUNK_SIZE}.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="overflow-x-auto">
@@ -240,7 +274,7 @@ export function BulkImportWizard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parsedRows.map((r, idx) => (
+                  {parsedRows.slice(0, PREVIEW_LIMIT).map((r, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{idx + 1}</TableCell>
                       {config.previewColumns.map((col) => (
@@ -250,15 +284,39 @@ export function BulkImportWizard() {
                   ))}
                 </TableBody>
               </Table>
+              {parsedRows.length > PREVIEW_LIMIT && (
+                <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-2 text-center">
+                  … and {parsedRows.length - PREVIEW_LIMIT} more rows (not shown in preview)
+                </p>
+              )}
             </div>
 
+            {/* Progress bar */}
+            {isSubmitting && progress && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm text-secondary-600 dark:text-secondary-400">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Importing… {progress.done} / {progress.total} records
+                  </span>
+                  <span>{progressPct}%</span>
+                </div>
+                <div className="w-full bg-secondary-200 dark:bg-secondary-700 rounded-full h-2">
+                  <div
+                    className="bg-primary-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between pt-4">
-              <Button variant="outline" onClick={() => setStep(1)} className="flex items-center">
+              <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting} className="flex items-center">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Edit
               </Button>
               <Button variant="primary" onClick={handleExecuteImport} disabled={isSubmitting}>
-                {isSubmitting ? "Importing..." : `Execute Import (${parsedRows.length} items)`}
+                {isSubmitting ? "Importing…" : `Execute Import (${parsedRows.length} items)`}
               </Button>
             </div>
           </CardContent>
