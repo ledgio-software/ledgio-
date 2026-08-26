@@ -468,7 +468,7 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
     res.status(created.length > 0 ? 201 : 400).json({
       success: created.length > 0,
       message: `${created.length} item(s) created${failed.length > 0 ? `, ${failed.length} failed` : ''}.`,
-      data: { importedCount: created.length, errorCount: failed.length, errors: failed, created },
+      data: { importedCount: created.length, errorCount: failed.length, errors: failed, failed, created },
     });
   } catch (error: any) {
     console.error('[Inventory] Error bulk-creating items:', error);
