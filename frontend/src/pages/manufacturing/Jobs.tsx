@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Briefcase, Plus, RefreshCw, AlertCircle, CheckCircle, ChevronDown, ChevronUp, DollarSign } from "lucide-react";
+import { Briefcase, Plus, RefreshCw, AlertCircle, CheckCircle, ChevronDown, ChevronUp, DollarSign, Calendar, TrendingUp } from "lucide-react";
 import { api } from "../../lib/api";
 
 interface JobCostLine {
@@ -21,6 +21,7 @@ interface Job {
   endDate: string | null;
   description: string | null;
   invoiceId: string | null;
+  budget: string | null;
   costLines: JobCostLine[];
 }
 
@@ -46,7 +47,7 @@ export function Jobs() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", customerId: "", startDate: "", description: "" });
+  const [form, setForm] = useState({ name: "", customerId: "", startDate: "", endDate: "", description: "", budget: "" });
   const [newLine, setNewLine] = useState({ type: "MATERIAL", description: "", quantity: "1", unitCost: "", accountId: "" });
   const [lineJobId, setLineJobId] = useState<string | null>(null);
 
@@ -73,8 +74,15 @@ export function Jobs() {
     if (!form.name.trim()) { setError("Name is required."); return; }
     setError(null);
     try {
-      await api.post("/jobs", { name: form.name, customerId: form.customerId || null, startDate: form.startDate || null, description: form.description || null });
-      setShowCreate(false); setForm({ name: "", customerId: "", startDate: "", description: "" });
+      await api.post("/jobs", {
+        name: form.name,
+        customerId: form.customerId || null,
+        startDate: form.startDate || null,
+        endDate: form.endDate || null,
+        description: form.description || null,
+        budget: form.budget ? parseFloat(form.budget) : null,
+      });
+      setShowCreate(false); setForm({ name: "", customerId: "", startDate: "", endDate: "", description: "", budget: "" });
       flash("Job created."); fetchAll();
     } catch (e: any) { setError(e?.response?.data?.error || "Create failed."); }
   };
@@ -112,6 +120,28 @@ export function Jobs() {
 
   const totalCost = (job: Job) => (job.costLines || []).reduce((s, l) => s + Number(l.amount), 0);
 
+function BudgetProgress({ job }: { job: Job }) {
+  const budget = job.budget ? Number(job.budget) : null;
+  const actual = totalCost(job);
+  if (!budget) return null;
+  const pct = Math.min((actual / budget) * 100, 100);
+  const over = actual > budget;
+  return (
+    <div className="px-4 pb-3 pt-1">
+      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+        <span>Budget usage</span>
+        <span className={over ? "text-red-600 font-medium" : ""}>{pct.toFixed(0)}% {over ? "(over budget)" : ""}</span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${over ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-emerald-500"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -148,6 +178,14 @@ export function Jobs() {
               <input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" />
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Deadline</label>
+              <input type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Budget (optional)</label>
+              <input type="number" min="0" step="0.01" placeholder="0.00" value={form.budget} onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" />
+            </div>
+            <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
               <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" />
             </div>
@@ -175,9 +213,17 @@ export function Jobs() {
                   <span className="text-sm text-gray-600 dark:text-gray-300">{job.name}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[job.status] || ""}`}>{job.status.replace("_", " ")}</span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
-                  <span><DollarSign size={11} className="inline" />{totalCost(job).toFixed(2)} total cost</span>
+                <div className="flex items-center gap-3 text-xs text-gray-400 mt-1 flex-wrap">
+                  {job.budget && (
+                    <span className="flex items-center gap-0.5">
+                      <TrendingUp size={11} />Budget: {Number(job.budget).toFixed(2)}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-0.5"><DollarSign size={11} />Cost: {totalCost(job).toFixed(2)}</span>
                   <span>{job.costLines.length} line{job.costLines.length !== 1 ? "s" : ""}</span>
+                  {job.endDate && (
+                    <span className="flex items-center gap-0.5"><Calendar size={11} />Due: {new Date(job.endDate).toLocaleDateString()}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -191,6 +237,8 @@ export function Jobs() {
               )}
             </div>
           </div>
+
+          <BudgetProgress job={job} />
 
           {expandedId === job.id && (
             <div className="border-t dark:border-gray-700">

@@ -25,6 +25,7 @@ const createJobSchema = z.object({
   startDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
+  budget: z.number().nonnegative().optional().nullable(),
 });
 
 async function nextJobNumber(tenantId: string): Promise<string> {
@@ -82,6 +83,7 @@ router.post('/', requireRole('Accountant'), async (req, res) => {
         startDate: body.startDate ? new Date(body.startDate) : undefined,
         endDate: body.endDate ? new Date(body.endDate) : undefined,
         description: body.description,
+        budget: body.budget ?? null,
         status: 'OPEN',
       },
     });
@@ -107,6 +109,7 @@ router.put('/:id', requireRole('Accountant'), async (req, res) => {
         ...(body.startDate !== undefined && { startDate: body.startDate ? new Date(body.startDate) : null }),
         ...(body.endDate !== undefined && { endDate: body.endDate ? new Date(body.endDate) : null }),
         ...(body.description !== undefined && { description: body.description }),
+        ...(body.budget !== undefined && { budget: body.budget }),
       },
     });
     res.json({ success: true, data: updated });
