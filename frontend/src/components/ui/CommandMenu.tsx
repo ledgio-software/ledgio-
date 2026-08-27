@@ -10,6 +10,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import { getVisibleNavGroups, getVisibleHrefs } from "../../lib/navigation";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { api } from "../../lib/api";
 
 const ITEM_CLASSNAME =
@@ -71,8 +72,11 @@ export function CommandMenu() {
   const { setTheme } = useTheme();
   const { user } = useAuth();
   const { mode } = useWorkspaceMode();
+  const { settings } = useTenantSettings();
 
-  const navGroups = getVisibleNavGroups(user?.role, user?.orgType, mode);
+  // Same source of truth (role + workspace mode + tier filtering) as the sidebar, so
+  // Cmd+K never offers a page the sidebar currently hides from this user.
+  const navGroups = getVisibleNavGroups(user?.role, user?.orgType, mode, settings.tier);
   const canAccessSettings = getVisibleHrefs(user?.role) === null;
 
   const debouncedQuery = useDebounce(query, 280);

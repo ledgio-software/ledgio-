@@ -64,7 +64,8 @@ export function Sidebar() {
   const visibleGroups = getVisibleNavGroups(
     user?.role,
     user?.orgType,
-    isRestricted ? "professional" : effectiveMode
+    isRestricted ? "professional" : effectiveMode,
+    tier,
   );
 
   function handleModeClick(m: WorkspaceMode) {

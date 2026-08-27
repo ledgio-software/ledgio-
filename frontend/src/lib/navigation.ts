@@ -49,6 +49,7 @@ export interface NavItem {
   name: string;
   href: string;
   icon: any;
+  minTier?: number;
 }
 
 export interface NavGroup {
@@ -125,8 +126,8 @@ export const navigationGroups: NavGroup[] = [
     sectionTitle: "INVENTORY & GODOWNS",
     items: [
       { name: "Warehouses & Stock", href: "/inventory", icon: Warehouse },
-      { name: "Stock Intelligence", href: "/analytics/inventory", icon: Lightbulb },
-      { name: "Serial Numbers", href: "/inventory/serial-numbers", icon: Hash },
+      { name: "Stock Intelligence", href: "/analytics/inventory", icon: Lightbulb, minTier: 2 },
+      { name: "Serial Numbers", href: "/inventory/serial-numbers", icon: Hash, minTier: 2 },
     ],
   },
   {
@@ -136,11 +137,11 @@ export const navigationGroups: NavGroup[] = [
       { name: "Invoices (AR)", href: "/invoices", icon: FileText },
       { name: "Customers", href: "/customers", icon: Users },
       { name: "Vendor Bills (AP)", href: "/bills", icon: Receipt },
-      { name: "Purchase Orders", href: "/purchase-orders", icon: FileSpreadsheet },
-      { name: "Sales Orders", href: "/sales-orders", icon: FileSpreadsheet },
-      { name: "Delivery Notes & GRN", href: "/delivery-notes", icon: Truck },
-      { name: "Payment Matching", href: "/payment-matching", icon: CreditCard },
-      { name: "Recurring Invoices", href: "/recurring-invoices", icon: Repeat },
+      { name: "Purchase Orders", href: "/purchase-orders", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Sales Orders", href: "/sales-orders", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Delivery Notes & GRN", href: "/delivery-notes", icon: Truck, minTier: 2 },
+      { name: "Payment Matching", href: "/payment-matching", icon: CreditCard, minTier: 2 },
+      { name: "Recurring Invoices", href: "/recurring-invoices", icon: Repeat, minTier: 2 },
       { name: "Expense Claims", href: "/expenses", icon: Wallet },
       { name: "Petty Cash", href: "/petty-cash", icon: Wallet2 },
     ],
@@ -150,64 +151,64 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Chart of Accounts", href: "/accounts", icon: BookOpen },
       { name: "Journal Vouchers", href: "/journals", icon: FileSpreadsheet },
-      { name: "Banking & Feeds", href: "/banking", icon: Landmark },
+      { name: "Banking & Feeds", href: "/banking", icon: Landmark, minTier: 2 },
       { name: "Tax Rates", href: "/settings/tax-rates", icon: Percent },
       { name: "Fiscal Periods", href: "/settings/fiscal-periods", icon: CalendarClock },
-      { name: "Recurring Transactions", href: "/settings/recurring-transactions", icon: Repeat },
-      { name: "Fixed Assets", href: "/fixed-assets", icon: Building2 },
-      { name: "Cost Centres", href: "/cost-centres", icon: Layers },
-      { name: "Manufacturing", href: "/manufacturing", icon: Cog },
-      { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent },
-      { name: "Price Lists", href: "/settings/price-lists", icon: BadgeDollarSign },
-      { name: "Job Costing", href: "/manufacturing/jobs", icon: ClipboardList },
-      { name: "Job Work Orders", href: "/manufacturing/job-work-orders", icon: Truck },
-      { name: "Cost Categories", href: "/cost-categories", icon: Layers },
-      { name: "Scenarios", href: "/settings/scenarios", icon: GitBranch },
-      { name: "Voucher Classes", href: "/settings/voucher-classes", icon: FileSpreadsheet },
-      { name: "Post-Dated Cheques", href: "/pdc", icon: CreditCard },
-      { name: "Interest Charges", href: "/reports/interest-charges", icon: TrendingUp },
+      { name: "Recurring Transactions", href: "/settings/recurring-transactions", icon: Repeat, minTier: 2 },
+      { name: "Fixed Assets", href: "/fixed-assets", icon: Building2, minTier: 2 },
+      { name: "Cost Centres", href: "/cost-centres", icon: Layers, minTier: 2 },
+      { name: "Manufacturing", href: "/manufacturing", icon: Cog, minTier: 2 },
+      { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent, minTier: 2 },
+      { name: "Price Lists", href: "/settings/price-lists", icon: BadgeDollarSign, minTier: 2 },
+      { name: "Job Costing", href: "/manufacturing/jobs", icon: ClipboardList, minTier: 2 },
+      { name: "Job Work Orders", href: "/manufacturing/job-work-orders", icon: Truck, minTier: 2 },
+      { name: "Cost Categories", href: "/cost-categories", icon: Layers, minTier: 2 },
+      { name: "Scenarios", href: "/settings/scenarios", icon: GitBranch, minTier: 2 },
+      { name: "Voucher Classes", href: "/settings/voucher-classes", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Post-Dated Cheques", href: "/pdc", icon: CreditCard, minTier: 2 },
+      { name: "Interest Charges", href: "/reports/interest-charges", icon: TrendingUp, minTier: 2 },
     ],
   },
   {
     sectionTitle: "REPORTS & ANALYTICS",
     items: [
       { name: "Executive Reports", href: "/reports/executive", icon: BarChart3 },
-      { name: "General Ledger", href: "/reports/ledger", icon: BookOpen },
-      { name: "Trial Balance", href: "/reports/trial-balance", icon: Scale },
+      { name: "General Ledger", href: "/reports/ledger", icon: BookOpen, minTier: 2 },
+      { name: "Trial Balance", href: "/reports/trial-balance", icon: Scale, minTier: 2 },
       { name: "Profit & Loss", href: "/reports/pnl", icon: PieChart },
       { name: "Balance Sheet", href: "/reports/balance-sheet", icon: Scale },
       { name: "Cash Flow Statement", href: "/reports/cash-flow", icon: Waves },
       { name: "Cash Flow Forecast", href: "/reports/cash-flow-forecast", icon: TrendingUp },
-      { name: "KPI Dashboard", href: "/reports/kpis", icon: Gauge },
-      { name: "AP/AR Aging", href: "/reports/aging", icon: Clock },
+      { name: "KPI Dashboard", href: "/reports/kpis", icon: Gauge, minTier: 2 },
+      { name: "AP/AR Aging", href: "/reports/aging", icon: Clock, minTier: 2 },
       { name: "Sales Channel Report", href: "/reports/sales-channel", icon: Store },
       { name: "Branch Comparison", href: "/reports/branch-comparison", icon: GitBranch },
       { name: "Landed Cost", href: "/reports/landed-costs", icon: Anchor },
-      { name: "Budgets", href: "/reports/budgets", icon: Target },
-      { name: "Analytics Dashboard", href: "/reports/analytics", icon: LineChart },
-      { name: "Daybook", href: "/reports/daybook", icon: BookOpen },
-      { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp },
-      { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet },
-      { name: "VAT Return", href: "/reports/vat-return", icon: Percent },
-      { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock },
-      { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3 },
-      { name: "Benford Analysis", href: "/reports/benford-analysis", icon: ShieldAlert },
-      { name: "Fraud Alerts", href: "/reports/fraud-alerts", icon: AlertTriangle },
+      { name: "Budgets", href: "/reports/budgets", icon: Target, minTier: 2 },
+      { name: "Analytics Dashboard", href: "/reports/analytics", icon: LineChart, minTier: 2 },
+      { name: "Daybook", href: "/reports/daybook", icon: BookOpen, minTier: 2 },
+      { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp, minTier: 2 },
+      { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet, minTier: 2 },
+      { name: "VAT Return", href: "/reports/vat-return", icon: Percent, minTier: 2 },
+      { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock, minTier: 2 },
+      { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3, minTier: 2 },
+      { name: "Benford Analysis", href: "/reports/benford-analysis", icon: ShieldAlert, minTier: 2 },
+      { name: "Fraud Alerts", href: "/reports/fraud-alerts", icon: AlertTriangle, minTier: 2 },
     ],
   },
   {
     sectionTitle: "PAYROLL",
     items: [
-      { name: "Employees", href: "/payroll/employees", icon: Users },
-      { name: "Payroll Runs", href: "/payroll/runs", icon: BadgeDollarSign },
-      { name: "Employee Loans", href: "/payroll/loans", icon: Landmark },
-      { name: "Leave Management", href: "/payroll/leave", icon: CalendarClock },
+      { name: "Employees", href: "/payroll/employees", icon: Users, minTier: 2 },
+      { name: "Payroll Runs", href: "/payroll/runs", icon: BadgeDollarSign, minTier: 2 },
+      { name: "Employee Loans", href: "/payroll/loans", icon: Landmark, minTier: 2 },
+      { name: "Leave Management", href: "/payroll/leave", icon: CalendarClock, minTier: 2 },
     ],
   },
   {
     sectionTitle: "ADMINISTRATION",
     items: [
-      { name: "Approvals", href: "/approvals", icon: ShieldCheck },
+      { name: "Approvals", href: "/approvals", icon: ShieldCheck, minTier: 2 },
       { name: "Audit Trail", href: "/audit-logs", icon: ShieldCheck },
       { name: "AI Assistant Activity", href: "/help-assistant/activity", icon: Bot },
       { name: "Bulk Data Import", href: "/import", icon: FileUp },
@@ -338,21 +339,23 @@ export function getVisibleHrefs(role: string | undefined): Set<string> | null {
 }
 
 /**
- * Filters navigationGroups down to what a given role/org-type/mode can
+ * Filters navigationGroups down to what a given role/org-type/mode/tier can
  * actually see, dropping any now-empty group.
  *
  * Priority order:
  * 1. Org-type filtering (NONPROFIT hides POS/Inventory, adds Funds).
- * 2. Role-based filtering (restricted roles like Cashier/Shop Manager/HR/
+ * 2. Plan tier filtering (tier 1 = Shop plan hides items with minTier > 1).
+ * 3. Role-based filtering (restricted roles like Cashier/Shop Manager/HR/
  *    Auditor see a fixed allowlist from RESTRICTED_ROLE_NAV — workspace mode
  *    is ignored for these roles since their nav is already minimal).
- * 3. Workspace mode filtering (Operations → simplified retail; Business →
+ * 4. Workspace mode filtering (Operations → simplified retail; Business →
  *    wholesale; Professional → full view). Only applies to unrestricted roles.
  */
 export function getVisibleNavGroups(
   role: string | undefined,
   orgType?: string,
   mode: WorkspaceMode = 'professional',
+  tier: number = 1,
 ): NavGroup[] {
   // Filter groups restricted to a specific org type (e.g. PHARMACY section)
   let groups = navigationGroups.filter(
@@ -373,6 +376,11 @@ export function getVisibleNavGroups(
       })
       .filter((group): group is NavGroup => group !== null);
   }
+
+  // Plan tier gate: hide items that require a higher-tier plan.
+  groups = groups
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.minTier || item.minTier <= tier) }))
+    .filter((group) => group.items.length > 0);
 
   // Restricted roles use the existing role allowlist only — mode doesn't apply.
   const visibleHrefs = getVisibleHrefs(role);
