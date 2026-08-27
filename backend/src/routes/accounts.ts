@@ -119,6 +119,22 @@ router.post('/', requireRole('Accountant'), async (req: Request, res: Response):
       });
       return;
     }
+    // Prisma unique constraint violation (P2002) — e.g. duplicate account code
+    // under concurrent creates. Treat as 409; if a clientTxnId was supplied,
+    // attempt one final lookup so the idempotency contract is still honoured.
+    if (error.code === 'P2002') {
+      if (req.body?.clientTxnId) {
+        try {
+          const existing = await accountService.findAccountByClientTxnId(req.body.clientTxnId);
+          if (existing) {
+            res.status(201).json({ success: true, message: 'Account created successfully', data: { account: existing } });
+            return;
+          }
+        } catch {}
+      }
+      res.status(409).json({ success: false, error: 'An account with that code already exists.' });
+      return;
+    }
     res.status(500).json({
       success: false,
       error: error.message || 'Internal Server Error while creating account.',
