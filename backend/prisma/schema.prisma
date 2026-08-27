@@ -635,6 +635,7 @@ model InvoicePayment {
   baseCurrencyAmount Decimal  @map("base_currency_amount") @db.Decimal(15, 2)
   method             String   @default("MANUAL") @map("method")
   journalId          String?  @map("journal_id")
+  idempotencyKey     String?  @map("idempotency_key")
   recordedByUserId   String?  @map("recorded_by_user_id")
   recordedByEmail    String?  @map("recorded_by_email")
   createdAt          DateTime @default(now()) @map("created_at")

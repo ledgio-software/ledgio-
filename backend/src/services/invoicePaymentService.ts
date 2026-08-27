@@ -35,6 +35,11 @@ export interface RecordInvoicePaymentOptions {
   amount?: number;
   method?: 'MANUAL' | 'PAYSTACK';
   description?: string;
+  // Caller-supplied idempotency key (e.g. Paystack transaction reference).
+  // If a payment with this key already exists for the tenant, the call
+  // short-circuits and returns the invoice without posting a second payment.
+  // Prevents double-posting on network retries.
+  idempotencyKey?: string;
 }
 
 /**
@@ -58,6 +63,27 @@ export async function recordInvoicePayment(
   options: RecordInvoicePaymentOptions = {}
 ) {
   const { tenantId } = requireTenantContext();
+
+  // Short-circuit on duplicate: if this idempotency key was already used,
+  // return the invoice as-is without posting another payment.
+  if (options.idempotencyKey) {
+    const existingPayment = await withCurrentTenantDb(prisma, async (client) => {
+      return (client as any).invoicePayment.findFirst({
+        where: { tenantId, idempotencyKey: options.idempotencyKey },
+        select: { invoiceId: true },
+      });
+    });
+    if (existingPayment) {
+      const inv = await withCurrentTenantDb(prisma, async (client) => {
+        return (client as any).invoice.findFirst({
+          where: { id: invoiceId, tenantId },
+          include: { customer: true },
+        });
+      });
+      if (!inv) throw new InvoicePaymentServiceError('Invoice not found.', 404);
+      return inv;
+    }
+  }
 
   const invoice = await withCurrentTenantDb(prisma, async (client) => {
     return (client as any).invoice.findFirst({
@@ -239,14 +265,42 @@ export async function recordInvoicePayment(
     journalId = journal.id;
   }
 
-  const newAmountPaid = d2(alreadyPaid.plus(amountDecimal));
-  const newStatus = new Decimal(newAmountPaid).gte(invoiceTotal.minus(new Decimal('0.01'))) ? 'PAID' : 'PARTIALLY_PAID';
-
   let syncSeq: bigint | null = null;
   const updated = await withCurrentTenantDb(prisma, async (client) => {
+    // Acquire a row-level lock on the invoice before reading its balance.
+    // Forces concurrent payment transactions on the same invoice to queue
+    // behind each other rather than reading a stale amountPaid value.
+    // FOR NO KEY UPDATE is less restrictive than FOR UPDATE: it still
+    // blocks concurrent row updates but does not block child-row inserts.
+    await (client as any).$executeRawUnsafe(
+      `SELECT id FROM invoices WHERE id = $1::uuid FOR NO KEY UPDATE`,
+      invoiceId
+    );
+
+    // Re-read the live balance inside the locked transaction. This is the
+    // authoritative value — the outer read may be stale if a concurrent
+    // payment committed between that read and this lock.
+    const fresh = await (client as any).invoice.findFirst({
+      where: { id: invoiceId, tenantId },
+      select: { amountPaid: true, status: true, total: true },
+    });
+    if (!fresh || fresh.status === 'PAID') {
+      throw new InvoicePaymentServiceError('Invoice is already paid.', 409);
+    }
+    const freshAlreadyPaid = new Decimal(fresh.amountPaid);
+    const freshTotal = new Decimal(fresh.total);
+    const freshNewAmountPaid = d2(freshAlreadyPaid.plus(amountDecimal));
+    if (new Decimal(freshNewAmountPaid).gt(freshTotal.plus(new Decimal('0.01')))) {
+      throw new InvoicePaymentServiceError(
+        `Payment amount exceeds the remaining balance — a concurrent payment may have been applied.`,
+        409
+      );
+    }
+    const safeNewStatus = new Decimal(freshNewAmountPaid).gte(freshTotal.minus(new Decimal('0.01'))) ? 'PAID' : 'PARTIALLY_PAID';
+
     const invoiceUpdated = await (client as any).invoice.update({
       where: { id: invoiceId },
-      data: { status: newStatus, amountPaid: newAmountPaid, journalId },
+      data: { status: safeNewStatus, amountPaid: freshNewAmountPaid, journalId },
       include: { customer: true },
     });
 
@@ -258,6 +312,7 @@ export async function recordInvoicePayment(
         baseCurrencyAmount: postingAmount,
         method: options.method || 'MANUAL',
         journalId,
+        idempotencyKey: options.idempotencyKey || null,
         recordedByUserId: actor.userId || null,
         recordedByEmail: actor.userEmail || null,
       },
@@ -277,12 +332,12 @@ export async function recordInvoicePayment(
     // Same transaction as the invoice's status/amountPaid write, for the
     // same reason as recordChange above.
     await recordAuditLogTx(client, {
-      action: newStatus === 'PAID' ? 'INVOICE.PAID' : 'INVOICE.PARTIALLY_PAID',
+      action: safeNewStatus === 'PAID' ? 'INVOICE.PAID' : 'INVOICE.PARTIALLY_PAID',
       entity: 'Invoice',
       entityId: invoiceUpdated.id,
       actor,
       changes: diffFields(invoice, invoiceUpdated, ['status', 'amountPaid', 'journalId']),
-      details: `Invoice ${invoice.invoiceNumber}: payment of ${amount.toFixed(2)} recorded (${newStatus === 'PAID' ? 'now fully paid' : `${invoiceTotal.minus(newAmountPaid).toDecimalPlaces(2).toFixed(2)} still owed`}).`,
+      details: `Invoice ${invoice.invoiceNumber}: payment of ${amount.toFixed(2)} recorded (${safeNewStatus === 'PAID' ? 'now fully paid' : `${freshTotal.minus(freshNewAmountPaid).toDecimalPlaces(2).toFixed(2)} still owed`}).`,
     });
 
     return invoiceUpdated;
