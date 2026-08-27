@@ -58,6 +58,7 @@ describe('Financial Reporting API Integration Tests (BE-109)', () => {
       adminEmail: adminEmail1,
       adminPassword: 'Password123!',
       adminName: 'Report Corp 1 Admin',
+      tier: 2,
     });
     tenant1Id = onboard1.tenant.id;
     adminToken1 = onboard1.token;
@@ -99,6 +100,7 @@ describe('Financial Reporting API Integration Tests (BE-109)', () => {
       adminEmail: adminEmail2,
       adminPassword: 'Password123!',
       adminName: 'Report Corp 2 Admin',
+      tier: 2,
     });
     tenant2Id = onboard2.tenant.id;
     adminToken2 = onboard2.token;

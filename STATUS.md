@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-27] - Shop Plan Tier Gates: Analytics, Trial Balance, KPI Dashboard, General Ledger
+
+**What/Why:** Shop-plan tenants (tier=1) were able to access Stock Intelligence / Executive Summary analytics, Trial Balance, and KPI Dashboard — features that require deeper accounting context and are overkill for a basic retail shop. Added Business-plan (tier≥2) gates to these routes and their corresponding frontend pages so Shop tenants see a clear UpgradeRequired screen instead of confusing empty-state data.
+
+**Changes:**
+- **`backend/src/routes/analytics.ts`** — Added `requireTier` import + `router.use(requireTier(2, 'Stock Intelligence'))` after auth/tenant middleware. All analytics endpoints (stock-intelligence, executive-summary, CSV/PDF/DOCX exports) now require tier 2.
+- **`backend/src/routes/reports.ts`** — Added `requireTier(2, 'Trial Balance')` to `GET /trial-balance` and `requireTier(2, 'KPI Dashboard')` to `GET /kpis`. (AP/AR Aging, Cash Flow Forecast were already gated.)
+- **`frontend/src/pages/analytics/InventoryIntelligence.tsx`** — Added `useTenantSettings` + `UpgradeRequired` imports, guarded `useEffect` to skip fetch for tier<2, added early-return UpgradeRequired guard.
+- **`frontend/src/pages/reports/KpiDashboard.tsx`** — Added `UpgradeRequired` import, added `isLoading` to `useTenantSettings` destructuring, added early-return UpgradeRequired guard.
+- **`frontend/src/pages/reports/GeneralLedger.tsx`** — Added `UpgradeRequired` import, added `isLoading` to `useTenantSettings` destructuring, added early-return UpgradeRequired guard.
+- Already gated (no change needed): `Budgets.tsx`, `Approvals.tsx`, `RecurringTransactions.tsx`, `budgets.ts`, `approvalWorkflows.ts`, `recurringTransactions.ts`.
 ## [2026-08-26] - Feat: Bulk Invoice/Payment Import + External API Key Integration
 
 **What/Why:** Two new integration paths for high-volume clients (e.g. phone installment companies) who need to push invoices and payments from their own systems into Ledgio automatically.

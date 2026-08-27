@@ -36,6 +36,8 @@ describe('Ledgio System-Wide End-to-End API Integration Suite', () => {
 
     adminToken = res.body.data.token;
     tenantId = res.body.data.tenant.id;
+
+    await prisma.tenant.update({ where: { id: tenantId }, data: { tier: 2 } });
   });
 
   // 1. Health & Core Public Endpoints

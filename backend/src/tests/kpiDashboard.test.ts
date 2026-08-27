@@ -42,6 +42,7 @@ describe('KPI & Financial Ratio Dashboard', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'KPI Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
     tenantId = onboard.tenant.id;

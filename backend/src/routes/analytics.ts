@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import * as analyticsService from '../services/analyticsService';
 import { buildCsv } from '../utils/csvExport';
@@ -12,6 +13,7 @@ const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Stock Intelligence'));
 
 type ExecutiveReportType = 'daily' | 'monthly' | 'yearly' | 'closeouts';
 
