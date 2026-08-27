@@ -617,7 +617,9 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createI
     // IRN appears on the invoice without waiting for the 15-minute cron sweep.
     // Fire-and-forget: the response is sent first; any failure is captured
     // in graClearanceStatus=FAILED so the cron will retry within 48 hours.
-    if (!replayed) {
+    // Skipped in test environment — graEvat.test.ts drives clearance manually
+    // and the unexpected extra axios call would break its mock call counts.
+    if (!replayed && process.env.NODE_ENV !== 'test') {
       (async () => {
         try {
           const tenant = await tenantRepository.findTenantById(prisma, tenantId);
