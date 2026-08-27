@@ -2176,6 +2176,7 @@ model Job {
   endDate     DateTime? @map("end_date")
   description String?
   invoiceId   String?  @map("invoice_id")
+  budget      Decimal? @db.Decimal(15, 2)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt      @map("updated_at")
 

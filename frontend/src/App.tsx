@@ -297,9 +297,189 @@ const Dashboard = () => {
       )}
 
       {isRestrictedRole && <ShopManagerDashboard />}
+      {!isRestrictedRole && <DashboardFinanceWidgets currency={settings.baseCurrency} />}
     </div>
   );
 };
+
+// ── Donut chart (pure SVG, no external deps) ──────────────────────────────────
+function DonutChart({ segments, size = 110 }: {
+  segments: { value: number; color: string; label: string }[];
+  size?: number;
+}) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total === 0) {
+    return (
+      <svg width={size} height={size}>
+        <circle cx={size / 2} cy={size / 2} r={size / 2 - 14} fill="none" stroke="#e5e7eb" strokeWidth={20} />
+      </svg>
+    );
+  }
+  const r = size / 2 - 14;
+  const circ = 2 * Math.PI * r;
+  let acc = 0;
+  return (
+    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      {segments.map((seg, i) => {
+        const len = (seg.value / total) * circ;
+        const dash = `${len} ${circ - len}`;
+        const offset = -acc;
+        acc += len;
+        return (
+          <circle key={i} cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke={seg.color} strokeWidth={20}
+            strokeDasharray={dash} strokeDashoffset={offset} />
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Dashboard finance widgets (AR/AP aging donuts + KPI cards) ────────────────
+function DashboardFinanceWidgets({ currency }: { currency: string }) {
+  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
+
+  type AgingTotals = { current: number; days1to30: number; days31to60: number; days61to90: number; days90plus: number; total: number };
+  const [arTotals, setArTotals] = useState<AgingTotals | null>(null);
+  const [apTotals, setApTotals] = useState<AgingTotals | null>(null);
+  const [hidden, setHidden] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('dash-widgets-hidden') || '{}'); } catch { return {}; }
+  });
+
+  useEffect(() => {
+    api.get('/reports/aging/ar').then(r => setArTotals(r.data.data?.totals ?? null)).catch(() => {});
+    api.get('/reports/aging/ap').then(r => setApTotals(r.data.data?.totals ?? null)).catch(() => {});
+  }, []);
+
+  const toggleWidget = (key: string) => {
+    setHidden(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem('dash-widgets-hidden', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const AR_SEGMENTS = arTotals ? [
+    { value: arTotals.current,    color: '#10b981', label: 'Current' },
+    { value: arTotals.days1to30,  color: '#f59e0b', label: '1–30 days' },
+    { value: arTotals.days31to60, color: '#f97316', label: '31–60 days' },
+    { value: arTotals.days61to90, color: '#ef4444', label: '61–90 days' },
+    { value: arTotals.days90plus, color: '#991b1b', label: '90+ days' },
+  ] : [];
+
+  const AP_SEGMENTS = apTotals ? [
+    { value: apTotals.current,    color: '#10b981', label: 'Current' },
+    { value: apTotals.days1to30,  color: '#f59e0b', label: '1–30 days' },
+    { value: apTotals.days31to60, color: '#f97316', label: '31–60 days' },
+    { value: apTotals.days61to90, color: '#ef4444', label: '61–90 days' },
+    { value: apTotals.days90plus, color: '#991b1b', label: '90+ days' },
+  ] : [];
+
+  const arOverdue = arTotals ? arTotals.days1to30 + arTotals.days31to60 + arTotals.days61to90 + arTotals.days90plus : 0;
+  const arOver30  = arTotals ? arTotals.days31to60 + arTotals.days61to90 + arTotals.days90plus : 0;
+  const arOver90  = arTotals ? arTotals.days90plus : 0;
+
+  const WIDGET_KEYS = ['kpi', 'ar', 'ap'];
+
+  return (
+    <div className="space-y-4">
+      {/* Customize toggle */}
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-xs text-secondary-400">Show/hide:</span>
+        {[{ key: 'kpi', label: 'AR KPIs' }, { key: 'ar', label: 'AR Aging' }, { key: 'ap', label: 'AP Aging' }].map(w => (
+          <button key={w.key} onClick={() => toggleWidget(w.key)}
+            className={`text-xs px-2 py-0.5 rounded border transition-colors ${hidden[w.key] ? 'text-secondary-400 border-secondary-200 dark:border-secondary-700' : 'text-primary-600 border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/20'}`}>
+            {w.label}
+          </button>
+        ))}
+      </div>
+
+      {/* AR KPI cards */}
+      {!hidden['kpi'] && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Unpaid Invoices',      value: arTotals?.total ?? null,  color: 'text-secondary-800 dark:text-secondary-100' },
+            { label: 'Overdue',              value: arOverdue,                 color: 'text-amber-600 dark:text-amber-400' },
+            { label: 'Overdue 30+ Days',     value: arOver30,                  color: 'text-orange-600 dark:text-orange-400' },
+            { label: 'Overdue 90+ Days',     value: arOver90,                  color: 'text-red-600 dark:text-red-400' },
+          ].map(card => (
+            <Card key={card.label}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{card.label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold tabular-nums ${card.color}`}>
+                  {card.value === null ? '–' : fmt(card.value)}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Aging donut charts */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* AR donut */}
+        {!hidden['ar'] && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Accounts Receivable Aging</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                <DonutChart segments={AR_SEGMENTS} size={110} />
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  {AR_SEGMENTS.map(s => (
+                    <div key={s.label} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="flex items-center gap-1.5 text-secondary-600 dark:text-secondary-400 truncate">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                        {s.label}
+                      </span>
+                      <span className="tabular-nums font-medium shrink-0">{fmt(s.value)}</span>
+                    </div>
+                  ))}
+                  <div className="border-t dark:border-secondary-700 pt-1.5 flex justify-between text-xs font-semibold">
+                    <span>Total</span>
+                    <span className="tabular-nums">{fmt(arTotals?.total ?? 0)}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AP donut */}
+        {!hidden['ap'] && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Accounts Payable Aging</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                <DonutChart segments={AP_SEGMENTS} size={110} />
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  {AP_SEGMENTS.map(s => (
+                    <div key={s.label} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="flex items-center gap-1.5 text-secondary-600 dark:text-secondary-400 truncate">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                        {s.label}
+                      </span>
+                      <span className="tabular-nums font-medium shrink-0">{fmt(s.value)}</span>
+                    </div>
+                  ))}
+                  <div className="border-t dark:border-secondary-700 pt-1.5 flex justify-between text-xs font-semibold">
+                    <span>Total</span>
+                    <span className="tabular-nums">{fmt(apTotals?.total ?? 0)}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function ShopManagerDashboard() {
   const { settings } = useTenantSettings();
