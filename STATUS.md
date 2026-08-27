@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-27] - Gated 5 Advanced Features to Business Plan (tier 2+)
+
+**What/Why:** Five features shipped after the initial plan-tier system was introduced had no tier gate, making them visible to Shop-plan tenants (tier 1) who should not have access: Fixed Assets & Depreciation, Purchase Orders, Recurring Invoices, Scheduled Reports, AP/AR Aging Analysis, and Cash Flow Forecast. Reviewed every feature added since the plan-tier system shipped and aligned gating with the product decision that Shop is a simple retail/small-business tier and does not need these advanced accounting features. Kept the following ungated (Shop-accessible): Petty Cash, GRA E-VAT, Partial Payments, core financial reports (P&L, Balance Sheet, Cash Flow Statement, KPI Dashboard, General Ledger, Executive Reports), and Paystack Pay Now Links.
+
+**Fix:**
+- **Backend:** Added `requireTier(2, 'Feature Label')` middleware via `router.use(...)` to: `fixedAssets.ts`, `purchaseOrders.ts`, `recurringInvoices.ts`, `scheduledReports.ts`. Added per-route `requireTier(2, ...)` inline to `/aging/ar`, `/aging/ap`, and `/cash-flow-forecast` in `reports.ts` (that file also serves ungated reports so a blanket `router.use` was not appropriate).
+- **Frontend:** Added `UpgradeRequired` early-return guard and guarded `useEffect` (skips the network fetch entirely for Shop-tier tenants) to: `FixedAssets.tsx`, `PurchaseOrders.tsx`, `RecurringInvoices.tsx`, `AgingReport.tsx`, `CashFlowForecast.tsx`. Scheduled Reports frontend was already using a list-only UI that simply returns nothing from the backend — the backend gate is sufficient.
+
+**Verification:** `npx tsc -b --noEmit` clean on both frontend and backend. No schema or migration changes needed — tier enforcement is purely middleware + frontend conditional rendering.
+
+**Files:** `backend/src/routes/fixedAssets.ts`, `backend/src/routes/purchaseOrders.ts`, `backend/src/routes/recurringInvoices.ts`, `backend/src/routes/reports.ts`, `backend/src/routes/scheduledReports.ts`; `frontend/src/pages/fixedassets/FixedAssets.tsx`, `frontend/src/pages/purchaseorders/PurchaseOrders.tsx`, `frontend/src/pages/recurringinvoices/RecurringInvoices.tsx`, `frontend/src/pages/reports/AgingReport.tsx`, `frontend/src/pages/reports/CashFlowForecast.tsx`.
+
 ## [Date: 2026-08-17] - Fixed Invoices Page Showing Accountant-Only Action Buttons to Every Role
 
 **What/Why:** User pasted browser console errors showing repeated `403`s on `POST /invoices/:id/send` and `POST /paystack/invoices/:id/initialize` from the Invoices page (plus benign, already-documented 403s on `/ledgers/summary`/`/reports/profit-loss` - the Dashboard's known and intentionally-swallowed pattern for restricted roles, see the "isRestrictedRole" comment in `App.tsx`). Traced to `Invoices.tsx`'s "Actions" dropdown menu, which had **zero role gating**: every role that can reach the Invoices page (Admin, Accountant, Viewer, Shop Manager, Auditor) sees "Email Invoice," "Request GRA Clearance," "Pay Now Link (Paystack)," and "Credit Note," but the backend gates all four to `requireRole('Accountant')` - only Admin/Accountant can actually use them. A Shop Manager or Auditor clicking any of them always 403s with no explanation, which is exactly what the repeated (4x) `paystack/.../initialize` 403s in the pasted log look like - a user retrying an action that can never succeed. Same bug class as the earlier "ExpenseClaims.tsx decider-button gating" fix.
