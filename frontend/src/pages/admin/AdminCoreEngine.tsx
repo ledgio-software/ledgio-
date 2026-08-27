@@ -244,7 +244,7 @@ export function AdminCoreEngine() {
     errors: number;
     errorRate: number;
     avgLatencyMs: number;
-    memory: { heapUsedMb: number; rss: number };
+    memory: { heapUsedMb: number; rssMb: number };
     uptime: number;
     nodeVersion: string;
     buckets: { ts: number; requests: number; errors: number; avgMs: number }[];
@@ -2052,7 +2052,7 @@ export function AdminCoreEngine() {
                       </div>
                       <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
                         <div className="text-secondary-400 mb-1">RSS Memory</div>
-                        <div className="font-mono text-white">{metricsData.memory.rss.toFixed(1)} MB</div>
+                        <div className="font-mono text-white">{metricsData.memory.rssMb.toFixed(1)} MB</div>
                       </div>
                     </div>
                   </>
