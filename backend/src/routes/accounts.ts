@@ -101,6 +101,18 @@ router.post('/', requireRole('Accountant'), async (req: Request, res: Response):
     });
   } catch (error: any) {
     if (error instanceof AccountServiceError) {
+      // When a 409 conflict races with a duplicate clientTxnId, the service retry
+      // may time out before the winner is visible. One final lookup ensures the
+      // idempotency contract is honoured at the route level.
+      if (error.statusCode === 409 && req.body?.clientTxnId) {
+        try {
+          const existing = await accountService.findAccountByClientTxnId(req.body.clientTxnId);
+          if (existing) {
+            res.status(201).json({ success: true, message: 'Account created successfully', data: { account: existing } });
+            return;
+          }
+        } catch {}
+      }
       res.status(error.statusCode).json({
         success: false,
         error: error.message,
