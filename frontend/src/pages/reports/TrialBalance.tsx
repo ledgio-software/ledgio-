@@ -131,7 +131,7 @@ export function TrialBalance() {
         <>
           {/* Balance status banner */}
           <div className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium ${
-            report.isBalanced
+            report.totals.isBalanced
               ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400"
               : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
           }`}>
