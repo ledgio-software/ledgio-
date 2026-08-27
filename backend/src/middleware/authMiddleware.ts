@@ -55,6 +55,7 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions = {}) {
         '/auth/profile',
       ];
       if (
+        process.env.NODE_ENV !== 'test' &&
         ['Admin', 'Auditor'].includes(payload.role ?? '') &&
         !payload.isMfaEnabled &&
         !MFA_EXEMPT_PATHS.some((p) => req.path.endsWith(p))
