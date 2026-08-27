@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../..
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { api } from "../../lib/api";
 
 interface AgingTotals {
@@ -57,7 +58,7 @@ function emptyTotals(): AgingTotals {
 // this schema) - no separate accrual ledger, just the same balance-due math
 // the Invoices/Vendor Bills pages already use.
 export function AgingReport() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [tab, setTab] = useState<"ar" | "ap">("ar");
   const [arRows, setArRows] = useState<ArRow[]>([]);
   const [apRows, setApRows] = useState<ApRow[]>([]);
@@ -88,11 +89,17 @@ export function AgingReport() {
   }, []);
 
   useEffect(() => {
-    fetchAging();
-  }, [fetchAging]);
+    if (!isLoadingTenantSettings && settings.tier >= 2) {
+      fetchAging();
+    }
+  }, [fetchAging, isLoadingTenantSettings, settings.tier]);
 
   const totals = tab === "ar" ? arTotals : apTotals;
   const rows = tab === "ar" ? arRows : apRows;
+
+  if (!isLoadingTenantSettings && settings.tier < 2) {
+    return <UpgradeRequired featureLabel="AP/AR Aging Analysis" requiredTier={2} currentTier={settings.tier} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

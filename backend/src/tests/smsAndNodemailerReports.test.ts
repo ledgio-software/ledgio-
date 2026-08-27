@@ -1,5 +1,6 @@
 import request from 'supertest';
 import app from '../app';
+import { prisma } from '../config/db';
 import { SmsService } from '../services/smsService';
 import { EmailService } from '../services/EmailService';
 import { ScheduledEmailCronService } from '../services/scheduledEmailService';
@@ -31,6 +32,7 @@ describe('Android SMS Gateway & Nodemailer Email Service Suite', () => {
     expect(res.status).toBe(201);
     adminToken = res.body.data.token;
     tenantId = res.body.data.tenant.id;
+    await prisma.tenant.update({ where: { id: tenantId }, data: { tier: 2 } });
   });
 
   describe('Private Android SMS Gateway Unit & Retry Logic', () => {

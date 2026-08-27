@@ -38,6 +38,7 @@ describe('Recurring customer invoices', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'RI Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
 

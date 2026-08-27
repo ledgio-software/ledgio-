@@ -39,6 +39,7 @@ describe('Purchase Orders + PO-vs-bill matching', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'PO Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
 

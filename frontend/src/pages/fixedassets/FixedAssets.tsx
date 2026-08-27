@@ -6,6 +6,8 @@ import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAccounts } from "../../hooks/useAccounts";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { Plus, Landmark } from "lucide-react";
 
 interface DepreciationEntry {
@@ -63,6 +65,7 @@ function statusBadge(status: FixedAsset["status"]) {
 }
 
 export function FixedAssets() {
+  const { settings: tenantSettings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const { showToast } = useToast();
   const { accounts } = useAccounts();
   const [assets, setAssets] = useState<FixedAsset[]>([]);
@@ -90,8 +93,10 @@ export function FixedAssets() {
   }, []);
 
   useEffect(() => {
-    fetchAssets();
-  }, [fetchAssets]);
+    if (!isLoadingTenantSettings && tenantSettings.tier >= 2) {
+      fetchAssets();
+    }
+  }, [fetchAssets, isLoadingTenantSettings, tenantSettings.tier]);
 
   const openDetail = async (asset: FixedAsset) => {
     try {
@@ -149,6 +154,10 @@ export function FixedAssets() {
   };
 
   const netBookValue = (a: FixedAsset) => Number(a.cost) - Number(a.accumulatedDepreciation);
+
+  if (!isLoadingTenantSettings && tenantSettings.tier < 2) {
+    return <UpgradeRequired featureLabel="Fixed Assets & Depreciation" requiredTier={2} currentTier={tenantSettings.tier} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
