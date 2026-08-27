@@ -119,10 +119,16 @@ router.post('/', requireRole('Accountant'), async (req: Request, res: Response):
       });
       return;
     }
-    // Prisma unique constraint violation (P2002) — e.g. duplicate account code
-    // under concurrent creates. Treat as 409; if a clientTxnId was supplied,
-    // attempt one final lookup so the idempotency contract is still honoured.
-    if (error.code === 'P2002') {
+    // Unique constraint violation — Prisma model-level (P2002) or raw SQL path
+    // (P2010 wrapping Postgres 23505). Both mean a duplicate account code.
+    // Treat as 409; if a clientTxnId was supplied, attempt one final lookup
+    // so the idempotency contract is still honoured.
+    const isUniqueViolation =
+      error.code === 'P2002' ||
+      (error.code === 'P2010' && (error.meta?.code === '23505' || String(error.message).includes('23505'))) ||
+      error.cause?.code === '23505' ||
+      String(error.message).toLowerCase().includes('unique constraint');
+    if (isUniqueViolation) {
       if (req.body?.clientTxnId) {
         try {
           const existing = await accountService.findAccountByClientTxnId(req.body.clientTxnId);
