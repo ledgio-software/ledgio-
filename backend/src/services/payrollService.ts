@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import * as accountRepository from '../repository/accountRepository';
@@ -27,20 +28,22 @@ const GHANA_PAYE_BANDS: [number, number][] = [
 ];
 
 export function computeMonthlyPAYE(grossSalary: number): number {
-  let remaining = grossSalary;
-  let tax = 0;
+  let remaining = new Decimal(grossSalary);
+  let tax = new Decimal(0);
   let prevLimit = 0;
 
   for (const [upperLimit, rate] of GHANA_PAYE_BANDS) {
-    const bandWidth = upperLimit === Infinity ? remaining : Math.min(upperLimit - prevLimit, remaining);
-    if (bandWidth <= 0) break;
-    tax += bandWidth * rate;
-    remaining -= bandWidth;
+    const bandWidth = upperLimit === Infinity
+      ? remaining
+      : Decimal.min(new Decimal(upperLimit - prevLimit), remaining);
+    if (bandWidth.lte(0)) break;
+    tax = tax.plus(bandWidth.times(rate));
+    remaining = remaining.minus(bandWidth);
     prevLimit = upperLimit;
-    if (remaining <= 0) break;
+    if (remaining.lte(0)) break;
   }
 
-  return Math.round(tax * 100) / 100;
+  return tax.toDecimalPlaces(2).toNumber();
 }
 
 // SSNIT rates per GRA/SSNIT guidelines.
@@ -366,38 +369,50 @@ export async function createPayrollRun(data: RunPayrollInput, _actor?: AuditActo
 
   const runNumber = `PR-${periodYear}-${String(periodMonth).padStart(2, '0')}`;
 
-  let totalGross = 0;
-  let totalPaye = 0;
-  let totalSsnitEmployee = 0;
-  let totalSsnitEmployer = 0;
-  let totalNetPay = 0;
+  let totalGross = new Decimal(0);
+  let totalPaye = new Decimal(0);
+  let totalSsnitEmployee = new Decimal(0);
+  let totalSsnitEmployer = new Decimal(0);
+  let totalNetPay = new Decimal(0);
 
   const payslipData = await Promise.all(employees.map(async (emp) => {
-    const foreignGross = emp.grossSalary;
-    const rate = emp.salaryExchangeRate || 1;
+    const foreignGross = new Decimal(emp.grossSalary);
+    const rate = new Decimal(emp.salaryExchangeRate || 1);
     const currency = emp.salaryCurrency || 'GHS';
-    const gross = Math.round(foreignGross * rate * 100) / 100;
-    const unpaidDed = await computeUnpaidLeaveDeduction(emp.id, gross, periodMonth, periodYear);
-    const taxableGross = Math.max(0, gross - unpaidDed);
-    const paye = computeMonthlyPAYE(taxableGross);
-    const ssnitEmp = Math.round(taxableGross * SSNIT_EMPLOYEE_RATE * 100) / 100;
-    const ssnitEr = Math.round(taxableGross * SSNIT_EMPLOYER_RATE * 100) / 100;
-    const net = Math.round((gross - unpaidDed - paye - ssnitEmp) * 100) / 100;
+    const gross = foreignGross.times(rate).toDecimalPlaces(2);
+    const unpaidDedNum = await computeUnpaidLeaveDeduction(emp.id, gross.toNumber(), periodMonth, periodYear);
+    const unpaidDed = new Decimal(unpaidDedNum);
+    const taxableGross = Decimal.max(0, gross.minus(unpaidDed));
+    const paye = new Decimal(computeMonthlyPAYE(taxableGross.toNumber()));
+    const ssnitEmp = taxableGross.times(SSNIT_EMPLOYEE_RATE).toDecimalPlaces(2);
+    const ssnitEr = taxableGross.times(SSNIT_EMPLOYER_RATE).toDecimalPlaces(2);
+    const net = gross.minus(unpaidDed).minus(paye).minus(ssnitEmp).toDecimalPlaces(2);
 
-    totalGross += gross;
-    totalPaye += paye;
-    totalSsnitEmployee += ssnitEmp;
-    totalSsnitEmployer += ssnitEr;
-    totalNetPay += net;
+    totalGross = totalGross.plus(gross);
+    totalPaye = totalPaye.plus(paye);
+    totalSsnitEmployee = totalSsnitEmployee.plus(ssnitEmp);
+    totalSsnitEmployer = totalSsnitEmployer.plus(ssnitEr);
+    totalNetPay = totalNetPay.plus(net);
 
-    return { employeeId: emp.id, gross, foreignGross, currency, rate, unpaidDed, paye, ssnitEmp, ssnitEr, net };
+    return {
+      employeeId: emp.id,
+      gross: gross.toNumber(),
+      foreignGross: foreignGross.toNumber(),
+      currency,
+      rate: rate.toNumber(),
+      unpaidDed: unpaidDedNum,
+      paye: paye.toNumber(),
+      ssnitEmp: ssnitEmp.toNumber(),
+      ssnitEr: ssnitEr.toNumber(),
+      net: net.toNumber(),
+    };
   }));
 
-  totalGross = Math.round(totalGross * 100) / 100;
-  totalPaye = Math.round(totalPaye * 100) / 100;
-  totalSsnitEmployee = Math.round(totalSsnitEmployee * 100) / 100;
-  totalSsnitEmployer = Math.round(totalSsnitEmployer * 100) / 100;
-  totalNetPay = Math.round(totalNetPay * 100) / 100;
+  const dbTotalGross = totalGross.toDecimalPlaces(2).toNumber();
+  const dbTotalPaye = totalPaye.toDecimalPlaces(2).toNumber();
+  const dbTotalSsnitEmployee = totalSsnitEmployee.toDecimalPlaces(2).toNumber();
+  const dbTotalSsnitEmployer = totalSsnitEmployer.toDecimalPlaces(2).toNumber();
+  const dbTotalNetPay = totalNetPay.toDecimalPlaces(2).toNumber();
 
   const runRows: any[] = await withCurrentTenantDb(prisma, async (client) => {
     const runs = await (client as any).$queryRawUnsafe(
@@ -405,7 +420,7 @@ export async function createPayrollRun(data: RunPayrollInput, _actor?: AuditActo
          total_gross, total_paye, total_ssnit_employee, total_ssnit_employer, total_net_pay)
        VALUES ($1, $2, $3, 'DRAFT', $4, $5, $6, $7, $8) RETURNING *`,
       runNumber, periodMonth, periodYear,
-      totalGross, totalPaye, totalSsnitEmployee, totalSsnitEmployer, totalNetPay
+      dbTotalGross, dbTotalPaye, dbTotalSsnitEmployee, dbTotalSsnitEmployer, dbTotalNetPay
     );
     const runId = runs[0].id;
     for (const s of payslipData) {
@@ -422,8 +437,8 @@ export async function createPayrollRun(data: RunPayrollInput, _actor?: AuditActo
 
   // Recalculate total net pay after loan deductions have been applied
   const updatedRun = await getPayrollRun(runRows[0].id);
-  const adjustedNetPay = (updatedRun.payslips || []).reduce((sum, s) => sum + s.netPay, 0);
-  const roundedNetPay = Math.round(adjustedNetPay * 100) / 100;
+  const adjustedNetPay = (updatedRun.payslips || []).reduce((sum, s) => sum.plus(new Decimal(s.netPay)), new Decimal(0));
+  const roundedNetPay = adjustedNetPay.toDecimalPlaces(2).toNumber();
   await withCurrentTenantDb(prisma, async (client) =>
     (client as any).$queryRawUnsafe(
       `UPDATE payroll_runs SET total_net_pay = $2 WHERE id = $1::uuid`,
@@ -470,7 +485,7 @@ export async function postPayrollJournalEntry(
     throw new PayrollServiceError(`Cannot post payroll journal — no account designated for: ${missing}. Assign these roles in Chart of Accounts.`, 400);
   }
 
-  const totalSsnit = Math.round((run.totalSsnitEmployee + run.totalSsnitEmployer) * 100) / 100;
+  const totalSsnit = new Decimal(run.totalSsnitEmployee).plus(run.totalSsnitEmployer).toDecimalPlaces(2).toNumber();
   const entryNumber = `PAY-${run.runNumber}`;
   const entryDate = `${run.periodYear}-${String(run.periodMonth).padStart(2, '0')}-01`;
 

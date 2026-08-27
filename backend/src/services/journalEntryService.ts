@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import * as journalEntryRepository from '../repository/journalEntryRepository';
@@ -58,45 +59,45 @@ export async function createJournalEntry(data: CreateJournalEntryInput, actor?: 
   }
 
   // 2. Validate line numbers and amounts
-  let totalDebit = 0;
-  let totalCredit = 0;
+  let totalDebit = new Decimal(0);
+  let totalCredit = new Decimal(0);
 
   for (let i = 0; i < data.lines.length; i++) {
     const line = data.lines[i];
     if (!line.accountId || typeof line.accountId !== 'string') {
       throw new JournalEntryServiceError(`Line ${i + 1}: Account ID is required.`, 400);
     }
-    const debit = Number(line.debit || 0);
-    const credit = Number(line.credit || 0);
+    const debit = new Decimal(line.debit ?? 0);
+    const credit = new Decimal(line.credit ?? 0);
 
-    if (isNaN(debit) || debit < 0) {
+    if (debit.isNaN() || debit.lt(0)) {
       throw new JournalEntryServiceError(`Line ${i + 1}: Debit must be a non-negative number.`, 400);
     }
-    if (isNaN(credit) || credit < 0) {
+    if (credit.isNaN() || credit.lt(0)) {
       throw new JournalEntryServiceError(`Line ${i + 1}: Credit must be a non-negative number.`, 400);
     }
-    if (debit === 0 && credit === 0) {
+    if (debit.eq(0) && credit.eq(0)) {
       throw new JournalEntryServiceError(
         `Line ${i + 1}: Line must specify either a debit or credit amount greater than 0.`,
         400
       );
     }
-    if (debit > 0 && credit > 0) {
+    if (debit.gt(0) && credit.gt(0)) {
       throw new JournalEntryServiceError(
         `Line ${i + 1}: A line cannot contain both debit and credit amounts.`,
         400
       );
     }
 
-    totalDebit += debit;
-    totalCredit += credit;
+    totalDebit = totalDebit.plus(debit);
+    totalCredit = totalCredit.plus(credit);
   }
 
-  // 3. Double-entry balancing validation
-  const roundedDebit = Math.round(totalDebit * 100) / 100;
-  const roundedCredit = Math.round(totalCredit * 100) / 100;
+  // 3. Double-entry balancing validation — use Decimal throughout, round only for display
+  const roundedDebit = totalDebit.toDecimalPlaces(2);
+  const roundedCredit = totalCredit.toDecimalPlaces(2);
 
-  if (Math.abs(roundedDebit - roundedCredit) > 0.001) {
+  if (roundedDebit.minus(roundedCredit).abs().gt(new Decimal('0.001'))) {
     throw new JournalEntryServiceError(
       `Journal entry is not balanced. Total Debits (${roundedDebit.toFixed(
         2
@@ -105,7 +106,7 @@ export async function createJournalEntry(data: CreateJournalEntryInput, actor?: 
     );
   }
 
-  if (roundedDebit <= 0) {
+  if (roundedDebit.lte(0)) {
     throw new JournalEntryServiceError('Journal entry total debit/credit amount must be greater than 0.', 400);
   }
 
@@ -339,17 +340,17 @@ export async function postJournalEntry(id: string, actor?: AuditActor): Promise<
     previousStatus = entry.status;
 
     // Re-verify double-entry balance
-    let totalDebit = 0;
-    let totalCredit = 0;
+    let totalDebit = new Decimal(0);
+    let totalCredit = new Decimal(0);
     for (const line of entry.lines || []) {
-      totalDebit += line.debit;
-      totalCredit += line.credit;
+      totalDebit = totalDebit.plus(new Decimal(line.debit));
+      totalCredit = totalCredit.plus(new Decimal(line.credit));
     }
 
-    const roundedDebit = Math.round(totalDebit * 100) / 100;
-    const roundedCredit = Math.round(totalCredit * 100) / 100;
+    const roundedDebit = totalDebit.toDecimalPlaces(2);
+    const roundedCredit = totalCredit.toDecimalPlaces(2);
 
-    if (Math.abs(roundedDebit - roundedCredit) > 0.001) {
+    if (roundedDebit.minus(roundedCredit).abs().gt(new Decimal('0.001'))) {
       throw new JournalEntryServiceError(
         `Journal entry is not balanced. Total Debits (${roundedDebit.toFixed(
           2

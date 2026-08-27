@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { requireTenantContext } from '../context/tenantContext';
@@ -9,6 +10,11 @@ import { recordAuditLogTx, diffFields, AuditActor } from './auditLogService';
 import { recordChange, notifyChange, invoiceToSyncPayload } from './syncChangeLogService';
 import * as fiscalPeriodService from './fiscalPeriodService';
 import { consumeLayers } from './stockLayerService';
+
+/** Round a Decimal to 2dp and return as JS number for use in journal line amounts. */
+function d2(value: Decimal): number {
+  return value.toDecimalPlaces(2).toNumber();
+}
 
 export class InvoicePaymentServiceError extends Error {
   statusCode: number;
@@ -73,23 +79,25 @@ export async function recordInvoicePayment(
   await approvalWorkflowService.assertApprovedOrNoWorkflow(tenantId, 'Invoice', invoiceId);
   await fiscalPeriodService.assertPeriodOpenForDate(tenantId, new Date());
 
-  const invoiceTotal = Number(invoice.total);
-  const alreadyPaid = Number(invoice.amountPaid);
-  const remainingBalance = Math.round((invoiceTotal - alreadyPaid) * 100) / 100;
+  const invoiceTotal = new Decimal(invoice.total);
+  const alreadyPaid = new Decimal(invoice.amountPaid);
+  const remainingBalance = invoiceTotal.minus(alreadyPaid).toDecimalPlaces(2);
 
-  const amount = options.amount !== undefined && options.amount !== null
-    ? Math.round(Number(options.amount) * 100) / 100
+  const amountDecimal = options.amount !== undefined && options.amount !== null
+    ? new Decimal(options.amount).toDecimalPlaces(2)
     : remainingBalance;
 
-  if (!amount || isNaN(amount) || amount <= 0) {
+  if (amountDecimal.isNaN() || amountDecimal.lte(0)) {
     throw new InvoicePaymentServiceError('Payment amount must be greater than 0.', 400);
   }
-  if (amount > remainingBalance + 0.01) {
+  // Allow up to 1 cent tolerance for floating-point caller inputs
+  if (amountDecimal.gt(remainingBalance.plus(new Decimal('0.01')))) {
     throw new InvoicePaymentServiceError(
-      `Payment amount (${amount.toFixed(2)}) exceeds the remaining balance (${remainingBalance.toFixed(2)}) for invoice ${invoice.invoiceNumber}.`,
+      `Payment amount (${amountDecimal.toFixed(2)}) exceeds the remaining balance (${remainingBalance.toFixed(2)}) for invoice ${invoice.invoiceNumber}.`,
       400
     );
   }
+  const amount = amountDecimal.toNumber();
 
   const accounts = await withCurrentTenantDb(prisma, (client) => accountRepository.listAccounts(client));
   const cashAcc = accountRepository.resolveDefaultAccount(accounts, 'CASH') || accounts[0];
@@ -102,16 +110,17 @@ export async function recordInvoicePayment(
   // Same base-currency conversion ratio for the whole invoice, applied to
   // just this payment's native-currency amount below - degrades to exactly
   // 1 for same-currency tenants (baseCurrencyAmount === total).
-  const fxScale = invoiceTotal !== 0 && invoice.baseCurrencyAmount != null
-    ? Number(invoice.baseCurrencyAmount) / invoiceTotal
-    : 1;
-  // What fraction of the whole invoice this one payment represents - 1 for
-  // a full payment (reduces every formula below to the old single-payment
-  // math exactly), less than 1 for a partial one.
-  const paymentShare = invoiceTotal !== 0 ? amount / invoiceTotal : 1;
+  const invoiceTotalNum = invoiceTotal.toNumber();
+  const fxScaleDecimal = invoiceTotalNum !== 0 && invoice.baseCurrencyAmount != null
+    ? new Decimal(invoice.baseCurrencyAmount).div(invoiceTotal)
+    : new Decimal(1);
+  // What fraction of the whole invoice this one payment represents.
+  const paymentShareDecimal = invoiceTotalNum !== 0 ? amountDecimal.div(invoiceTotal) : new Decimal(1);
+  const fxScale = fxScaleDecimal.toNumber();
+  const paymentShare = paymentShareDecimal.toNumber();
 
   // Original base-currency amount using the rate locked at invoice creation.
-  const postingAmount = Math.round(amount * fxScale * 100) / 100;
+  const postingAmount = d2(amountDecimal.times(fxScaleDecimal));
 
   // FX gain/loss: when payment currency differs from base currency and live
   // rates are available, revalue the cash receipt at today's rate. Any
@@ -125,8 +134,8 @@ export async function recordInvoicePayment(
   if (invoiceCurrency !== baseCurrency && fxRateService.isFxConfigured()) {
     try {
       const currentBaseAmount = await fxRateService.convertAmount(amount, invoiceCurrency, baseCurrency);
-      fxGainLoss = Math.round((currentBaseAmount - postingAmount) * 100) / 100;
-      cashPostingAmount = Math.round(currentBaseAmount * 100) / 100;
+      fxGainLoss = d2(new Decimal(currentBaseAmount).minus(postingAmount));
+      cashPostingAmount = d2(new Decimal(currentBaseAmount));
     } catch {
       // If live rate fetch fails, fall back to the locked rate silently.
     }
@@ -145,11 +154,11 @@ export async function recordInvoicePayment(
   if (breakdown && breakdown.length > 0) {
     for (const line of breakdown) {
       if (!line.accountId || !accountsById.has(line.accountId)) continue;
-      const scaledAmount = Math.round(Number(line.amount) * paymentShare * fxScale * 100) / 100;
+      const scaledAmount = d2(new Decimal(line.amount).times(paymentShareDecimal).times(fxScaleDecimal));
       taxDestinationTotals.set(line.accountId, (taxDestinationTotals.get(line.accountId) || 0) + scaledAmount);
     }
-  } else if (Number(invoice.tax) > 0 && invoice.taxRate?.accountId && accountsById.has(invoice.taxRate.accountId)) {
-    const scaledAmount = Math.round(Number(invoice.tax) * paymentShare * fxScale * 100) / 100;
+  } else if (new Decimal(invoice.tax ?? 0).gt(0) && invoice.taxRate?.accountId && accountsById.has(invoice.taxRate.accountId)) {
+    const scaledAmount = d2(new Decimal(invoice.tax).times(paymentShareDecimal).times(fxScaleDecimal));
     taxDestinationTotals.set(invoice.taxRate.accountId, scaledAmount);
   }
 
@@ -168,7 +177,7 @@ export async function recordInvoicePayment(
       };
     });
 
-  const revenueAmount = Math.round((postingAmount - taxDestinationSum) * 100) / 100;
+  const revenueAmount = d2(new Decimal(postingAmount).minus(taxDestinationSum));
 
   let journalId = null;
   if (cashAcc && revenueAcc) {
@@ -199,18 +208,18 @@ export async function recordInvoicePayment(
       if ((tenant as any)?.stockValuationMethod === 'FIFO') {
         for (const item of (invoice.items as any[])) {
           if (!item.inventoryItemId || !item.quantity) continue;
-          const consumeQty = Math.round(Number(item.quantity) * paymentShare);
+          const consumeQty = new Decimal(item.quantity).times(paymentShareDecimal).toDecimalPlaces(0).toNumber();
           if (consumeQty <= 0) continue;
           const { totalCost } = await consumeLayers({ tenantId, itemId: item.inventoryItemId, qty: consumeQty });
           cogsCost += totalCost;
         }
-        cogsCost = Math.round(cogsCost * fxScale * 100) / 100;
+        cogsCost = d2(new Decimal(cogsCost).times(fxScaleDecimal));
       } else {
-        const totalNativeCost = (invoice.items as any[]).reduce((sum: number, item: any) => {
-          if (!item.inventoryItemId || item.inventoryItem?.costPrice == null) return sum;
-          return sum + Number(item.inventoryItem.costPrice) * Number(item.quantity);
-        }, 0);
-        cogsCost = Math.round(totalNativeCost * paymentShare * fxScale * 100) / 100;
+        const totalNativeCost = (invoice.items as any[]).reduce((acc: Decimal, item: any) => {
+          if (!item.inventoryItemId || item.inventoryItem?.costPrice == null) return acc;
+          return acc.plus(new Decimal(item.inventoryItem.costPrice).times(new Decimal(item.quantity)));
+        }, new Decimal(0));
+        cogsCost = d2(totalNativeCost.times(paymentShareDecimal).times(fxScaleDecimal));
       }
       if (cogsCost > 0.001) {
         lines.push({ accountId: cogsAcc.id, debit: cogsCost, credit: 0, description: `COGS - ${invoice.invoiceNumber}`, fundId: invoice.fundId || undefined });
@@ -230,8 +239,8 @@ export async function recordInvoicePayment(
     journalId = journal.id;
   }
 
-  const newAmountPaid = Math.round((alreadyPaid + amount) * 100) / 100;
-  const newStatus = newAmountPaid >= invoiceTotal - 0.01 ? 'PAID' : 'PARTIALLY_PAID';
+  const newAmountPaid = d2(alreadyPaid.plus(amountDecimal));
+  const newStatus = new Decimal(newAmountPaid).gte(invoiceTotal.minus(new Decimal('0.01'))) ? 'PAID' : 'PARTIALLY_PAID';
 
   let syncSeq: bigint | null = null;
   const updated = await withCurrentTenantDb(prisma, async (client) => {
@@ -273,7 +282,7 @@ export async function recordInvoicePayment(
       entityId: invoiceUpdated.id,
       actor,
       changes: diffFields(invoice, invoiceUpdated, ['status', 'amountPaid', 'journalId']),
-      details: `Invoice ${invoice.invoiceNumber}: payment of ${amount.toFixed(2)} recorded (${newStatus === 'PAID' ? 'now fully paid' : `${(invoiceTotal - newAmountPaid).toFixed(2)} still owed`}).`,
+      details: `Invoice ${invoice.invoiceNumber}: payment of ${amount.toFixed(2)} recorded (${newStatus === 'PAID' ? 'now fully paid' : `${invoiceTotal.minus(newAmountPaid).toDecimalPlaces(2).toFixed(2)} still owed`}).`,
     });
 
     return invoiceUpdated;

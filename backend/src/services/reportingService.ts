@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { requireTenantContext } from '../context/tenantContext';
@@ -121,40 +122,41 @@ export async function getVatReturn(startDate?: string, endDate?: string) {
       orderBy: { createdAt: 'asc' },
     });
 
-    const outputVatMap = new Map<string, { taxRateName: string; taxRate: number; taxableAmount: number; taxAmount: number }>();
+    const outputVatMap = new Map<string, { taxRateName: string; taxRate: number; taxableAmount: Decimal; taxAmount: Decimal }>();
 
     for (const payment of payments) {
       const invoice = payment.invoice;
       if (!invoice) continue;
-      const invoiceTotal = Number(invoice.total);
-      const invoiceTax = Number(invoice.tax ?? 0);
-      if (invoiceTax <= 0 || invoiceTotal <= 0) continue;
+      const invoiceTotal = new Decimal(invoice.total);
+      const invoiceTax = new Decimal(invoice.tax ?? 0);
+      if (invoiceTax.lte(0) || invoiceTotal.lte(0)) continue;
 
-      const paymentAmount = Number(payment.amount);
-      const paymentShare = paymentAmount / invoiceTotal;
-      const taxForPayment = Math.round(invoiceTax * paymentShare * 100) / 100;
-      const taxableForPayment = Math.round((paymentAmount - taxForPayment) * 100) / 100;
+      const paymentAmount = new Decimal(payment.amount);
+      const paymentShare = paymentAmount.div(invoiceTotal);
+      const taxForPayment = invoiceTax.times(paymentShare).toDecimalPlaces(2);
+      const taxableForPayment = paymentAmount.minus(taxForPayment).toDecimalPlaces(2);
 
       const taxRateName = invoice.taxRate?.name ?? 'Standard VAT';
       const taxRatePercent = invoice.taxRate?.rate != null ? Number(invoice.taxRate.rate) : 0;
 
       const existing = outputVatMap.get(taxRateName);
       if (existing) {
-        existing.taxableAmount += taxableForPayment;
-        existing.taxAmount += taxForPayment;
+        existing.taxableAmount = existing.taxableAmount.plus(taxableForPayment);
+        existing.taxAmount = existing.taxAmount.plus(taxForPayment);
       } else {
         outputVatMap.set(taxRateName, { taxRateName, taxRate: taxRatePercent, taxableAmount: taxableForPayment, taxAmount: taxForPayment });
       }
     }
 
     const outputVatLines = Array.from(outputVatMap.values()).map((l) => ({
-      ...l,
-      taxableAmount: Math.round(l.taxableAmount * 100) / 100,
-      taxAmount: Math.round(l.taxAmount * 100) / 100,
+      taxRateName: l.taxRateName,
+      taxRate: l.taxRate,
+      taxableAmount: l.taxableAmount.toDecimalPlaces(2).toNumber(),
+      taxAmount: l.taxAmount.toDecimalPlaces(2).toNumber(),
     }));
 
-    const totalOutputTaxable = Math.round(outputVatLines.reduce((s, l) => s + l.taxableAmount, 0) * 100) / 100;
-    const totalOutputVat = Math.round(outputVatLines.reduce((s, l) => s + l.taxAmount, 0) * 100) / 100;
+    const totalOutputTaxable = outputVatLines.reduce((s, l) => s.plus(l.taxableAmount), new Decimal(0)).toDecimalPlaces(2).toNumber();
+    const totalOutputVat = outputVatLines.reduce((s, l) => s.plus(l.taxAmount), new Decimal(0)).toDecimalPlaces(2).toNumber();
 
     return {
       startDate: startDate ?? null,
@@ -177,7 +179,7 @@ function _buildStockAgingResult(
   for (const row of rows) {
     const daysOnHand = Math.floor((asOf.getTime() - row.purchasedAt.getTime()) / 86400000);
     const bucket = daysOnHand <= 30 ? '0-30' : daysOnHand <= 60 ? '31-60' : daysOnHand <= 90 ? '61-90' : '90+';
-    const value = Math.round(row.qty * row.unitCost * 100) / 100;
+    const value = new Decimal(row.qty).times(row.unitCost).toDecimalPlaces(2).toNumber();
     buckets[bucket] += row.qty;
     bucketValue[bucket] += value;
     items.push({ ...row, daysOnHand, bucket, value });
@@ -186,13 +188,13 @@ function _buildStockAgingResult(
   return {
     asOfDate: asOf.toISOString().split('T')[0],
     bucketSummary: {
-      '0-30':  { qty: buckets['0-30'],  value: Math.round(bucketValue['0-30']  * 100) / 100 },
-      '31-60': { qty: buckets['31-60'], value: Math.round(bucketValue['31-60'] * 100) / 100 },
-      '61-90': { qty: buckets['61-90'], value: Math.round(bucketValue['61-90'] * 100) / 100 },
-      '90+':   { qty: buckets['90+'],   value: Math.round(bucketValue['90+']   * 100) / 100 },
+      '0-30':  { qty: buckets['0-30'],  value: new Decimal(bucketValue['0-30']).toDecimalPlaces(2).toNumber() },
+      '31-60': { qty: buckets['31-60'], value: new Decimal(bucketValue['31-60']).toDecimalPlaces(2).toNumber() },
+      '61-90': { qty: buckets['61-90'], value: new Decimal(bucketValue['61-90']).toDecimalPlaces(2).toNumber() },
+      '90+':   { qty: buckets['90+'],   value: new Decimal(bucketValue['90+']).toDecimalPlaces(2).toNumber() },
     },
     totalQty: items.reduce((s, i) => s + i.qty, 0),
-    totalValue: Math.round(items.reduce((s, i) => s + i.value, 0) * 100) / 100,
+    totalValue: items.reduce((s, i) => s.plus(i.value), new Decimal(0)).toDecimalPlaces(2).toNumber(),
     items: items.sort((a, b) => b.daysOnHand - a.daysOnHand),
   };
 }
@@ -345,13 +347,13 @@ export async function getCostCategoryPnl(costCategoryId: string, startDate?: str
       orderBy: { journalEntry: { entryDate: 'asc' } },
     });
 
-    let totalDebit = 0;
-    let totalCredit = 0;
+    let totalDebit = new Decimal(0);
+    let totalCredit = new Decimal(0);
     const rows = lines.map((l: any) => {
-      const debit = Number(l.debit);
-      const credit = Number(l.credit);
-      totalDebit += debit;
-      totalCredit += credit;
+      const debit = new Decimal(l.debit ?? 0).toDecimalPlaces(2).toNumber();
+      const credit = new Decimal(l.credit ?? 0).toDecimalPlaces(2).toNumber();
+      totalDebit = totalDebit.plus(debit);
+      totalCredit = totalCredit.plus(credit);
       return {
         date: l.journalEntry.entryDate,
         entryNumber: l.journalEntry.entryNumber,
@@ -363,6 +365,8 @@ export async function getCostCategoryPnl(costCategoryId: string, startDate?: str
       };
     });
 
-    return { category: { id: category.id, name: category.name }, lines: rows, totalDebit, totalCredit, net: totalCredit - totalDebit };
+    const totalDebitNum = totalDebit.toDecimalPlaces(2).toNumber();
+    const totalCreditNum = totalCredit.toDecimalPlaces(2).toNumber();
+    return { category: { id: category.id, name: category.name }, lines: rows, totalDebit: totalDebitNum, totalCredit: totalCreditNum, net: totalCredit.minus(totalDebit).toDecimalPlaces(2).toNumber() };
   });
 }
