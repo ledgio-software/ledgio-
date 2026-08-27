@@ -11,6 +11,12 @@ import { PaystackServiceError } from '../services/paystackService';
 import * as invoicePaymentService from '../services/invoicePaymentService';
 import { InvoicePaymentServiceError } from '../services/invoicePaymentService';
 import { actorFromRequest, recordAuditLog, recordAuditLogTx } from '../services/auditLogService';
+import { decryptCredential } from '../utils/credentialEncryption';
+
+function safeDecrypt(v: string | null | undefined): string | null {
+  if (!v) return v ?? null;
+  try { return decryptCredential(v); } catch { return v; }
+}
 
 const router = Router();
 
@@ -204,7 +210,7 @@ router.post('/invoices/:invoiceId/initialize', requireRole('Accountant'), async 
     });
 
     if (!invoice) {
-      res.status(404).json({ success: false, error: 'Invoice not found.' });
+      res.status(404).json({ success: false, error: 'Invoice not found on the server. Please refresh your invoice list and try again.' });
       return;
     }
     if (invoice.status === 'DRAFT') {
@@ -226,7 +232,7 @@ router.post('/invoices/:invoiceId/initialize', requireRole('Accountant'), async 
     const reference = `INV-${invoice.invoiceNumber}-${Date.now()}`;
 
     const result = await paystackService.initializeTransaction({
-      email: invoice.customer.email,
+      email: safeDecrypt(invoice.customer.email) ?? '',
       amount,
       currency: invoice.currency,
       reference,

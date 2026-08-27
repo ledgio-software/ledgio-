@@ -13,6 +13,577 @@ This file records all significant changes, decisions, and progress made on the M
 - **`frontend/src/pages/reports/KpiDashboard.tsx`** — Added `UpgradeRequired` import, added `isLoading` to `useTenantSettings` destructuring, added early-return UpgradeRequired guard.
 - **`frontend/src/pages/reports/GeneralLedger.tsx`** — Added `UpgradeRequired` import, added `isLoading` to `useTenantSettings` destructuring, added early-return UpgradeRequired guard.
 - Already gated (no change needed): `Budgets.tsx`, `Approvals.tsx`, `RecurringTransactions.tsx`, `budgets.ts`, `approvalWorkflows.ts`, `recurringTransactions.ts`.
+## [2026-08-26] - Feat: Bulk Invoice/Payment Import + External API Key Integration
+
+**What/Why:** Two new integration paths for high-volume clients (e.g. phone installment companies) who need to push invoices and payments from their own systems into Ledgio automatically.
+
+**Changes:**
+
+**Schema — `backend/prisma/schema.prisma`**
+- Added `ApiKey` model in the public schema: `id`, `tenantId`, `name`, `keyHash` (PBKDF2), `keyPrefix` (first 8 chars for efficient lookup), `lastUsedAt`, `isActive`, `createdAt`. Relation to `Tenant`.
+- Added `apiKeys ApiKey[]` relation to `Tenant`.
+
+**Migration — `backend/prisma/migrations/20260826000001_add_api_keys/migration.sql`**
+- Creates `api_keys` table with indexes on `tenant_id` and `key_prefix`. FK to `tenants` with CASCADE delete.
+
+**Backend — `backend/src/routes/import.ts`**
+- Added `POST /api/v1/import/invoices`: accepts array of invoice rows (customerName, invoiceDate, dueDate, currency, description, quantity, unitPrice, notes). Auto-creates customers not found. Per-row error collection, up to 5,000 rows.
+- Added `POST /api/v1/import/payments`: accepts array of payment rows (invoiceNumber, amount, paymentDate, paymentMethod, reference). Delegates to `recordInvoicePayment` service. Per-row error collection.
+
+**Backend — `backend/src/middleware/apiKeyMiddleware.ts`** (new)
+- `authenticateApiKey` middleware: reads `X-API-Key` header, finds active keys by prefix (8-char prefix stored in plaintext to avoid full-table scan), verifies with `verifyPassword` (PBKDF2), sets AsyncLocalStorage tenant context via `runWithTenantContext`, updates `lastUsedAt` asynchronously.
+
+**Backend — `backend/src/routes/apiKeys.ts`** (new)
+- `GET /api/v1/api-keys`: list keys for tenant (id, name, keyPrefix, lastUsedAt, isActive, createdAt — never returns hash or raw key).
+- `POST /api/v1/api-keys`: generate key (`ledgio_<32 hex chars>`), hash with `hashPassword`, return raw key once in response.
+- `DELETE /api/v1/api-keys/:id`: soft-revoke (sets `isActive=false`).
+- All routes: `authenticateJwt` + `tenantContextMiddleware` + `requireRole('Accountant')`.
+
+**Backend — `backend/src/routes/externalApi.ts`** (new)
+- `POST /api/external/v1/invoices`: accepts single object or array (≤100). Idempotency via `externalRef`→`clientTxnId`. Auto-creates customer by name. Creates invoice with status `SENT`. Returns 201/207.
+- `POST /api/external/v1/payments`: accepts single object or array (≤100). Delegates to `recordInvoicePayment`. Returns 200/207.
+- Authentication: `authenticateApiKey` only (no JWT needed).
+
+**Backend — `backend/src/app.ts`**
+- Registered `apiKeysRouter` at `/api/v1/api-keys` and `externalApiRouter` at `/api/external/v1`.
+
+**Frontend — `frontend/src/pages/import/BulkImportWizard.tsx`**
+- Extended `ImportType` union to include `"invoices"` and `"payments"`.
+- Added `IMPORT_CONFIGS` entries for both types (sample CSV, buildPayload, previewColumns, endpoint, successNav).
+- Added two new `<option>` elements to the type dropdown.
+
+**Frontend — `frontend/src/pages/settings/ApiKeys.tsx`** (new)
+- Full settings page: table of API keys with prefix, last-used, status; "Generate New Key" form; copy-to-clipboard raw key reveal (amber warning, shown once); "Revoke" button with confirmation; code examples section for both external endpoints.
+
+**Frontend — `frontend/src/lib/navigation.ts`**
+- Added `Key` import. Added `{ name: "API Keys", href: "/settings/api-keys", icon: Key }` to ADMINISTRATION section.
+
+**Frontend — `frontend/src/App.tsx`**
+- Added lazy import for `ApiKeys`. Added route `/settings/api-keys` gated to `SETTINGS_RESTRICTED_ROLES`.
+
+**Files changed:**
+- `backend/prisma/schema.prisma`
+- `backend/prisma/migrations/20260826000001_add_api_keys/migration.sql` (new)
+- `backend/src/app.ts`
+- `backend/src/middleware/apiKeyMiddleware.ts` (new)
+- `backend/src/routes/apiKeys.ts` (new)
+- `backend/src/routes/externalApi.ts` (new)
+- `backend/src/routes/import.ts`
+- `frontend/src/App.tsx`
+- `frontend/src/lib/navigation.ts`
+- `frontend/src/pages/import/BulkImportWizard.tsx`
+- `frontend/src/pages/settings/ApiKeys.tsx` (new)
+
+---
+
+## [2026-08-26] - Fix: Two inventory page bugs (SerialNumbers wrong API path + bulk import freeze)
+
+**What/Why:** Two bugs reported by the user:
+
+1. **Serial Numbers page showed "Failed to load serial numbers."** — `SerialNumbers.tsx` line 54 called `api.get("/inventory")` instead of `api.get("/inventory/items")`. The wrong path caused the `Promise.all` to throw, hitting the catch block before any serials were fetched. Fixed: one-char path correction. (PR #108)
+
+2. **Bulk inventory import froze the browser** — `POST /api/v1/import/inventory-items` processed each row inside its own `withCurrentTenantDb` call, which opens a separate Prisma `$transaction` (BEGIN → SET LOCAL search_path → INSERT → COMMIT) per item. Under Render's connection pooler each round-trip is 300–500ms, making 50 items × 4 round-trips ≈ 80 seconds per chunk — long enough to hit browser/proxy timeouts and appear as a freeze. Fixed by restructuring into two phases:
+   - **Phase 1**: synchronous pre-validation (required fields, in-batch SKU deduplication) — no DB needed
+   - **Phase 2**: ONE `withCurrentTenantDb` call for the entire batch:
+     - Resolve all unique warehouse names in one loop
+     - `inventoryItem.createManyAndReturn({ skipDuplicates: true })` — one SQL `INSERT … RETURNING` for all items
+     - `warehouseStock.createMany()` — one SQL for all opening stock rows
+
+**Files changed:**
+- `frontend/src/pages/inventory/SerialNumbers.tsx` — `/inventory` → `/inventory/items`
+- `backend/src/routes/import.ts` — replaced per-row loop with batch-insert approach
+
+## [2026-08-25] - TallyPrime Parity Batch 3 PR 1: VAT Return, Stock Aging, Financial Ratios Reports
+
+**What/Why:** Closed 3 of the 12 remaining TallyPrime parity gaps (PR 1 of 6). All are pure reporting additions with no schema changes.
+
+**Changes:**
+
+**Backend — `backend/src/services/reportingService.ts`**
+- Added `import { requireTenantContext }` to support tenant-scoped inline queries.
+- `getVatReturn(startDate?, endDate?)` — queries `InvoicePayment` records in the date range, computes output VAT proportionally (payment.amount / invoice.total × invoice.tax), grouped by tax rate name. Notes input VAT is not separately tracked on bills.
+- `_buildStockAgingResult()` — helper buckets inventory rows into 0–30 / 31–60 / 61–90 / 90+ day buckets by `daysOnHand`.
+- `getStockAging(asOfDate?)` — FIFO tenants: queries `StockLayer` (remainingQty > 0, purchasedAt ≤ asOfDate). Average-cost tenants: queries `WarehouseStock` + oldest `StockAdjustment` date per item-warehouse as age proxy.
+- `getFinancialRatios(startDate?, endDate?, asOfDate?)` — calls existing `getBalanceSheet()` + `getProfitAndLoss()`, then computes solvency (Debt-to-Equity, Debt-to-Assets, Equity Ratio), profitability (Net Profit Margin, ROA, ROE), efficiency (Asset Turnover). Notes liquidity ratios unavailable without current/non-current classification.
+
+**Backend — `backend/src/routes/reports.ts`**
+- `GET /api/v1/reports/vat-return?startDate=&endDate=` — with `getCachedReport`/`setCachedReport`.
+- `GET /api/v1/reports/stock-aging?asOfDate=` — cached.
+- `GET /api/v1/reports/financial-ratios?startDate=&endDate=&asOfDate=` — cached.
+
+**Frontend — new pages**
+- `frontend/src/pages/reports/VatReturn.tsx` — period picker, output VAT table grouped by rate, 3 summary tiles (taxable sales, output VAT, net payable), input VAT limitation note, CSV export.
+- `frontend/src/pages/reports/StockAging.tsx` — as-of date picker, bucket summary cards (clickable filter), full item table with days-on-hand column and slow-mover highlight (90+d rows), CSV export.
+- `frontend/src/pages/reports/FinancialRatios.tsx` — date range picker, ratio cards per category (green/red indicators, higher/lower is better labels), limitation note on liquidity ratios.
+
+**Frontend — navigation & routing**
+- `frontend/src/lib/navigation.ts` — Added "VAT Return", "Stock Aging", "Financial Ratios" to REPORTS & ANALYTICS section.
+- `frontend/src/App.tsx` — Lazy imports + protected routes for `/reports/vat-return`, `/reports/stock-aging`, `/reports/financial-ratios`.
+
+**Verified:** `tsc --noEmit` passes clean on both backend and frontend.
+
+---
+
+## [2026-08-25] - TallyPrime Parity Batch 2: WHT, Post-Dated Cheques, Dual UoM, Interest on Overdue, FIFO Stock Valuation
+
+**What/Why:** Closed the 5 remaining TallyPrime feature-parity gaps identified after PR #96 merged (10 gaps). All 5 gaps shipped on branch `claude/chat-session-k4pf3d`, PR #97.
+
+**Changes:**
+
+**Gap 1 — Withholding Tax (WHT)**
+- **`backend/prisma/schema.prisma`** — New `WhtRate` model; `whtRateId`/`whtAmount` optional FK on `VendorBill`.
+- **`backend/prisma/migrations/20260825000008_add_wht_rates/migration.sql`** (new) — `wht_rates` table; `wht_rate_id`/`wht_amount` columns on `vendor_bills`.
+- **`backend/src/repository/accountRepository.ts`** — Added `'WHT_PAYABLE'` to `AccountDefaultRole` union and lookup maps.
+- **`backend/src/services/accountService.ts`** — Added `WHT_PAYABLE: ['LIABILITY']` to `REASONABLE_TYPES_FOR_ROLE`.
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration v20 adds `'WHT_PAYABLE'` to CHECK constraint.
+- **`backend/src/routes/whtRates.ts`** (new) — CRUD route; soft-deactivate on delete when bills reference the rate.
+- **`backend/src/services/vendorBillPaymentService.ts`** — 3-line journal on WHT bill payment: Debit EXPENSE full, Credit CASH net, Credit WHT_PAYABLE deducted.
+- **`backend/src/routes/bills.ts`** — `POST/PUT` accept optional `whtRateId`.
+- **`backend/src/services/onboardingWizardService.ts`** — Seeds WHT Payable account (role `WHT_PAYABLE`) and starter WHT5 rate (5%).
+- **`backend/src/app.ts`** — Registered `whtRatesRouter` at `/api/v1/wht-rates`.
+- **`frontend/src/pages/settings/WhtRates.tsx`** (new) — List + create/edit modal; account picker (Liability accounts first).
+- **`frontend/src/pages/bills/VendorBills.tsx`** — WHT rate selector in New Bill form; deducted WHT and net payable in bill summary.
+- **`frontend/src/lib/navigation.ts`** — Added `/settings/wht-rates` to OPERATIONS_HIDDEN; nav entry in FINANCE & BANKING.
+- **`frontend/src/App.tsx`** — Lazy import + route for `/settings/wht-rates`.
+
+**Gap 2 — Post-Dated Cheques (PDC)**
+- **`backend/prisma/schema.prisma`** — New `PostDatedCheque` model (PENDING/DEPOSITED/BOUNCED/CANCELLED).
+- **`backend/prisma/migrations/20260825000009_add_post_dated_cheques/migration.sql`** (new) — `post_dated_cheques` table.
+- **`backend/src/repository/accountRepository.ts`** — Added `'PDC_RECEIVABLE'` and `'PDC_PAYABLE'` to `AccountDefaultRole`.
+- **`backend/src/services/accountService.ts`** — Added `PDC_RECEIVABLE: ['ASSET']`, `PDC_PAYABLE: ['LIABILITY']`.
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration v21 adds both PDC roles to CHECK constraint.
+- **`backend/src/routes/postDatedCheques.ts`** (new) — GET list, POST create (optional journal on receipt), PATCH deposit/bounce/cancel (each posts the appropriate journal entry).
+- **`backend/src/services/onboardingWizardService.ts`** — Seeds PDC Receivable (asset) and PDC Payable (liability) accounts.
+- **`backend/src/app.ts`** — Registered `postDatedChequesRouter` at `/api/v1/post-dated-cheques`.
+- **`frontend/src/pages/banking/PostDatedCheques.tsx`** (new) — Receivable/Payable tabs, status filter pills, summary tiles, Deposit/Bounce/Cancel actions, create modal.
+- **`frontend/src/lib/navigation.ts`** — `/pdc` in FINANCE & BANKING; Operations mode hidden.
+- **`frontend/src/App.tsx`** — Lazy import + route for `/pdc`.
+
+**Gap 3 — Dual Units of Measure**
+- **`backend/prisma/migrations/20260825000010_add_secondary_uom/migration.sql`** (new) — `secondary_unit_of_measure TEXT`, `conversion_factor NUMERIC(10,4)` on `inventory_items`.
+- **`backend/prisma/schema.prisma`** — `secondaryUnitOfMeasure` and `conversionFactor` optional fields on `InventoryItem`.
+- **`backend/src/routes/inventory.ts`** — Item create/update accept new fields.
+- **`backend/src/routes/purchaseOrders.ts`** and **`backend/src/routes/bills.ts`** — Line items accept optional `purchaseUoM: "primary" | "secondary"`; quantity multiplied by `conversionFactor` before writing to WarehouseStock when secondary.
+- **`backend/src/services/vendorBillReceivingService.ts`** — UoM conversion applied on receiving.
+- **`frontend/src/pages/inventory/WarehouseManagement.tsx`** — Item create/edit: Secondary UoM and Conversion Factor fields (shown only when Secondary UoM is set); list shows both units.
+- Purchase order and vendor bill form line rows: UoM toggle (Primary/Secondary) when item has `conversionFactor`.
+
+**Gap 4 — Interest on Overdue Receivables**
+- **`backend/prisma/schema.prisma`** — New `InterestPolicy` (unique per tenant) and `InterestCharge` models.
+- **`backend/prisma/migrations/20260825000011_add_interest_policy/migration.sql`** (new) — `interest_policies` and `interest_charges` tables; unique index on `(tenant_id, invoice_id, period_start)` for idempotency.
+- **`backend/src/repository/accountRepository.ts`** — Added `'INTEREST_INCOME'` to `AccountDefaultRole`.
+- **`backend/src/services/accountService.ts`** — Added `INTEREST_INCOME: ['REVENUE']` to `REASONABLE_TYPES_FOR_ROLE`.
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration v22 (after v21) adds `INTEREST_INCOME` to CHECK constraint.
+- **`backend/src/routes/interestPolicy.ts`** (new) — `GET/PUT /` (upsert policy), `GET /charges` (list), `PATCH /charges/:id/void`.
+- **`backend/src/services/interestChargeCronService.ts`** (new) — Daily cron at `0 7 * * *`: per tenant, finds overdue invoices (status SENT/PARTIALLY_PAID, dueDate < today − graceDays), posts Dr CASH / Cr INTEREST_INCOME journal, creates `InterestCharge` row.
+- **`backend/src/services/onboardingWizardService.ts`** — Added `INTEREST_INCOME` to auto-designate roles; seeds "Interest Income" revenue account.
+- **`backend/src/app.ts`** — Registered `interestPolicyRouter` at `/api/v1/interest-policy`.
+- **`backend/src/index.ts`** — `InterestChargeCronService.init()` called alongside other daily crons.
+- **`frontend/src/pages/reports/InterestCharges.tsx`** (new) — Policy config card (annual rate %, grace days, active toggle, account picker) + charges table (date, invoice, period, amount, status pill, void button).
+- **`frontend/src/lib/navigation.ts`** — `/reports/interest-charges` in FINANCE & BANKING; Operations mode hidden.
+- **`frontend/src/App.tsx`** — Lazy import + route for `/reports/interest-charges`.
+
+**Gap 5 — FIFO Stock Valuation**
+- **`backend/prisma/schema.prisma`** — New `StockLayer` model; `stockValuationMethod String @default("AVERAGE")` on `Tenant`.
+- **`backend/prisma/migrations/20260825000012_add_fifo_stock_layers/migration.sql`** (new) — `stock_valuation_method` column on `tenants`; `stock_layers` table with partial index on `(tenant_id, item_id, purchased_at) WHERE remaining_qty > 0`.
+- **`backend/src/services/stockLayerService.ts`** (new) — `addLayer()`: inserts a StockLayer on purchase receipt. `consumeLayers()`: FIFO depletion (oldest layers first), updates `remainingQty`, returns `{ totalCost }`. `warehouseId` optional for cross-warehouse FIFO.
+- **`backend/src/services/vendorBillReceivingService.ts`** — Calls `addLayer()` after receiving stock when tenant is FIFO; moving-average `costPrice` maintained in parallel.
+- **`backend/src/services/invoicePaymentService.ts`** — COGS block: if FIFO, calls `consumeLayers()` per line item scaled to payment share; if AVERAGE, existing moving-average logic unchanged.
+- **`backend/src/routes/cashTill.ts`** — POS COGS: if FIFO, calls `consumeLayers()` per sale line; if AVERAGE, existing calculation unchanged. Void reversal deferred (FIFO layer restoration is complex; average-cost reversal preserved for now).
+- **`backend/src/routes/tenants.ts`** — `PUT /current` accepts `stockValuationMethod` (validates AVERAGE | FIFO).
+- **`frontend/src/pages/settings/Settings.tsx`** — "Inventory" section in Currency & Financial Preferences card: stock valuation method selector (Average Cost / FIFO) with non-retroactive warning.
+
+Both backend and frontend TypeScript compile clean (cast workarounds for stale Prisma generated types: `(prisma as any).stockLayer`, `(tenant as any)?.stockValuationMethod`). `TASKS.md` updated.
+
+---
+
+## [2026-08-25] - TallyPrime Gaps #2–5: Stock Movement, Registers, Fiscal Period Lock, Sales Orders
+
+**What/Why:** Continued TallyPrime feature-parity implementation from TASKS.md gaps #2–5.
+
+**Changes:**
+
+- **Gap #2 — Stock Movement Analysis**: `GET /reports/stock-movement` (UNION of 6 sources); `StockMovement.tsx` frontend page at `/reports/stock-movement` with item/warehouse dropdowns, 4 summary tiles, colored type badges, CSV export. Added to nav, auditor + external accountant allowlists.
+- **Gap #3 — Purchase & Sales Registers**: `GET /reports/sales-register` + `GET /reports/purchase-register` in `backend/src/routes/reports.ts` (paginated, date-ranged). `Registers.tsx` frontend with Sales/Purchase tab toggle, summary tiles, status badges, CSV export, pagination.
+- **Gap #4 — Fiscal Period Lock**: Wired `assertPeriodOpenForDate(tenantId, new Date())` into `invoicePaymentService.recordInvoicePayment()` and `vendorBillPaymentService.payVendorBill()` — paying an invoice or bill in a LOCKED period now returns 400. Schema + endpoints were already in place.
+- **Gap #5 — Sales Orders**: New `SalesOrder` + `SalesOrderLine` Prisma models; `salesOrderId` back-link on `Invoice`; migration `20260825000003_add_sales_orders`. Backend routes at `/api/v1/sales-orders`: `GET /`, `GET /:id`, `POST /`, `PUT /:id/confirm`, `PUT /:id/cancel`, `POST /:id/convert-to-invoice`. Frontend: `SalesOrders.tsx` at `/sales-orders` with status filter, inline create form, per-row actions. Nav entry in SALES & PURCHASES; AR Clerk, External Accountant, and Auditor allowlists updated.
+- **`TASKS.md`** — Gaps #2–5 marked `[x]`.
+
+## [2026-08-25] - NHIS Billing Removed; TallyPrime Gap Analysis; Daybook Report
+
+**What/Why:** NHIS billing was removed entirely (not applicable to the user's market). A full TallyPrime feature-parity gap analysis identified 10 missing features. First gap shipped: the Daybook Report.
+
+**Changes:**
+
+- **`backend/src/routes/cashTill.ts`** — Removed NHIS payment method, NHIS Receivable journal routing, nhisClaimRef field, `GET /tills/nhis-claims`, and `PUT /tills/sales/:id/settle-nhis` endpoints.
+- **`backend/prisma/schema.prisma`** — Removed `nhisClaimRef` and `nhisSettledAt` from `CashSale`.
+- **`backend/prisma/migrations/20260825000002_remove_nhis_columns/migration.sql`** (new) — Drops `nhis_claim_ref` and `nhis_settled_at` from `cash_sales`.
+- **`frontend/src/pages/pos/PointOfSale.tsx`** — Payment method toggle reduced to CASH/MoMo/Card; NHIS state and UI removed.
+- **`frontend/src/pages/pharmacy/NhisClaims.tsx`** — File deleted.
+- **`frontend/src/lib/navigation.ts`** — NHIS Claims nav entry removed; Daybook added to REPORTS & ANALYTICS, auditor allowlist, and external accountant allowlist.
+- **`frontend/src/App.tsx`** — NhisClaims lazy import and route removed; Daybook lazy import and route at `/reports/daybook` added.
+- **`backend/src/routes/reports.ts`** — New `GET /reports/daybook` endpoint: queries posted journal entries with their lines and account names from the per-tenant schema, date-range filtered, paginated (up to 200/page).
+- **`frontend/src/pages/reports/Daybook.tsx`** (new) — Daybook page: date pickers, Run button, expandable voucher cards showing all debit/credit lines with account code + name, totals row, CSV export, pagination.
+- **`TASKS.md`** — Added TallyPrime feature parity section (10 tasks); marked Daybook complete.
+
+Both backend and frontend `tsc --noEmit` clean.
+
+## [2026-08-24] - Pharmacy Module Phase 2: NHIS Billing, Low-Stock Alerts, Daily Count
+
+**What/Why:** Three must-have features for Ghana FDA-licensed pharmacies that Phase 1 left open: (1) NHIS/insurance billing — a large share of Ghana pharmacy revenue flows through NHIS, which requires separate ledger treatment; (2) low-stock reorder alerts — `reorderLevel` existed on items but no notification fired; (3) end-of-day controlled substance count — Ghana FDA requires a daily physical count of scheduled drugs to be logged.
+
+**Changes:**
+
+- **`backend/prisma/schema.prisma`** — Added `paymentMethod String @default("CASH")`, `nhisClaimRef String?`, `nhisSettledAt DateTime?` to `CashSale`. Added `lastLowStockAlertAt DateTime?` to `InventoryItem`.
+
+- **`backend/prisma/migrations/20260825000000_nhis_billing/migration.sql`** (new) — Adds `payment_method`, `nhis_claim_ref`, `nhis_settled_at` columns to `cash_sales`; index on `(tenant_id, payment_method)`.
+
+- **`backend/prisma/migrations/20260825000001_low_stock_alert/migration.sql`** (new) — Adds `last_low_stock_alert_at` column to `inventory_items`.
+
+- **`backend/src/services/lowStockAlertService.ts`** (new) — `checkAndAlertLowStock(tenantId, itemId)`: sums stock across all warehouses, creates a `LOW_STOCK` in-app `Notification` (broadcast, `userId: null`) and optional SMS to `tenant.bossPhone` when stock ≤ reorderLevel; 24-hour dedup guard via `lastLowStockAlertAt`; invalidates notification Redis cache; all errors swallowed (fire-and-forget safe).
+
+- **`backend/src/routes/cashTill.ts`** — Extended `createSaleSchema` with `paymentMethod` (CASH/NHIS/MOMO/CARD) and `nhisClaimRef`. Non-CASH sales debit NHIS Receivable (code 1020, auto-created on first use) instead of Cash. `nhis_claim_ref` saved via raw SQL alongside customer fields. Added `GET /tills/nhis-claims` (outstanding/settled filter). Added `PUT /tills/sales/:id/settle-nhis` (Accountant role) — sets `nhis_settled_at`, posts Cash-Dr/NHIS-Receivable-Cr reversal journal. Added fire-and-forget low-stock alerts per sale item.
+
+- **`backend/src/routes/inventory.ts`** — Added fire-and-forget `checkAndAlertLowStock` calls after REMOVE adjustments and transfer-out operations.
+
+- **`backend/src/routes/pharmacy.ts`** — Added `DAILY_COUNT` to narcotics entry enum; DAILY_COUNT uses absolute `balanceAfter = quantity` (not delta). New `POST /pharmacy/narcotics/daily-count` (Accountant role): records discrepancy and overrides running balance. PDF renderer: DAILY_COUNT rows show grey background, `[COUNT]` prefix, `Δ±N` discrepancy in balance column.
+
+- **`frontend/src/pages/pos/PointOfSale.tsx`** — 4-tab payment method toggle (CASH/NHIS/MoMo/CARD); NHIS shows claim-ref input, others hide change-due. Payload includes `paymentMethod` and `nhisClaimRef`.
+
+- **`frontend/src/pages/pharmacy/NhisClaims.tsx`** (new) — NHIS claims tracker: outstanding/settled/all filter, total outstanding banner, Settle button per row, days-outstanding color coding.
+
+- **`frontend/src/pages/pharmacy/NarcoticsRegister.tsx`** — Added Daily Count modal (drug picker, expected balance display, counted-qty input, live discrepancy indicator, notes textarea). DAILY_COUNT badge and grey row styling. Added "Daily Count" button in header.
+
+- **`frontend/src/lib/navigation.ts`** — Added NHIS Claims (`/pharmacy/nhis-claims`, ShieldCheck icon) to PHARMACY nav section.
+
+- **`frontend/src/App.tsx`** — Lazy route for `/pharmacy/nhis-claims`.
+
+Both backend and frontend `tsc --noEmit` clean.
+
+## [Date: 2026-08-24] - Pharmacy Module (Full Implementation)
+
+**What/Why:** Pharmacies are a strong fit for Ledgio's SME target market in Ghana. Ghana FDA requires licensed pharmacies to maintain a Prescription Register, a Narcotics Register, and batch/lot tracking with FEFO dispensing. This module gates all pharmacy features behind a new `PHARMACY` org type.
+
+**Changes:**
+
+- **`backend/prisma/schema.prisma`** — Added `regulatoryCategory` (GENERAL|PRESCRIPTION|SCHEDULED_A|SCHEDULED_B|CONTROLLED, default GENERAL) and `requiresBatchTracking` (boolean, default false) to `InventoryItem`. Added 4 new Prisma models: `InventoryBatch` (batch/lot tracking per warehouse), `Prescription` + `PrescriptionLine` (Ghana FDA Rx register), `NarcoticsLogEntry` (narcotics controlled-substance audit log). Added relations to `Warehouse` and `InventoryItem`.
+
+- **`backend/prisma/migrations/20260824000000_pharmacy_module/migration.sql`** (new) — SQL migration: ALTERs `inventory_items` (adds `regulatory_category`, `requires_batch_tracking`); CREATE TABLE for `inventory_batches`, `prescriptions`, `prescription_lines`, `narcotics_log_entries` with all indexes and foreign keys.
+
+- **`backend/src/routes/pharmacy.ts`** (new) — All pharmacy endpoints under `/api/v1/pharmacy`, gated by `requirePharmacyOrgType()` middleware (403 for non-PHARMACY tenants). Endpoints: `GET/POST /prescriptions`, `GET /prescriptions/:id`, `PATCH /prescriptions/:id/dispense`, `GET/POST /narcotics`, `GET /narcotics/export.pdf` (pdfkit Ghana FDA format, landscape A4), `GET /expiry-alerts` (batches expiring within N days, sorted by urgency).
+
+- **`backend/src/routes/inventory.ts`** — Extended `POST /items` and `PUT /items/:id` to accept `regulatoryCategory` and `requiresBatchTracking`. Added `GET /inventory/batches` (with `itemId`/`warehouseId`/`expiringSoon` filters) and `POST /inventory/batches` (upserts batch, increments `warehouseStock.quantityOnHand`, auto-creates `NarcoticsLogEntry` for CONTROLLED items).
+
+- **`backend/src/routes/cashTill.ts`** — Added `rxNumber` to `createSaleSchema`. Added regulatory warnings block (non-GENERAL items without Rx → `warnings[]` in response). Added FEFO batch deduction (earliest-expiry batch drawn first for `requiresBatchTracking` items). Added auto narcotics log on CONTROLLED item sale.
+
+- **`backend/src/app.ts`** — Registered `pharmacyRouter` at `/api/v1/pharmacy`.
+
+- **`frontend/src/lib/navigation.ts`** — Added `orgTypeOnly?: string` to `NavGroup`. Added PHARMACY section (Prescription Register, Narcotics Register, Expiry Alerts) with `orgTypeOnly: "PHARMACY"`. Updated `getVisibleNavGroups()` to filter groups by `orgTypeOnly`.
+
+- **`frontend/src/pages/auth/Register.tsx`** — Added PHARMACY org type card ("Licensed Pharmacy") to the registration profile picker.
+
+- **`frontend/src/pages/pharmacy/PrescriptionRegister.tsx`** (new) — Prescription list, search by patient/Rx#, New Prescription modal (patient info + doctor + date + line items), Detail modal, Dispense action.
+
+- **`frontend/src/pages/pharmacy/NarcoticsRegister.tsx`** (new) — Narcotics log table (Date/Drug/Batch/Op/Qty In/Qty Out/Balance/Patient/Ref), Add Entry modal, Export PDF button.
+
+- **`frontend/src/pages/pharmacy/ExpiryAlerts.tsx`** (new) — Expiry alert table with 30/60/90/180-day filter, color-coded urgency badges, Write Off quick action.
+
+- **`frontend/src/pages/inventory/WarehouseManagement.tsx`** — Added `regulatoryCategory` and `requiresBatchTracking` to `InventoryItem` interface. Added regulatory fields to Add Product modal (PHARMACY tenants only). Added RX/CTRL coloured badges in items table. Added "+ Batch" button per warehouse row (PHARMACY + batch-tracked items only). Added Receive Batch modal (`POST /inventory/batches`).
+
+- **`frontend/src/pages/pos/PointOfSale.tsx`** — Added `regulatoryCategory` to `InventoryItemOption` and `CartLine`. Added Rx warning amber banner when cart contains non-GENERAL items (PHARMACY tenants). Added `rxNumber` field (sent with sale payload). Shows warning toast if `response.warnings[]` non-empty after sale.
+
+- **`frontend/src/App.tsx`** — Added lazy-loaded routes for `/pharmacy/prescriptions`, `/pharmacy/narcotics`, `/pharmacy/expiry`.
+
+**Verification:** Backend `tsc --noEmit` clean. Frontend `tsc --noEmit` clean.
+
+## [Date: 2026-08-23] - Security Phase 3: Zod Input Validation on High-Risk Write Endpoints
+
+**What/Why:** All validation was hand-rolled `if (!field)` guards — no schema library, no type coercion. Malformed or out-of-range values (negative quantities, `planTier: 999`, empty item arrays) reached business logic unchecked. Added Zod v4 to enforce types, ranges, and required fields before any handler runs.
+
+**Changes:**
+
+- **`backend/package.json`** — Added `zod@^4.x` dependency.
+
+- **`backend/src/middleware/validateBody.ts`** (new) — Generic Zod validation middleware factory. On failure returns HTTP 400 `{ success: false, error: 'Validation failed.', fields: [...] }` matching the existing business error shape. On success, replaces `req.body` with the coerced, sanitized value so handlers can trust types without re-checking.
+
+- **`backend/src/routes/invoices.ts`** — Added `createCustomerSchema`, `updateCustomerSchema`, and `createInvoiceSchema` (with nested `lineItemSchema`). Attached `validateBody(...)` to `POST /customers`, `PUT /customers/:id`, and `POST /`. Removed now-redundant hand-rolled guards (`if (!name || !email)`, `creditLimit < 0` check, `if (!customerId || !items)`) that Zod already enforces.
+
+- **`backend/src/routes/cashTill.ts`** — Added `createSaleSchema` (with nested `saleLineSchema`). Attached `validateBody(createSaleSchema)` to `POST /tills/sales`. Validates `tillId` (UUID), `items[].itemId` (UUID), `items[].quantity` (positive int ≤ 10000), `cashGiven` (nonnegative).
+
+- **`backend/src/routes/subscription.ts`** — Added `initializeSchema` and `verifySchema`. Attached `validateBody(...)` to `POST /initialize` and `POST /verify`. `planTier: 999` now returns 400 instead of reaching Paystack. Removed redundant `if (!reference)` guard.
+
+**Verification:** Backend `tsc --noEmit` clean. `posCart.test.ts` updated to expect HTTP 400 (not 500) for a non-UUID `itemId` — Zod's `z.string().uuid()` now correctly rejects malformed IDs before the handler runs, which is the right behavior. Full CI suite green on commit `c85c52f`.
+
+## [Date: 2026-08-23] - Security Phase 2: Encrypt Customer PII at Application Layer
+
+**What/Why:** Customer `email`, `phone`, and `tin` were stored as plaintext in the `customers` table. Ghana's Data Protection Act requires reasonable safeguards. The existing AES-256-GCM utility (`credentialEncryption.ts`) already proven for GRA/Paystack credentials was reused.
+
+**Changes:**
+
+- **`backend/src/services/customerPiiMigrationService.ts`** (new) — Idempotent one-shot backfill function `migrateCustomerPii()`. Detects already-encrypted rows by `ivHex:authTagHex:ciphertextHex` format; skips them. Encrypts `email` (always), `phone`/`tin` (when non-null) for every row that is still plaintext.
+
+- **`backend/src/index.ts`** — Calls `migrateCustomerPii()` on server start after DB connect (same pattern as cron init). Errors are logged but do not crash the server.
+
+- **`backend/src/routes/invoices.ts`** — Added `decryptCustomer()` helper (tolerates plaintext input during transitional period). `POST /customers` now encrypts before write; `GET /customers`, `POST /customers`, `PUT /customers/:id` all decrypt before returning. `GET /:id/pdf` and `POST /:id/gra-clearance` decrypt the nested customer before using `email`/`tin`. `POST /:id/send` response decrypts customer.
+
+- **`backend/src/services/invoiceEmailService.ts`** — Decrypts `customer.email` and `customer.address` before sending invoice emails and writing audit log entries.
+
+- **`backend/src/services/dunningReminderService.ts`** — Decrypts `customer.email` before sending payment reminder emails and writing audit log entries.
+
+- **`backend/src/routes/paystack.ts`** — Decrypts `customer.email` before passing to Paystack `initializeTransaction`.
+
+- **`backend/src/services/syncChangeLogService.ts`** — Removed `email` from the inline `customer` snapshot in `invoiceToSyncPayload` (consistent with Phase 1's field-stripping; email was never needed by the frontend sync layer).
+
+- **`frontend/src/lib/syncEngine.ts`** — Dropped `email` from the nested `customer` field of `LocalInvoice` interface to match.
+
+- **`backend/src/routes/search.ts`** — Customer search now matches on `name` only (email/phone are ciphertext and cannot be substring-searched). Result subtitle still shows the decrypted email via `safeDecrypt`.
+
+**Operator note:** `CREDENTIAL_ENCRYPTION_KEY` must be set on the Render backend service. It is already required for GRA/Paystack credential encryption. The backfill runs automatically on the first server start after deployment.
+
+**Verification:** Backend `tsc --noEmit` clean. Frontend `npm run build` clean.
+
+## [Date: 2026-08-23] - Security Phase 1: Strip PII from Sync Bootstrap Payload
+
+**What/Why:** The `GET /sync/bootstrap` endpoint was returning full DB rows for customers and inventory items, including PII fields (`email`, `phone`, `address`, `tin`, `tenantId`, `costPrice`, etc.) that no frontend component currently reads from IndexedDB. These fields are only needed on the authenticated REST endpoints that already require a JWT. Stripping them from the sync payload reduces the data surface stored in every user's browser IndexedDB and transmitted over the wire.
+
+**Changes:**
+
+- **`backend/src/routes/sync.ts`** — Added `select` clauses to both `findMany` calls in `GET /bootstrap`. Customers now return only `{ id, name, customerType, creditLimit }`. InventoryItems return only `{ id, sku, name, sellingPrice, wholesalePrice, reorderLevel }`. No other sync behavior changed.
+
+- **`frontend/src/lib/syncEngine.ts`** — Trimmed `LocalCustomer` interface to `{ id, name, customerType, creditLimit }` (dropped `tenantId`, `email`, `phone`, `address`, `tin`, `createdAt`). Trimmed `LocalInventoryItem` to `{ id, sku, name, sellingPrice, wholesalePrice, reorderLevel }` (dropped `tenantId`, `category`, `unitOfMeasure`, `costPrice`, `createdAt`). Updated `applyChangeEntry` for both entity types to destructure only the safe fields before writing to IndexedDB, preventing PII from leaking into local storage via the WebSocket change-push path.
+
+**Verification:** `npm run build` in `/frontend` — clean (0 type errors). No UI components read customer PII or inventory cost/category data from IndexedDB — both collections are fetched live from REST on every mount.
+
+## [Date: 2026-08-23] - Tier 1 Offline-First Upgrade: Customers + Inventory in Local Sync (PR #90)
+
+**What/Why:** Extended the local-first IndexedDB sync layer to cover reference data (customers and inventory items) so users can browse, filter, and work with those entities offline. Also added two UI signals that make sync state visible: an offline banner and a pending-writes indicator in the sidebar.
+
+**Changes:**
+
+- **`backend/src/routes/sync.ts`** — Bootstrap endpoint (`GET /sync/bootstrap`) now fetches customers and inventory items alongside accounts and invoices in one parallel `Promise.all`. Response gains `customers` and `inventoryItems` arrays.
+
+- **`frontend/src/lib/syncEngine.ts`** — Added `LocalCustomer` and `LocalInventoryItem` interfaces. Bumped Dexie to version 2 with new `customers` (indexed on `id, name`) and `inventoryItems` (indexed on `id, name, sku`) tables; existing data migrates transparently. `bootstrapSync` now stores all four entity types and explicitly clears them on `success: false` responses (previously stale data was left in place, causing the Paystack 404 bug). `resetLocalSyncData` clears all six tables using array-form `transaction()` call (Dexie's TS overloads cap at 7 args; the fix avoids a `TS2554` build error). `applyChangeEntry` handles WebSocket `Customer` and `InventoryItem` push events.
+
+- **`frontend/src/components/layout/OfflineBanner.tsx`** (new) — Amber strip rendered below the Header whenever `navigator.onLine` is false. Shows count of pending outbox entries. Uses `useLiveQuery` to stay reactive and `window.addEventListener("online"/"offline")` for the connectivity state.
+
+- **`frontend/src/components/layout/MainLayout.tsx`** — Renders `<OfflineBanner />` between `<Header />` and `<SubscriptionBanner />`.
+
+- **`frontend/src/components/layout/Sidebar.tsx`** — Added a spinning "N changes syncing…" chip above the Settings link whenever the outbox has pending entries (works online too, for slow connections).
+
+**Files changed:**
+`backend/src/routes/sync.ts`, `frontend/src/lib/syncEngine.ts`, `frontend/src/components/layout/OfflineBanner.tsx` (new), `frontend/src/components/layout/MainLayout.tsx`, `frontend/src/components/layout/Sidebar.tsx`
+
+---
+
+## [Date: 2026-08-23] - Fix: Paystack 404 on stale IndexedDB invoice (PR #89)
+
+**What/Why:** Clicking "Pay Now → Generate Link" on an invoice returned a 404. Root cause: the invoice existed in local IndexedDB but had been deleted server-side (after a DB reset on staging). Three-part fix.
+
+**Changes:**
+
+- **`backend/src/routes/paystack.ts`** — 404 response message changed to "Invoice not found on the server. Please refresh your invoice list and try again." (actionable, not generic).
+
+- **`frontend/src/lib/syncEngine.ts`** — `bootstrapSync` now clears local tables when the server returns `success: false` instead of leaving stale data in place. This prevents the scenario from recurring across all sync entities.
+
+- **`frontend/src/pages/invoices/Invoices.tsx`** — `handleGeneratePaystackLink` catch block detects a 404 response, shows the server's error message as a toast, triggers `resyncInvoicesFromServer()` in the background, and closes the modal — self-healing with no user action required.
+
+**Files changed:**
+`backend/src/routes/paystack.ts`, `frontend/src/lib/syncEngine.ts`, `frontend/src/pages/invoices/Invoices.tsx`
+
+---
+
+## [Date: 2026-08-22] - User-Reported UX & Bug Fixes (KANESHIE OIL SHOP)
+
+**What/Why:** Five real support tickets from live users addressed:
+
+1. **Subscription upgrade appears to do nothing** — When `PAYSTACK_SECRET_KEY` is not set the backend returns 503 and the frontend rendered the error as small text below the button (easy to miss). Replaced with a prominent amber `<div role="alert">` banner above the plan cards in both `SubscriptionWall.tsx` and `Settings.tsx` (SubscriptionTab). No env var change — operator must still configure Paystack.
+
+2. **Shop Manager mobile dashboard is empty** — All KPI cards were gated behind `!isRestrictedRole`, leaving Shop Managers with just a heading. Added a `ShopManagerDashboard` component in `App.tsx` that renders when `isRestrictedRole === true`: four stat tiles (Till Status, Today's Sales, Low Stock Items, Last Closeout Discrepancy) fetched from existing endpoints (`/tills/current`, `/tills/closeouts`, `/inventory/warehouses`) that already scope correctly to the user's assigned warehouses. Three quick-action links below the tiles (Make a Sale, Open/Close Till, View Inventory).
+
+3. **Invoice item picker requires scrolling the entire catalog** — Replaced the plain `<select>` in the Itemized Invoice line-item row with a searchable combobox (`<input>` + floating `<ul>` of filtered matches, max 30, closes on selection or blur). Search filters by name and SKU (case-insensitive substring). No backend change — items already loaded in state.
+
+4. **Bulk product card loses typed data on accidental Escape/backdrop click** — Two fixes: (a) `openBulkModal()` in `WarehouseManagement.tsx` now only resets rows to blank when all rows are actually empty — re-opening after an accidental Escape restores the typed data; (b) `Modal.tsx` gained a `preventEasyClose` prop that suppresses the native `<dialog>` cancel event and backdrop-click handler; the bulk modal passes this prop.
+
+5. **Welcome email with PDF not received after signup** — The root cause is an env var / credentials issue (`EMAIL_USER`/`EMAIL_PASS` not set or expired), but the symptom was invisible: the frontend showed "Welcome email sent" regardless. Fixed: `POST /auth/verify` now returns `emailSent: boolean` (true only when `EmailService.isConfigured()` is true at send time); `Verification.tsx` reads this flag and shows a fallback message instructing the user to contact support when email delivery is unavailable. Operator must still set `EMAIL_USER`/`EMAIL_PASS` in Render.
+
+**Files changed:**
+`frontend/src/App.tsx`, `frontend/src/components/SubscriptionWall.tsx`, `frontend/src/pages/settings/Settings.tsx`, `frontend/src/components/ui/Modal.tsx`, `frontend/src/pages/inventory/WarehouseManagement.tsx`, `frontend/src/pages/invoices/Invoices.tsx`, `backend/src/routes/auth.ts`, `frontend/src/pages/auth/Verification.tsx`
+
+---
+
+## [Date: 2026-08-21] - CI Test Reliability Fixes (PR #86)
+
+**What/Why:** Four targeted fixes to resolve flaky/failing CI tests that had accumulated across the backend Jest suite. All failures were test-infrastructure issues, not production bugs. CI is now green (all suites passing) on commit `2ea5088`.
+
+**Changes:**
+
+- **`backend/src/tests/` (67 files)** — Replaced `const runId = Date.now()` with `` const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; `` in every test file that used a timestamp-based runId. Jest parallel workers can start within the same millisecond and collide on unique-constraint columns (tenant slugs, emails, SKUs, invoice numbers). The added hex suffix makes each worker's namespace unique even at identical wall-clock milliseconds.
+
+- **`backend/src/routes/cashTill.ts`** — `GET /tills/current` Prisma select for sale lines was missing `lineTotal` and `unitPrice`. `posCart.test.ts:122` asserted `Number(breadLine.lineTotal).toBe(10)` and received `NaN` (undefined field). Added both fields to the `lines` select.
+
+- **`backend/src/services/pdfGenerationService.ts`** — Stock blind-count sheet SKU column was 28% of tableWidth (~123 pt), too narrow for the 24-character runId-derived SKUs the test generates. `truncateToWidth` was silently ellipsizing them, so `expect(text).toContain(skuA)` failed. Widened SKU column to 38% (~171 pt), reduced the always-blank "Counted Qty" column from 28% to 20% to compensate.
+
+- **`backend/src/tests/stockTake.test.ts`** and **`backend/src/tests/reportExports.test.ts`** — `inventory.ts:190` uppercases all incoming SKUs on create (`sku.trim().toUpperCase()`). Tests generated SKU variables with lowercase hex suffixes (e.g., `STA-...-8r1prm`) but the stored and PDF-rendered values are uppercase (`STA-...-8R1PRM`). Added `.toUpperCase()` to the `skuA`/`skuB` declarations in `stockTake.test.ts` and to `sku` in `reportExports.test.ts`.
+
+**Files affected:**
+`backend/src/tests/` (67 test files), `backend/src/routes/cashTill.ts`, `backend/src/services/pdfGenerationService.ts`, `backend/src/tests/stockTake.test.ts`, `backend/src/tests/reportExports.test.ts`
+
+---
+
+## [Date: 2026-08-21] - Backend API Execution-Time Improvements
+
+**What/Why:** Six targeted performance fixes to reduce API response times across the most expensive endpoints. No schema or API contract changes that break existing behaviour.
+
+**Changes:**
+- **`backend/src/routes/reports.ts`** — `GET /analytics/trends`: replaced 24-iteration sequential `for` loop with `Promise.all` fan-out; expected improvement from ~20 s cold to ~1–2 s. `GET /analytics/top-customers`: replaced `findMany` + JS `for` loop aggregation with a Prisma `groupBy` SQL aggregation followed by a small `IN` lookup for customer names — eliminates loading every invoice into JS memory.
+- **`backend/src/routes/cashTill.ts`** — `GET /tills/current`: added `take: 100` cap on the `sales` include and narrowed `lines` to a `select` with only `{ id, quantity, itemName }` — prevents unbounded sales+lines load in POS environments with high transaction volumes.
+- **`backend/src/routes/bills.ts`** — `GET /bills`: switched from `include: { vendor, lines: { include: { item } }, warehouse }` to a targeted `select` that omits `warehouse` (unused in the frontend list view) and returns only the line/vendor fields the list table actually renders.
+- **`backend/src/utils/jwt.ts`** — Added a 30-second in-process negative revocation cache (`notRevokedCache: Map<string, number>`). Authenticated requests with a valid LRU-cached token skip the Redis revocation round-trip for up to 30 s. `evictFromJwtCache` (called at logout) clears both caches immediately so revocation is still instant.
+- **`backend/prisma/schema.prisma`** + **`backend/prisma/migrations/20260821300000_add_cash_till_status_index/`** — Replaced the single `@@index([tenantId])` on `CashTill` with `@@index([tenantId, status])` so the common `WHERE tenant_id = $1 AND status = 'OPEN'` query uses an index scan instead of a sequential scan.
+
+**Files affected:**
+`backend/src/routes/reports.ts`, `backend/src/routes/cashTill.ts`, `backend/src/routes/bills.ts`, `backend/src/utils/jwt.ts`, `backend/prisma/schema.prisma`, `backend/prisma/migrations/20260821300000_add_cash_till_status_index/migration.sql`
+
+---
+
+## [Date: 2026-08-21] - Subscription Billing: Free Trial → MoMo / Visa Payment Flow
+
+**What/Why:** Implemented the full subscription billing lifecycle for the Ghanaian SMB market. New tenants get a 90-day free trial; when it expires they enter a 7-day read-only grace period, then a hard block until they subscribe. Payment via Paystack supports Mobile Money (MTN/AirtelTigo/Telecel) and Visa/Mastercard. Paying for a higher plan also upgrades the tenant's tier. All existing tenants are grandfathered to ACTIVE (no disruption).
+
+**Prices (GHS/month):** Shop = 105 | Business = 305 | Enterprise = 510
+
+**Changes:**
+- **`backend/prisma/schema.prisma`** — Added `subscriptionStatus String @default("TRIAL")`, `trialEndsAt DateTime?`, `subscriptionPaidUntil DateTime?` to `Tenant` model.
+- **`backend/prisma/migrations/20260821100000_subscription_billing/migration.sql`** (NEW) — Adds the 3 columns; backfills all existing tenants to `subscriptionStatus = 'ACTIVE'` so they are unaffected.
+- **`backend/src/middleware/subscriptionEnforcementMiddleware.ts`** (NEW) — `computeSubscriptionState()` function + `subscriptionEnforcementMiddleware` (ACTIVE/TRIAL: pass; GRACE: block writes with 402; EXPIRED: block all with 402). Inlined into `tenantContextMiddleware.ts` to cover all tenant-scoped routes without touching every router file.
+- **`backend/src/middleware/tenantContextMiddleware.ts`** — Extended `TenantContextData` construction to include 3 new subscription fields; inlined subscription enforcement after context is set.
+- **`backend/src/routes/subscription.ts`** (NEW) — `GET /plans`, `GET /status`, `POST /initialize` (Paystack checkout), `POST /verify` (activate on success), `POST /webhook` (HMAC-SHA512 Paystack webhook). Enforcement middleware intentionally excluded so expired tenants can pay.
+- **`backend/src/services/tenantService.ts`** — Sets `trialEndsAt = now() + 90 days` and `subscriptionStatus: 'TRIAL'` on new tenant creation; warms Redis cache with subscription fields.
+- **`backend/src/cache/tenantCache.ts`** — Extended `CachedTenant` interface with 3 new fields; date deserialization handles ISO strings.
+- **`backend/src/context/tenantContext.ts`** — Extended `TenantContextData` with 3 optional subscription fields.
+- **`frontend/src/components/SubscriptionBanner.tsx`** (NEW) — Amber banner for TRIAL with ≤14 days left; red banner for GRACE; links to `/settings?tab=subscription`.
+- **`frontend/src/components/SubscriptionWall.tsx`** (NEW) — Full-page overlay for EXPIRED state; plan cards with GHS prices; Paystack initialize → open tab → verify flow.
+- **`frontend/src/components/layout/MainLayout.tsx`** — Fetches `/subscription/status` on mount; renders `<SubscriptionWall>` when EXPIRED, `<SubscriptionBanner>` between Header and main content.
+- **`frontend/src/pages/settings/Settings.tsx`** — Added "Subscription" tab (Admin only) with current plan summary and upgrade payment flow.
+- **Tests fixed:** `performanceAndHardening.test.ts` (3 cache fixtures updated with new fields), `tenantContextMiddleware.test.ts` (toEqual assertions updated for new subscription context fields).
+
+**Key design decisions:**
+- Enforcement is inlined in `tenantContextMiddleware.ts` (not a separate middleware mount) to avoid touching 20+ router files.
+- `computeSubscriptionState` returns TRIAL when `subscriptionStatus = 'TRIAL'` and `trialEndsAt = null` (pre-migration / test-created tenants) rather than falling through to EXPIRED.
+- `/api/v1/subscription/*` routes are exempt from enforcement so expired tenants can pay.
+
+**Files changed:** `backend/prisma/schema.prisma`, `backend/prisma/migrations/20260821100000_subscription_billing/migration.sql` (new), `backend/src/middleware/subscriptionEnforcementMiddleware.ts` (new), `backend/src/middleware/tenantContextMiddleware.ts`, `backend/src/routes/subscription.ts` (new), `backend/src/services/tenantService.ts`, `backend/src/cache/tenantCache.ts`, `backend/src/context/tenantContext.ts`, `frontend/src/components/SubscriptionBanner.tsx` (new), `frontend/src/components/SubscriptionWall.tsx` (new), `frontend/src/components/layout/MainLayout.tsx`, `frontend/src/pages/settings/Settings.tsx`, `backend/src/tests/performanceAndHardening.test.ts`, `backend/src/tests/tenantContextMiddleware.test.ts`, `TASKS.md`
+
+---
+
+## [Date: 2026-08-21] - Payroll Module: Verified End-to-End Functional
+
+**What/Why:** Closed the `Develop Payroll management module (w:15)` task. The payroll routes, services, DB schema, and frontend pages were already built. The blocking gap was `postPayrollJournalEntry` throwing a 400 for every tenant because the 5 required GL account `defaultRole` designations were never set up. Audit confirmed all 4 sub-gaps are already resolved in the codebase:
+
+1. **`frontend/src/types/accounting.ts`** — `AccountDefaultRole` union already includes all 7 payroll roles (`SALARY_EXPENSE`, `EMPLOYER_SSNIT_EXPENSE`, `PAYE_PAYABLE`, `SSNIT_PAYABLE`, `NET_PAY_PAYABLE`, plus depreciation roles).
+2. **`frontend/src/pages/accounts/ChartOfAccounts.tsx`** — `ROLES_FOR_TYPE` already has a `Liability` key with the 3 payable roles and `Expense` with the 2 expense roles; `ROLE_LABEL`/`ROLE_SHORT_LABEL` already have all payroll entries.
+3. **`backend/src/services/onboardingWizardService.ts`** — Auto-designation loop already seeds all 5 payroll roles for new tenants.
+4. **`backend/src/database/migrations/tenantMigrations.ts`** — Migration 017 (`017_seed_payroll_gl_accounts`) already handles existing tenants: inserts 4 missing accounts (`ON CONFLICT (code) DO NOTHING`) and designates all 5 roles via name-pattern matching.
+
+No code changes required — task marked complete after verification.
+
+**Files changed:** `TASKS.md`
+
+---
+
+## [Date: 2026-08-21] - CRM: Standalone Customer Management Module
+
+**What/Why:** Closed the `Integrate CRM functionalities (w:10)` task. The `Customer` model already existed in the DB schema and a partial API was embedded in `invoices.ts`, but there was no standalone page, no customer detail view, no invoice history per customer, no search/filter, and the `phone`/`address` fields were never shown in the UI. This change adds a complete standalone Customers module.
+
+**Changes:**
+- **`backend/src/routes/invoices.ts`** — Added `DELETE /api/v1/invoices/customers/:id` endpoint (Admin/Accountant only). Checks for existing invoices before allowing deletion (returns 400 with count if > 0, 404 if customer not found, 200 on success).
+- **`frontend/src/pages/customers/Customers.tsx`** (NEW) — Full-page customer management: searchable list (name/email), type filter pill buttons (All/Retail/Wholesale), table with Name/Email/Phone/Type badge/Credit Limit/Actions columns, Add/Edit modal with all fields including the previously-missing phone and address fields, and a right-panel detail drawer showing contact info, credit limit, outstanding balance (sum of unpaid invoice balances), and last 20 invoices sorted by date desc.
+- **`frontend/src/lib/navigation.ts`** — Added `{ name: "Customers", href: "/customers", icon: Users }` to the SALES & PURCHASES nav group after Invoices (AR). Visible in all workspace modes.
+- **`frontend/src/App.tsx`** — Added lazy import for `Customers` page and `<Route path="/customers">` after the `/invoices` route.
+
+**Files changed:** `backend/src/routes/invoices.ts`, `frontend/src/pages/customers/Customers.tsx` (new), `frontend/src/lib/navigation.ts`, `frontend/src/App.tsx`, `TASKS.md`
+
+---
+
+## [Date: 2026-08-21] - Performance Optimization for High Load
+
+**What/Why:** Closed the `Optimize performance and scalability for high load (w:7)` task. Four categories of change: (1) Redis report caching so expensive full-ledger aggregations are not recomputed on every page refresh; (2) Redis notification caching to absorb the 15-second polling loop that fires for every logged-in user; (3) composite DB indexes on the three hottest query paths; (4) Vite manual chunk splitting for smaller initial JS bundles.
+
+**Changes:**
+- **`backend/src/cache/reportCache.ts`** (NEW) — `getCachedReport`, `setCachedReport`, `invalidateReportCache`. 5-minute TTL per `report:{tenantId}:{type}:{sha1-param-hash}`. Fire-and-forget writes; `delPattern` for atomic tenant-wide invalidation.
+- **`backend/src/routes/reports.ts`** — Cache-aside layer added to 7 endpoints: `/trial-balance`, `/profit-loss`, `/balance-sheet`, `/kpis`, `/analytics/trends`, `/analytics/top-customers`, `/analytics/top-items`. Cache miss computes and writes; cache hit returns immediately.
+- **`backend/src/cache/notificationCache.ts`** (NEW) — Per-user 10-second Redis cache for `GET /notifications`. `invalidateNotificationCache` for single-user invalidation; `invalidateAllNotificationCaches` (delPattern) for broadcast creates.
+- **`backend/src/routes/notifications.ts`** — GET handler reads from cache; POST (create) flushes all tenant caches; PUT (mark-read / read-all) flushes the acting user's cache.
+- **`backend/src/services/journalEntryService.ts`** — `postJournalEntry` and `voidJournalEntry` now call `invalidateReportCache(tenantId)` after each ledger mutation so stale report caches expire immediately.
+- **`backend/prisma/schema.prisma`** — Added composite indexes: `Invoice(tenantId, status, issueDate)`, `CashSale(tenantId, createdAt)`, `SyncChangeLog(tenantId, occurredAt)`.
+- **`backend/prisma/migrations/20260821000000_performance_indexes/migration.sql`** (NEW) — CONCURRENTLY-safe `CREATE INDEX IF NOT EXISTS` for the three new indexes above.
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration 018: composite indexes on per-tenant `notifications` table (`tenant_id, user_id, read` and `tenant_id, created_at DESC`).
+- **`frontend/vite.config.ts`** — `build.rollupOptions.output.manualChunks` splits react-vendor, recharts, lucide-react, and cmdk/react-hook-form into separate chunks for better cache utilisation on deployment.
+
+**Files changed:** `backend/src/cache/reportCache.ts` (new), `backend/src/cache/notificationCache.ts` (new), `backend/src/routes/reports.ts`, `backend/src/routes/notifications.ts`, `backend/src/services/journalEntryService.ts`, `backend/prisma/schema.prisma`, `backend/prisma/migrations/20260821000000_performance_indexes/migration.sql` (new), `backend/src/database/migrations/tenantMigrations.ts`, `frontend/vite.config.ts`
+
+---
+
+## [Date: 2026-08-21] - Advanced Automation: Real Cross-App Search + Receipt OCR
+
+**What/Why:** Closed two automation gaps flagged in the Ghana market research as baseline competitive features: (1) The header search bar's placeholder ("Search accounts, entries, reports…") over-promised relative to what `CommandMenu.tsx` actually did (static navigation shortcuts only — a "copy-honesty issue" the research named explicitly). Built real cross-entity keyword search instead of just fixing the copy. (2) Expense Receipt OCR — `ExpenseClaim` was pure manual data entry with no image-processing capability at all; added Claude vision OCR to pre-fill the expense form from a photo of a receipt. Closes "Implement advanced automation features (w:8)".
+
+**Changes:**
+- **`backend/src/routes/search.ts`** (NEW) — `GET /api/v1/search?q=` endpoint. Returns ≤5 results per entity type: Customers/Invoices/Vendors/InventoryItems from the main schema (tenantId-filtered), Accounts/JournalEntries from per-tenant schemas (via `withCurrentTenantDb`). Minimum 2 chars required. Requires `requireRole('Viewer')`. Results include `type, id, title, subtitle, href` for the frontend to navigate to the right page.
+- **`backend/src/routes/ocr.ts`** (NEW) — `POST /api/v1/ocr/receipt`. Accepts `{ imageBase64, mimeType }`, validates MIME type (JPEG/PNG/GIF/WebP) and size (≤5 MB base64), calls Anthropic claude-haiku-4-5-20251001 vision API with a structured extraction prompt, returns `{ vendor, amount, date, description, category }` (null for any field Claude cannot read). 503 if `ANTHROPIC_API_KEY` not configured; 429 on Anthropic rate limit.
+- **`backend/src/app.ts`** — Mounts `searchRouter` at `/api/v1/search` and `ocrRouter` at `/api/v1/ocr`.
+- **`frontend/src/components/ui/CommandMenu.tsx`** — Extended from navigation-shortcuts-only to real data search. New `useDebounce` hook (280ms); on every input change ≥2 chars fires `GET /api/v1/search?q=`. Results shown in a "SEARCH RESULTS" group above nav shortcuts; each result has a colour-coded type badge (Customer=blue, Invoice=emerald, Vendor=orange, Item=purple, Account=amber, Journal=rose) and its source icon. Spinner shows while fetching. `shouldFilter={!hasQuery}` disables cmdk's own client-side filtering when showing real server results. Menu state (query, results) resets on close.
+- **`frontend/src/pages/expenses/ExpenseClaims.tsx`** — Added "Scan Receipt" button to the "File a New Claim" card. Hidden `<input type="file" accept="image/*">` reads the selected image via `FileReader.readAsDataURL`, strips the data-URL prefix, and POSTs to `/api/v1/ocr/receipt`. On success auto-fills `category` (OCR vendor/category), `description` (OCR vendor + description), `amount`, and `expenseDate`. Loading spinner on the button while OCR is processing; toast on success prompting the user to review the pre-filled values. File input reset after each scan so the same file can be re-scanned.
+- **`frontend/src/components/layout/Header.tsx`** — Search bar placeholder changed from "Quick navigation... (Cmd+K)" to "Search or navigate… (Cmd+K)" to accurately describe the real capability.
+
+**Files changed:** `backend/src/routes/search.ts` (new), `backend/src/routes/ocr.ts` (new), `backend/src/app.ts`, `frontend/src/components/ui/CommandMenu.tsx`, `frontend/src/pages/expenses/ExpenseClaims.tsx`, `frontend/src/components/layout/Header.tsx`
+
+---
+
+## [Date: 2026-08-21] - Analytics Dashboard (`/reports/analytics`)
+
+**What/Why:** All existing reports were point-in-time or single-period tabular views — no time-series trend visualization, no top-customer/top-item analytics. Closes the final open task "Develop advanced reporting and analytics dashboards" (w:10).
+
+**Changes:**
+- **`backend/src/routes/reports.ts`** — Three new endpoints:
+  - `GET /reports/analytics/trends?months=3|6|12` — loops over N months, calls the existing `getProfitAndLoss` service per month, returns `[{ month, label, revenue, cogs, expenses, netProfit }]`. Numbers are guaranteed to match the P&L report exactly.
+  - `GET /reports/analytics/top-customers?startDate=&endDate=&limit=10` — queries invoices with `amountPaid > 0` grouped by customer, returns ranked by total revenue with customer type.
+  - `GET /reports/analytics/top-items?startDate=&endDate=&limit=10` — queries COMPLETED POS `cashSaleLines` grouped by itemId, returns ranked by total line revenue.
+- **`frontend/src/pages/reports/AnalyticsDashboard.tsx`** — new page at `/reports/analytics`:
+  - 3M/6M/12M period selector (pill toggle), drives both trend and top-N queries.
+  - 3 KPI summary tiles: Total Revenue (with half-period trend delta), Total Costs, Net Profit (with margin %).
+  - Month-by-month SVG bar chart — Revenue (green) and Total Costs (orange) bars per month, Net Profit dot per month, Y-axis grid with compact currency labels, accessible with `<title>` tooltips per element.
+  - Top 5 Customers: ranked list with proportional share bars, customer type badge, invoice count.
+  - Top 5 Items: ranked list with proportional share bars, units sold, SKU.
+  - No external chart library — pure inline SVG, no CDN dependency.
+- **`frontend/src/lib/navigation.ts`** — Added `LineChart` import; added `{ name: "Analytics Dashboard", href: "/reports/analytics", icon: LineChart }` after Budgets in the REPORTS & ANALYTICS section; added `/reports/analytics` to `OPERATIONS_HIDDEN` (hidden from Simple mode, visible in Business/Professional); added to auditor role's allowed nav.
+- **`frontend/src/App.tsx`** — Added lazy import and `<Route path="/reports/analytics">` alongside other report routes.
+
+---
+
+## [Date: 2026-08-21] - CRM: Standalone Customer Management Page
+
+**What/Why:** Customer management was buried inside the Invoices page as Add/Edit modals with no search, no filter, no delete, and two fields (`phone`, `address`) never exposed in the UI despite existing in the DB. Added a proper `/customers` standalone page matching the product roadmap's CRM item, with a searchable list, per-customer detail drawer showing invoice history and credit usage, and a full add/edit modal covering all fields.
+
+**Changes:**
+- **`frontend/src/pages/customers/Customers.tsx`** — New page. Searchable customer list (client-side filter by name/email), type filter pills (All/Retail/Wholesale), table with Name/Email/Phone/Type badge/Credit Limit/Actions columns. Add/Edit modal with all fields: name, email, phone (previously missing from UI), address (previously missing), credit limit, GRA TIN, customer type toggle. Delete button (calls DELETE endpoint, shows error toast if customer has invoices). Row click opens a detail drawer: contact card (email, phone, address, TIN), credit card (limit + outstanding balance with progress bar), invoice history table (last 20 invoices with status badge and amount).
+- **`backend/src/routes/invoices.ts`** — Added `DELETE /api/v1/invoices/customers/:id` (Admin/Accountant only). Checks invoice count first; returns 400 with count if any exist, otherwise deletes. Tenant-scoped via `requireTenantContext`.
+- **`frontend/src/lib/navigation.ts`** — Added `{ name: "Customers", href: "/customers", icon: Users }` after "Invoices (AR)" in SALES & PURCHASES. `Users` already imported; no new icon needed.
+- **`frontend/src/App.tsx`** — Added `Customers` lazy import and `<Route path="/customers">` after the `/invoices` route.
+
+---
+
+## [Date: 2026-08-21] - Subscription-Gated VIEW Toggle, Feedback in Admin Console, Widget Overlap Fix
+
+**What/Why:** Three UX issues resolved. (1) Shop tenants (tier 1) could freely switch the sidebar VIEW toggle to Business or Full view and browse payroll, bank reconciliation, and approvals nav items that the backend rejects — the UI filter had no tie to the subscription tier. (2) The FeedbackWidget FAB (`fixed bottom-6 left-6`) visually overlapped the sidebar's Upgrade section on desktop. (3) Feedback submitted by tenants had no platform-level visibility — admins had to query the DB directly.
+
+**Changes:**
+- **`frontend/src/components/layout/Sidebar.tsx`** — Added `useTenantSettings`, `TIER_NAMES`, `TenantTier`, `Lock`, `X`, `Mail` imports. Added `upgradePanelFor` state, `TIER_MAX_MODE`, `TIER_BADGE_CLASS` constants. Computes `effectiveMode` clamped to tenant tier so stored localStorage preference cannot exceed the plan. Uses `effectiveMode` for `getVisibleNavGroups`. Renamed VIEW section to "Upgrade" with current plan badge above mode buttons. Locked modes show a Lock icon; clicking opens an inline upgrade panel with a `mailto:support@ledgio.app` CTA (different subject for Business vs Enterprise).
+- **`frontend/src/components/FeedbackWidget.tsx`** — FAB class changed from `fixed bottom-6 left-6` to `fixed bottom-6 left-6 md:left-[17rem]`; panel class changed similarly. On desktop the FAB sits 272px from the left edge (16px past the 256px sidebar), clearing the sidebar footprint. Mobile keeps `left-6`.
+- **`frontend/src/lib/navigation.ts`** — Removed "Feedback Inbox" nav entry (href `/feedback`) from the ADMINISTRATION section. Removed unused `MessageSquare` import. Feedback is now admin-console-only.
+- **`backend/src/routes/adminFeedback.ts`** — New file. `GET /api/v1/admin/feedback` queries `prisma.feedback.findMany()` across all tenants, gated by master passcode (`x-admin-passcode` header or `passcode` query param). Supports filters: `tenantId`, `category`, `status`, `dateFrom`, `dateTo`, `page`, `limit` (max 200). Joins tenant name/slug in application code. Returns `{ items, pagination }`.
+- **`backend/src/app.ts`** — Added import and route mount `app.use('/api/v1/admin/feedback', adminFeedbackRouter)`.
+- **`frontend/src/pages/admin/AdminCoreEngine.tsx`** — Added `MessageSquare` icon import. Extended active-tab union with `"feedback"`. Added feedback state variables and `fetchFeedback` callback (GET `/api/v1/admin/feedback` with passcode header, re-runs on filter change). Added "Feedback" tab button. Added Feedback panel with filter bar (category, status, tenantId) and table (Date, Tenant, User, Role, Category badge, Status badge, expandable Message column).
 
 ---
 
@@ -355,6 +926,33 @@ This file records all significant changes, decisions, and progress made on the M
 **Verification:** TypeScript compilation clean across all changed files. No existing API contracts changed — all new fields are additive with safe defaults (`RETAIL` for `customerType`/`saleType`, `null` for `wholesalePrice`).
 
 **Files:** `backend/prisma/schema.prisma`, `backend/prisma/migrations/20260818000000_wholesale_retail_pricing/migration.sql`, `backend/src/routes/inventory.ts`, `backend/src/routes/invoices.ts`, `backend/src/routes/cashTill.ts`, `backend/src/routes/reports.ts`, `frontend/src/pages/inventory/WarehouseManagement.tsx`, `frontend/src/pages/invoices/Invoices.tsx`, `frontend/src/pages/pos/PointOfSale.tsx`, `frontend/src/lib/offlineDb.ts`, `frontend/src/lib/saleSyncQueue.ts`, `frontend/src/pages/reports/SalesChannelReport.tsx`, `frontend/src/lib/navigation.ts`, `frontend/src/App.tsx`.
+
+## [Date: 2026-08-21] - Payroll Module: Closed All Blocking GL Account Gaps, Making Payroll End-to-End Functional
+
+**What/Why:** The payroll module (routes, services, DB migrations 012–015, frontend pages, nav, lazy routes) was already 100% built, but `postPayrollJournalEntry` threw a hard 400 error for every tenant because 5 required GL account `defaultRole` designations were never set up anywhere in the codebase: `SALARY_EXPENSE`, `EMPLOYER_SSNIT_EXPENSE`, `PAYE_PAYABLE`, `SSNIT_PAYABLE`, `NET_PAY_PAYABLE`. Four gaps blocked this:
+
+1. `AccountDefaultRole` in `frontend/src/types/accounting.ts` was missing all 7 payroll roles (5 payroll + 2 new payroll expense roles), so TypeScript rejected them at compile time.
+2. The Chart of Accounts UI had no role toggles for `Liability`-type accounts and no payroll roles under `Expense`, so users had no way to manually designate them.
+3. `onboardingWizardService.ts`'s auto-designation loop only covered `['CASH', 'REVENUE', 'EXPENSE', 'COGS', 'INVENTORY_ASSET']` — the 5 payroll roles were never set for new tenants going through the wizard.
+4. Existing tenants who had already seeded their chart of accounts had no migration to backfill the missing payroll GL accounts or their role designations.
+
+**Fix:**
+
+- **`frontend/src/types/accounting.ts`**: Extended `AccountDefaultRole` union from 5 roles to 12, adding `SALARY_EXPENSE`, `EMPLOYER_SSNIT_EXPENSE`, `PAYE_PAYABLE`, `SSNIT_PAYABLE`, `NET_PAY_PAYABLE` (payroll) plus `DEPRECIATION_EXPENSE`, `ACCUMULATED_DEPRECIATION` (already in DB constraint but previously un-typed).
+
+- **`frontend/src/hooks/useAccounts.ts`**: Fixed a stale hardcoded union type on `setAccountDefaultRole`'s `role` parameter that hadn't been updated when the type was expanded in `accounting.ts` — was causing a `TS2345` type error in CI against the new payroll roles. Now imports and uses `AccountDefaultRole` directly.
+
+- **`frontend/src/pages/accounts/ChartOfAccounts.tsx`**: Added `Liability` entry to `ROLES_FOR_TYPE` (`['PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE']`) and added `SALARY_EXPENSE`/`EMPLOYER_SSNIT_EXPENSE` to the `Expense` entry. Populated `ROLE_LABEL` and `ROLE_SHORT_LABEL` for all 12 roles including all 5 new payroll roles. Liability-type accounts now show "Set as Default PAYE Payable" / "Set as Default SSNIT Payable" / "Set as Default Net Pay Payable" role-toggle buttons in the Default Posting column.
+
+- **`backend/src/data/ghanaSmeChartOfAccountsTemplate.ts`**: Added 4 accounts that payroll requires but the original template didn't include: `2210 PAYE Tax Payable (LIABILITY)`, `2220 SSNIT Contributions Payable (LIABILITY)`, `2230 Net Pay Payable (LIABILITY)`, `6022 Employer SSNIT Contribution (EXPENSE)`. Template is now 33 accounts (was 29). The 5th payroll account (Salaries & Wages Expense, code 6020) was already present.
+
+- **`backend/src/services/onboardingWizardService.ts`**: Extended the post-seed auto-designation loop to cover all 10 roles: `['CASH', 'REVENUE', 'EXPENSE', 'COGS', 'INVENTORY_ASSET', 'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE']`. `pickAutoDefaultCandidate` in `accountRepository.ts` already handled all 5 payroll roles by name-pattern matching — only the caller needed updating.
+
+- **`backend/src/database/migrations/tenantMigrations.ts`** (migration 017 — `017_seed_payroll_gl_accounts`): INSERTs the 4 missing payroll accounts (`ON CONFLICT (code) DO NOTHING`) and UPDATEs `default_role` for all 5 payroll roles using the same name-pattern matching as `pickAutoDefaultCandidate`. Entire INSERT + UPDATE block is wrapped in `IF EXISTS (SELECT 1 FROM accounts LIMIT 1) THEN ... END IF;` — skips empty schemas (freshly provisioned tenants who haven't run the wizard yet) entirely, preventing the migration from pre-populating accounts that would prematurely mark `chartOfAccountsReady: true` and cause the wizard's seed step to report fewer created accounts than the template length.
+
+**Verification:** `tsc --noEmit` clean (frontend and backend). `onboardingWizard.test.ts` both previously-failing tests now pass: `chartOfAccountsReady` is correctly `false` for a freshly provisioned tenant (migration 017 correctly skips the empty schema), and `seedChartOfAccounts` correctly reports `created: 33` (all 33 template accounts). All payroll roles are now auto-designated for any tenant seeded via the wizard, so `postPayrollJournalEntry`'s `resolveDefaultAccount` calls succeed without manual Chart of Accounts setup.
+
+**Files:** `frontend/src/types/accounting.ts`; `frontend/src/hooks/useAccounts.ts`; `frontend/src/pages/accounts/ChartOfAccounts.tsx`; `backend/src/data/ghanaSmeChartOfAccountsTemplate.ts`; `backend/src/services/onboardingWizardService.ts`; `backend/src/database/migrations/tenantMigrations.ts`.
 
 ## [Date: 2026-08-17] - Fixed Invoices Page Showing Accountant-Only Action Buttons to Every Role
 

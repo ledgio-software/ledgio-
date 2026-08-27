@@ -18,7 +18,20 @@ import {
   Mail,
   Users,
   Building2,
-  Plug
+  Plug,
+  MessageSquare,
+  BarChart2,
+  Globe,
+  Monitor,
+  RefreshCw,
+  Clock,
+  Zap,
+  XCircle,
+  AlertTriangle,
+  UserX,
+  UserCheck,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -49,7 +62,169 @@ export function AdminCoreEngine() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "integrations" | "schemas" | "audit" | "onboard">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors">("broadcast");
+
+  // Platform-wide Feedback state
+  const [feedbackItems, setFeedbackItems] = useState<{
+    id: string;
+    tenantId: string;
+    userId: string;
+    userName: string;
+    userRole: string;
+    category: string;
+    message: string;
+    status: string;
+    createdAt: string;
+    tenant: { name: string; slug: string } | null;
+  }[] | null>(null);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
+  const [feedbackCategoryFilter, setFeedbackCategoryFilter] = useState("");
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState("");
+  const [feedbackTenantFilter, setFeedbackTenantFilter] = useState("");
+  const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
+
+  // Google Analytics State
+  const [analyticsData, setAnalyticsData] = useState<{
+    configured: boolean;
+    dateRange: string;
+    totalUsers: number;
+    newUsers: number;
+    sessions: number;
+    pageViews: number;
+    avgSessionDuration: number;
+    bounceRate: number;
+    topPages: { page: string; views: number }[];
+    topCountries: { country: string; users: number }[];
+    topDevices: { device: string; sessions: number }[];
+    activeUsers: number;
+  } | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [analyticsDays, setAnalyticsDays] = useState(28);
+
+  const fetchMetrics = useCallback(() => {
+    setIsLoadingMetrics(true);
+    setMetricsError(null);
+    return api
+      .get("/admin/metrics", { headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setMetricsData(res.data.data))
+      .catch(() => setMetricsError("Failed to load performance metrics."))
+      .finally(() => setIsLoadingMetrics(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "performance") return;
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  const fetchJobs = useCallback(() => {
+    setIsLoadingJobs(true);
+    setJobsError(null);
+    return api
+      .get("/admin/jobs", { headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setJobsData(res.data.data.jobs))
+      .catch(() => setJobsError("Failed to load cron jobs."))
+      .finally(() => setIsLoadingJobs(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "jobs") return;
+    fetchJobs();
+    const interval = setInterval(fetchJobs, 60000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  const handleTriggerJob = async (jobName: string) => {
+    setTriggeringJob(jobName);
+    try {
+      await api.post(`/admin/jobs/${encodeURIComponent(jobName)}/trigger`, {}, { headers: { 'x-admin-passcode': passcode } });
+      showToast(`Job "${jobName}" triggered successfully.`, "success");
+      setTimeout(fetchJobs, 1500);
+    } catch (err: any) {
+      showToast(err.response?.data?.error || `Failed to trigger "${jobName}".`, "error");
+    } finally {
+      setTriggeringJob(null);
+    }
+  };
+
+  const fetchErrors = useCallback(() => {
+    setIsLoadingErrors(true);
+    setErrorsError(null);
+    return api
+      .get("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setErrorsData(res.data.data.errors))
+      .catch(() => setErrorsError("Failed to load error logs."))
+      .finally(() => setIsLoadingErrors(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "errors") return;
+    fetchErrors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  const handleClearErrors = async () => {
+    setIsClearingErrors(true);
+    try {
+      await api.delete("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } });
+      setErrorsData([]);
+      showToast("Error log cleared.", "success");
+    } catch {
+      showToast("Failed to clear error log.", "error");
+    } finally {
+      setIsClearingErrors(false);
+    }
+  };
+
+  const loadTenantUsers = async (tenantId: string) => {
+    if (tenantUsers[tenantId]) return;
+    setLoadingTenantUsers(tenantId);
+    try {
+      const res = await api.get("/admin/users/search", { params: { tenantId }, headers: { 'x-admin-passcode': passcode } });
+      setTenantUsers((prev) => ({ ...prev, [tenantId]: res.data.data.users }));
+    } catch {
+      showToast("Failed to load tenant users.", "error");
+    } finally {
+      setLoadingTenantUsers(null);
+    }
+  };
+
+  const handleToggleUserActive = async (userId: string, tenantId: string, activate: boolean) => {
+    setTogglingUserId(userId);
+    try {
+      await api.patch(`/admin/users/${userId}/${activate ? "activate" : "deactivate"}`, {}, { headers: { 'x-admin-passcode': passcode } });
+      showToast(`User ${activate ? "activated" : "deactivated"}.`, "success");
+      setTenantUsers((prev) => ({
+        ...prev,
+        [tenantId]: prev[tenantId]?.map((u) => u.id === userId ? { ...u, isActive: activate } : u) ?? [],
+      }));
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to update user status.", "error");
+    } finally {
+      setTogglingUserId(null);
+    }
+  };
+
+  const fetchAnalytics = useCallback((days: number = analyticsDays) => {
+    setIsLoadingAnalytics(true);
+    setAnalyticsError(null);
+    return api
+      .get("/admin/analytics", { params: { days }, headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setAnalyticsData(res.data.data))
+      .catch(() => setAnalyticsError("Failed to load analytics data."))
+      .finally(() => setIsLoadingAnalytics(false));
+  }, [passcode, analyticsDays]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "analytics") return;
+    fetchAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab, analyticsDays]);
 
   // Engine Diagnostics State
   const [healthData, setHealthData] = useState<{
@@ -63,9 +238,49 @@ export function AdminCoreEngine() {
   const [healthError, setHealthError] = useState<string | null>(null);
   const [isLoadingHealth, setIsLoadingHealth] = useState(false);
 
+  // Performance metrics state
+  const [metricsData, setMetricsData] = useState<{
+    requests: number;
+    errors: number;
+    errorRate: number;
+    avgLatencyMs: number;
+    memory: { heapUsedMb: number; rssMb: number };
+    uptime: number;
+    nodeVersion: string;
+    buckets: { ts: number; requests: number; errors: number; avgMs: number }[];
+  } | null>(null);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+
+  // Cron jobs state
+  const [jobsData, setJobsData] = useState<{
+    name: string;
+    schedule: string;
+    description?: string;
+    lastRun?: { startedAt: string; finishedAt: string; success: boolean; errorMsg?: string; durationMs: number };
+  }[] | null>(null);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [triggeringJob, setTriggeringJob] = useState<string | null>(null);
+
+  // Error log state
+  const [errorsData, setErrorsData] = useState<{
+    ts: string; method: string; path: string; status: number; error: string; stack?: string;
+  }[] | null>(null);
+  const [errorsError, setErrorsError] = useState<string | null>(null);
+  const [isLoadingErrors, setIsLoadingErrors] = useState(false);
+  const [isClearingErrors, setIsClearingErrors] = useState(false);
+  const [expandedErrorIdx, setExpandedErrorIdx] = useState<number | null>(null);
+
+  // Expanded tenant user rows in schemas tab
+  const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null);
+  const [tenantUsers, setTenantUsers] = useState<Record<string, { id: string; name: string; email: string; role: string; isActive: boolean }[]>>({});
+  const [loadingTenantUsers, setLoadingTenantUsers] = useState<string | null>(null);
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+
   // Tenant Schemas & Tiers state
   const [tenants, setTenants] = useState<
-    { id: string; name: string; slug: string; schema: string; tier: number; createdAt: string }[] | null
+    { id: string; name: string; slug: string; schema: string; tier: number; createdAt: string; subscriptionStatus?: string; trialEndsAt?: string; subscriptionPaidUntil?: string; userCount?: number }[] | null
   >(null);
   const [tenantsError, setTenantsError] = useState<string | null>(null);
   const [isLoadingTenants, setIsLoadingTenants] = useState(false);
@@ -327,6 +542,25 @@ export function AdminCoreEngine() {
       setIsExportingAuditLogs(false);
     }
   };
+
+  const fetchFeedback = useCallback(() => {
+    setIsLoadingFeedback(true);
+    setFeedbackError(null);
+    const params: Record<string, string> = {};
+    if (feedbackCategoryFilter) params.category = feedbackCategoryFilter;
+    if (feedbackStatusFilter) params.status = feedbackStatusFilter;
+    if (feedbackTenantFilter.trim()) params.tenantId = feedbackTenantFilter.trim();
+    return api
+      .get("/admin/feedback", { params, headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setFeedbackItems(res.data.data.items))
+      .catch(() => setFeedbackError("Failed to load platform-wide feedback."))
+      .finally(() => setIsLoadingFeedback(false));
+  }, [passcode, feedbackCategoryFilter, feedbackStatusFilter, feedbackTenantFilter]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "feedback") return;
+    fetchFeedback();
+  }, [isUnlocked, activeTab, feedbackCategoryFilter, feedbackStatusFilter, feedbackTenantFilter]);
 
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -639,6 +873,58 @@ export function AdminCoreEngine() {
               >
                 <Building2 className="h-4 w-4" />
                 <span>Onboard Client</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("feedback")}
+                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                  activeTab === "feedback" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Feedback</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("analytics")}
+                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                  activeTab === "analytics" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <BarChart2 className="h-4 w-4" />
+                <span>Analytics</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("performance")}
+                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                  activeTab === "performance" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <Activity className="h-4 w-4" />
+                <span>Performance</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("jobs")}
+                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                  activeTab === "jobs" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                <span>Cron Jobs</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("errors")}
+                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                  activeTab === "errors" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Error Log
+                  {errorsData && errorsData.length > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {errorsData.length}
+                    </span>
+                  )}
+                </span>
               </button>
             </div>
 
@@ -988,46 +1274,151 @@ export function AdminCoreEngine() {
                       <Table>
                         <TableHeader className="!bg-secondary-950">
                           <TableRow className="border-secondary-800 hover:bg-transparent">
+                            <TableHead className="text-secondary-400 w-6"></TableHead>
                             <TableHead className="text-secondary-400">Name</TableHead>
                             <TableHead className="text-secondary-400">Slug</TableHead>
                             <TableHead className="text-secondary-400">Schema</TableHead>
                             <TableHead className="text-secondary-400">Plan</TableHead>
+                            <TableHead className="text-secondary-400">Status</TableHead>
+                            <TableHead className="text-secondary-400">Users</TableHead>
                             <TableHead className="text-secondary-400">Onboarded</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {tenants.map((t) => (
-                            <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-950/60">
-                              <TableCell className="font-semibold text-white">{t.name}</TableCell>
-                              <TableCell className="font-mono text-secondary-300">{t.slug}</TableCell>
-                              <TableCell className="font-mono text-secondary-300">{t.schema}</TableCell>
-                              <TableCell className="text-secondary-300">
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    className="h-8 px-2 rounded-md border border-secondary-700 bg-secondary-950 text-secondary-100 text-xs"
-                                    value={tierDrafts[t.id] ?? t.tier}
-                                    onChange={(e) => setTierDrafts((prev) => ({ ...prev, [t.id]: Number(e.target.value) }))}
-                                  >
-                                    <option value={1}>Shop</option>
-                                    <option value={2}>Business</option>
-                                    <option value={3}>Enterprise</option>
-                                  </select>
-                                  {(tierDrafts[t.id] ?? t.tier) !== t.tier && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-8 text-xs"
-                                      disabled={savingTierId === t.id}
-                                      onClick={() => handleSaveTier(t.id)}
-                                    >
-                                      {savingTierId === t.id ? "Saving..." : "Save"}
-                                    </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-secondary-300">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
-                            </TableRow>
-                          ))}
+                          {tenants.map((t) => {
+                            const isExpanded = expandedTenantId === t.id;
+                            const users = tenantUsers[t.id];
+                            const subStatus = t.subscriptionStatus ?? "ACTIVE";
+                            const subBadge = subStatus === "TRIAL" ? "bg-amber-500/10 text-amber-400 border-amber-700"
+                              : subStatus === "ACTIVE" ? "bg-emerald-500/10 text-emerald-400 border-emerald-700"
+                              : subStatus === "GRACE" ? "bg-orange-500/10 text-orange-400 border-orange-700"
+                              : "bg-rose-500/10 text-rose-400 border-rose-700";
+                            return (
+                              <>
+                                <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-950/60 cursor-pointer" onClick={() => {
+                                  if (isExpanded) {
+                                    setExpandedTenantId(null);
+                                  } else {
+                                    setExpandedTenantId(t.id);
+                                    loadTenantUsers(t.id);
+                                  }
+                                }}>
+                                  <TableCell className="pr-0">
+                                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-secondary-400" /> : <ChevronRight className="h-3.5 w-3.5 text-secondary-400" />}
+                                  </TableCell>
+                                  <TableCell className="font-semibold text-white">{t.name}</TableCell>
+                                  <TableCell className="font-mono text-secondary-300">{t.slug}</TableCell>
+                                  <TableCell className="font-mono text-secondary-300">{t.schema}</TableCell>
+                                  <TableCell className="text-secondary-300" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        className="h-8 px-2 rounded-md border border-secondary-700 bg-secondary-950 text-secondary-100 text-xs"
+                                        value={tierDrafts[t.id] ?? t.tier}
+                                        onChange={(e) => setTierDrafts((prev) => ({ ...prev, [t.id]: Number(e.target.value) }))}
+                                      >
+                                        <option value={1}>Shop</option>
+                                        <option value={2}>Business</option>
+                                        <option value={3}>Enterprise</option>
+                                      </select>
+                                      {(tierDrafts[t.id] ?? t.tier) !== t.tier && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-8 text-xs"
+                                          disabled={savingTierId === t.id}
+                                          onClick={() => handleSaveTier(t.id)}
+                                        >
+                                          {savingTierId === t.id ? "Saving..." : "Save"}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${subBadge}`}>
+                                      {subStatus}
+                                    </span>
+                                    {t.trialEndsAt && subStatus === "TRIAL" && (
+                                      <div className="text-[10px] text-secondary-500 mt-0.5">ends {new Date(t.trialEndsAt).toLocaleDateString()}</div>
+                                    )}
+                                    {t.subscriptionPaidUntil && subStatus === "ACTIVE" && (
+                                      <div className="text-[10px] text-secondary-500 mt-0.5">until {new Date(t.subscriptionPaidUntil).toLocaleDateString()}</div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-secondary-300 font-mono text-center">{t.userCount ?? "—"}</TableCell>
+                                  <TableCell className="text-secondary-300">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
+                                </TableRow>
+                                {isExpanded && (
+                                  <TableRow key={`${t.id}-users`} className="border-secondary-800 bg-secondary-950/40">
+                                    <TableCell colSpan={8} className="p-0">
+                                      <div className="px-6 py-4 space-y-2">
+                                        <div className="text-xs font-bold text-secondary-300 mb-2 flex items-center gap-2">
+                                          <Users className="h-3.5 w-3.5" /> Users in {t.name}
+                                        </div>
+                                        {loadingTenantUsers === t.id && (
+                                          <div className="flex items-center gap-2 text-secondary-500 text-xs py-2">
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading users…
+                                          </div>
+                                        )}
+                                        {users && users.length === 0 && (
+                                          <p className="text-xs text-secondary-500">No users found for this tenant.</p>
+                                        )}
+                                        {users && users.length > 0 && (
+                                          <div className="overflow-x-auto">
+                                            <table className="w-full text-xs">
+                                              <thead>
+                                                <tr className="text-secondary-500 text-left border-b border-secondary-800">
+                                                  <th className="pb-1 pr-4 font-medium">Name</th>
+                                                  <th className="pb-1 pr-4 font-medium">Email</th>
+                                                  <th className="pb-1 pr-4 font-medium">Role</th>
+                                                  <th className="pb-1 pr-4 font-medium">Status</th>
+                                                  <th className="pb-1 font-medium">Action</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {users.map((u) => (
+                                                  <tr key={u.id} className="border-b border-secondary-800/50 last:border-0">
+                                                    <td className="py-1.5 pr-4 text-secondary-200">{u.name}</td>
+                                                    <td className="py-1.5 pr-4 font-mono text-secondary-300">{u.email}</td>
+                                                    <td className="py-1.5 pr-4 text-secondary-400">{u.role}</td>
+                                                    <td className="py-1.5 pr-4">
+                                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${u.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-700" : "bg-rose-500/10 text-rose-400 border-rose-700"}`}>
+                                                        {u.isActive ? "Active" : "Inactive"}
+                                                      </span>
+                                                    </td>
+                                                    <td className="py-1.5">
+                                                      {u.isActive ? (
+                                                        <button
+                                                          onClick={(e) => { e.stopPropagation(); handleToggleUserActive(u.id, t.id, false); }}
+                                                          disabled={togglingUserId === u.id}
+                                                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-rose-950/40 text-rose-400 border border-rose-800 hover:bg-rose-950/70 transition-colors disabled:opacity-50"
+                                                        >
+                                                          <UserX className="h-3 w-3" />
+                                                          {togglingUserId === u.id ? "…" : "Deactivate"}
+                                                        </button>
+                                                      ) : (
+                                                        <button
+                                                          onClick={(e) => { e.stopPropagation(); handleToggleUserActive(u.id, t.id, true); }}
+                                                          disabled={togglingUserId === u.id}
+                                                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800 hover:bg-emerald-950/70 transition-colors disabled:opacity-50"
+                                                        >
+                                                          <UserCheck className="h-3 w-3" />
+                                                          {togglingUserId === u.id ? "…" : "Activate"}
+                                                        </button>
+                                                      )}
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                       {tenants.length === 0 && (
@@ -1368,6 +1759,635 @@ export function AdminCoreEngine() {
                       </Button>
                     </div>
                   </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tab 8: Google Analytics */}
+            {activeTab === "analytics" && (
+              <div className="space-y-6">
+                {/* Header + controls */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <BarChart2 className="h-5 w-5 text-amber-400" />
+                      Platform Traffic Analytics
+                    </h2>
+                    <p className="text-xs text-secondary-400 mt-0.5">
+                      Real-time + historical data from Google Analytics 4 — all Ledgio tenants combined.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={analyticsDays}
+                      onChange={(e) => setAnalyticsDays(Number(e.target.value))}
+                      className="h-9 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs"
+                    >
+                      <option value={7}>Last 7 days</option>
+                      <option value={14}>Last 14 days</option>
+                      <option value={28}>Last 28 days</option>
+                      <option value={90}>Last 90 days</option>
+                    </select>
+                    <button
+                      onClick={() => fetchAnalytics(analyticsDays)}
+                      disabled={isLoadingAnalytics}
+                      className="h-9 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 border border-secondary-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isLoadingAnalytics ? "animate-spin" : ""}`} />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {isLoadingAnalytics && !analyticsData && (
+                  <div className="flex items-center justify-center py-16 text-secondary-400 gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Fetching analytics…
+                  </div>
+                )}
+
+                {analyticsError && (
+                  <div className="p-4 bg-red-950/30 border border-red-900 rounded-lg text-red-300 text-xs">
+                    {analyticsError}
+                  </div>
+                )}
+
+                {analyticsData && !analyticsData.configured && (
+                  <Card className="bg-secondary-900 border-secondary-800 text-white">
+                    <CardContent className="p-6 text-center space-y-3">
+                      <BarChart2 className="h-10 w-10 text-secondary-600 mx-auto" />
+                      <p className="text-secondary-300 text-sm font-semibold">Google Analytics not configured</p>
+                      <p className="text-secondary-500 text-xs max-w-md mx-auto">
+                        Set <code className="text-amber-400">GA_PROPERTY_ID</code>,{" "}
+                        <code className="text-amber-400">GOOGLE_SERVICE_ACCOUNT_EMAIL</code>, and{" "}
+                        <code className="text-amber-400">GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY</code> on the backend, and{" "}
+                        <code className="text-amber-400">VITE_GA_MEASUREMENT_ID</code> on the frontend to enable tracking.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {analyticsData && analyticsData.configured && (
+                  <>
+                    {/* Realtime pill */}
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-bold">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                        {analyticsData.activeUsers} active right now
+                      </span>
+                    </div>
+
+                    {/* Core metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {[
+                        { label: "Total Users", value: analyticsData.totalUsers.toLocaleString(), icon: Users },
+                        { label: "New Users", value: analyticsData.newUsers.toLocaleString(), icon: Users },
+                        { label: "Sessions", value: analyticsData.sessions.toLocaleString(), icon: Activity },
+                        { label: "Page Views", value: analyticsData.pageViews.toLocaleString(), icon: Monitor },
+                        {
+                          label: "Avg Session",
+                          value: `${Math.floor(analyticsData.avgSessionDuration / 60)}m ${analyticsData.avgSessionDuration % 60}s`,
+                          icon: Activity,
+                        },
+                        {
+                          label: "Bounce Rate",
+                          value: `${analyticsData.bounceRate.toFixed(1)}%`,
+                          icon: BarChart2,
+                        },
+                      ].map(({ label, value }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800 text-white">
+                          <CardContent className="p-4">
+                            <div className="text-[11px] text-secondary-400 mb-1">{label}</div>
+                            <div className="text-xl font-extrabold text-white">{value}</div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* Top pages */}
+                      <Card className="bg-secondary-900 border-secondary-800 text-white lg:col-span-1">
+                        <CardHeader>
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <Monitor className="h-4 w-4 text-amber-400" />
+                            Top Pages
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {analyticsData.topPages.map((p, i) => {
+                            const max = analyticsData.topPages[0]?.views || 1;
+                            return (
+                              <div key={i}>
+                                <div className="flex justify-between items-center text-xs mb-0.5">
+                                  <span className="text-secondary-300 truncate max-w-[180px]" title={p.page}>{p.page || '/'}</span>
+                                  <span className="text-secondary-400 font-mono ml-2 flex-shrink-0">{p.views.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-secondary-800 h-1 rounded-full overflow-hidden">
+                                  <div className="h-full bg-amber-400" style={{ width: `${(p.views / max) * 100}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {analyticsData.topPages.length === 0 && (
+                            <p className="text-xs text-secondary-500">No data yet.</p>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Top countries */}
+                      <Card className="bg-secondary-900 border-secondary-800 text-white">
+                        <CardHeader>
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-amber-400" />
+                            Top Countries
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {analyticsData.topCountries.map((c, i) => {
+                            const max = analyticsData.topCountries[0]?.users || 1;
+                            return (
+                              <div key={i}>
+                                <div className="flex justify-between items-center text-xs mb-0.5">
+                                  <span className="text-secondary-300">{c.country}</span>
+                                  <span className="text-secondary-400 font-mono">{c.users.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-secondary-800 h-1 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-400" style={{ width: `${(c.users / max) * 100}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {analyticsData.topCountries.length === 0 && (
+                            <p className="text-xs text-secondary-500">No data yet.</p>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Devices */}
+                      <Card className="bg-secondary-900 border-secondary-800 text-white">
+                        <CardHeader>
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <Monitor className="h-4 w-4 text-amber-400" />
+                            Devices
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {analyticsData.topDevices.map((d, i) => {
+                            const total = analyticsData.topDevices.reduce((s, x) => s + x.sessions, 0) || 1;
+                            const pct = Math.round((d.sessions / total) * 100);
+                            return (
+                              <div key={i} className="flex items-center justify-between text-xs">
+                                <span className="text-secondary-300 capitalize">{d.device}</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-20 bg-secondary-800 h-1.5 rounded-full overflow-hidden">
+                                    <div className="h-full bg-purple-400" style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="text-secondary-400 font-mono w-8 text-right">{pct}%</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {analyticsData.topDevices.length === 0 && (
+                            <p className="text-xs text-secondary-500">No data yet.</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Performance Metrics */}
+            {activeTab === "performance" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-amber-400" />
+                      API Performance (last hour)
+                    </h2>
+                    <p className="text-xs text-secondary-400 mt-0.5">5-minute rolling buckets — refreshes every 30 s.</p>
+                  </div>
+                  <button
+                    onClick={fetchMetrics}
+                    disabled={isLoadingMetrics}
+                    className="h-9 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 border border-secondary-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingMetrics ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                </div>
+
+                {isLoadingMetrics && !metricsData && (
+                  <div className="flex items-center justify-center py-16 text-secondary-400 gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Loading metrics…
+                  </div>
+                )}
+                {metricsError && (
+                  <div className="p-4 bg-red-950/30 border border-red-900 rounded-lg text-red-300 text-xs">{metricsError}</div>
+                )}
+                {metricsData && (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      {[
+                        { label: "Requests (1hr)", value: metricsData.requests.toLocaleString(), color: "text-blue-400" },
+                        { label: "Error Rate", value: `${metricsData.errorRate.toFixed(1)}%`, color: metricsData.errorRate > 5 ? "text-rose-400" : metricsData.errorRate > 1 ? "text-amber-400" : "text-emerald-400" },
+                        { label: "Avg Latency", value: `${metricsData.avgLatencyMs.toFixed(0)} ms`, color: metricsData.avgLatencyMs > 500 ? "text-rose-400" : metricsData.avgLatencyMs > 200 ? "text-amber-400" : "text-emerald-400" },
+                        { label: "Heap Used", value: `${metricsData.memory.heapUsedMb.toFixed(1)} MB`, color: "text-purple-400" },
+                      ].map(({ label, value, color }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800 text-white">
+                          <CardContent className="p-4">
+                            <div className="text-[11px] text-secondary-400 mb-1">{label}</div>
+                            <div className={`text-2xl font-extrabold font-mono ${color}`}>{value}</div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Sparkline */}
+                    {metricsData.buckets.length > 0 && (
+                      <Card className="bg-secondary-900 border-secondary-800 text-white">
+                        <CardHeader>
+                          <CardTitle className="text-sm font-bold">Request / Error Rate — last {metricsData.buckets.length} × 5 min</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto">
+                            <svg width={Math.max(metricsData.buckets.length * 48, 400)} height={80} className="w-full h-20">
+                              {(() => {
+                                const maxReq = Math.max(...metricsData.buckets.map((b) => b.requests), 1);
+                                const w = Math.max(metricsData.buckets.length * 48, 400);
+                                const bw = w / metricsData.buckets.length;
+                                return metricsData.buckets.map((b, i) => {
+                                  const reqH = Math.round((b.requests / maxReq) * 64);
+                                  const errH = b.requests > 0 ? Math.round((b.errors / b.requests) * reqH) : 0;
+                                  const x = i * bw;
+                                  return (
+                                    <g key={b.ts}>
+                                      <rect x={x + 2} y={80 - reqH} width={bw - 4} height={reqH} rx={2} fill="#3b82f6" opacity={0.6} />
+                                      {errH > 0 && <rect x={x + 2} y={80 - errH} width={bw - 4} height={errH} rx={2} fill="#ef4444" opacity={0.8} />}
+                                    </g>
+                                  );
+                                });
+                              })()}
+                            </svg>
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 text-[10px] text-secondary-400">
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-blue-500/60 rounded-sm" /> Requests</span>
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-red-500/80 rounded-sm" /> Errors</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* System info */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
+                        <div className="text-secondary-400 mb-1">Node.js</div>
+                        <div className="font-mono text-white">{metricsData.nodeVersion}</div>
+                      </div>
+                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
+                        <div className="text-secondary-400 mb-1">Process Uptime</div>
+                        <div className="font-mono text-white">{Math.floor(metricsData.uptime / 3600)}h {Math.floor((metricsData.uptime % 3600) / 60)}m</div>
+                      </div>
+                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
+                        <div className="text-secondary-400 mb-1">RSS Memory</div>
+                        <div className="font-mono text-white">{metricsData.memory.rssMb.toFixed(1)} MB</div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Cron Jobs */}
+            {activeTab === "jobs" && (
+              <Card className="bg-secondary-900 border-secondary-800 text-white">
+                <CardHeader className="flex flex-row items-start justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-amber-400" />
+                      Cron Job Monitor
+                    </CardTitle>
+                    <CardDescription className="text-secondary-400 text-xs">
+                      All 9 scheduled background services — live last-run status and manual trigger.
+                    </CardDescription>
+                  </div>
+                  <button
+                    onClick={fetchJobs}
+                    disabled={isLoadingJobs}
+                    className="h-9 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 border border-secondary-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingJobs ? "animate-spin" : ""}`} />
+                    Refresh
+                  </button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isLoadingJobs && !jobsData && (
+                    <div className="flex items-center justify-center py-16 text-secondary-400 gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin" /> Loading jobs…
+                    </div>
+                  )}
+                  {jobsError && (
+                    <div className="p-4 bg-red-950/30 border border-red-900 rounded-lg text-red-300 text-xs">{jobsError}</div>
+                  )}
+                  {jobsData && (
+                    <div className="overflow-x-auto rounded-lg border border-secondary-800">
+                      <Table>
+                        <TableHeader className="!bg-secondary-950">
+                          <TableRow className="border-secondary-800 hover:bg-transparent">
+                            <TableHead className="text-secondary-400">Job Name</TableHead>
+                            <TableHead className="text-secondary-400">Schedule</TableHead>
+                            <TableHead className="text-secondary-400">Last Run</TableHead>
+                            <TableHead className="text-secondary-400">Duration</TableHead>
+                            <TableHead className="text-secondary-400">Status</TableHead>
+                            <TableHead className="text-secondary-400">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {jobsData.map((job) => {
+                            const lr = job.lastRun;
+                            const statusChip = !lr
+                              ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-700 text-secondary-400 border border-secondary-600">Never run</span>
+                              : lr.success
+                                ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-700">OK</span>
+                                : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-700">FAILED</span>;
+                            return (
+                              <TableRow key={job.name} className="border-secondary-800 hover:bg-secondary-950/60">
+                                <TableCell>
+                                  <div className="font-semibold text-white text-xs">{job.name}</div>
+                                  {job.description && <div className="text-[10px] text-secondary-500 mt-0.5">{job.description}</div>}
+                                </TableCell>
+                                <TableCell className="font-mono text-secondary-400 text-xs">{job.schedule}</TableCell>
+                                <TableCell className="text-secondary-400 text-xs whitespace-nowrap">
+                                  {lr ? new Date(lr.startedAt).toLocaleString() : "—"}
+                                </TableCell>
+                                <TableCell className="font-mono text-secondary-400 text-xs">
+                                  {lr ? `${(lr.durationMs / 1000).toFixed(1)}s` : "—"}
+                                </TableCell>
+                                <TableCell>
+                                  {statusChip}
+                                  {lr && !lr.success && lr.errorMsg && (
+                                    <div className="text-[10px] text-rose-400 mt-0.5 max-w-[160px] truncate" title={lr.errorMsg}>{lr.errorMsg}</div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <button
+                                    onClick={() => handleTriggerJob(job.name)}
+                                    disabled={triggeringJob === job.name}
+                                    className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded bg-amber-600/20 text-amber-400 border border-amber-700 hover:bg-amber-600/40 transition-colors disabled:opacity-50"
+                                  >
+                                    <Zap className="h-3 w-3" />
+                                    {triggeringJob === job.name ? "Running…" : "Trigger Now"}
+                                  </button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tab: Error Log */}
+            {activeTab === "errors" && (
+              <Card className="bg-secondary-900 border-secondary-800 text-white">
+                <CardHeader className="flex flex-row items-start justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-rose-400" />
+                      In-Memory Error Log
+                    </CardTitle>
+                    <CardDescription className="text-secondary-400 text-xs">
+                      Last 100 unhandled server errors — ring buffer, newest first. Click a row for the stack trace.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={fetchErrors}
+                      disabled={isLoadingErrors}
+                      className="h-9 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 border border-secondary-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isLoadingErrors ? "animate-spin" : ""}`} />
+                      Refresh
+                    </button>
+                    {errorsData && errorsData.length > 0 && (
+                      <button
+                        onClick={handleClearErrors}
+                        disabled={isClearingErrors}
+                        className="h-9 px-3 rounded-lg bg-rose-950/40 hover:bg-rose-950/70 border border-rose-800 text-rose-400 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                        {isClearingErrors ? "Clearing…" : "Clear"}
+                      </button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isLoadingErrors && !errorsData && (
+                    <div className="flex items-center justify-center py-16 text-secondary-400 gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin" /> Loading errors…
+                    </div>
+                  )}
+                  {errorsError && (
+                    <div className="p-4 bg-red-950/30 border border-red-900 rounded-lg text-red-300 text-xs">{errorsError}</div>
+                  )}
+                  {errorsData !== null && !isLoadingErrors && (
+                    errorsData.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-secondary-500 gap-2">
+                        <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                        <p className="text-sm">No errors logged — system is clean.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-secondary-800">
+                        <Table>
+                          <TableHeader className="!bg-secondary-950">
+                            <TableRow className="border-secondary-800 hover:bg-transparent">
+                              <TableHead className="text-secondary-400">Timestamp</TableHead>
+                              <TableHead className="text-secondary-400">Method</TableHead>
+                              <TableHead className="text-secondary-400">Path</TableHead>
+                              <TableHead className="text-secondary-400">Status</TableHead>
+                              <TableHead className="text-secondary-400">Error</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {errorsData.map((err, idx) => {
+                              const isExpanded = expandedErrorIdx === idx;
+                              return (
+                                <>
+                                  <TableRow
+                                    key={idx}
+                                    className="border-secondary-800 hover:bg-secondary-950/60 cursor-pointer"
+                                    onClick={() => setExpandedErrorIdx(isExpanded ? null : idx)}
+                                  >
+                                    <TableCell className="text-secondary-400 text-xs whitespace-nowrap">{new Date(err.ts).toLocaleString()}</TableCell>
+                                    <TableCell>
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                        err.method === "GET" ? "bg-blue-900/40 text-blue-400" :
+                                        err.method === "POST" ? "bg-emerald-900/40 text-emerald-400" :
+                                        err.method === "DELETE" ? "bg-rose-900/40 text-rose-400" :
+                                        "bg-secondary-800 text-secondary-300"
+                                      }`}>{err.method}</span>
+                                    </TableCell>
+                                    <TableCell className="font-mono text-secondary-300 text-xs">{err.path}</TableCell>
+                                    <TableCell>
+                                      <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${err.status >= 500 ? "bg-rose-900/40 text-rose-400" : "bg-amber-900/40 text-amber-400"}`}>
+                                        {err.status}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs max-w-xs truncate" title={err.error}>
+                                      {err.error}
+                                    </TableCell>
+                                  </TableRow>
+                                  {isExpanded && err.stack && (
+                                    <TableRow key={`${idx}-stack`} className="border-secondary-800 bg-secondary-950/60">
+                                      <TableCell colSpan={5} className="p-0">
+                                        <pre className="px-6 py-3 text-[10px] font-mono text-rose-300/80 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
+                                          {err.stack}
+                                        </pre>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tab 7: Platform-wide Feedback */}
+            {activeTab === "feedback" && (
+              <Card className="bg-secondary-900 border-secondary-800 text-white">
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold flex items-center">
+                    <MessageSquare className="h-5 w-5 mr-2 text-amber-400" />
+                    Tenant Feedback Inbox
+                  </CardTitle>
+                  <CardDescription className="text-secondary-400 text-xs">
+                    All feedback submitted by users across every tenant workspace — read-only view.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Filters */}
+                  <div className="flex flex-wrap gap-3">
+                    <select
+                      value={feedbackCategoryFilter}
+                      onChange={(e) => setFeedbackCategoryFilter(e.target.value)}
+                      className="h-9 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs px-2"
+                    >
+                      <option value="">All Categories</option>
+                      <option value="GENERAL">General</option>
+                      <option value="BUG">Bug</option>
+                      <option value="FEATURE_REQUEST">Feature Request</option>
+                    </select>
+                    <select
+                      value={feedbackStatusFilter}
+                      onChange={(e) => setFeedbackStatusFilter(e.target.value)}
+                      className="h-9 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs px-2"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="NEW">New</option>
+                      <option value="REVIEWED">Reviewed</option>
+                    </select>
+                    <Input
+                      value={feedbackTenantFilter}
+                      onChange={(e) => setFeedbackTenantFilter(e.target.value)}
+                      placeholder="Filter by Tenant ID…"
+                      className="h-9 w-52 bg-secondary-950 border-secondary-700 text-white text-xs"
+                    />
+                    <button
+                      onClick={fetchFeedback}
+                      className="h-9 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 text-xs font-medium border border-secondary-700 transition-colors"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {isLoadingFeedback && (
+                    <div className="flex items-center gap-2 text-secondary-400 text-sm py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading feedback…
+                    </div>
+                  )}
+                  {feedbackError && (
+                    <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                      {feedbackError}
+                    </div>
+                  )}
+                  {feedbackItems !== null && !isLoadingFeedback && (
+                    feedbackItems.length === 0 ? (
+                      <p className="text-sm text-secondary-500 py-4">No feedback found for the current filters.</p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-secondary-800">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800">
+                              <TableHead className="text-secondary-400 text-xs">Date</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Tenant</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">User</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Role</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Category</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Message</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {feedbackItems.map((item) => {
+                              const isExpanded = expandedFeedbackId === item.id;
+                              return (
+                                <TableRow
+                                  key={item.id}
+                                  className="border-secondary-800 cursor-pointer hover:bg-secondary-800/40"
+                                  onClick={() => setExpandedFeedbackId(isExpanded ? null : item.id)}
+                                >
+                                  <TableCell className="text-xs text-secondary-400 whitespace-nowrap">
+                                    {new Date(item.createdAt).toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-secondary-300">
+                                    {item.tenant?.name ?? item.tenantId}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-secondary-300">{item.userName}</TableCell>
+                                  <TableCell className="text-xs text-secondary-400">{item.userRole}</TableCell>
+                                  <TableCell>
+                                    <span className={`text-[10px] font-bold rounded px-1.5 py-0.5 ${
+                                      item.category === "BUG"
+                                        ? "bg-rose-950/60 text-rose-400 border border-rose-800"
+                                        : item.category === "FEATURE_REQUEST"
+                                          ? "bg-blue-950/60 text-blue-400 border border-blue-800"
+                                          : "bg-secondary-800 text-secondary-400 border border-secondary-700"
+                                    }`}>
+                                      {item.category === "FEATURE_REQUEST" ? "Feature" : item.category === "BUG" ? "Bug" : "General"}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className={`text-[10px] font-bold rounded px-1.5 py-0.5 ${
+                                      item.status === "REVIEWED"
+                                        ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800"
+                                        : "bg-amber-950/60 text-amber-400 border border-amber-800"
+                                    }`}>
+                                      {item.status}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-xs text-secondary-300 max-w-xs">
+                                    {isExpanded ? item.message : (
+                                      item.message.length > 100 ? item.message.slice(0, 100) + "…" : item.message
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )
+                  )}
                 </CardContent>
               </Card>
             )}

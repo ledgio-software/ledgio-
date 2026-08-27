@@ -1,7 +1,13 @@
+import { prisma } from '../config/db';
+import { addLayer } from './stockLayerService';
+
 export interface ReceivingLineInput {
   itemId: string;
   quantity: number;
   unitCost: number;
+  // When purchaseUoM is 'secondary', quantity is in the secondary unit of measure
+  // and is multiplied by conversionFactor before writing to WarehouseStock.
+  purchaseUoM?: 'primary' | 'secondary';
 }
 
 export interface ReceivingLineResult {
@@ -33,11 +39,25 @@ export async function receiveInventoryForBill(
 ): Promise<ReceivingLineResult[]> {
   const results: ReceivingLineResult[] = [];
 
+  // Fetch stock valuation method once before the loop — public schema.
+  const tenant = await (prisma as any).tenant.findUnique({
+    where: { id: tenantId },
+    select: { stockValuationMethod: true },
+  });
+  const isFifo = tenant?.stockValuationMethod === 'FIFO';
+
   for (const line of lines) {
     const item = await client.inventoryItem.findFirst({ where: { id: line.itemId, tenantId } });
     if (!item) {
       throw new Error(`Inventory item ${line.itemId} not found.`);
     }
+
+    // Apply secondary UoM conversion if the line was entered in secondary units.
+    const conversionFactor = item.conversionFactor ? Number(item.conversionFactor) : 1;
+    const receivedQty =
+      line.purchaseUoM === 'secondary' && conversionFactor > 0
+        ? Math.round(line.quantity * conversionFactor)
+        : line.quantity;
 
     const existingStock = await client.warehouseStock.findUnique({
       where: { warehouseId_itemId: { warehouseId, itemId: line.itemId } },
@@ -45,14 +65,14 @@ export async function receiveInventoryForBill(
     const previousQtyOnHand = existingStock?.quantityOnHand || 0;
     const previousCostPrice = Number(item.costPrice);
 
-    const newQtyOnHand = previousQtyOnHand + line.quantity;
+    const newQtyOnHand = previousQtyOnHand + receivedQty;
     const newCostPrice =
-      (previousQtyOnHand * previousCostPrice + line.quantity * line.unitCost) / newQtyOnHand;
+      (previousQtyOnHand * previousCostPrice + receivedQty * line.unitCost) / newQtyOnHand;
 
     await client.warehouseStock.upsert({
       where: { warehouseId_itemId: { warehouseId, itemId: line.itemId } },
-      update: { quantityOnHand: { increment: line.quantity } },
-      create: { tenantId, warehouseId, itemId: line.itemId, quantityOnHand: line.quantity },
+      update: { quantityOnHand: { increment: receivedQty } },
+      create: { tenantId, warehouseId, itemId: line.itemId, quantityOnHand: receivedQty },
     });
 
     await client.inventoryItem.update({
@@ -60,9 +80,14 @@ export async function receiveInventoryForBill(
       data: { costPrice: newCostPrice },
     });
 
+    // Record a FIFO lot for this receipt so consumeLayers can deplete it on sale.
+    if (isFifo) {
+      await addLayer({ tenantId, warehouseId, itemId: line.itemId, qty: receivedQty, unitCost: line.unitCost });
+    }
+
     results.push({
       itemId: line.itemId,
-      quantity: line.quantity,
+      quantity: receivedQty,
       unitCost: line.unitCost,
       previousCostPrice,
       newCostPrice,

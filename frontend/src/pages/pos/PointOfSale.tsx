@@ -36,6 +36,7 @@ interface InventoryItemOption {
   wholesalePrice: number | null;
   unitOfMeasure: string;
   stockQty: number;
+  regulatoryCategory?: string;
 }
 
 interface CartLine {
@@ -47,6 +48,7 @@ interface CartLine {
   wholesalePrice: number | null;
   stockQty: number;
   quantity: number;
+  regulatoryCategory?: string;
 }
 
 interface CashSaleLine {
@@ -84,6 +86,7 @@ interface CashTill {
 }
 
 interface LastReceipt {
+  id: string;
   receiptNo: string;
   amount: number;
   changeGiven: number;
@@ -115,6 +118,8 @@ export function PointOfSale() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [saleType, setSaleType] = useState<"RETAIL" | "WHOLESALE">("RETAIL");
+  const [rxNumber, setRxNumber] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "MOMO" | "CARD">("CASH");
   const [isRecordingSale, setIsRecordingSale] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastReceipt | null>(null);
@@ -203,6 +208,7 @@ export function PointOfSale() {
               wholesalePrice: it.wholesalePrice != null ? Number(it.wholesalePrice) : null,
               unitOfMeasure: it.unitOfMeasure,
               stockQty: stock ? stock.quantityOnHand : 0,
+              regulatoryCategory: it.regulatoryCategory,
             };
           })
           .filter((it: InventoryItemOption) => it.stockQty > 0);
@@ -354,6 +360,7 @@ export function PointOfSale() {
           wholesalePrice: item.wholesalePrice,
           stockQty: item.stockQty,
           quantity: 1,
+          regulatoryCategory: item.regulatoryCategory,
         },
       ];
     });
@@ -385,7 +392,7 @@ export function PointOfSale() {
     setSaleError(null);
     if (!till || cart.length === 0) return;
 
-    if (Number(cashGiven) < cartTotal) {
+    if (paymentMethod === "CASH" && Number(cashGiven) < cartTotal) {
       setSaleError(`Cash given must be at least ${formatMoney(cartTotal)}.`);
       return;
     }
@@ -401,16 +408,23 @@ export function PointOfSale() {
       const res = await api.post("/tills/sales", {
         tillId: till.id,
         items: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity })),
-        cashGiven: Number(cashGiven),
+        cashGiven: paymentMethod === "CASH" ? Number(cashGiven) : cartTotal,
         saleType,
         clientTxnId,
         clientOccurredAt,
         customerPhone: customerPhone.trim() || undefined,
         customerName: customerName.trim() || undefined,
+        rxNumber: rxNumber.trim() || undefined,
+        paymentMethod,
       });
 
       if (res.data.success) {
+        const warnings: string[] = res.data.data.warnings || [];
+        if (warnings.length > 0) {
+          showToast(`Warning: ${warnings.join(" ")}`, "warning" as any);
+        }
         setLastReceipt({
+          id: res.data.data.sale.id,
           receiptNo: res.data.data.sale.receiptNo,
           amount: res.data.data.totalAmount,
           changeGiven: res.data.data.changeGiven,
@@ -421,6 +435,8 @@ export function PointOfSale() {
         setCashGiven("");
         setCustomerPhone("");
         setCustomerName("");
+        setRxNumber("");
+        setPaymentMethod("CASH");
         fetchTillAndItems();
       }
     } catch (err: any) {
@@ -806,23 +822,47 @@ export function PointOfSale() {
                 </div>
 
                 <form onSubmit={handleRecordSale} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs text-secondary-500">Basket Total</div>
-                      <div className="text-xl font-bold">{formatMoney(cartTotal)}</div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Cash Given</label>
-                      <Input type="number" required min={0} step="0.01" value={cashGiven} onChange={(e) => setCashGiven(e.target.value)} disabled={cart.length === 0} />
+                  <div>
+                    <div className="text-xs text-secondary-500 mb-1">Basket Total</div>
+                    <div className="text-xl font-bold">{formatMoney(cartTotal)}</div>
+                  </div>
+
+                  {/* Payment Method */}
+                  <div>
+                    <div className="text-xs text-secondary-500 mb-1">Payment Method</div>
+                    <div className="flex rounded-md border border-secondary-200 dark:border-secondary-800 p-1 text-sm">
+                      {(["CASH", "MOMO", "CARD"] as const).map((method) => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setPaymentMethod(method)}
+                          className={`flex-1 py-1.5 rounded text-xs font-medium ${paymentMethod === method ? "bg-primary-600 text-white" : "text-secondary-500"}`}
+                        >
+                          {method === "MOMO" ? "MoMo" : method}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="p-4 bg-secondary-50 dark:bg-secondary-900 rounded-lg">
-                    <div className="text-xs text-secondary-500">Change Due</div>
-                    <div className={`text-xl font-bold ${changeDue < 0 ? "text-red-500" : "text-emerald-600"}`}>
-                      {formatMoney(Math.max(0, changeDue))}
+                  {paymentMethod === "CASH" ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Cash Given</label>
+                        <Input type="number" required min={0} step="0.01" value={cashGiven} onChange={(e) => setCashGiven(e.target.value)} disabled={cart.length === 0} />
+                      </div>
+                      <div className="p-4 bg-secondary-50 dark:bg-secondary-900 rounded-lg">
+                        <div className="text-xs text-secondary-500">Change Due</div>
+                        <div className={`text-xl font-bold ${changeDue < 0 ? "text-red-500" : "text-emerald-600"}`}>
+                          {formatMoney(Math.max(0, changeDue))}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 bg-secondary-50 dark:bg-secondary-900 rounded-lg">
+                      <div className="text-xs text-secondary-500">Amount ({paymentMethod === "MOMO" ? "MoMo" : paymentMethod})</div>
+                      <div className="text-xl font-bold text-emerald-600">{formatMoney(cartTotal)}</div>
                     </div>
-                  </div>
+                  )}
 
                   <details className="group">
                     <summary className="text-xs text-secondary-500 cursor-pointer hover:text-secondary-700 dark:hover:text-secondary-300 select-none">
@@ -840,16 +880,40 @@ export function PointOfSale() {
                     </div>
                   </details>
 
-                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || !cashGiven}>
+                  {user?.orgType === "PHARMACY" && cart.some(l => l.regulatoryCategory && l.regulatoryCategory !== "GENERAL") && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                      <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 text-xs font-medium mb-2">
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        Prescription / controlled drug(s) in cart. Enter Rx number (optional):
+                      </div>
+                      <Input
+                        type="text"
+                        placeholder="Rx number e.g. RX-1720123456-A1B2"
+                        value={rxNumber}
+                        onChange={(e) => setRxNumber(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven)}>
                     {isRecordingSale ? "Recording..." : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}
                   </Button>
                 </form>
 
                 {lastReceipt && (
                   <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
-                    <div className="flex items-center text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-1">
-                      <Receipt className="mr-1.5 h-4 w-4" />
-                      Sale recorded — Receipt {lastReceipt.receiptNo}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-1">
+                        <Receipt className="mr-1.5 h-4 w-4" />
+                        Sale recorded — Receipt {lastReceipt.receiptNo}
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs text-emerald-700 dark:text-emerald-400 underline hover:text-emerald-900"
+                        onClick={() => window.open(`/api/v1/tills/sales/${lastReceipt.id}/receipt.pdf`, '_blank')}
+                      >
+                        Print Receipt
+                      </button>
                     </div>
                     <p className="text-xs text-emerald-700 dark:text-emerald-400">
                       {lastReceipt.lines.map((l) => `${l.quantity} × ${l.itemName}`).join(", ")} — Total {formatMoney(lastReceipt.amount)} — Change given {formatMoney(lastReceipt.changeGiven)}
@@ -925,21 +989,31 @@ export function PointOfSale() {
                           </span>
                           <span>{new Date(sale.createdAt).toLocaleTimeString()}</span>
                         </div>
-                        {sale.status === "VOIDED" ? (
-                          <div className="mt-1 flex items-center text-red-600 dark:text-red-400 font-medium">
-                            <Ban className="h-3 w-3 mr-1" />
-                            Voided by {sale.voidedByName}{sale.voidReason ? ` — ${sale.voidReason}` : ""}
-                          </div>
-                        ) : (
+                        <div className="mt-1 flex items-center gap-3">
                           <button
                             type="button"
-                            onClick={() => openVoidModal(sale)}
-                            className="mt-1 flex items-center text-secondary-400 hover:text-red-500 font-medium"
+                            onClick={() => window.open(`/api/v1/tills/sales/${sale.id}/receipt.pdf`, '_blank')}
+                            className="flex items-center text-secondary-400 hover:text-primary-600 font-medium"
                           >
-                            <Ban className="h-3 w-3 mr-1" />
-                            Void this sale
+                            <Receipt className="h-3 w-3 mr-1" />
+                            Print
                           </button>
-                        )}
+                          {sale.status === "VOIDED" ? (
+                            <span className="flex items-center text-red-600 dark:text-red-400 font-medium">
+                              <Ban className="h-3 w-3 mr-1" />
+                              Voided by {sale.voidedByName}{sale.voidReason ? ` — ${sale.voidReason}` : ""}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openVoidModal(sale)}
+                              className="flex items-center text-secondary-400 hover:text-red-500 font-medium"
+                            >
+                              <Ban className="h-3 w-3 mr-1" />
+                              Void this sale
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

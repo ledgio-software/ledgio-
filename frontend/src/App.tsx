@@ -1,4 +1,5 @@
-import { Component, lazy, Suspense, useEffect, useRef } from "react";
+import { Component, lazy, Suspense, useEffect, useRef, useState } from "react";
+import { initAnalytics, trackPageView } from "./lib/analytics";
 import type { ErrorInfo, ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -17,7 +18,7 @@ import { CommandMenu } from "./components/ui/CommandMenu";
 import {
   ShoppingCart, Package, FileText as FileTextIcon, DollarSign,
   Wallet as WalletIcon, ArrowLeftRight, ClipboardList, BarChart2,
-  Receipt as ReceiptIcon,
+  Receipt as ReceiptIcon, Store, AlertTriangle, CheckCircle2, TrendingUp,
 } from "lucide-react";
 import { useProfitAndLoss } from "./hooks/useProfitAndLoss";
 import { useAccounts } from "./hooks/useAccounts";
@@ -37,6 +38,9 @@ const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts").th
 const OnboardingWizard = lazy(() => import("./pages/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
 const Settings = lazy(() => import("./pages/settings/Settings").then(m => ({ default: m.Settings })));
 const TaxRates = lazy(() => import("./pages/settings/TaxRates").then(m => ({ default: m.TaxRates })));
+const WhtRates = lazy(() => import("./pages/settings/WhtRates").then(m => ({ default: m.WhtRates })));
+const PostDatedCheques = lazy(() => import("./pages/banking/PostDatedCheques").then(m => ({ default: m.PostDatedCheques })));
+const InterestCharges = lazy(() => import("./pages/reports/InterestCharges").then(m => ({ default: m.InterestCharges })));
 const Funds = lazy(() => import("./pages/settings/Funds").then(m => ({ default: m.Funds })));
 const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m => ({ default: m.FiscalPeriods })));
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
@@ -50,6 +54,7 @@ const FeedbackInbox = lazy(() => import("./pages/feedback/FeedbackInbox").then(m
 const BulkImportWizard = lazy(() => import("./pages/import/BulkImportWizard").then(m => ({ default: m.BulkImportWizard })));
 const BankReconciliation = lazy(() => import("./pages/banking/BankReconciliation").then(m => ({ default: m.BankReconciliation })));
 const Invoices = lazy(() => import("./pages/invoices/Invoices").then(m => ({ default: m.Invoices })));
+const Customers = lazy(() => import("./pages/customers/Customers").then(m => ({ default: m.Customers })));
 const VendorBills = lazy(() => import("./pages/bills/VendorBills").then(m => ({ default: m.VendorBills })));
 const WarehouseManagement = lazy(() => import("./pages/inventory/WarehouseManagement").then(m => ({ default: m.WarehouseManagement })));
 const PointOfSale = lazy(() => import("./pages/pos/PointOfSale").then(m => ({ default: m.PointOfSale })));
@@ -68,14 +73,40 @@ const AgingReport = lazy(() => import("./pages/reports/AgingReport").then(m => (
 const SalesChannelReport = lazy(() => import("./pages/reports/SalesChannelReport").then(m => ({ default: m.SalesChannelReport })));
 const BranchComparisonReport = lazy(() => import("./pages/reports/BranchComparisonReport").then(m => ({ default: m.BranchComparisonReport })));
 const LandedCostReport = lazy(() => import("./pages/reports/LandedCostReport").then(m => ({ default: m.LandedCostReport })));
+const Daybook = lazy(() => import("./pages/reports/Daybook").then(m => ({ default: m.Daybook })));
+const StockMovement = lazy(() => import("./pages/reports/StockMovement").then(m => ({ default: m.StockMovement })));
+const Registers = lazy(() => import("./pages/reports/Registers").then(m => ({ default: m.Registers })));
+const AnalyticsDashboard = lazy(() => import("./pages/reports/AnalyticsDashboard").then(m => ({ default: m.AnalyticsDashboard })));
 const PettyCash = lazy(() => import("./pages/pettycash/PettyCash").then(m => ({ default: m.PettyCash })));
 const PurchaseOrders = lazy(() => import("./pages/purchaseorders/PurchaseOrders").then(m => ({ default: m.PurchaseOrders })));
+const SalesOrders = lazy(() => import("./pages/salesorders/SalesOrders").then(m => ({ default: m.SalesOrders })));
+const DeliveryNotes = lazy(() => import("./pages/logistics/DeliveryNotes").then(m => ({ default: m.DeliveryNotes })));
+const PaymentMatching = lazy(() => import("./pages/payments/PaymentMatching").then(m => ({ default: m.PaymentMatching })));
 const RecurringInvoices = lazy(() => import("./pages/recurringinvoices/RecurringInvoices").then(m => ({ default: m.RecurringInvoices })));
 const FixedAssets = lazy(() => import("./pages/fixedassets/FixedAssets").then(m => ({ default: m.FixedAssets })));
 const Employees = lazy(() => import("./pages/payroll/Employees").then(m => ({ default: m.Employees })));
 const PayrollRuns = lazy(() => import("./pages/payroll/PayrollRuns").then(m => ({ default: m.PayrollRuns })));
 const Loans = lazy(() => import("./pages/payroll/Loans").then(m => ({ default: m.Loans })));
 const Leave = lazy(() => import("./pages/payroll/Leave").then(m => ({ default: m.Leave })));
+const PaymentCallback = lazy(() => import("./pages/subscription/PaymentCallback").then(m => ({ default: m.PaymentCallback })));
+const PrescriptionRegister = lazy(() => import("./pages/pharmacy/PrescriptionRegister").then(m => ({ default: m.PrescriptionRegister })));
+const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister").then(m => ({ default: m.NarcoticsRegister })));
+const ExpiryAlerts = lazy(() => import("./pages/pharmacy/ExpiryAlerts").then(m => ({ default: m.ExpiryAlerts })));
+const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m => ({ default: m.CostCentres })));
+const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
+const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ default: m.VatReturn })));
+const StockAging = lazy(() => import("./pages/reports/StockAging").then(m => ({ default: m.StockAging })));
+const TrialBalance = lazy(() => import("./pages/reports/TrialBalance").then(m => ({ default: m.TrialBalance })));
+const FinancialRatios = lazy(() => import("./pages/reports/FinancialRatios").then(m => ({ default: m.FinancialRatios })));
+const BenfordAnalysis = lazy(() => import("./pages/reports/BenfordAnalysis").then(m => ({ default: m.BenfordAnalysis })));
+const PriceLists = lazy(() => import("./pages/settings/PriceLists").then(m => ({ default: m.PriceLists })));
+const SerialNumbers = lazy(() => import("./pages/inventory/SerialNumbers").then(m => ({ default: m.SerialNumbers })));
+const Jobs = lazy(() => import("./pages/manufacturing/Jobs").then(m => ({ default: m.Jobs })));
+const JobWorkOrders = lazy(() => import("./pages/manufacturing/JobWorkOrders").then(m => ({ default: m.JobWorkOrders })));
+const CostCategories = lazy(() => import("./pages/costcentres/CostCategories").then(m => ({ default: m.CostCategories })));
+const Scenarios = lazy(() => import("./pages/settings/Scenarios").then(m => ({ default: m.Scenarios })));
+const VoucherClasses = lazy(() => import("./pages/settings/VoucherClasses").then(m => ({ default: m.VoucherClasses })));
+const ApiKeys = lazy(() => import("./pages/settings/ApiKeys").then(m => ({ default: m.ApiKeys })));
 
 // "What happened today?" quick-action grid shown in Operations and Business modes.
 const GUIDED_ACTIONS_OPS = [
@@ -263,9 +294,140 @@ const Dashboard = () => {
           </Card>
         </div>
       )}
+
+      {isRestrictedRole && <ShopManagerDashboard />}
     </div>
   );
 };
+
+function ShopManagerDashboard() {
+  const { settings } = useTenantSettings();
+  const [tillStatus, setTillStatus] = useState<{ status: string; cashSalesTotal: number } | null>(null);
+  const [todaySales, setTodaySales] = useState<{ total: number; count: number } | null>(null);
+  const [lowStockCount, setLowStockCount] = useState<number | null>(null);
+  const [lastDiscrepancy, setLastDiscrepancy] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: settings.baseCurrency }).format(n);
+
+  useEffect(() => {
+    setLoading(true);
+    const today = new Date().toISOString().slice(0, 10);
+
+    Promise.allSettled([
+      api.get('/tills/current'),
+      api.get(`/tills/closeouts?startDate=${today}&endDate=${today}&limit=50`),
+      api.get('/inventory/warehouses'),
+    ]).then(([tillRes, closeoutRes, whRes]) => {
+      if (tillRes.status === 'fulfilled') {
+        const t = tillRes.value.data?.data?.till;
+        setTillStatus(t ? { status: t.status, cashSalesTotal: Number(t.cashSalesTotal ?? 0) } : null);
+      }
+      if (closeoutRes.status === 'fulfilled') {
+        const rows: any[] = closeoutRes.value.data?.data?.closeouts ?? [];
+        const total = rows.reduce((s: number, r: any) => s + Number(r.cashSalesTotal ?? 0), 0);
+        setTodaySales({ total, count: rows.reduce((s: number, r: any) => s + (r.totalTransactions ?? 0), 0) });
+        if (rows.length > 0) setLastDiscrepancy(Number(rows[0].discrepancy ?? 0));
+      }
+      if (whRes.status === 'fulfilled') {
+        const warehouses: any[] = whRes.value.data?.data?.warehouses ?? [];
+        let low = 0;
+        for (const wh of warehouses) {
+          for (const s of (wh.stocks ?? [])) {
+            if (s.quantityOnHand <= (s.reorderLevel ?? 0)) low++;
+          }
+        }
+        setLowStockCount(low);
+      }
+    }).finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) {
+    return <div className="grid gap-4 grid-cols-2 md:grid-cols-4 animate-pulse">{[...Array(4)].map((_, i) => <div key={i} className="h-24 rounded-xl bg-secondary-100 dark:bg-secondary-800" />)}</div>;
+  }
+
+  const tillOpen = tillStatus?.status === 'OPEN';
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Till Status</CardTitle>
+            <Store className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-xl font-bold ${tillOpen ? 'text-emerald-600 dark:text-emerald-400' : 'text-secondary-500'}`}>
+              {tillStatus ? (tillOpen ? 'OPEN' : 'CLOSED') : 'No Till'}
+            </div>
+            {tillOpen && (
+              <p className="text-xs text-secondary-500 mt-1">Sales today: {fmt(tillStatus!.cashSalesTotal)}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
+            <TrendingUp className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+              {todaySales ? fmt(todaySales.total) : fmt(0)}
+            </div>
+            {todaySales && (
+              <p className="text-xs text-secondary-500 mt-1">{todaySales.count} transaction{todaySales.count !== 1 ? 's' : ''}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-xl font-bold ${(lowStockCount ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-secondary-900 dark:text-secondary-50'}`}>
+              {lowStockCount ?? 0}
+            </div>
+            <p className="text-xs text-secondary-500 mt-1">
+              {(lowStockCount ?? 0) > 0 ? 'Items at or below reorder level' : 'All items stocked'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Last Closeout</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-xl font-bold ${lastDiscrepancy !== null && lastDiscrepancy !== 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {lastDiscrepancy !== null ? (lastDiscrepancy === 0 ? 'Balanced' : fmt(lastDiscrepancy)) : '—'}
+            </div>
+            <p className="text-xs text-secondary-500 mt-1">
+              {lastDiscrepancy !== null && lastDiscrepancy !== 0 ? 'Discrepancy detected' : 'No discrepancy'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {[
+          { label: 'Open / Close Till', href: '/pos', icon: Store, color: 'emerald' },
+          { label: 'Make a Sale', href: '/pos', icon: ShoppingCart, color: 'blue' },
+          { label: 'View Inventory', href: '/inventory', icon: Package, color: 'purple' },
+        ].map(({ label, href, icon: Icon, color }) => (
+          <Link key={label} to={href} className={`flex flex-col items-center gap-2 rounded-xl p-4 text-center text-xs font-medium transition-all duration-150 ${ACTION_COLOR_CLASSES[color] ?? ACTION_COLOR_CLASSES.blue}`}>
+            <Icon className="h-6 w-6 flex-shrink-0" />
+            {label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function ProtectedRoute({ children, blockedRoles }: { children: React.ReactNode; blockedRoles?: Set<string> }) {
   const { token, isLoading, user } = useAuth();
@@ -321,6 +483,14 @@ function PresenceLifecycleMount() {
   return null;
 }
 
+function PageViewTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location]);
+  return null;
+}
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -365,6 +535,8 @@ const RouteLoadingFallback = () => (
 );
 
 function App() {
+  useEffect(() => { initAnalytics(); }, []);
+
   return (
     <ErrorBoundary>
     <ThemeProvider defaultTheme="system" storageKey="accountgo-theme">
@@ -374,6 +546,7 @@ function App() {
         <SyncEngineLifecycleMount />
         <PresenceLifecycleMount />
         <BrowserRouter>
+          <PageViewTracker />
           <CommandMenu />
           <Suspense fallback={<RouteLoadingFallback />}>
             <Routes>
@@ -382,6 +555,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/accept-invite" element={<AcceptInvitation />} />
               <Route path="/verify-account" element={<Verification />} />
+              <Route path="/verify" element={<PaymentCallback />} />
               <Route path="/features" element={<FeaturesPage />} />
               <Route path="/how-it-works" element={<HowItWorksPage />} />
               <Route path="/legal" element={<LegalHubPage />} />
@@ -394,6 +568,7 @@ function App() {
               <Route path="/onboarding" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><OnboardingWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/tax-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><TaxRates /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/wht-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><WhtRates /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/funds" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Funds /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/fiscal-periods" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><FiscalPeriods /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/recurring-transactions" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><RecurringTransactions /></MainLayout></ProtectedRoute>} />
@@ -406,7 +581,10 @@ function App() {
               <Route path="/feedback" element={<ProtectedRoute><MainLayout><FeedbackInbox /></MainLayout></ProtectedRoute>} />
               <Route path="/import" element={<ProtectedRoute><MainLayout><BulkImportWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/banking" element={<ProtectedRoute><MainLayout><BankReconciliation /></MainLayout></ProtectedRoute>} />
+              <Route path="/pdc" element={<ProtectedRoute><MainLayout><PostDatedCheques /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/interest-charges" element={<ProtectedRoute><MainLayout><InterestCharges /></MainLayout></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><MainLayout><Invoices /></MainLayout></ProtectedRoute>} />
+              <Route path="/customers" element={<ProtectedRoute><MainLayout><Customers /></MainLayout></ProtectedRoute>} />
               <Route path="/bills" element={<ProtectedRoute><MainLayout><VendorBills /></MainLayout></ProtectedRoute>} />
               <Route path="/inventory" element={<ProtectedRoute><MainLayout><WarehouseManagement /></MainLayout></ProtectedRoute>} />
               <Route path="/pos" element={<ProtectedRoute><MainLayout><PointOfSale /></MainLayout></ProtectedRoute>} />
@@ -425,14 +603,39 @@ function App() {
               <Route path="/reports/sales-channel" element={<ProtectedRoute><MainLayout><SalesChannelReport /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/branch-comparison" element={<ProtectedRoute><MainLayout><BranchComparisonReport /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/landed-costs" element={<ProtectedRoute><MainLayout><LandedCostReport /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/analytics" element={<ProtectedRoute><MainLayout><AnalyticsDashboard /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/daybook" element={<ProtectedRoute><MainLayout><Daybook /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/stock-movement" element={<ProtectedRoute><MainLayout><StockMovement /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/registers" element={<ProtectedRoute><MainLayout><Registers /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/vat-return" element={<ProtectedRoute><MainLayout><VatReturn /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/stock-aging" element={<ProtectedRoute><MainLayout><StockAging /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/trial-balance" element={<ProtectedRoute><MainLayout><TrialBalance /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/financial-ratios" element={<ProtectedRoute><MainLayout><FinancialRatios /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/benford-analysis" element={<ProtectedRoute><MainLayout><BenfordAnalysis /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/price-lists" element={<ProtectedRoute><MainLayout><PriceLists /></MainLayout></ProtectedRoute>} />
+              <Route path="/inventory/serial-numbers" element={<ProtectedRoute><MainLayout><SerialNumbers /></MainLayout></ProtectedRoute>} />
               <Route path="/petty-cash" element={<ProtectedRoute><MainLayout><PettyCash /></MainLayout></ProtectedRoute>} />
               <Route path="/purchase-orders" element={<ProtectedRoute><MainLayout><PurchaseOrders /></MainLayout></ProtectedRoute>} />
+              <Route path="/sales-orders" element={<ProtectedRoute><MainLayout><SalesOrders /></MainLayout></ProtectedRoute>} />
+              <Route path="/delivery-notes" element={<ProtectedRoute><MainLayout><DeliveryNotes /></MainLayout></ProtectedRoute>} />
+              <Route path="/payment-matching" element={<ProtectedRoute><MainLayout><PaymentMatching /></MainLayout></ProtectedRoute>} />
               <Route path="/recurring-invoices" element={<ProtectedRoute><MainLayout><RecurringInvoices /></MainLayout></ProtectedRoute>} />
               <Route path="/fixed-assets" element={<ProtectedRoute><MainLayout><FixedAssets /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/employees" element={<ProtectedRoute><MainLayout><Employees /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/runs" element={<ProtectedRoute><MainLayout><PayrollRuns /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/loans" element={<ProtectedRoute><MainLayout><Loans /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/leave" element={<ProtectedRoute><MainLayout><Leave /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
+              <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />
+              <Route path="/manufacturing" element={<ProtectedRoute><MainLayout><Manufacturing /></MainLayout></ProtectedRoute>} />
+              <Route path="/manufacturing/jobs" element={<ProtectedRoute><MainLayout><Jobs /></MainLayout></ProtectedRoute>} />
+              <Route path="/manufacturing/job-work-orders" element={<ProtectedRoute><MainLayout><JobWorkOrders /></MainLayout></ProtectedRoute>} />
+              <Route path="/cost-categories" element={<ProtectedRoute><MainLayout><CostCategories /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/scenarios" element={<ProtectedRoute><MainLayout><Scenarios /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/voucher-classes" element={<ProtectedRoute><MainLayout><VoucherClasses /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/api-keys" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><ApiKeys /></MainLayout></ProtectedRoute>} />
               <Route path="/reports" element={<Navigate to="/reports/pnl" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />

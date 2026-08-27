@@ -7,7 +7,7 @@ export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENS
 // 009_add_account_default_role. At most one account per role per tenant.
 // DEPRECIATION_EXPENSE/ACCUMULATED_DEPRECIATION added by migration
 // 010_add_fixed_asset_support for fixedAssetService.ts's monthly postings.
-export type AccountDefaultRole = 'CASH' | 'REVENUE' | 'EXPENSE' | 'DEPRECIATION_EXPENSE' | 'ACCUMULATED_DEPRECIATION' | 'COGS' | 'INVENTORY_ASSET' | 'SALARY_EXPENSE' | 'EMPLOYER_SSNIT_EXPENSE' | 'PAYE_PAYABLE' | 'SSNIT_PAYABLE' | 'NET_PAY_PAYABLE';
+export type AccountDefaultRole = 'CASH' | 'REVENUE' | 'EXPENSE' | 'DEPRECIATION_EXPENSE' | 'ACCUMULATED_DEPRECIATION' | 'COGS' | 'INVENTORY_ASSET' | 'SALARY_EXPENSE' | 'EMPLOYER_SSNIT_EXPENSE' | 'PAYE_PAYABLE' | 'SSNIT_PAYABLE' | 'NET_PAY_PAYABLE' | 'WHT_PAYABLE' | 'PDC_RECEIVABLE' | 'PDC_PAYABLE' | 'INTEREST_INCOME' | 'JOB_WIP' | 'JOB_EXPENSE';
 
 export interface AccountRecord {
   id: string;
@@ -23,6 +23,7 @@ export interface AccountRecord {
   // migration 010. Unlike defaultRole, multiple accounts can hold this flag.
   isFixedAsset: boolean;
   defaultRole: AccountDefaultRole | null;
+  clientTxnId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,12 +54,13 @@ function mapAccountRow(row: any): AccountRecord {
     isCashEquivalent: Boolean(row.is_cash_equivalent),
     isFixedAsset: Boolean(row.is_fixed_asset),
     defaultRole: (row.default_role as AccountDefaultRole) || null,
+    clientTxnId: row.client_txn_id || null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
 }
 
-const ACCOUNT_COLUMNS = 'id, code, name, type, parent_id, currency, is_active, is_cash_equivalent, is_fixed_asset, default_role, created_at, updated_at';
+const ACCOUNT_COLUMNS = 'id, code, name, type, parent_id, currency, is_active, is_cash_equivalent, is_fixed_asset, default_role, client_txn_id, created_at, updated_at';
 
 /**
  * Default for isCashEquivalent when not explicitly supplied: ASSET accounts
@@ -112,6 +114,12 @@ const PLAUSIBLE_TYPES_FOR_ROLE: Record<AccountDefaultRole, AccountType[]> = {
   PAYE_PAYABLE: ['LIABILITY'],
   SSNIT_PAYABLE: ['LIABILITY'],
   NET_PAY_PAYABLE: ['LIABILITY'],
+  WHT_PAYABLE: ['LIABILITY'],
+  PDC_RECEIVABLE: ['ASSET'],
+  PDC_PAYABLE: ['LIABILITY'],
+  INTEREST_INCOME: ['REVENUE'],
+  JOB_WIP: ['ASSET'],
+  JOB_EXPENSE: ['EXPENSE', 'COST_OF_SALES'],
 };
 
 export function resolveDefaultAccount(
@@ -176,6 +184,25 @@ export function pickAutoDefaultCandidate(
   if (role === 'NET_PAY_PAYABLE') {
     const liabilities = accounts.filter((a) => a.type === 'LIABILITY');
     return liabilities.find((a) => /net pay|salaries payable|wages payable/i.test(a.name)) || liabilities.sort(byCodeAsc)[0];
+  }
+  if (role === 'WHT_PAYABLE') {
+    const liabilities = accounts.filter((a) => a.type === 'LIABILITY');
+    return liabilities.find((a) => /withholding|wht payable/i.test(a.name)) || liabilities.sort(byCodeAsc)[0];
+  }
+  if (role === 'PDC_RECEIVABLE') {
+    const assets = accounts.filter((a) => a.type === 'ASSET' && !a.isCashEquivalent && !a.isFixedAsset);
+    return assets.find((a) => /pdc.*receiv|post.dated.*receiv|cheque.*receiv/i.test(a.name)) || assets.sort(byCodeAsc)[0];
+  }
+  if (role === 'PDC_PAYABLE') {
+    const liabilities = accounts.filter((a) => a.type === 'LIABILITY');
+    return liabilities.find((a) => /pdc.*pay|post.dated.*pay|cheque.*pay/i.test(a.name)) || liabilities.sort(byCodeAsc)[0];
+  }
+  if (role === 'INTEREST_INCOME') {
+    // Only match a specifically-named interest income account — never fall back
+    // to the first REVENUE account, which would steal Sales Revenue's REVENUE
+    // designation and leave the tenant with no REVENUE default.
+    const revenues = accounts.filter((a) => a.type === 'REVENUE');
+    return revenues.find((a) => /interest.*income|interest.*revenue/i.test(a.name));
   }
   const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'COST_OF_SALES');
   return expenseAccounts.find((a) => /miscellaneous/i.test(a.name)) || expenseAccounts.sort(byCodeAsc)[0];

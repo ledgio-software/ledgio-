@@ -27,6 +27,51 @@ import { GraEvatServiceError } from '../services/graEvatService';
 import { generateInvoicePdf } from '../services/pdfGenerationService';
 import * as tenantRepository from '../repository/tenantRepository';
 import { assertWarehouseAccess, WarehouseAccessError } from '../services/warehouseAccessService';
+import { encryptCredential, decryptCredential } from '../utils/credentialEncryption';
+import { z } from 'zod';
+import { validateBody } from '../middleware/validateBody';
+import { invalidateCachedList } from '../cache/listCache';
+
+const createCustomerSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email().max(320),
+  phone: z.string().max(30).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  creditLimit: z.number().nonnegative().optional().nullable(),
+  tin: z.string().max(20).optional().nullable(),
+  customerType: z.enum(['RETAIL', 'WHOLESALE']).optional(),
+});
+const updateCustomerSchema = createCustomerSchema.partial().extend({
+  email: z.string().email().max(320).optional(),
+});
+
+const lineItemSchema = z.object({
+  description: z.string().min(1).max(500),
+  quantity: z.number().positive(),
+  unitPrice: z.number().nonnegative(),
+  inventoryItemId: z.string().uuid().optional().nullable(),
+});
+const createInvoiceSchema = z.object({
+  customerId: z.string().uuid(),
+  dueDate: z.string().datetime({ offset: true }).optional().nullable(),
+  currency: z.string().length(3).optional(),
+  exchangeRate: z.number().positive().optional(),
+  items: z.array(lineItemSchema).min(1).max(100),
+  taxRateId: z.string().uuid().optional().nullable(),
+  fundId: z.string().uuid().optional().nullable(),
+  warehouseId: z.string().uuid().optional().nullable(),
+  clientTxnId: z.string().min(1).max(100).optional().nullable(),
+});
+
+/** Decrypt a customer row's PII fields. Returns plaintext; tolerates plaintext input (transitional). */
+function decryptCustomer(c: any): any {
+  if (!c) return c;
+  const safe = (v: string | null): string | null => {
+    if (!v) return v;
+    try { return decryptCredential(v); } catch { return v; }
+  };
+  return { ...c, email: safe(c.email), phone: safe(c.phone), tin: safe(c.tin) };
+}
 
 // Sentinel used to unwind a poisoned transaction cleanly on a clientTxnId
 // race (see the POST / handler) - never surfaced to a caller directly.
@@ -66,7 +111,7 @@ router.get('/customers', async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json({
       success: true,
-      data: { customers },
+      data: { customers: customers.map(decryptCustomer) },
     });
   } catch (error: any) {
     console.error('[Invoices] Error fetching customers:', error);
@@ -79,18 +124,10 @@ router.get('/customers', async (req: Request, res: Response): Promise<void> => {
  * Adds a new customer. Shop Manager can add a walk-in customer on the spot
  * when creating a sale for them - see POST / below.
  */
-router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/customers', requireRole('Accountant', 'Shop Manager'), validateBody(createCustomerSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
-    if (!name || !email) {
-      res.status(400).json({ success: false, error: 'Customer name and email are required.' });
-      return;
-    }
-    if (creditLimit !== undefined && creditLimit !== null && (typeof creditLimit !== 'number' || creditLimit < 0)) {
-      res.status(400).json({ success: false, error: 'creditLimit must be a non-negative number, or null for no limit.' });
-      return;
-    }
     const resolvedType = customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
 
     const created = await withCurrentTenantDb(prisma, async (client) => {
@@ -98,17 +135,17 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req:
         data: {
           tenantId,
           name: name.trim(),
-          email: email.trim().toLowerCase(),
-          phone,
+          email: encryptCredential(email.trim().toLowerCase()),
+          phone: phone ? encryptCredential(String(phone).trim()) : null,
           address,
           creditLimit: creditLimit ?? null,
-          tin: tin ? String(tin).trim() || null : null,
+          tin: tin ? encryptCredential(String(tin).trim()) : null,
           customerType: resolvedType,
         },
       });
     });
 
-    res.status(201).json({ success: true, data: { customer: created } });
+    res.status(201).json({ success: true, data: { customer: decryptCustomer(created) } });
   } catch (error: any) {
     console.error('[Invoices] Error creating customer:', error);
     res.status(500).json({ success: false, error: 'Failed to create customer.' });
@@ -119,16 +156,11 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), async (req:
  * PUT /api/v1/customers/:id
  * Updates a customer's contact details and/or credit limit.
  */
-router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.put('/customers/:id', requireRole('Accountant'), validateBody(updateCustomerSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
-
-    if (creditLimit !== undefined && creditLimit !== null && (typeof creditLimit !== 'number' || creditLimit < 0)) {
-      res.status(400).json({ success: false, error: 'creditLimit must be a non-negative number, or null for no limit.' });
-      return;
-    }
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).customer.findFirst({ where: { id, tenantId } });
@@ -137,11 +169,11 @@ router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res
         where: { id },
         data: {
           ...(name !== undefined && { name: String(name).trim() }),
-          ...(email !== undefined && { email: String(email).trim().toLowerCase() }),
-          ...(phone !== undefined && { phone }),
+          ...(email !== undefined && { email: encryptCredential(String(email).trim().toLowerCase()) }),
+          ...(phone !== undefined && { phone: phone ? encryptCredential(String(phone).trim()) : null }),
           ...(address !== undefined && { address }),
           ...(creditLimit !== undefined && { creditLimit }),
-          ...(tin !== undefined && { tin: tin ? String(tin).trim() || null : null }),
+          ...(tin !== undefined && { tin: tin ? encryptCredential(String(tin).trim()) : null }),
           ...(customerType !== undefined && { customerType: customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL' }),
         },
       });
@@ -152,10 +184,45 @@ router.put('/customers/:id', requireRole('Accountant'), async (req: Request, res
       return;
     }
 
-    res.status(200).json({ success: true, data: { customer: updated } });
+    res.status(200).json({ success: true, data: { customer: decryptCustomer(updated) } });
   } catch (error: any) {
     console.error('[Invoices] Error updating customer:', error);
     res.status(500).json({ success: false, error: 'Failed to update customer.' });
+  }
+});
+
+/**
+ * DELETE /api/v1/invoices/customers/:id
+ * Deletes a customer — blocked if any invoices exist for them.
+ */
+router.delete('/customers/:id', requireRole('Admin', 'Accountant'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { id } = req.params;
+
+    const invoiceCount = await withCurrentTenantDb(prisma, async (client) =>
+      (client as any).invoice.count({ where: { tenantId, customerId: id } })
+    );
+    if (invoiceCount > 0) {
+      res.status(400).json({ success: false, error: `Cannot delete: customer has ${invoiceCount} invoice(s). Remove all invoices first.` });
+      return;
+    }
+
+    const deleted = await withCurrentTenantDb(prisma, async (client) => {
+      const existing = await (client as any).customer.findFirst({ where: { id, tenantId } });
+      if (!existing) return null;
+      return (client as any).customer.delete({ where: { id } });
+    });
+
+    if (!deleted) {
+      res.status(404).json({ success: false, error: 'Customer not found.' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Invoices] Error deleting customer:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete customer.' });
   }
 });
 
@@ -169,7 +236,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const invoices = await withCurrentTenantDb(prisma, async (client) => {
       return (client as any).invoice.findMany({
         where: { tenantId },
-        include: { customer: true, items: true },
+        include: {
+          customer: true,
+          items: true,
+        },
         orderBy: { createdAt: 'desc' },
       });
     });
@@ -189,15 +259,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * below so they can only sell out of a warehouse they're actually assigned
  * to, mirroring how they're already scoped for Inventory and POS.
  */
-router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createInvoiceSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { customerId, dueDate, currency = 'USD', exchangeRate = 1.0, items, taxRateId, fundId, warehouseId, clientTxnId } = req.body;
 
-    if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ success: false, error: 'Customer and at least one item are required.' });
-      return;
-    }
     // Itemized invoice (deducts real stock at issue time) vs. a plain
     // "Simple Invoice" line-item-only-in-name record: mirrors
     // VendorBill's Simple/Itemized toggle on the purchase side.
@@ -221,10 +287,34 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
       }
     }
 
+    // Load the customer's assigned price list entries for auto-pricing.
+    // The caller-supplied unitPrice is always used when provided and non-zero;
+    // the price list only fills in a price when the caller sends 0 or omits it.
+    let priceListEntries: Map<string, { unitPrice: number; minQty: number }[]> = new Map();
+    const customer = await (prisma as any).customer.findFirst({ where: { id: customerId, tenantId }, select: { priceListId: true } });
+    if (customer?.priceListId) {
+      const entries: any[] = await (prisma as any).priceListEntry.findMany({
+        where: { priceListId: customer.priceListId, tenantId },
+        orderBy: { minQty: 'asc' },
+      });
+      for (const e of entries) {
+        const key = e.inventoryItemId;
+        if (!priceListEntries.has(key)) priceListEntries.set(key, []);
+        priceListEntries.get(key)!.push({ unitPrice: Number(e.unitPrice), minQty: e.minQty });
+      }
+    }
+
     let subtotal = 0;
     const itemData = items.map((it: any) => {
       const qty = Number(it.quantity) || 1;
-      const price = Number(it.unitPrice) || 0;
+      // Auto-fill from price list when caller sends no price and an item is linked
+      let price = Number(it.unitPrice) || 0;
+      if (price === 0 && it.inventoryItemId && priceListEntries.has(it.inventoryItemId)) {
+        const tiers = priceListEntries.get(it.inventoryItemId)!;
+        // Find the highest minQty tier that the quantity satisfies
+        const applicable = tiers.filter((t) => qty >= t.minQty);
+        if (applicable.length > 0) price = applicable[applicable.length - 1].unitPrice;
+      }
       const amt = qty * price;
       subtotal += amt;
       return {
@@ -393,30 +483,44 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
             });
             const stockByItemId = new Map(stocks.map((s: any) => [s.itemId, s]));
 
+            // Check tenant setting for negative stock allowance
+            const tenantSettings = await (client as any).tenant.findUnique({ where: { id: tenantId }, select: { allowNegativeStock: true } });
+            const allowNegStock = tenantSettings?.allowNegativeStock ?? false;
+
             // Friendly pre-check for every line before touching anything - the
             // actual deduction below is still atomically guarded per line to
             // protect against a genuine concurrent race (mirrors
             // cashTill.ts's POST /tills/sales stock-deduction pattern).
-            for (const line of stockLines) {
-              const item = itemsById.get(line.inventoryItemId) as any;
-              const stock = stockByItemId.get(line.inventoryItemId) as any;
-              if (!stock || stock.quantityOnHand < line.quantity) {
-                throw new InvoiceStockError(
-                  `Insufficient stock for ${item.name} in ${warehouse.name} (Available: ${stock?.quantityOnHand || 0} ${item.unitOfMeasure}).`,
-                  400
-                );
+            if (!allowNegStock) {
+              for (const line of stockLines) {
+                const item = itemsById.get(line.inventoryItemId) as any;
+                const stock = stockByItemId.get(line.inventoryItemId) as any;
+                if (!stock || stock.quantityOnHand < line.quantity) {
+                  throw new InvoiceStockError(
+                    `Insufficient stock for ${item.name} in ${warehouse.name} (Available: ${stock?.quantityOnHand || 0} ${item.unitOfMeasure}).`,
+                    400
+                  );
+                }
               }
             }
 
             for (const line of stockLines) {
               const stock = stockByItemId.get(line.inventoryItemId) as any;
-              const deduction = await (client as any).warehouseStock.updateMany({
-                where: { id: stock.id, quantityOnHand: { gte: line.quantity } },
-                data: { quantityOnHand: { decrement: line.quantity } },
-              });
-              if (deduction.count === 0) {
-                const item = itemsById.get(line.inventoryItemId) as any;
-                throw new InvoiceStockError(`Insufficient stock for ${item?.name || line.inventoryItemId} - another sale just took the remaining units.`, 409);
+              if (allowNegStock) {
+                // When negative stock is allowed, deduct unconditionally
+                await (client as any).warehouseStock.updateMany({
+                  where: { id: stock?.id, ...(stock ? {} : { itemId: line.inventoryItemId, warehouseId }) },
+                  data: { quantityOnHand: { decrement: line.quantity } },
+                });
+              } else {
+                const deduction = await (client as any).warehouseStock.updateMany({
+                  where: { id: stock.id, quantityOnHand: { gte: line.quantity } },
+                  data: { quantityOnHand: { decrement: line.quantity } },
+                });
+                if (deduction.count === 0) {
+                  const item = itemsById.get(line.inventoryItemId) as any;
+                  throw new InvoiceStockError(`Insufficient stock for ${item?.name || line.inventoryItemId} - another sale just took the remaining units.`, 409);
+                }
               }
             }
             stockDeducted = true;
@@ -503,6 +607,101 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
         payload: invoiceToSyncPayload(created),
         sequence: syncSeq,
       });
+    }
+
+    if (created?.stockDeducted) {
+      invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
+    }
+
+    // Fire async GRA clearance immediately for GRA-configured tenants so the
+    // IRN appears on the invoice without waiting for the 15-minute cron sweep.
+    // Fire-and-forget: the response is sent first; any failure is captured
+    // in graClearanceStatus=FAILED so the cron will retry within 48 hours.
+    // Skipped in test environment — graEvat.test.ts drives clearance manually
+    // and the unexpected extra axios call would break its mock call counts.
+    if (!replayed && process.env.NODE_ENV !== 'test') {
+      (async () => {
+        try {
+          const tenant = await tenantRepository.findTenantById(prisma, tenantId);
+          if (!tenant || !graEvatService.isGraEvatConfigured({
+            tin: tenant.graTin ?? null,
+            deviceNumber: tenant.graDeviceNumber ?? null,
+            securityKeyEncrypted: tenant.graSecurityKeyEncrypted ?? null,
+          })) return;
+
+          // Mark PENDING immediately so the cron skips it while we work.
+          await withCurrentTenantDb(prisma, async (client) => {
+            await (client as any).invoice.update({
+              where: { id: created.id },
+              data: { graClearanceStatus: 'PENDING' },
+            });
+          });
+
+          const invoiceWithDetails = await withCurrentTenantDb(prisma, async (client) => {
+            return (client as any).invoice.findFirst({
+              where: { id: created.id },
+              include: { customer: true, items: { include: { inventoryItem: true } } },
+            });
+          });
+          if (!invoiceWithDetails) return;
+
+          invoiceWithDetails.customer = decryptCustomer(invoiceWithDetails.customer);
+
+          const result = await graEvatService.requestClearance(
+            {
+              tin: tenant.graTin ?? null,
+              deviceNumber: tenant.graDeviceNumber ?? null,
+              securityKeyEncrypted: tenant.graSecurityKeyEncrypted ?? null,
+            },
+            {
+              invoiceNumber: invoiceWithDetails.invoiceNumber,
+              issueDate: invoiceWithDetails.issueDate,
+              currency: invoiceWithDetails.currency,
+              exchangeRate: Number(invoiceWithDetails.exchangeRate),
+              subtotal: Number(invoiceWithDetails.subtotal),
+              tax: Number(invoiceWithDetails.tax),
+              total: Number(invoiceWithDetails.total),
+              taxBreakdown: (invoiceWithDetails.taxBreakdown as any) ?? null,
+              customerName: invoiceWithDetails.customer?.name ?? 'Unknown',
+              customerTin: invoiceWithDetails.customer?.tin ?? null,
+              userName: (req as any).user?.name || (req as any).user?.email || 'Ledgio User',
+              items: invoiceWithDetails.items.map((item: any) => ({
+                id: item.id,
+                description: item.description,
+                quantity: Number(item.quantity),
+                unitPrice: Number(item.unitPrice),
+                amount: Number(item.amount),
+                sku: item.inventoryItem?.sku ?? null,
+              })),
+            }
+          );
+          const qrCodeDataUrl = await graEvatService.renderClearanceQrCode(result.qrCodeData);
+          await withCurrentTenantDb(prisma, async (client) => {
+            await (client as any).invoice.update({
+              where: { id: created.id },
+              data: {
+                graClearanceStatus: 'CLEARED',
+                graVerificationEngineId: result.verificationEngineId,
+                graQrCodeData: qrCodeDataUrl,
+                graSignature: result.signature,
+                graEncryptedData: result.encryptedData,
+                graClearedAt: result.clearedAt,
+                graClearanceError: null,
+              },
+            });
+          });
+          console.log(`[Invoices] GRA auto-clearance succeeded for ${invoiceWithDetails.invoiceNumber}`);
+        } catch (graErr: any) {
+          const msg = graErr instanceof GraEvatServiceError ? graErr.message : 'GRA auto-clearance failed.';
+          await withCurrentTenantDb(prisma, async (client) => {
+            await (client as any).invoice.update({
+              where: { id: created.id },
+              data: { graClearanceStatus: 'FAILED', graClearanceError: msg },
+            });
+          }).catch(() => {});
+          console.error(`[Invoices] GRA auto-clearance failed for invoice ${created.id}:`, msg);
+        }
+      })();
     }
 
     res.status(replayed ? 200 : 201).json({ success: true, message: 'Invoice created successfully', data: { invoice: created } });
@@ -592,6 +791,7 @@ router.get('/:id/pdf', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    invoice.customer = decryptCustomer(invoice.customer);
     const pdfBuffer = await generateInvoicePdf(tenantName || 'Company', {
       invoiceNumber: invoice.invoiceNumber,
       issueDateLabel: new Date(invoice.issueDate).toLocaleDateString('en-GH'),
@@ -638,8 +838,8 @@ router.post('/:id/send', requireRole('Accountant'), async (req: Request, res: Re
     const updated = await invoiceEmailService.sendInvoiceEmail(req.params.id, actor);
     res.status(200).json({
       success: true,
-      message: `Invoice emailed to ${updated.customer.email}.`,
-      data: { invoice: updated },
+      message: `Invoice emailed to ${decryptCustomer(updated.customer).email}.`,
+      data: { invoice: { ...updated, customer: decryptCustomer(updated.customer) } },
     });
   } catch (error: any) {
     if (error instanceof InvoiceEmailServiceError) {
@@ -680,6 +880,8 @@ router.post('/:id/gra-clearance', requireRole('Accountant'), async (req: Request
       res.status(400).json({ success: false, error: 'This invoice is already GRA-cleared.' });
       return;
     }
+
+    invoice.customer = decryptCustomer(invoice.customer);
 
     try {
       const tenant = await tenantRepository.findTenantById(prisma, tenantId);
@@ -769,6 +971,8 @@ router.post('/:id/credit-notes', requireRole('Accountant'), async (req: Request,
   try {
     const actor = actorFromRequest(req);
     const note = await creditDebitNoteService.createCreditNote(req.params.id, req.body, actor);
+    const { tenantId: cnTenantId } = requireTenantContext();
+    invalidateCachedList(cnTenantId, 'inventory-items').catch(() => {});
     res.status(201).json({ success: true, message: 'Credit note issued successfully.', data: { creditNote: note } });
   } catch (error: any) {
     if (error instanceof CreditDebitNoteServiceError || error instanceof JournalEntryServiceError) {

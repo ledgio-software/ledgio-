@@ -718,6 +718,147 @@ export const TENANT_MIGRATIONS: TenantMigration[] = [
         END IF;
       END $$;
     `
+  },
+  {
+    version: 18,
+    name: '018_notification_performance_indexes',
+    sql: `
+      -- Composite indexes so the notification GET query (filtered by
+      -- tenant_id + user_id + unread flag, ordered by created_at DESC)
+      -- never does a sequential scan on large notification tables.
+      CREATE INDEX IF NOT EXISTS idx_notifications_tenant_user_read
+        ON notifications(tenant_id, user_id, read);
+
+      CREATE INDEX IF NOT EXISTS idx_notifications_tenant_created
+        ON notifications(tenant_id, created_at DESC);
+    `
+  },
+  {
+    version: 19,
+    name: '019_add_cost_centre_id_to_journal_lines_and_ledgers',
+    sql: `
+      -- Cost centre dimension for departmental/branch/project P&L segmentation.
+      -- cost_centre_id is a bare nullable UUID column, not a real FK -
+      -- CostCentre lives in the shared public.cost_centres table (tenantId-scoped
+      -- Prisma model), not this tenant's own schema, so it can't be a native FK
+      -- across schemas. Existence/tenant-ownership is validated at the service
+      -- layer before every write, the same cross-schema-reference pattern
+      -- fund_id already uses (tenantMigrations v7).
+      ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS cost_centre_id UUID;
+      ALTER TABLE ledgers ADD COLUMN IF NOT EXISTS cost_centre_id UUID;
+
+      CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_cost_centre ON journal_entry_lines(cost_centre_id);
+      CREATE INDEX IF NOT EXISTS idx_ledgers_cost_centre ON ledgers(cost_centre_id);
+    `
+  },
+  {
+    version: 20,
+    name: '020_add_wht_payable_role',
+    sql: `
+      -- Widen the default_role CHECK to include WHT_PAYABLE for Withholding Tax.
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_account_default_role' AND conrelid = 'accounts'::regclass) THEN
+          ALTER TABLE accounts DROP CONSTRAINT chk_account_default_role;
+        END IF;
+        ALTER TABLE accounts ADD CONSTRAINT chk_account_default_role
+          CHECK (default_role IN (
+            'CASH', 'REVENUE', 'EXPENSE', 'DEPRECIATION_EXPENSE', 'ACCUMULATED_DEPRECIATION',
+            'COGS', 'INVENTORY_ASSET',
+            'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+            'WHT_PAYABLE'
+          ));
+      END $$;
+    `
+  },
+  {
+    version: 21,
+    name: '021_add_pdc_account_roles',
+    sql: `
+      -- Widen the default_role CHECK to include PDC_RECEIVABLE and PDC_PAYABLE.
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_account_default_role' AND conrelid = 'accounts'::regclass) THEN
+          ALTER TABLE accounts DROP CONSTRAINT chk_account_default_role;
+        END IF;
+        ALTER TABLE accounts ADD CONSTRAINT chk_account_default_role
+          CHECK (default_role IN (
+            'CASH', 'REVENUE', 'EXPENSE', 'DEPRECIATION_EXPENSE', 'ACCUMULATED_DEPRECIATION',
+            'COGS', 'INVENTORY_ASSET',
+            'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+            'WHT_PAYABLE',
+            'PDC_RECEIVABLE', 'PDC_PAYABLE'
+          ));
+      END $$;
+    `
+  },
+  {
+    version: 22,
+    name: '022_add_interest_income_role',
+    sql: `
+      -- Widen the default_role CHECK to include INTEREST_INCOME for overdue-receivables interest accrual.
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_account_default_role' AND conrelid = 'accounts'::regclass) THEN
+          ALTER TABLE accounts DROP CONSTRAINT chk_account_default_role;
+        END IF;
+        ALTER TABLE accounts ADD CONSTRAINT chk_account_default_role
+          CHECK (default_role IN (
+            'CASH', 'REVENUE', 'EXPENSE', 'DEPRECIATION_EXPENSE', 'ACCUMULATED_DEPRECIATION',
+            'COGS', 'INVENTORY_ASSET',
+            'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+            'WHT_PAYABLE',
+            'PDC_RECEIVABLE', 'PDC_PAYABLE',
+            'INTEREST_INCOME'
+          ));
+      END $$;
+    `
+  },
+  {
+    version: 23,
+    name: '023_add_cost_category_to_journal_lines',
+    sql: `
+      -- cost_category_id cross-schema reference (same pattern as cost_centre_id in v19:
+      -- CostCategory lives in public.cost_categories, not the tenant schema, so no native FK).
+      ALTER TABLE journal_entry_lines ADD COLUMN IF NOT EXISTS cost_category_id UUID;
+      CREATE INDEX IF NOT EXISTS idx_journal_entry_lines_cost_category ON journal_entry_lines(cost_category_id);
+    `
+  },
+  {
+    version: 24,
+    name: '024_add_voucher_fields_to_journal_entries',
+    sql: `
+      -- Provisional/Memo vouchers and Voucher Classes (TallyPrime parity).
+      -- scenario_id and voucher_class_id are cross-schema references to public.scenarios
+      -- and public.voucher_classes respectively (same pattern as cost_centre_id v19).
+      ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS voucher_type TEXT NOT NULL DEFAULT 'JOURNAL';
+      ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS scenario_id UUID;
+      ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS voucher_class_id UUID;
+      CREATE INDEX IF NOT EXISTS idx_journal_entries_scenario ON journal_entries(scenario_id);
+    `
+  },
+  {
+    version: 25,
+    name: '025_add_job_account_roles',
+    sql: `
+      -- Widen the default_role CHECK to include JOB_WIP and JOB_EXPENSE for job costing.
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_account_default_role' AND conrelid = 'accounts'::regclass) THEN
+          ALTER TABLE accounts DROP CONSTRAINT chk_account_default_role;
+        END IF;
+        ALTER TABLE accounts ADD CONSTRAINT chk_account_default_role
+          CHECK (default_role IN (
+            'CASH', 'REVENUE', 'EXPENSE', 'DEPRECIATION_EXPENSE', 'ACCUMULATED_DEPRECIATION',
+            'COGS', 'INVENTORY_ASSET',
+            'SALARY_EXPENSE', 'EMPLOYER_SSNIT_EXPENSE', 'PAYE_PAYABLE', 'SSNIT_PAYABLE', 'NET_PAY_PAYABLE',
+            'WHT_PAYABLE',
+            'PDC_RECEIVABLE', 'PDC_PAYABLE',
+            'INTEREST_INCOME',
+            'JOB_WIP', 'JOB_EXPENSE'
+          ));
+      END $$;
+    `
   }
 ];
 

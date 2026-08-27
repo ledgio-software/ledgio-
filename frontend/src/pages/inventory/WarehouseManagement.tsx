@@ -72,11 +72,15 @@ interface InventoryItem {
   name: string;
   category: string;
   unitOfMeasure: string;
+  secondaryUnitOfMeasure?: string | null;
+  conversionFactor?: number | null;
   costPrice: number;
   sellingPrice: number;
   wholesalePrice?: number | null;
   reorderLevel: number;
   warehouseStocks: WarehouseStock[];
+  regulatoryCategory?: string;
+  requiresBatchTracking?: boolean;
 }
 
 interface WarehouseData {
@@ -157,6 +161,8 @@ export function WarehouseManagement() {
   const [itemSku, setItemSku] = useState("");
   const [category, setCategory] = useState("General");
   const [unitOfMeasure, setUnitOfMeasure] = useState("pcs");
+  const [secondaryUnitOfMeasure, setSecondaryUnitOfMeasure] = useState("");
+  const [conversionFactor, setConversionFactor] = useState("");
   const [costPrice, setCostPrice] = useState("150");
   const [sellingPrice, setSellingPrice] = useState("250");
   const [wholesalePrice, setWholesalePrice] = useState("");
@@ -164,6 +170,17 @@ export function WarehouseManagement() {
   const [initialQty, setInitialQty] = useState("50");
   const [preferredVendorId, setPreferredVendorId] = useState("");
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
+  // Pharmacy fields (only used when orgType === PHARMACY)
+  const [regulatoryCategory, setRegulatoryCategory] = useState("GENERAL");
+  const [requiresBatchTracking, setRequiresBatchTracking] = useState(false);
+  // Receive Batch modal
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [batchItemId, setBatchItemId] = useState("");
+  const [batchWarehouseId, setBatchWarehouseId] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
+  const [batchExpiry, setBatchExpiry] = useState("");
+  const [batchQty, setBatchQty] = useState("1");
+  const [batchCostPrice, setBatchCostPrice] = useState("");
 
   // Transfer Form State
   const [fromWarehouseId, setFromWarehouseId] = useState("");
@@ -229,23 +246,52 @@ export function WarehouseManagement() {
         sku: itemSku,
         category,
         unitOfMeasure,
+        ...(secondaryUnitOfMeasure ? { secondaryUnitOfMeasure } : {}),
+        ...(secondaryUnitOfMeasure && conversionFactor ? { conversionFactor: Number(conversionFactor) } : {}),
         costPrice: Number(costPrice),
         sellingPrice: Number(sellingPrice),
         wholesalePrice: wholesalePrice !== "" ? Number(wholesalePrice) : undefined,
         initialWarehouseId,
         initialQty: Number(initialQty),
         preferredVendorId: preferredVendorId || undefined,
+        regulatoryCategory: user?.orgType === "PHARMACY" ? regulatoryCategory : undefined,
+        requiresBatchTracking: user?.orgType === "PHARMACY" ? requiresBatchTracking : undefined,
       });
 
       if (res.data.success) {
         setItemName("");
         setItemSku("");
         setPreferredVendorId("");
+        setSecondaryUnitOfMeasure("");
+        setConversionFactor("");
         setIsItemModalOpen(false);
         fetchData();
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to create item.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReceiveBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await api.post("/inventory/batches", {
+        itemId: batchItemId,
+        warehouseId: batchWarehouseId,
+        batchNumber,
+        expiryDate: batchExpiry ? new Date(batchExpiry).toISOString() : null,
+        quantity: Number(batchQty),
+        costPrice: Number(batchCostPrice),
+      });
+      showToast("Batch received.", "success");
+      setIsBatchModalOpen(false);
+      setBatchNumber(""); setBatchExpiry(""); setBatchQty("1"); setBatchCostPrice("");
+      fetchData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to receive batch.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -472,9 +518,14 @@ export function WarehouseManagement() {
   };
 
   const openBulkModal = () => {
+    const hasData = bulkRows.some(
+      (r) => r.name.trim() || r.sku.trim() || r.costPrice || r.sellingPrice
+    );
+    if (!hasData) {
+      setBulkRows([{ ...EMPTY_BULK_ROW }, { ...EMPTY_BULK_ROW }, { ...EMPTY_BULK_ROW }]);
+      setBulkResult(null);
+    }
     setBulkTab("table");
-    setBulkRows([{ ...EMPTY_BULK_ROW }, { ...EMPTY_BULK_ROW }, { ...EMPTY_BULK_ROW }]);
-    setBulkResult(null);
     setIsBulkModalOpen(true);
   };
 
@@ -559,8 +610,8 @@ export function WarehouseManagement() {
           sku: row.sku.trim() || undefined,
           category: row.category.trim() || "General",
           unitOfMeasure: row.unitOfMeasure.trim() || "pcs",
-          costPrice: row.costPrice ? Number(row.costPrice) : undefined,
-          sellingPrice: row.sellingPrice ? Number(row.sellingPrice) : undefined,
+          costPrice: row.costPrice ? Number(row.costPrice) : 0,
+          sellingPrice: row.sellingPrice ? Number(row.sellingPrice) : 0,
           initialWarehouseId: resolveWarehouseIdByName(row.warehouseName),
           initialQty: row.initialQty ? Number(row.initialQty) : 0,
         })),
@@ -787,6 +838,11 @@ export function WarehouseManagement() {
                       </TableCell>
                       <TableCell className="font-medium text-secondary-900 dark:text-secondary-50">
                         {it.name}
+                        {it.regulatoryCategory && it.regulatoryCategory !== "GENERAL" && (
+                          <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${it.regulatoryCategory === "CONTROLLED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"}`}>
+                            {it.regulatoryCategory === "CONTROLLED" ? "CTRL" : "RX"}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs">{it.category}</TableCell>
                       <TableCell className="text-xs">
@@ -840,6 +896,15 @@ export function WarehouseManagement() {
                                 >
                                   Adjust
                                 </button>
+                                {user?.orgType === "PHARMACY" && it.requiresBatchTracking && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setBatchItemId(it.id); setBatchWarehouseId(wh.id); setBatchCostPrice(String(it.costPrice)); setIsBatchModalOpen(true); }}
+                                    className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-xs"
+                                  >
+                                    + Batch
+                                  </button>
+                                )}
                               </div>
                             );
                           })}
@@ -849,7 +914,7 @@ export function WarehouseManagement() {
                       <TableCell className="text-right">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${isLowStock ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400 border border-rose-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
                           {isLowStock && <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
-                          {totalQty} {it.unitOfMeasure}
+                          {totalQty} {it.unitOfMeasure}{it.secondaryUnitOfMeasure && it.conversionFactor ? ` (${it.secondaryUnitOfMeasure} = ${it.conversionFactor} ${it.unitOfMeasure})` : ''}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -878,7 +943,7 @@ export function WarehouseManagement() {
           </div>
           <div className="flex justify-end space-x-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsWarehouseModalOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>Create Location</Button>
+            <Button type="submit" variant="primary" disabled={isSubmitting}>{isSubmitting ? "Creating..." : "Create Location"}</Button>
           </div>
         </form>
       </Modal>
@@ -902,6 +967,32 @@ export function WarehouseManagement() {
             <div>
               <label className="block text-sm font-medium mb-1">Unit of Measure</label>
               <Input placeholder="pcs, kg, boxes" value={unitOfMeasure} onChange={(e) => setUnitOfMeasure(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Secondary UoM <span className="text-secondary-400 font-normal">optional</span>
+              </label>
+              <Input
+                placeholder="Carton, Dozen, Box…"
+                value={secondaryUnitOfMeasure}
+                onChange={(e) => setSecondaryUnitOfMeasure(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Conversion Factor <span className="text-secondary-400 font-normal">1 secondary = ? primary</span>
+              </label>
+              <Input
+                type="number"
+                step="0.0001"
+                min="0.0001"
+                placeholder="e.g. 12 for Carton of 12 pcs"
+                value={conversionFactor}
+                disabled={!secondaryUnitOfMeasure}
+                onChange={(e) => setConversionFactor(e.target.value)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -953,15 +1044,97 @@ export function WarehouseManagement() {
               Who to auto-draft a reorder Purchase Order to once stock falls to the reorder level.
             </p>
           </div>
+          {user?.orgType === "PHARMACY" && (
+            <div className="grid grid-cols-2 gap-4 border-t pt-4 dark:border-gray-700">
+              <div>
+                <label className="block text-sm font-medium mb-1">Regulatory Category</label>
+                <select
+                  value={regulatoryCategory}
+                  onChange={(e) => setRegulatoryCategory(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-secondary-300 bg-white dark:bg-secondary-800 text-secondary-900 dark:text-secondary-50 text-sm"
+                >
+                  <option value="GENERAL">General (OTC)</option>
+                  <option value="PRESCRIPTION">Prescription (RX)</option>
+                  <option value="SCHEDULED_A">Scheduled A</option>
+                  <option value="SCHEDULED_B">Scheduled B</option>
+                  <option value="CONTROLLED">Controlled (Narcotic)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input
+                  type="checkbox"
+                  id="requiresBatchTracking"
+                  checked={requiresBatchTracking}
+                  onChange={(e) => setRequiresBatchTracking(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="requiresBatchTracking" className="text-sm font-medium">Requires Batch / Lot Tracking</label>
+              </div>
+            </div>
+          )}
           <div className="flex justify-end space-x-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsItemModalOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>Save Product</Button>
+            <Button type="submit" variant="primary" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Save Product"}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Receive Batch Modal (PHARMACY) */}
+      <Modal isOpen={isBatchModalOpen} onClose={() => setIsBatchModalOpen(false)} title="Receive Batch">
+        <form onSubmit={handleReceiveBatch} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Drug *</label>
+              <select
+                required
+                value={batchItemId}
+                onChange={(e) => setBatchItemId(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              >
+                <option value="">Select item…</option>
+                {items.filter(i => i.requiresBatchTracking).map((it) => (
+                  <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Warehouse *</label>
+              <select
+                required
+                value={batchWarehouseId}
+                onChange={(e) => setBatchWarehouseId(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              >
+                <option value="">Select warehouse…</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Batch Number *</label>
+              <Input required value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="e.g. BN-2024-001" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Expiry Date</label>
+              <Input type="date" value={batchExpiry} onChange={(e) => setBatchExpiry(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Quantity *</label>
+              <Input type="number" min={1} required value={batchQty} onChange={(e) => setBatchQty(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Cost Price (GH₵) *</label>
+              <Input type="number" required value={batchCostPrice} onChange={(e) => setBatchCostPrice(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setIsBatchModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Receive Batch"}</Button>
           </div>
         </form>
       </Modal>
 
       {/* Bulk Add Products Modal */}
-      <Modal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} title="Bulk Add Products" className="max-w-5xl">
+      <Modal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} title="Bulk Add Products" className="max-w-5xl" preventEasyClose>
         <div className="space-y-4">
           <div className="flex space-x-4 border-b border-secondary-200 dark:border-secondary-800">
             <button

@@ -31,6 +31,22 @@ export interface LocalAccount {
   _failureReason?: string;
 }
 
+export interface LocalCustomer {
+  id: string;
+  name: string;
+  customerType: string;
+  creditLimit: number | null;
+}
+
+export interface LocalInventoryItem {
+  id: string;
+  sku: string;
+  name: string;
+  sellingPrice: number;
+  wholesalePrice: number | null;
+  reorderLevel: number;
+}
+
 export interface LocalInvoiceItem {
   id?: string;
   description: string;
@@ -44,7 +60,7 @@ export interface LocalInvoice {
   tenantId: string;
   invoiceNumber: string;
   customerId: string;
-  customer?: { id: string; name: string; email: string };
+  customer?: { id: string; name: string };
   items?: LocalInvoiceItem[];
   issueDate: string;
   dueDate: string;
@@ -122,6 +138,8 @@ interface MetaEntry {
 class SyncDatabase extends Dexie {
   accounts!: Table<LocalAccount, string>;
   invoices!: Table<LocalInvoice, string>;
+  customers!: Table<LocalCustomer, string>;
+  inventoryItems!: Table<LocalInventoryItem, string>;
   outbox!: Table<OutboxEntry, number>;
   meta!: Table<MetaEntry, string>;
 
@@ -130,6 +148,14 @@ class SyncDatabase extends Dexie {
     this.version(1).stores({
       accounts: 'id, code',
       invoices: 'id, invoiceNumber, status, customerId',
+      outbox: '++localId, clientTxnId, status',
+      meta: 'key',
+    });
+    this.version(2).stores({
+      accounts: 'id, code',
+      invoices: 'id, invoiceNumber, status, customerId',
+      customers: 'id, name',
+      inventoryItems: 'id, name, sku',
       outbox: '++localId, clientTxnId, status',
       meta: 'key',
     });
@@ -153,9 +179,11 @@ async function setMeta(key: string, value: string): Promise<void> {
 
 /** Wipes every locally-synced table - called on logout, or when the bootstrapped tenant doesn't match the current one (shared-device safety, same reasoning as TenantSettingsContext resetting on logout). */
 export async function resetLocalSyncData(): Promise<void> {
-  await syncDb.transaction('rw', syncDb.accounts, syncDb.invoices, syncDb.outbox, syncDb.meta, async () => {
+  await syncDb.transaction('rw', [syncDb.accounts, syncDb.invoices, syncDb.customers, syncDb.inventoryItems, syncDb.outbox, syncDb.meta], async () => {
     await syncDb.accounts.clear();
     await syncDb.invoices.clear();
+    await syncDb.customers.clear();
+    await syncDb.inventoryItems.clear();
     await syncDb.outbox.clear();
     await syncDb.meta.clear();
   });
@@ -174,15 +202,30 @@ export async function bootstrapSync(tenantId: string): Promise<void> {
   }
 
   const res = await api.get('/sync/bootstrap');
-  if (!res.data.success) return;
+  if (!res.data.success) {
+    // Server responded but something went wrong — wipe local mirrors so the
+    // user doesn't see (and try to act on) invoices that no longer exist on
+    // the server (e.g. after a DB reset or tenant rebuild).
+    await syncDb.transaction('rw', syncDb.accounts, syncDb.invoices, syncDb.customers, syncDb.inventoryItems, async () => {
+      await syncDb.accounts.clear();
+      await syncDb.invoices.clear();
+      await syncDb.customers.clear();
+      await syncDb.inventoryItems.clear();
+    });
+    return;
+  }
 
-  const { accounts, invoices, sequence } = res.data.data;
+  const { accounts, invoices, customers, inventoryItems, sequence } = res.data.data;
 
-  await syncDb.transaction('rw', syncDb.accounts, syncDb.invoices, syncDb.meta, async () => {
+  await syncDb.transaction('rw', syncDb.accounts, syncDb.invoices, syncDb.customers, syncDb.inventoryItems, syncDb.meta, async () => {
     await syncDb.accounts.clear();
     await syncDb.accounts.bulkPut(accounts);
     await syncDb.invoices.clear();
     await syncDb.invoices.bulkPut(invoices);
+    await syncDb.customers.clear();
+    await syncDb.customers.bulkPut(customers ?? []);
+    await syncDb.inventoryItems.clear();
+    await syncDb.inventoryItems.bulkPut(inventoryItems ?? []);
     await setMeta(META_LAST_SEQUENCE, sequence);
     await setMeta(META_TENANT_ID, tenantId);
   });
@@ -207,6 +250,20 @@ async function applyChangeEntry(entry: {
       await syncDb.invoices.delete(entry.entityId);
     } else {
       await syncDb.invoices.put(entry.payload as LocalInvoice);
+    }
+  } else if (entry.entityType === 'Customer') {
+    if (entry.operation === 'DELETE') {
+      await syncDb.customers.delete(entry.entityId);
+    } else {
+      const { id, name, customerType, creditLimit } = entry.payload as any;
+      await syncDb.customers.put({ id, name, customerType, creditLimit });
+    }
+  } else if (entry.entityType === 'InventoryItem') {
+    if (entry.operation === 'DELETE') {
+      await syncDb.inventoryItems.delete(entry.entityId);
+    } else {
+      const { id, sku, name, sellingPrice, wholesalePrice, reorderLevel } = entry.payload as any;
+      await syncDb.inventoryItems.put({ id, sku, name, sellingPrice, wholesalePrice, reorderLevel });
     }
   }
   await setMeta(META_LAST_SEQUENCE, entry.sequence);
@@ -316,9 +373,13 @@ export function disconnectSyncSocket(): void {
  * every-page-visit behavior since it only runs on these specific actions.
  */
 export async function resyncInvoicesFromServer(): Promise<void> {
-  const res = await api.get('/invoices');
-  if (!res.data.success) return;
-  await syncDb.invoices.bulkPut(res.data.data.invoices);
+  try {
+    const res = await api.get('/invoices');
+    if (!res.data.success) return;
+    await syncDb.invoices.bulkPut(res.data.data.invoices);
+  } catch {
+    // Background sync — network/server errors are non-fatal
+  }
 }
 
 // --- Optimistic local-first writes -------------------------------------

@@ -1,6 +1,7 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import dns from 'dns';
 
@@ -46,6 +47,13 @@ import recurringTransactionsRouter from './routes/recurringTransactions';
 import approvalWorkflowsRouter from './routes/approvalWorkflows';
 import adminAuditLogsRouter from './routes/adminAuditLogs';
 import adminIntegrationsRouter from './routes/adminIntegrations';
+import adminFeedbackRouter from './routes/adminFeedback';
+import adminAnalyticsRouter from './routes/adminAnalytics';
+import adminMetricsRouter from './routes/adminMetrics';
+import adminJobsRouter from './routes/adminJobs';
+import adminErrorLogsRouter from './routes/adminErrorLogs';
+import adminUsersRouter from './routes/adminUsers';
+import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
 import syncRouter from './routes/sync';
 import dataExportRouter from './routes/dataExport';
@@ -54,10 +62,32 @@ import onboardingWizardRouter from './routes/onboardingWizard';
 import helpAssistantRouter from './routes/helpAssistant';
 import pettyCashRouter from './routes/pettyCash';
 import purchaseOrdersRouter from './routes/purchaseOrders';
+import salesOrdersRouter from './routes/salesOrders';
+import priceListsRouter from './routes/priceLists';
+import serialNumbersRouter from './routes/serialNumbers';
+import jobsRouter from './routes/jobs';
+import jobWorkOrdersRouter from './routes/jobWorkOrders';
+import deliveryNotesRouter from './routes/deliveryNotes';
+import goodsReceiptNotesRouter from './routes/goodsReceiptNotes';
+import paymentBatchesRouter from './routes/paymentBatches';
 import recurringInvoicesRouter from './routes/recurringInvoices';
 import paystackRouter from './routes/paystack';
 import fixedAssetsRouter from './routes/fixedAssets';
 import payrollRouter from './routes/payroll';
+import searchRouter from './routes/search';
+import ocrRouter from './routes/ocr';
+import subscriptionRouter from './routes/subscription';
+import pharmacyRouter from './routes/pharmacy';
+import costCentresRouter from './routes/costCentres';
+import costCategoriesRouter from './routes/costCategories';
+import scenariosRouter from './routes/scenarios';
+import voucherClassesRouter from './routes/voucherClasses';
+import manufacturingRouter from './routes/manufacturing';
+import whtRatesRouter from './routes/whtRates';
+import postDatedChequesRouter from './routes/postDatedCheques';
+import interestPolicyRouter from './routes/interestPolicy';
+import apiKeysRouter from './routes/apiKeys';
+import externalApiRouter from './routes/externalApi';
 
 dotenv.config();
 
@@ -110,7 +140,8 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
 
 // ── Observability ──────────────────────────────────────────────────────────────
 // Inject X-Request-ID and structured HTTP request/latency logs on every request
@@ -177,6 +208,24 @@ app.use('/api/v1/inventory', inventoryRouter);
 // Cash Till & Daily Closeout endpoints
 app.use('/api/v1/tills', cashTillRouter);
 
+// Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
+app.use('/api/v1/pharmacy', pharmacyRouter);
+
+// Cost Centres / Profit Centres (departmental/branch P&L segmentation)
+app.use('/api/v1/cost-centres', costCentresRouter);
+app.use('/api/v1/cost-categories', costCategoriesRouter);
+app.use('/api/v1/scenarios', scenariosRouter);
+app.use('/api/v1/voucher-classes', voucherClassesRouter);
+
+// Manufacturing / Bill of Materials (BOM templates + production orders)
+app.use('/api/v1/manufacturing', manufacturingRouter);
+
+// Withholding Tax rates (WHT) - GRA-mandated deductions on contractor/rent payments
+app.use('/api/v1/wht-rates', whtRatesRouter);
+app.use('/api/v1/pdc', postDatedChequesRouter);
+// Interest policy & charges for overdue receivables
+app.use('/api/v1/interest-policy', interestPolicyRouter);
+
 // Intelligent Analytics & Decision Engine endpoints
 app.use('/api/v1/analytics', analyticsRouter);
 
@@ -188,6 +237,26 @@ app.use('/api/v1/petty-cash', pettyCashRouter);
 
 // Purchase Order endpoints
 app.use('/api/v1/purchase-orders', purchaseOrdersRouter);
+
+// Sales Order endpoints
+app.use('/api/v1/sales-orders', salesOrdersRouter);
+
+// Price List endpoints
+app.use('/api/v1/price-lists', priceListsRouter);
+
+// Serial Number endpoints
+app.use('/api/v1/serial-numbers', serialNumbersRouter);
+
+// Job Costing endpoints
+app.use('/api/v1/jobs', jobsRouter);
+app.use('/api/v1/job-work-orders', jobWorkOrdersRouter);
+
+// Delivery Note & Goods Receipt Note endpoints
+app.use('/api/v1/delivery-notes', deliveryNotesRouter);
+app.use('/api/v1/goods-receipt-notes', goodsReceiptNotesRouter);
+
+// Payment Batch (bill-by-bill settlement / payment matching) endpoints
+app.use('/api/v1/payment-batches', paymentBatchesRouter);
 app.use('/api/v1/recurring-invoices', recurringInvoicesRouter);
 app.use('/api/v1/paystack', paystackRouter);
 app.use('/api/v1/fixed-assets', fixedAssetsRouter);
@@ -210,6 +279,12 @@ app.use('/api/v1/audit-logs', auditLogsRouter);
 // Bulk data import API endpoints
 app.use('/api/v1/import', importRouter);
 
+// API key management (generate/revoke keys for machine-to-machine integration)
+app.use('/api/v1/api-keys', apiKeysRouter);
+
+// External API endpoints — authenticated by X-API-Key, no JWT required
+app.use('/api/external/v1', externalApiRouter);
+
 // Migration admin endpoints
 app.use('/api/v1/admin/migrations', migrationsRouter);
 
@@ -228,6 +303,12 @@ app.use('/api/v1/recurring-transactions', recurringTransactionsRouter);
 app.use('/api/v1/approval-workflows', approvalWorkflowsRouter);
 app.use('/api/v1/admin/audit-logs', adminAuditLogsRouter);
 app.use('/api/v1/admin/integrations', adminIntegrationsRouter);
+app.use('/api/v1/admin/feedback', adminFeedbackRouter);
+app.use('/api/v1/admin/analytics', adminAnalyticsRouter);
+app.use('/api/v1/admin/metrics', adminMetricsRouter);
+app.use('/api/v1/admin/jobs', adminJobsRouter);
+app.use('/api/v1/admin/error-logs', adminErrorLogsRouter);
+app.use('/api/v1/admin/users', adminUsersRouter);
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);
@@ -248,6 +329,18 @@ app.use('/api/v1/onboarding', onboardingWizardRouter);
 // Ghana Payroll (PAYE, SSNIT, payslips, journal posting).
 app.use('/api/v1/payroll', payrollRouter);
 
+// Cross-entity keyword search (customers, invoices, accounts, items, etc.).
+app.use('/api/v1/search', searchRouter);
+
+// Receipt / vendor-bill OCR (Claude vision → pre-fill expense & bill forms).
+app.use('/api/v1/ocr', ocrRouter);
+
+// Subscription billing: free trial → MoMo / Visa payment via Paystack.
+// No subscription enforcement on this router — expired tenants must still
+// be able to reach the payment endpoints (enforcement is applied inside
+// tenantContextMiddleware for all other tenant-scoped routes).
+app.use('/api/v1/subscription', subscriptionRouter);
+
 // Rejected CORS requests otherwise fall through to Express's default HTML
 // error handler, which leaks a stack trace and breaks the API's JSON contract.
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -255,6 +348,15 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     res.status(403).json({ success: false, error: 'Origin not allowed by CORS policy.' });
     return;
   }
+  const status = (err as any).status || (err as any).statusCode || 500;
+  recordError({
+    ts: new Date().toISOString(),
+    method: req.method,
+    path: req.path,
+    status,
+    error: err.message ?? 'Unknown error',
+    stack: err.stack,
+  });
   next(err);
 });
 

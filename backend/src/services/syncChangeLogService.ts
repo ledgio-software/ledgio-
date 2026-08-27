@@ -131,7 +131,7 @@ export function invoiceToSyncPayload(invoice: any): Record<string, unknown> {
     // showing a real customer name/email immediately, not just after the
     // receiving client's next full bootstrap.
     customer: invoice.customer
-      ? { id: invoice.customer.id, name: invoice.customer.name, email: invoice.customer.email }
+      ? { id: invoice.customer.id, name: invoice.customer.name }
       : undefined,
     issueDate: invoice.issueDate?.toISOString?.() ?? invoice.issueDate,
     dueDate: invoice.dueDate?.toISOString?.() ?? invoice.dueDate,

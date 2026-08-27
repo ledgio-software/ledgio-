@@ -5,6 +5,44 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'react-vendor';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons';
+          }
+          if (id.includes('node_modules/cmdk')) {
+            return 'command';
+          }
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-') || id.includes('node_modules/victory')) {
+            return 'charts';
+          }
+          if (id.includes('node_modules/docx') || id.includes('node_modules/xlsx') || id.includes('node_modules/exceljs') || id.includes('node_modules/file-saver')) {
+            return 'export-libs';
+          }
+          if (id.includes('node_modules/@radix-ui')) {
+            return 'radix-ui';
+          }
+          if (id.includes('node_modules/date-fns') || id.includes('node_modules/dayjs') || id.includes('node_modules/moment')) {
+            return 'date-utils';
+          }
+          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/@motionone')) {
+            return 'animation';
+          }
+          if (id.includes('node_modules/zod') || id.includes('node_modules/react-hook-form') || id.includes('node_modules/@hookform')) {
+            return 'forms';
+          }
+          if (id.includes('node_modules/axios') || id.includes('node_modules/@tanstack/react-query')) {
+            return 'data-fetching';
+          }
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
