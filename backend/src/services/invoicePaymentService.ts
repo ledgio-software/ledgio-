@@ -273,7 +273,7 @@ export async function recordInvoicePayment(
     // FOR NO KEY UPDATE is less restrictive than FOR UPDATE: it still
     // blocks concurrent row updates but does not block child-row inserts.
     await (client as any).$executeRawUnsafe(
-      `SELECT id FROM invoices WHERE id = $1::uuid FOR NO KEY UPDATE`,
+      `SELECT id FROM invoices WHERE id = $1 FOR NO KEY UPDATE`,
       invoiceId
     );
 
