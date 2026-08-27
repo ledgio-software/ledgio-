@@ -1570,4 +1570,38 @@ router.get('/cost-category-pnl', requireRole('Viewer'), async (req: Request, res
   }
 });
 
+/**
+ * GET /api/v1/reports/benford-analysis
+ * Description: Benford's Law leading-digit distribution analysis on posted journal entry line amounts.
+ *   Flags digits whose observed frequency deviates significantly from the logarithmic Benford curve
+ *   (Z-score > 1.96) and an overall chi-square goodness-of-fit test (df=8, p<0.05 threshold = 15.507).
+ *   Useful for detecting fabricated transaction amounts, salami-slicing, or internal fraud patterns.
+ * Query params: startDate, endDate (YYYY-MM-DD, optional)
+ * Access: Accountant role or higher
+ */
+router.get('/benford-analysis', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { startDate, endDate } = req.query;
+    const params = { startDate: startDate as string, endDate: endDate as string };
+
+    const cached = await getCachedReport(tenantId, 'benford-analysis', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getBenfordAnalysis(
+      startDate ? (startDate as string) : undefined,
+      endDate ? (endDate as string) : undefined
+    );
+    void setCachedReport(tenantId, 'benford-analysis', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] Benford analysis error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to run Benford analysis.' });
+  }
+});
+
 export default router;

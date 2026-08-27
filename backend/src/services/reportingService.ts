@@ -370,3 +370,98 @@ export async function getCostCategoryPnl(costCategoryId: string, startDate?: str
     return { category: { id: category.id, name: category.name }, lines: rows, totalDebit: totalDebitNum, totalCredit: totalCreditNum, net: totalCredit.minus(totalDebit).toDecimalPlaces(2).toNumber() };
   });
 }
+
+export interface BenfordDigitResult {
+  digit: number;
+  expected: number;        // Benford expected probability 0–1
+  actual: number;          // observed probability 0–1
+  count: number;
+  zScore: number;          // |observed - expected| / sqrt(expected*(1-expected)/n)
+  flagged: boolean;        // |z| > 1.96 (95% confidence)
+}
+
+export interface BenfordAnalysisResult {
+  totalTransactions: number;
+  digits: BenfordDigitResult[];
+  chiSquare: number;
+  overallFlagged: boolean; // chi-square > 15.51 (df=8, p<0.05)
+  startDate?: string;
+  endDate?: string;
+}
+
+// Benford's Law: P(d) = log10(1 + 1/d)
+const BENFORD_EXPECTED: Record<number, number> = Object.fromEntries(
+  [1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => [d, Math.log10(1 + 1 / d)])
+);
+
+export async function getBenfordAnalysis(startDate?: string, endDate?: string): Promise<BenfordAnalysisResult> {
+  if (startDate) validateDateFormat(startDate, 'startDate');
+  if (endDate) validateDateFormat(endDate, 'endDate');
+
+  const { tenantId } = requireTenantContext();
+
+  type DigitRow = { digit: string; cnt: string };
+
+  const rows = (await withCurrentTenantDb(prisma, async (client) => {
+    // Extract the leading digit from the absolute value of each non-zero line amount.
+    // SUBSTRING(LTRIM(...,'0.'), 1, 1) gives the first significant digit as text.
+    const dateFilter = startDate || endDate
+      ? `AND je.entry_date BETWEEN $2 AND $3`
+      : '';
+    const params: (string | Date)[] = [tenantId];
+    if (startDate || endDate) {
+      params.push(startDate ? new Date(startDate) : new Date('1900-01-01'));
+      params.push(endDate ? new Date(endDate) : new Date('9999-12-31'));
+    }
+
+    return (client as any).$queryRawUnsafe(
+      `SELECT
+         SUBSTRING(LTRIM(CAST(ABS(jel.amount) AS TEXT), '0.'), 1, 1) AS digit,
+         COUNT(*) AS cnt
+       FROM journal_entry_lines jel
+       JOIN journal_entries je ON je.id = jel.journal_entry_id
+       WHERE jel.tenant_id = $1
+         AND je.status = 'POSTED'
+         AND jel.amount <> 0
+         ${dateFilter}
+       GROUP BY digit
+       ORDER BY digit`,
+      ...params
+    );
+  })) as DigitRow[];
+
+  // Build digit → count map, filter to valid leading digits 1–9
+  const countMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
+  for (const row of rows) {
+    const d = parseInt(row.digit, 10);
+    if (d >= 1 && d <= 9) countMap[d] = parseInt(row.cnt, 10);
+  }
+
+  const total = Object.values(countMap).reduce((s, c) => s + c, 0);
+
+  const digits: BenfordDigitResult[] = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => {
+    const expected = BENFORD_EXPECTED[d];
+    const count = countMap[d];
+    const actual = total > 0 ? count / total : 0;
+    const stdErr = total > 0 ? Math.sqrt((expected * (1 - expected)) / total) : 1;
+    const zScore = stdErr > 0 ? Math.abs(actual - expected) / stdErr : 0;
+    return { digit: d, expected: parseFloat(expected.toFixed(4)), actual: parseFloat(actual.toFixed(4)), count, zScore: parseFloat(zScore.toFixed(3)), flagged: zScore > 1.96 };
+  });
+
+  // Chi-square goodness-of-fit: sum((observed - expected)^2 / expected) across digits
+  const chiSquare = total > 0
+    ? digits.reduce((sum, d) => {
+        const expectedCount = BENFORD_EXPECTED[d.digit] * total;
+        return sum + Math.pow(d.count - expectedCount, 2) / expectedCount;
+      }, 0)
+    : 0;
+
+  return {
+    totalTransactions: total,
+    digits,
+    chiSquare: parseFloat(chiSquare.toFixed(3)),
+    overallFlagged: chiSquare > 15.507, // chi-square critical value df=8, p=0.05
+    startDate,
+    endDate,
+  };
+}
