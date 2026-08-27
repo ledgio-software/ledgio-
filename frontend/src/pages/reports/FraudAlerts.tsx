@@ -75,24 +75,24 @@ export function FraudAlerts() {
   const handleExport = () => {
     if (tab === "duplicate-payments") {
       exportToCsv(
+        "duplicate_payments",
         dupPayments.map((r) => ({
           Customer: r.vendorName,
           Amount: r.amount,
           "Payment Date": r.paymentDate,
           "Duplicate Count": r.count,
-        })),
-        "duplicate_payments"
+        }))
       );
     } else {
       exportToCsv(
+        "round_amount_transactions",
         roundAmounts.map((r) => ({
           "Journal Entry": r.journalEntryId,
           Account: r.accountName ?? "",
           Description: r.description ?? "",
           Amount: r.amount,
           Date: r.entryDate,
-        })),
-        "round_amount_transactions"
+        }))
       );
     }
   };
