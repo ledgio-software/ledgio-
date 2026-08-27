@@ -1,0 +1,75 @@
+export interface JobLastRun {
+  startedAt: string;
+  finishedAt: string;
+  success: boolean;
+  errorMsg?: string;
+  durationMs: number;
+}
+
+export interface JobRecord {
+  name: string;
+  schedule: string;
+  description?: string;
+  lastRun?: JobLastRun;
+  runOnce?: () => Promise<void>;  // callable for manual trigger
+}
+
+const registry = new Map<string, JobRecord & { _startedAt?: number }>();
+
+export function registerJob(name: string, schedule: string, description?: string, runOnce?: () => Promise<void>): void {
+  const existing = registry.get(name);
+  registry.set(name, { ...(existing ?? {}), name, schedule, description, runOnce });
+}
+
+export function recordJobStart(name: string): void {
+  const job = registry.get(name);
+  if (!job) return;
+  (job as any)._startedAt = Date.now();
+}
+
+export function recordJobEnd(name: string, success: boolean, errorMsg?: string): void {
+  const job = registry.get(name) as any;
+  if (!job) return;
+  const startedAt: number = job._startedAt ?? Date.now();
+  const finishedAt = Date.now();
+  job.lastRun = {
+    startedAt: new Date(startedAt).toISOString(),
+    finishedAt: new Date(finishedAt).toISOString(),
+    success,
+    errorMsg,
+    durationMs: finishedAt - startedAt,
+  };
+  delete job._startedAt;
+}
+
+export function listJobs(): Omit<JobRecord, 'runOnce'>[] {
+  return Array.from(registry.values()).map(({ runOnce: _r, ...rest }) => rest);
+}
+
+/** Wraps a cron tick function so scheduled runs record start/end automatically. */
+export function wrapCronTick(name: string, fn: () => Promise<void>): () => Promise<void> {
+  return async () => {
+    recordJobStart(name);
+    try {
+      await fn();
+      recordJobEnd(name, true);
+    } catch (e: any) {
+      recordJobEnd(name, false, e?.message ?? 'Unknown error');
+      throw e;
+    }
+  };
+}
+
+export async function triggerJob(name: string): Promise<void> {
+  const job = registry.get(name);
+  if (!job) throw new Error(`Job "${name}" not registered.`);
+  if (!job.runOnce) throw new Error(`Job "${name}" does not support manual triggering.`);
+  recordJobStart(name);
+  try {
+    await job.runOnce();
+    recordJobEnd(name, true);
+  } catch (e: any) {
+    recordJobEnd(name, false, e?.message ?? 'Unknown error');
+    throw e;
+  }
+}

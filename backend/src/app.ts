@@ -49,6 +49,11 @@ import adminAuditLogsRouter from './routes/adminAuditLogs';
 import adminIntegrationsRouter from './routes/adminIntegrations';
 import adminFeedbackRouter from './routes/adminFeedback';
 import adminAnalyticsRouter from './routes/adminAnalytics';
+import adminMetricsRouter from './routes/adminMetrics';
+import adminJobsRouter from './routes/adminJobs';
+import adminErrorLogsRouter from './routes/adminErrorLogs';
+import adminUsersRouter from './routes/adminUsers';
+import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
 import syncRouter from './routes/sync';
 import dataExportRouter from './routes/dataExport';
@@ -300,6 +305,10 @@ app.use('/api/v1/admin/audit-logs', adminAuditLogsRouter);
 app.use('/api/v1/admin/integrations', adminIntegrationsRouter);
 app.use('/api/v1/admin/feedback', adminFeedbackRouter);
 app.use('/api/v1/admin/analytics', adminAnalyticsRouter);
+app.use('/api/v1/admin/metrics', adminMetricsRouter);
+app.use('/api/v1/admin/jobs', adminJobsRouter);
+app.use('/api/v1/admin/error-logs', adminErrorLogsRouter);
+app.use('/api/v1/admin/users', adminUsersRouter);
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);
@@ -339,6 +348,15 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     res.status(403).json({ success: false, error: 'Origin not allowed by CORS policy.' });
     return;
   }
+  const status = (err as any).status || (err as any).statusCode || 500;
+  recordError({
+    ts: new Date().toISOString(),
+    method: req.method,
+    path: req.path,
+    status,
+    error: err.message ?? 'Unknown error',
+    stack: err.stack,
+  });
   next(err);
 });
 

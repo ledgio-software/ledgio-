@@ -81,9 +81,21 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const tenants = await tenantRepository.listTenants(prisma);
+    // Augment each tenant with user count (cheap aggregate, no N+1)
+    const tenantIds = tenants.map((t) => t.id);
+    const userCounts = await prisma.user.groupBy({
+      by: ['tenantId'],
+      where: { tenantId: { in: tenantIds } },
+      _count: { id: true },
+    });
+    const countMap = Object.fromEntries(userCounts.map((r) => [r.tenantId, r._count.id]));
+    const enriched = tenants.map((t) => ({
+      ...sanitizeTenantForResponse(t),
+      userCount: countMap[t.id] ?? 0,
+    }));
     return res.status(200).json({
       success: true,
-      data: { tenants: tenants.map(sanitizeTenantForResponse) },
+      data: { tenants: enriched },
     });
   } catch (error: any) {
     console.error('[TenantsList] Unexpected error:', error);
