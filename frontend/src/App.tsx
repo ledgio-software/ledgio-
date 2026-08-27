@@ -379,8 +379,6 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
   const arOver30  = arTotals ? arTotals.days31to60 + arTotals.days61to90 + arTotals.days90plus : 0;
   const arOver90  = arTotals ? arTotals.days90plus : 0;
 
-  const WIDGET_KEYS = ['kpi', 'ar', 'ap'];
-
   return (
     <div className="space-y-4">
       {/* Customize toggle */}
