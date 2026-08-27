@@ -312,11 +312,3 @@ export async function setReversalLink(
   if (!rows || rows.length === 0) return null;
   return getJournalEntryById(prisma, originalEntryId);
 }
-
-export async function deleteJournalEntry(prisma: PrismaClient, id: string): Promise<boolean> {
-  const count = await prisma.$executeRawUnsafe(
-    `DELETE FROM journal_entries WHERE id = $1::uuid`,
-    id
-  );
-  return count > 0;
-}
