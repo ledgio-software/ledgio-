@@ -5,6 +5,7 @@ import * as journalService from './journalEntryService';
 import * as approvalWorkflowService from './approvalWorkflowService';
 import * as fxRateService from './fxRateService';
 import { recordAuditLogTx, diffFields, AuditActor } from './auditLogService';
+import * as fiscalPeriodService from './fiscalPeriodService';
 
 export class VendorBillPaymentServiceError extends Error {
   statusCode: number;
@@ -29,6 +30,10 @@ export async function payVendorBill(tenantId: string, billId: string, actor?: Au
   const bill = await withCurrentTenantDb(prisma, async (client) => {
     return (client as any).vendorBill.findFirst({ where: { id: billId, tenantId }, include: { vendor: true } });
   });
+  // Fetch the WHT rate separately from the public schema (wht_rates is in public, not tenant schema)
+  const whtRate = bill?.whtRateId
+    ? await (prisma as any).whtRate.findFirst({ where: { id: bill.whtRateId, tenantId } })
+    : null;
 
   if (!bill) {
     throw new VendorBillPaymentServiceError('Vendor bill not found.', 404);
@@ -39,6 +44,7 @@ export async function payVendorBill(tenantId: string, billId: string, actor?: Au
 
   // Opt-in approval gate: only blocks if approval was actually requested for this bill.
   await approvalWorkflowService.assertApprovedOrNoWorkflow(tenantId, 'VendorBill', billId);
+  await fiscalPeriodService.assertPeriodOpenForDate(tenantId, new Date());
 
   const accounts = await withCurrentTenantDb(prisma, (client) => accountRepository.listAccounts(client));
   const expenseAcc = accountRepository.resolveDefaultAccount(accounts, 'EXPENSE') || accounts[0];
@@ -68,12 +74,30 @@ export async function payVendorBill(tenantId: string, billId: string, actor?: Au
     }
   }
 
+  // WHT: compute the amount to deduct from the cash outflow and post to WHT Payable.
+  let whtAmount = 0;
+  let whtPayableAccId: string | null = null;
+  if (whtRate) {
+    whtAmount = Math.round(lockedBaseAmount * Number(whtRate.rate) * 100) / 100;
+    if (whtRate.accountId) {
+      whtPayableAccId = whtRate.accountId;
+    } else {
+      const whtPayableAcc = accountRepository.resolveDefaultAccount(accounts, 'WHT_PAYABLE');
+      whtPayableAccId = whtPayableAcc?.id || null;
+    }
+  }
+  const cashNetAmount = Math.round((cashPostingAmount - whtAmount) * 100) / 100;
+
   let journalId = null;
   if (expenseAcc && cashAcc) {
     const lines: { accountId: string; debit: number; credit: number; description: string; fundId?: string }[] = [
       { accountId: expenseAcc.id, debit: lockedBaseAmount, credit: 0, description: `Expense - ${bill.billNumber}`, fundId: bill.fundId || undefined },
-      { accountId: cashAcc.id, debit: 0, credit: cashPostingAmount, description: `Cash Payment - ${bill.billNumber}`, fundId: bill.fundId || undefined },
+      { accountId: cashAcc.id, debit: 0, credit: whtAmount > 0 ? cashNetAmount : cashPostingAmount, description: `Cash Payment - ${bill.billNumber}`, fundId: bill.fundId || undefined },
     ];
+    // WHT deduction: credit WHT Payable for the withheld amount
+    if (whtAmount > 0 && whtPayableAccId) {
+      lines.push({ accountId: whtPayableAccId, debit: 0, credit: whtAmount, description: `WHT Payable - ${bill.billNumber}`, fundId: bill.fundId || undefined });
+    }
     // FX gain (paid less than accrued): credit REVENUE; FX loss: debit EXPENSE
     if (Math.abs(fxGainLoss) > 0.001) {
       if (fxGainLoss > 0 && revenueAcc) {
@@ -97,7 +121,11 @@ export async function payVendorBill(tenantId: string, billId: string, actor?: Au
   return withCurrentTenantDb(prisma, async (client) => {
     const updated = await (client as any).vendorBill.update({
       where: { id: billId },
-      data: { status: 'PAID', journalId },
+      data: {
+        status: 'PAID',
+        journalId,
+        ...(whtAmount > 0 ? { whtAmount } : {}),
+      },
     });
 
     await recordAuditLogTx(client, {

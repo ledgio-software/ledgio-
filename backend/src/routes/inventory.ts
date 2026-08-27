@@ -1,14 +1,37 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { validateBody } from '../middleware/validateBody';
 import { requireTenantContext } from '../context/tenantContext';
 import { assertWarehouseAccess, getAccessibleWarehouseIds, WarehouseAccessError } from '../services/warehouseAccessService';
 import { recordAuditLog, recordAuditLogTx, actorFromRequest } from '../services/auditLogService';
 import { applyStockAdjustment } from '../services/stockAdjustmentService';
 import { generateStockTakeSheetPdf } from '../services/pdfGenerationService';
+import { checkAndAlertLowStock } from '../services/lowStockAlertService';
+import { getCachedList, setCachedList, invalidateCachedList } from '../cache/listCache';
+
+const createItemSchema = z.object({
+  name: z.string().min(1, 'Item name is required').max(200),
+  sku: z.string().max(100).optional(),
+  category: z.string().max(100).default('General'),
+  unitOfMeasure: z.string().max(50).default('pcs'),
+  secondaryUnitOfMeasure: z.string().max(50).optional().nullable(),
+  conversionFactor: z.union([z.number().positive(), z.string().transform(Number)]).optional().nullable(),
+  costPrice: z.union([z.number().nonnegative('Cost price must be ≥ 0'), z.string().transform(Number)]),
+  sellingPrice: z.union([z.number().nonnegative('Selling price must be ≥ 0'), z.string().transform(Number)]),
+  wholesalePrice: z.union([z.number().nonnegative(), z.string().transform(Number)]).optional().nullable(),
+  initialWarehouseId: z.string().uuid().optional().nullable(),
+  initialQty: z.union([z.number().nonnegative(), z.string().transform(Number)]).default(0),
+  reorderLevel: z.union([z.number().int().nonnegative(), z.string().transform(Number)]).default(10),
+  preferredVendorId: z.string().uuid().optional().nullable(),
+  regulatoryCategory: z.string().optional(),
+  requiresBatchTracking: z.boolean().default(false),
+  trackSerials: z.boolean().default(false),
+});
 
 const router = Router();
 
@@ -146,18 +169,24 @@ router.get('/warehouses/:id/stock-sheet.pdf', async (req: Request, res: Response
 router.get('/items', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
+
     const items = await withCurrentTenantDb(prisma, async (client) => {
       const accessibleIds = await getAccessibleWarehouseIds(client, tenantId, req.user!.id, req.user!.role);
 
-      const allItems = await (client as any).inventoryItem.findMany({
-        where: { tenantId },
-        include: { warehouseStocks: { include: { warehouse: true } } },
-        orderBy: { name: 'asc' },
-      });
+      // Cache the full catalog (all warehouses) per tenant and serve it to
+      // all roles. Warehouse-scoped filtering happens in memory after the
+      // cache hit — nearly free vs. a second round-trip to the DB.
+      let allItems: any[] = (await getCachedList<any[]>(tenantId, 'inventory-items')) ?? [];
+      if (allItems.length === 0) {
+        allItems = await (client as any).inventoryItem.findMany({
+          where: { tenantId },
+          include: { warehouseStocks: { include: { warehouse: true } } },
+          orderBy: { name: 'asc' },
+        });
+        // Fire-and-forget; a failed cache write falls back to DB next request
+        if (allItems.length > 0) setCachedList(tenantId, 'inventory-items', allItems).catch(() => {});
+      }
 
-      // A location-scoped user (Shop Manager/Cashier) sees the same product
-      // catalog as everyone else, but only the stock levels for warehouses
-      // they're assigned to - not every shop's stock.
       if (accessibleIds === null) return allItems;
       const accessibleSet = new Set(accessibleIds);
       return allItems.map((item: any) => ({
@@ -177,10 +206,10 @@ router.get('/items', async (req: Request, res: Response): Promise<void> => {
  * POST /api/v1/inventory/items
  * Creates a new inventory item and assigns initial stock to a warehouse.
  */
-router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), validateBody(createItemSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId } = req.body;
+    const { name, sku, category = 'General', unitOfMeasure = 'pcs', secondaryUnitOfMeasure, conversionFactor, costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
 
     if (!name || !costPrice || !sellingPrice) {
       res.status(400).json({ success: false, error: 'Item name, cost price, and selling price are required.' });
@@ -211,11 +240,15 @@ router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Ware
           name: name.trim(),
           category,
           unitOfMeasure,
+          ...(secondaryUnitOfMeasure !== undefined && { secondaryUnitOfMeasure: secondaryUnitOfMeasure || null }),
+          ...(conversionFactor !== undefined && conversionFactor !== null && conversionFactor !== '' && { conversionFactor: Number(conversionFactor) }),
           costPrice: Number(costPrice),
           sellingPrice: Number(sellingPrice),
           wholesalePrice: wholesalePrice !== undefined && wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null,
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           preferredVendorId: preferredVendorId || null,
+          ...(regulatoryCategory !== undefined && { regulatoryCategory: String(regulatoryCategory) }),
+          ...(requiresBatchTracking !== undefined && { requiresBatchTracking: Boolean(requiresBatchTracking) }),
         },
       });
 
@@ -242,6 +275,7 @@ router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Ware
       return item;
     });
 
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
     res.status(201).json({ success: true, message: 'Item created successfully', data: { item: createdItem } });
   } catch (error: any) {
     console.error('[Inventory] Error creating item:', error);
@@ -265,7 +299,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
-    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId } = req.body;
+    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId, requiresBatchTracking, secondaryUnitOfMeasure, conversionFactor } = req.body;
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).inventoryItem.findFirst({ where: { id, tenantId } });
@@ -287,6 +321,9 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
           ...(wholesalePrice !== undefined && { wholesalePrice: wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null }),
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           ...(preferredVendorId !== undefined && { preferredVendorId: preferredVendorId || null }),
+          ...(requiresBatchTracking !== undefined && { requiresBatchTracking: Boolean(requiresBatchTracking) }),
+          ...(secondaryUnitOfMeasure !== undefined && { secondaryUnitOfMeasure: secondaryUnitOfMeasure || null }),
+          ...(conversionFactor !== undefined && { conversionFactor: conversionFactor !== null && conversionFactor !== '' ? Number(conversionFactor) : null }),
         },
       });
     });
@@ -296,6 +333,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
       return;
     }
 
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
     res.status(200).json({ success: true, data: { item: updated } });
   } catch (error: any) {
     if (error.message === 'Preferred vendor not found.') {
@@ -326,26 +364,30 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
       res.status(400).json({ success: false, error: 'Provide a non-empty array of items to create.' });
       return;
     }
-    if (items.length > 500) {
-      res.status(400).json({ success: false, error: 'A maximum of 500 items can be created per bulk request.' });
+    if (items.length > 10_000) {
+      res.status(400).json({ success: false, error: 'A maximum of 10,000 items can be created per bulk request.' });
       return;
     }
 
-    const created: any[] = [];
+    // ── Phase 1: synchronous pre-validation (no DB) ─────────────────────────
+    type ValidRow = {
+      index: number;
+      name: string;
+      sku: string;
+      category: string;
+      unitOfMeasure: string;
+      costPrice: number;
+      sellingPrice: number;
+      initialWarehouseId: string | null;
+      initialQty: number;
+    };
+
+    const validRows: ValidRow[] = [];
     const failed: { index: number; name?: string; error: string }[] = [];
-    const warehouseValidityCache = new Map<string, boolean>();
     const usedSkusThisBatch = new Set<string>();
 
-    // Each row gets its OWN transaction - a Postgres constraint violation
-    // (e.g. duplicate SKU) aborts the enclosing transaction at the DB level,
-    // not just the JS try/catch around it, so a shared transaction across
-    // rows would silently roll back every already-"succeeded" row too (a
-    // COMMIT on an aborted transaction is a silent no-op, not an error) the
-    // moment a later row failed. A per-row transaction is what actually
-    // makes "one bad row doesn't discard the others" true at the DB level.
     for (let i = 0; i < items.length; i++) {
       const row = items[i] || {};
-      let itemSku = '';
       try {
         const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, initialWarehouseId, initialQty = 0 } = row;
 
@@ -353,62 +395,102 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
         if (costPrice === undefined || costPrice === null || costPrice === '') throw new Error('Cost price is required.');
         if (sellingPrice === undefined || sellingPrice === null || sellingPrice === '') throw new Error('Selling price is required.');
 
-        itemSku = sku ? String(sku).trim().toUpperCase() : '';
+        let itemSku = sku ? String(sku).trim().toUpperCase() : '';
         if (!itemSku) {
           do {
             itemSku = `SKU-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
           } while (usedSkusThisBatch.has(itemSku));
         }
-        if (usedSkusThisBatch.has(itemSku)) {
-          throw new Error(`Duplicate SKU "${itemSku}" within this batch.`);
-        }
-
-        if (initialWarehouseId && !warehouseValidityCache.has(initialWarehouseId)) {
-          const wh = await withCurrentTenantDb(prisma, (client) => (client as any).warehouse.findFirst({ where: { id: initialWarehouseId, tenantId } }));
-          warehouseValidityCache.set(initialWarehouseId, !!wh);
-        }
-        if (initialWarehouseId && !warehouseValidityCache.get(initialWarehouseId)) {
-          throw new Error('Initial warehouse not found.');
-        }
-        if (initialWarehouseId) {
-          await withCurrentTenantDb(prisma, (client) => assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, initialWarehouseId));
-        }
-
-        const newItem = await withCurrentTenantDb(prisma, async (client) => {
-          const newItem = await (client as any).inventoryItem.create({
-            data: {
-              tenantId,
-              sku: itemSku,
-              name: String(name).trim(),
-              category,
-              unitOfMeasure,
-              costPrice: Number(costPrice),
-              sellingPrice: Number(sellingPrice),
-            },
-          });
-
-          if (initialWarehouseId && Number(initialQty) > 0) {
-            await (client as any).warehouseStock.create({
-              data: {
-                tenantId,
-                warehouseId: initialWarehouseId,
-                itemId: newItem.id,
-                quantityOnHand: Number(initialQty),
-              },
-            });
-          }
-
-          return newItem;
-        });
-
+        if (usedSkusThisBatch.has(itemSku)) throw new Error(`Duplicate SKU "${itemSku}" within this batch.`);
         usedSkusThisBatch.add(itemSku);
-        created.push(newItem);
+
+        validRows.push({
+          index: i,
+          name: String(name).trim(),
+          sku: itemSku,
+          category,
+          unitOfMeasure,
+          costPrice: Number(costPrice),
+          sellingPrice: Number(sellingPrice),
+          initialWarehouseId: initialWarehouseId || null,
+          initialQty: Number(initialQty) > 0 ? Number(initialQty) : 0,
+        });
       } catch (rowError: any) {
-        const message = rowError.code === 'P2002'
-          ? `SKU "${itemSku}" already exists for this business.`
-          : (rowError.message || 'Failed to create this item.');
-        failed.push({ index: i, name: row?.name, error: message });
+        failed.push({ index: i, name: row?.name, error: rowError.message || 'Failed to create this item.' });
       }
+    }
+
+    // ── Phase 2: single DB session ────────────────────────────────────────────
+    const created: any[] = [];
+
+    if (validRows.length > 0) {
+      await withCurrentTenantDb(prisma, async (client) => {
+        // Validate unique warehouse IDs once (not once per row)
+        const uniqueWarehouseIds = [...new Set(validRows.map(r => r.initialWarehouseId).filter(Boolean) as string[])];
+        const validWarehouseIds = new Set<string>();
+        for (const wid of uniqueWarehouseIds) {
+          const wh = await (client as any).warehouse.findFirst({ where: { id: wid, tenantId } });
+          if (!wh) continue;
+          try {
+            await assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, wid);
+            validWarehouseIds.add(wid);
+          } catch {
+            // access denied — rows referencing this warehouse will error below
+          }
+        }
+
+        // Filter rows whose warehouse didn't pass validation
+        const okRows: ValidRow[] = [];
+        for (const row of validRows) {
+          if (row.initialWarehouseId && !validWarehouseIds.has(row.initialWarehouseId)) {
+            failed.push({ index: row.index, name: row.name, error: 'Warehouse not found or access denied.' });
+          } else {
+            okRows.push(row);
+          }
+        }
+
+        if (okRows.length === 0) return;
+
+        // Single INSERT … RETURNING for all valid rows
+        const inserted: any[] = await (client as any).inventoryItem.createManyAndReturn({
+          data: okRows.map(r => ({
+            tenantId,
+            sku: r.sku,
+            name: r.name,
+            category: r.category,
+            unitOfMeasure: r.unitOfMeasure,
+            costPrice: r.costPrice,
+            sellingPrice: r.sellingPrice,
+          })),
+          skipDuplicates: true,
+        });
+        created.push(...inserted);
+
+        // Attribute each skipped row to the specific row so callers get per-row error details
+        if (inserted.length < okRows.length) {
+          const insertedSkus = new Set(inserted.map((it: any) => it.sku));
+          for (const row of okRows) {
+            if (!insertedSkus.has(row.sku)) {
+              failed.push({ index: row.index, name: row.name, error: `SKU "${row.sku}" already exists in this business.` });
+            }
+          }
+        }
+
+        // Stock rows for inserted items that had a warehouse + qty
+        const skuToItem = new Map(inserted.map((it: any) => [it.sku, it]));
+        const stockData = okRows
+          .filter(r => r.initialWarehouseId && r.initialQty > 0 && skuToItem.has(r.sku))
+          .map(r => ({
+            tenantId,
+            warehouseId: r.initialWarehouseId!,
+            itemId: skuToItem.get(r.sku)!.id,
+            quantityOnHand: r.initialQty,
+          }));
+
+        if (stockData.length > 0) {
+          await (client as any).warehouseStock.createMany({ data: stockData, skipDuplicates: true });
+        }
+      });
     }
 
     if (created.length > 0) {
@@ -424,10 +506,13 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
       });
     }
 
-    res.status(created.length > 0 ? 201 : 400).json({
+    if (created.length > 0) {
+      invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
+    }
+    res.status(201).json({
       success: created.length > 0,
       message: `${created.length} item(s) created${failed.length > 0 ? `, ${failed.length} failed` : ''}.`,
-      data: { created, failed },
+      data: { importedCount: created.length, errorCount: failed.length, errors: failed, failed, created },
     });
   } catch (error: any) {
     console.error('[Inventory] Error bulk-creating items:', error);
@@ -531,6 +616,11 @@ router.post('/transfers', requireRole('Accountant', 'Shop Manager', 'Cashier', '
       return transfer;
     });
 
+    // Fire-and-forget low-stock alert for the source item after transfer out.
+    checkAndAlertLowStock(tenantId, itemId).catch(() => {});
+    // Stock levels changed — invalidate cached item list so next read reflects new quantities
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
+
     res.status(201).json({
       success: true,
       message: 'Stock transfer completed successfully',
@@ -622,6 +712,12 @@ router.post('/adjustments', requireRole('Accountant', 'Shop Manager', 'Cashier',
 
       return { adjustment, warehouse, item, newQty, previousQty };
     });
+
+    // Fire-and-forget low-stock alert when stock is removed or set to a low value.
+    if (mode === 'remove' || mode === 'set') {
+      checkAndAlertLowStock(tenantId, itemId).catch(() => {});
+    }
+    invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -813,5 +909,150 @@ router.post('/stock-take', requireRole('Accountant', 'Shop Manager', 'Cashier', 
     res.status(400).json({ success: false, error: error.message || 'Failed to reconcile stock take.' });
   }
 });
+
+// ─── Inventory Batch Endpoints ───────────────────────────────────────────────
+
+/**
+ * GET /api/v1/inventory/batches
+ * Lists inventory batches. Optional ?itemId=, ?warehouseId=, ?expiringSoon=N (days).
+ */
+router.get('/batches', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { itemId, warehouseId, expiringSoon } = req.query;
+
+    const where: any = { tenantId };
+    if (itemId) where.itemId = String(itemId);
+    if (warehouseId) where.warehouseId = String(warehouseId);
+    if (expiringSoon) {
+      const days = parseInt(String(expiringSoon), 10) || 30;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() + days);
+      where.expiryDate = { not: null, lte: cutoff };
+    }
+
+    const batches = await withCurrentTenantDb(prisma, async (client) => {
+      return (client as any).inventoryBatch.findMany({
+        where,
+        include: {
+          item: { select: { id: true, name: true, sku: true } },
+          warehouse: { select: { id: true, name: true } },
+        },
+        orderBy: [{ expiryDate: 'asc' }, { createdAt: 'desc' }],
+      });
+    });
+
+    res.status(200).json({ success: true, data: { batches } });
+  } catch (error: any) {
+    console.error('[Inventory] Error fetching batches:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve inventory batches.' });
+  }
+});
+
+/**
+ * POST /api/v1/inventory/batches
+ * Receives a new batch for a batch-tracked item. Upserts the InventoryBatch row and
+ * increments warehouseStock.quantityOnHand. For CONTROLLED items, also posts a
+ * narcotics log RECEIVED entry.
+ */
+router.post(
+  '/batches',
+  requireRole('Accountant', 'Warehouse Manager', 'Shop Manager'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { tenantId } = requireTenantContext();
+      const { itemId, warehouseId, batchNumber, expiryDate, quantity, costPrice, supplierId } = req.body;
+
+      if (!itemId || !warehouseId || !batchNumber || quantity === undefined || costPrice === undefined) {
+        res.status(400).json({ success: false, error: 'itemId, warehouseId, batchNumber, quantity, and costPrice are required.' });
+        return;
+      }
+      const qty = parseInt(String(quantity), 10);
+      if (!Number.isInteger(qty) || qty <= 0) {
+        res.status(400).json({ success: false, error: 'quantity must be a positive integer.' });
+        return;
+      }
+
+      const result = await withCurrentTenantDb(prisma, async (client) => {
+        const item = await (client as any).inventoryItem.findFirst({ where: { id: itemId, tenantId } });
+        if (!item) throw new Error('Item not found.');
+
+        const warehouse = await (client as any).warehouse.findFirst({ where: { id: warehouseId, tenantId } });
+        if (!warehouse) throw new Error('Warehouse not found.');
+
+        await assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, warehouseId);
+
+        // Upsert the batch row
+        const existingBatch = await (client as any).inventoryBatch.findFirst({
+          where: { tenantId, itemId, batchNumber },
+        });
+
+        let batch: any;
+        if (existingBatch) {
+          batch = await (client as any).inventoryBatch.update({
+            where: { id: existingBatch.id },
+            data: { quantityOnHand: { increment: qty } },
+          });
+        } else {
+          batch = await (client as any).inventoryBatch.create({
+            data: {
+              tenantId,
+              itemId,
+              warehouseId,
+              batchNumber: String(batchNumber).trim(),
+              expiryDate: expiryDate ? new Date(expiryDate) : null,
+              quantityOnHand: qty,
+              supplierId: supplierId || null,
+              costPrice: Number(costPrice),
+            },
+          });
+        }
+
+        // Increment the warehouseStock total (the authoritative quantity)
+        await (client as any).warehouseStock.upsert({
+          where: { warehouseId_itemId: { warehouseId, itemId } },
+          create: { tenantId, warehouseId, itemId, quantityOnHand: qty },
+          update: { quantityOnHand: { increment: qty } },
+        });
+
+        // Narcotics auto-log for CONTROLLED items
+        if (item.regulatoryCategory === 'CONTROLLED') {
+          const lastEntry = await (client as any).narcoticsLogEntry.findFirst({
+            where: { tenantId, itemId },
+            orderBy: { entryDate: 'desc' },
+          });
+          const balanceAfter = (lastEntry ? lastEntry.balanceAfter : 0) + qty;
+          await (client as any).narcoticsLogEntry.create({
+            data: {
+              tenantId,
+              itemId,
+              batchNumber: String(batchNumber).trim(),
+              operationType: 'RECEIVED',
+              quantity: qty,
+              balanceAfter,
+              supplierRef: supplierId || null,
+              recordedByName: req.user?.name || req.user?.email || 'Unknown',
+            },
+          });
+        }
+
+        return { batch, item, warehouse };
+      });
+
+      res.status(201).json({ success: true, message: 'Batch received successfully.', data: { batch: result.batch } });
+    } catch (error: any) {
+      console.error('[Inventory] Error receiving batch:', error);
+      if (error.message === 'Item not found.' || error.message === 'Warehouse not found.') {
+        res.status(404).json({ success: false, error: error.message });
+        return;
+      }
+      if (error instanceof WarehouseAccessError) {
+        res.status(error.statusCode).json({ success: false, error: error.message });
+        return;
+      }
+      res.status(500).json({ success: false, error: 'Failed to receive batch.' });
+    }
+  }
+);
 
 export default router;

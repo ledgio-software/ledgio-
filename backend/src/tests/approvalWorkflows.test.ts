@@ -3,20 +3,23 @@ import app from '../app';
 import { prisma } from '../config/db';
 import { onboardTenant } from '../services/tenantService';
 import { deleteTenantBySlug, ensureTenantTableExists } from '../repository/tenantRepository';
-import { deleteUserByEmail, ensureUserTableExists } from '../repository/userRepository';
+import { deleteUserByEmail, ensureUserTableExists, createUser } from '../repository/userRepository';
 import { dropTenantSchema } from '../database/tenantSchemaManager';
+import { generateJwtToken } from '../utils/jwt';
 
 describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', () => {
-  const runId = Date.now();
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tenant1Slug = `approval-corp-1-${runId}`;
   const tenant1Schema = `tenant_approval_corp_1_${runId}`;
   const admin1Email = `admin_approval1_${runId}@corp1.com`;
+  const approverEmail1 = `approver_approval1_${runId}@corp1.com`;
 
   const tenant2Slug = `approval-corp-2-${runId}`;
   const tenant2Schema = `tenant_approval_corp_2_${runId}`;
   const admin2Email = `admin_approval2_${runId}@corp2.com`;
 
   let token1: string;
+  let approverToken1: string;
   let token2: string;
   let tenant1Id: string | undefined;
   let tenant2Id: string | undefined;
@@ -31,6 +34,7 @@ describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', ()
     await deleteTenantBySlug(prisma, tenant1Slug).catch(() => {});
     await deleteTenantBySlug(prisma, tenant2Slug).catch(() => {});
     await deleteUserByEmail(prisma, admin1Email).catch(() => {});
+    await deleteUserByEmail(prisma, approverEmail1).catch(() => {});
     await deleteUserByEmail(prisma, admin2Email).catch(() => {});
     await dropTenantSchema(prisma, tenant1Schema).catch(() => {});
     await dropTenantSchema(prisma, tenant2Schema).catch(() => {});
@@ -52,6 +56,23 @@ describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', ()
     });
     token1 = onboard1.token;
     tenant1Id = onboard1.tenant.id;
+
+    // A second user (Accountant) acts as the approver — SoD requires submitter ≠ approver.
+    const approver1 = await createUser(prisma, {
+      email: approverEmail1,
+      password: 'Password123!',
+      name: 'Approval Corp 1 Approver',
+      role: 'Accountant',
+      tenantId: tenant1Id,
+      isActive: true,
+    } as any);
+    approverToken1 = generateJwtToken({
+      id: approver1.id,
+      email: approver1.email,
+      role: approver1.role,
+      tenantId: tenant1Id,
+      name: approver1.name,
+    });
 
     const onboard2 = await onboardTenant(prisma, {
       companyName: 'Approval Isolation Corp 2',
@@ -139,14 +160,14 @@ describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', ()
     // Cannot skip ahead to level 2 before level 1 is decided.
     const outOfOrder = await request(app)
       .post(`/api/v1/approval-workflows/${workflowId}/steps/2/decide`)
-      .set('Authorization', `Bearer ${token1}`)
+      .set('Authorization', `Bearer ${approverToken1}`)
       .set('X-Tenant-ID', tenant1Slug)
       .send({ decision: 'APPROVE' });
     expect(outOfOrder.status).toBe(400);
 
     const level1Approve = await request(app)
       .post(`/api/v1/approval-workflows/${workflowId}/steps/1/decide`)
-      .set('Authorization', `Bearer ${token1}`)
+      .set('Authorization', `Bearer ${approverToken1}`)
       .set('X-Tenant-ID', tenant1Slug)
       .send({ decision: 'APPROVE' });
     expect(level1Approve.status).toBe(200);
@@ -160,7 +181,7 @@ describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', ()
 
     const level2Approve = await request(app)
       .post(`/api/v1/approval-workflows/${workflowId}/steps/2/decide`)
-      .set('Authorization', `Bearer ${token1}`)
+      .set('Authorization', `Bearer ${approverToken1}`)
       .set('X-Tenant-ID', tenant1Slug)
       .send({ decision: 'APPROVE' });
     expect(level2Approve.status).toBe(200);
@@ -197,7 +218,7 @@ describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', ()
 
     const rejectRes = await request(app)
       .post(`/api/v1/approval-workflows/${workflowId}/steps/1/decide`)
-      .set('Authorization', `Bearer ${token1}`)
+      .set('Authorization', `Bearer ${approverToken1}`)
       .set('X-Tenant-ID', tenant1Slug)
       .send({ decision: 'REJECT', comments: 'Not this quarter' });
     expect(rejectRes.status).toBe(200);
@@ -211,7 +232,7 @@ describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', ()
 
     const cannotRedecide = await request(app)
       .post(`/api/v1/approval-workflows/${workflowId}/steps/1/decide`)
-      .set('Authorization', `Bearer ${token1}`)
+      .set('Authorization', `Bearer ${approverToken1}`)
       .set('X-Tenant-ID', tenant1Slug)
       .send({ decision: 'APPROVE' });
     expect(cannotRedecide.status).toBe(400);
@@ -246,7 +267,7 @@ describe('Approval Workflows API (multi-level, opt-in posting/payment gate)', ()
 
     const decided = await request(app)
       .post(`/api/v1/approval-workflows/${workflowId}/steps/1/decide`)
-      .set('Authorization', `Bearer ${token1}`)
+      .set('Authorization', `Bearer ${approverToken1}`)
       .set('X-Tenant-ID', tenant1Slug)
       .send({ decision: 'APPROVE' });
     expect(decided.status).toBe(200);

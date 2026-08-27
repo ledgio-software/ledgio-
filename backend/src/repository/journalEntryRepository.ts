@@ -36,6 +36,7 @@ export interface CreateJournalEntryLineData {
   credit: number;
   description?: string;
   fundId?: string | null;
+  costCategoryId?: string | null;
 }
 
 export interface CreateJournalEntryData {
@@ -44,6 +45,9 @@ export interface CreateJournalEntryData {
   description?: string;
   status?: JournalEntryStatus;
   reversalOfEntryId?: string;
+  voucherType?: string;
+  scenarioId?: string;
+  voucherClassId?: string;
   lines: CreateJournalEntryLineData[];
 }
 
@@ -84,14 +88,17 @@ export async function createJournalEntry(
 
   // 1. Insert Header
   const headerRows: any[] = await prisma.$queryRawUnsafe(
-    `INSERT INTO journal_entries (entry_number, entry_date, description, status, reversal_of_entry_id)
-     VALUES ($1, $2::date, $3, CAST($4 AS "JournalEntryStatus"), $5::uuid)
+    `INSERT INTO journal_entries (entry_number, entry_date, description, status, reversal_of_entry_id, voucher_type, scenario_id, voucher_class_id)
+     VALUES ($1, $2::date, $3, CAST($4 AS "JournalEntryStatus"), $5::uuid, $6, $7::uuid, $8::uuid)
      RETURNING id, entry_number, entry_date, description, status, created_at, updated_at, reversal_of_entry_id, reversed_by_entry_id`,
     data.entryNumber,
     data.entryDate || new Date(),
     data.description || null,
     data.status || 'DRAFT',
-    data.reversalOfEntryId || null
+    data.reversalOfEntryId || null,
+    data.voucherType || 'JOURNAL',
+    data.scenarioId || null,
+    data.voucherClassId || null
   );
   const entryHeader = headerRows[0];
   const insertedLines: JournalEntryLineRecord[] = [];
@@ -99,15 +106,16 @@ export async function createJournalEntry(
   // Insert lines
   for (const line of data.lines) {
     const lineRows: any[] = await prisma.$queryRawUnsafe(
-      `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, description, fund_id)
-       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid)
+      `INSERT INTO journal_entry_lines (journal_entry_id, account_id, debit, credit, description, fund_id, cost_category_id)
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid, $7::uuid)
        RETURNING id, journal_entry_id, account_id, debit, credit, description, created_at, fund_id`,
       entryHeader.id,
       line.accountId,
       line.debit || 0.00,
       line.credit || 0.00,
       line.description || null,
-      line.fundId || null
+      line.fundId || null,
+      line.costCategoryId || null
     );
     insertedLines.push(mapJournalEntryLineRow(lineRows[0]));
   }
@@ -303,12 +311,4 @@ export async function setReversalLink(
 
   if (!rows || rows.length === 0) return null;
   return getJournalEntryById(prisma, originalEntryId);
-}
-
-export async function deleteJournalEntry(prisma: PrismaClient, id: string): Promise<boolean> {
-  const count = await prisma.$executeRawUnsafe(
-    `DELETE FROM journal_entries WHERE id = $1::uuid`,
-    id
-  );
-  return count > 0;
 }

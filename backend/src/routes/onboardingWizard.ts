@@ -101,4 +101,19 @@ router.post('/opening-balances', requireRole('Admin'), async (req: Request, res:
   }
 });
 
+/**
+ * POST /api/v1/onboarding/seed-wht-defaults
+ * Seeds the default Ghana WHT5 (5%) preset if not already present.
+ */
+router.post('/seed-wht-defaults', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const result = await onboardingWizardService.seedWhtRateDefaults(tenantId, actorFromRequest(req));
+    res.status(200).json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[OnboardingWizard] Error seeding WHT defaults:', error);
+    res.status(500).json({ success: false, error: 'Failed to seed WHT rate defaults.' });
+  }
+});
+
 export default router;

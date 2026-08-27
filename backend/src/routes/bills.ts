@@ -21,6 +21,7 @@ import { CreditDebitNoteServiceError } from '../services/creditDebitNoteService'
 import { JournalEntryServiceError } from '../services/journalEntryService';
 import * as purchaseOrderService from '../services/purchaseOrderService';
 import * as vendorBillPaymentService from '../services/vendorBillPaymentService';
+import { invalidateCachedList } from '../cache/listCache';
 
 const router = Router();
 
@@ -86,7 +87,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const bills = await withCurrentTenantDb(prisma, async (client) => {
       return (client as any).vendorBill.findMany({
         where: { tenantId },
-        include: { vendor: true, lines: { include: { item: true } }, warehouse: true },
+        select: {
+          id: true, billNumber: true, amount: true, currency: true,
+          status: true, dueDate: true, createdAt: true, billType: true,
+          scheduledPaymentDate: true, landedCostForBillId: true, journalId: true,
+          vendor: { select: { id: true, name: true, email: true } },
+          lines: {
+            select: {
+              id: true, quantity: true,
+              item: { select: { id: true, name: true } },
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       });
     });
@@ -120,7 +132,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { vendorId, dueDate, currency = 'USD', items, warehouseId, fundId, purchaseOrderId } = req.body;
+    const { vendorId, dueDate, currency = 'USD', items, warehouseId, fundId, purchaseOrderId, whtRateId } = req.body;
 
     if (!vendorId) {
       res.status(400).json({ success: false, error: 'Vendor ID is required.' });
@@ -213,6 +225,14 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
         await assertWarehouseAccess(client, tenantId, req.user!.id, req.user!.role, warehouseId);
       }
 
+      // Validate whtRateId if provided (must exist and belong to this tenant)
+      if (whtRateId) {
+        const whtRate = await (prisma as any).whtRate.findFirst({ where: { id: whtRateId, tenantId } });
+        if (!whtRate) {
+          throw new Error('WHT rate not found.');
+        }
+      }
+
       const bill = await (client as any).vendorBill.create({
         data: {
           tenantId,
@@ -226,6 +246,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
           warehouseId: isItemized ? warehouseId : null,
           fundId: fundId || null,
           purchaseOrderId: purchaseOrderId || null,
+          whtRateId: whtRateId || null,
           ...(isItemized && {
             lines: {
               create: items.map((l: any) => ({
@@ -247,7 +268,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
           client,
           tenantId,
           warehouseId,
-          items.map((l: any) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost }))
+          items.map((l: any) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost, purchaseUoM: l.purchaseUoM }))
         );
 
         await recordAuditLogTx(client, {
@@ -280,6 +301,10 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
       );
     }
 
+    if (isItemized) {
+      const { tenantId: billTenantId } = requireTenantContext();
+      invalidateCachedList(billTenantId, 'inventory-items').catch(() => {});
+    }
     res.status(201).json({
       success: true,
       message: isItemized ? 'Vendor bill recorded and stock received.' : 'Vendor bill recorded',
@@ -291,7 +316,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), async (req: Request,
       res.status(error.statusCode).json({ success: false, error: error.message });
       return;
     }
-    if (error.message === 'Vendor not found.' || error.message === 'Warehouse not found.') {
+    if (error.message === 'Vendor not found.' || error.message === 'Warehouse not found.' || error.message === 'WHT rate not found.') {
       res.status(404).json({ success: false, error: error.message });
       return;
     }
@@ -363,6 +388,8 @@ router.post('/:id/landed-cost', requireRole('Accountant'), async (req: Request, 
       return { landedCostBill, allocations };
     });
 
+    const { tenantId: lcTenantId } = requireTenantContext();
+    invalidateCachedList(lcTenantId, 'inventory-items').catch(() => {});
     res.status(201).json({
       success: true,
       message: 'Landed cost recorded and allocated across the purchase.',

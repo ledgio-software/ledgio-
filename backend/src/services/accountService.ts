@@ -107,6 +107,14 @@ export async function createAccount(data: CreateAccountData, actor?: AuditActor)
       // 1. Check duplicate code
       const existingCode = await accountRepository.getAccountByCode(client, data.code);
       if (existingCode) {
+        // If we got here via a race where the winner committed before we reached
+        // the INSERT (but after our clientTxnId fast-path at line 100), the
+        // winner's account will share the same clientTxnId — treat it as an
+        // idempotency replay rather than a genuine conflict.
+        if (data.clientTxnId && existingCode.clientTxnId === data.clientTxnId) {
+          replayed = true;
+          return existingCode;
+        }
         throw new AccountServiceError(`Account code "${data.code.trim()}" already exists.`, 409);
       }
 
@@ -141,8 +149,13 @@ export async function createAccount(data: CreateAccountData, actor?: AuditActor)
         // (uq_accounts_client_txn_id locally, accounts_code_key under CI's
         // timing). Both must be treated as "go look up the real winner",
         // not just the client_txn_id one.
+        // Prisma wraps raw-query errors as P2010 (not the Postgres code 23505
+        // directly), but embeds the full Postgres error in the message, so
+        // the constraint name is always present regardless of which code field
+        // the runtime exposes. Check message alone — it's reliable in both
+        // local (native Postgres error bubbled as 23505) and CI (P2010 wrapper).
         const message = String(error.message || '');
-        if (error.code === '23505' && data.clientTxnId &&
+        if (data.clientTxnId &&
           (message.includes('uq_accounts_client_txn_id') || message.includes('accounts_code_key'))) {
           throw new DuplicateAccountReplayError();
         }
@@ -182,8 +195,11 @@ export async function createAccount(data: CreateAccountData, actor?: AuditActor)
       // delivers the committed row; one short retry is enough.
       created = await withCurrentTenantDb(prisma, async (client) => {
         let winner = await accountRepository.getAccountByClientTxnId(client, data.clientTxnId!);
-        if (!winner) {
-          await new Promise((r) => setTimeout(r, 50));
+        // Under heavy CI concurrency the winning transaction's committed row
+        // can take longer than expected to be visible through the connection pool.
+        // Retry up to 5 times with exponential back-off (50→100→200→400→800ms = 1550ms total).
+        for (let attempt = 0; !winner && attempt < 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 50 * 2 ** attempt)); // 50, 100, 200, 400, 800 ms
           winner = await accountRepository.getAccountByClientTxnId(client, data.clientTxnId!);
         }
         if (winner) return winner;
@@ -214,6 +230,12 @@ export async function createAccount(data: CreateAccountData, actor?: AuditActor)
   }
 
   return created;
+}
+
+export async function findAccountByClientTxnId(clientTxnId: string): Promise<AccountRecord | null> {
+  return withCurrentTenantDb(prisma, (client) =>
+    accountRepository.getAccountByClientTxnId(client, clientTxnId)
+  );
 }
 
 export async function getAccountById(id: string): Promise<AccountRecord | null> {
@@ -367,6 +389,12 @@ const REASONABLE_TYPES_FOR_ROLE: Record<AccountDefaultRole, AccountType[]> = {
   PAYE_PAYABLE: ['LIABILITY'],
   SSNIT_PAYABLE: ['LIABILITY'],
   NET_PAY_PAYABLE: ['LIABILITY'],
+  WHT_PAYABLE: ['LIABILITY'],
+  PDC_RECEIVABLE: ['ASSET'],
+  PDC_PAYABLE: ['LIABILITY'],
+  INTEREST_INCOME: ['REVENUE'],
+  JOB_WIP: ['ASSET'],
+  JOB_EXPENSE: ['EXPENSE', 'COST_OF_SALES'],
 };
 
 /**

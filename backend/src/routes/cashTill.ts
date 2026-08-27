@@ -4,14 +4,38 @@ import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { checkEmergencyStop } from '../middleware/emergencyStopMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { assertWarehouseAccess, getAccessibleWarehouseIds, WarehouseAccessError } from '../services/warehouseAccessService';
+import { z } from 'zod';
+import { validateBody } from '../middleware/validateBody';
+import { invalidateCachedList } from '../cache/listCache';
+
+const saleLineSchema = z.object({
+  itemId: z.string().uuid(),
+  quantity: z.number().int().positive().max(10000),
+});
+const createSaleSchema = z.object({
+  tillId: z.string().uuid(),
+  items: z.array(saleLineSchema).min(1).max(200),
+  cashGiven: z.number().nonnegative().optional().nullable(),
+  clientTxnId: z.string().min(1).max(100).optional().nullable(),
+  clientOccurredAt: z.string().datetime({ offset: true }).optional().nullable(),
+  saleType: z.enum(['RETAIL', 'WHOLESALE']).optional(),
+  customerPhone: z.string().max(30).optional().nullable(),
+  customerName: z.string().max(200).optional().nullable(),
+  rxNumber: z.string().min(1).max(100).optional().nullable(),
+  paymentMethod: z.enum(['CASH', 'MOMO', 'CARD']).default('CASH'),
+});
 import { verifyPassword } from '../utils/password';
 import { recordAuditLog, recordAuditLogTx, actorFromRequest, AuditActor } from '../services/auditLogService';
 import { SmsService } from '../services/smsService';
 import * as accountRepository from '../repository/accountRepository';
 import * as journalService from '../services/journalEntryService';
 import { sendWhatsAppReceipt } from '../services/whatsAppReceiptService';
+import { checkAndAlertLowStock } from '../services/lowStockAlertService';
+import { consumeLayers } from '../services/stockLayerService';
+import PDFDocument from 'pdfkit';
 
 /**
  * Posts the real Cash/Revenue journal entry for a completed POS cash sale
@@ -28,7 +52,8 @@ import { sendWhatsAppReceipt } from '../services/whatsAppReceiptService';
  */
 async function postCashSaleRevenue(
   sale: { id: string; amount: any; receiptNo: string; createdByName?: string | null },
-  actor: AuditActor
+  actor: AuditActor,
+  paymentMethod: string = 'CASH'
 ): Promise<string | null> {
   try {
     const [accounts, saleLines] = await Promise.all([
@@ -60,9 +85,13 @@ async function postCashSaleRevenue(
       return null;
     }
 
+    const debitAcc = cashAcc;
     const amount = Number(sale.amount);
+    const debitDesc = paymentMethod === 'CASH'
+      ? `Cash received - ${sale.receiptNo}`
+      : `${paymentMethod} payment received - ${sale.receiptNo}`;
     const lines: { accountId: string; debit: number; credit: number; description: string }[] = [
-      { accountId: cashAcc.id, debit: amount, credit: 0, description: `Cash received - ${sale.receiptNo}` },
+      { accountId: debitAcc.id, debit: amount, credit: 0, description: debitDesc },
       { accountId: revenueAcc.id, debit: 0, credit: amount, description: `Sales revenue - ${sale.receiptNo}` },
     ];
 
@@ -73,11 +102,28 @@ async function postCashSaleRevenue(
     const cogsAcc = accountRepository.resolveDefaultAccount(accounts, 'COGS');
     const invAcc = accountRepository.resolveDefaultAccount(accounts, 'INVENTORY_ASSET');
     if (cogsAcc && invAcc && Array.isArray(saleLines) && saleLines.length > 0) {
-      const totalCost = (saleLines as any[]).reduce((sum: number, l: any) => {
-        const cost = costByItemId.get(l.itemId) ?? 0;
-        return sum + cost * Number(l.quantity);
-      }, 0);
-      const cogs = Math.round(totalCost * 100) / 100;
+      const { tenantId } = requireTenantContext();
+      const tenantForFifo = await (prisma as any).tenant.findUnique({
+        where: { id: tenantId },
+        select: { stockValuationMethod: true },
+      });
+
+      let cogs = 0;
+      if (tenantForFifo?.stockValuationMethod === 'FIFO') {
+        for (const l of (saleLines as any[])) {
+          if (!l.itemId || !l.quantity) continue;
+          const { totalCost } = await consumeLayers({ tenantId, itemId: l.itemId, qty: Number(l.quantity) });
+          cogs += totalCost;
+        }
+        cogs = Math.round(cogs * 100) / 100;
+      } else {
+        const totalCost = (saleLines as any[]).reduce((sum: number, l: any) => {
+          const cost = costByItemId.get(l.itemId) ?? 0;
+          return sum + cost * Number(l.quantity);
+        }, 0);
+        cogs = Math.round(totalCost * 100) / 100;
+      }
+
       if (cogs > 0) {
         lines.push({ accountId: cogsAcc.id, debit: cogs, credit: 0, description: `COGS - ${sale.receiptNo}` });
         lines.push({ accountId: invAcc.id, debit: 0, credit: cogs, description: `Inventory - ${sale.receiptNo}` });
@@ -148,7 +194,18 @@ router.get('/current', async (req: Request, res: Response): Promise<void> => {
           ...(accessibleIds !== null && { warehouseId: { in: accessibleIds } }),
           status: 'OPEN',
         },
-        include: { warehouse: true, sales: { include: { lines: true }, orderBy: { createdAt: 'desc' } } },
+        include: {
+          warehouse: true,
+          sales: {
+            take: 100,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              lines: {
+                select: { id: true, quantity: true, itemName: true, itemId: true, lineTotal: true, unitPrice: true },
+              },
+            },
+          },
+        },
         orderBy: { openedAt: 'desc' },
       });
     });
@@ -230,14 +287,20 @@ router.post('/open', async (req: Request, res: Response): Promise<void> => {
  * stock deduction across every line. Body: { tillId, items: [{itemId,
  * quantity}], cashGiven }.
  */
-router.post('/sales', async (req: Request, res: Response): Promise<void> => {
+router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName } = req.body;
+    const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName, rxNumber, paymentMethod } = req.body;
     const resolvedSaleType = saleType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
+    const resolvedPaymentMethod: string = paymentMethod || 'CASH';
 
-    if (!tillId || !Array.isArray(items) || items.length === 0 || cashGiven === undefined || cashGiven === null || cashGiven === '') {
-      res.status(400).json({ success: false, error: 'Till ID, at least one cart item, and cash given are required.' });
+    // cashGiven is only required for CASH payments; other methods don't collect cash at the till
+    if (!tillId || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ success: false, error: 'Till ID and at least one cart item are required.' });
+      return;
+    }
+    if (resolvedPaymentMethod === 'CASH' && (cashGiven === undefined || cashGiven === null || cashGiven === '')) {
+      res.status(400).json({ success: false, error: 'Cash given is required for CASH payment.' });
       return;
     }
     for (const line of items) {
@@ -325,9 +388,20 @@ router.post('/sales', async (req: Request, res: Response): Promise<void> => {
           return sum + effectivePriceFor(item) * line.quantity;
         }, 0);
 
-        const changeGiven = Number(cashGiven) - totalAmount;
-        if (changeGiven < 0) {
+        // For non-CASH payments, cashGiven = amount (exact, no change)
+        const effectiveCashGiven = resolvedPaymentMethod === 'CASH' ? Number(cashGiven) : totalAmount;
+        const changeGiven = resolvedPaymentMethod === 'CASH' ? effectiveCashGiven - totalAmount : 0;
+        if (resolvedPaymentMethod === 'CASH' && changeGiven < 0) {
           throw new Error(`Cash given (GH₵ ${cashGiven}) is less than total bill amount (GH₵ ${totalAmount.toFixed(2)}).`);
+        }
+
+        // Regulatory warning check: collect non-GENERAL items without an Rx reference.
+        const warnings: string[] = [];
+        for (const line of items) {
+          const item = itemsById.get(line.itemId) as any;
+          if (item.regulatoryCategory && item.regulatoryCategory !== 'GENERAL' && !rxNumber) {
+            warnings.push(`${item.name} (${item.regulatoryCategory}) dispensed without an Rx reference.`);
+          }
         }
 
         // 1. Deduct stock per line - atomic guarded decrement so two concurrent
@@ -345,6 +419,30 @@ router.post('/sales', async (req: Request, res: Response): Promise<void> => {
           }
         }
 
+        // FEFO batch deduction for items with requiresBatchTracking.
+        // Deducts from the nearest-expiry batches first; warehouseStock total is
+        // already updated above - batches are the sub-ledger.
+        for (const line of items) {
+          const item = itemsById.get(line.itemId) as any;
+          if (!item.requiresBatchTracking) continue;
+
+          let remaining = line.quantity;
+          const batches = await (client as any).inventoryBatch.findMany({
+            where: { tenantId, itemId: line.itemId, warehouseId: till.warehouseId, quantityOnHand: { gt: 0 } },
+            orderBy: { expiryDate: 'asc' },
+          });
+
+          for (const batch of batches) {
+            if (remaining <= 0) break;
+            const take = Math.min(batch.quantityOnHand, remaining);
+            await (client as any).inventoryBatch.update({
+              where: { id: batch.id },
+              data: { quantityOnHand: { decrement: take } },
+            });
+            remaining -= take;
+          }
+        }
+
         // 2. Record the cash sale header and its lines.
         const receiptNo = `REC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
         let sale;
@@ -355,27 +453,24 @@ router.post('/sales', async (req: Request, res: Response): Promise<void> => {
               tillId,
               receiptNo,
               amount: totalAmount,
-              cashGiven: Number(cashGiven),
+              cashGiven: effectiveCashGiven,
               changeGiven,
               createdByUserId: req.user!.id,
               createdByName: req.user!.name || req.user!.email,
               clientTxnId: clientTxnId || null,
               clientOccurredAt: clientOccurredAt ? new Date(clientOccurredAt) : null,
               saleType: resolvedSaleType,
+              paymentMethod: resolvedPaymentMethod,
             },
           });
 
-          // customer_name / customer_phone were added via raw SQL migration (016)
-          // and are not in schema.prisma, so we save them in a follow-up UPDATE
-          // to avoid Prisma's "Unknown field" runtime error.
-          if (customerName || customerPhone) {
-            await (client as any).$executeRawUnsafe(
-              `UPDATE cash_sales SET customer_name = $1, customer_phone = $2 WHERE id = $3`,
-              customerName ? String(customerName).trim() : null,
-              customerPhone ? String(customerPhone).trim() : null,
-              sale.id
-            );
-          }
+          // customer_name / customer_phone (migration 016) are raw SQL columns not in schema.prisma.
+          await (client as any).$executeRawUnsafe(
+            `UPDATE cash_sales SET customer_name = $1, customer_phone = $2 WHERE id = $3`,
+            customerName ? String(customerName).trim() : null,
+            customerPhone ? String(customerPhone).trim() : null,
+            sale.id
+          );
         } catch (createError: any) {
           // A concurrent request racing on the SAME clientTxnId can lose this
           // unique-constraint check even after passing the fast-path findFirst
@@ -416,7 +511,35 @@ router.post('/sales', async (req: Request, res: Response): Promise<void> => {
           data: { cashSalesTotal: { increment: totalAmount } },
         });
 
-        return { sale, lines, totalAmount, changeGiven, replayed: false };
+        // 4. Auto narcotics log for CONTROLLED items.
+        for (const line of items) {
+          const item = itemsById.get(line.itemId) as any;
+          if (item.regulatoryCategory !== 'CONTROLLED') continue;
+          const lastEntry = await (client as any).narcoticsLogEntry.findFirst({
+            where: { tenantId, itemId: line.itemId },
+            orderBy: { entryDate: 'desc' },
+          });
+          const balanceAfter = (lastEntry ? lastEntry.balanceAfter : 0) - line.quantity;
+          await (client as any).narcoticsLogEntry.create({
+            data: {
+              tenantId,
+              itemId: line.itemId,
+              operationType: 'DISPENSED',
+              quantity: line.quantity,
+              balanceAfter,
+              prescriptionRef: rxNumber || null,
+              patientName: customerName ? String(customerName).trim() : null,
+              recordedByName: req.user?.name || req.user?.email || 'Cashier',
+            },
+          });
+        }
+
+        // 5. Fire-and-forget low-stock alerts for every sold item.
+        for (const line of items) {
+          checkAndAlertLowStock(tenantId, line.itemId).catch(() => {});
+        }
+
+        return { sale, lines, totalAmount, changeGiven, replayed: false, warnings };
     });
     } catch (raceError: any) {
       if (raceError instanceof DuplicateSaleReplayError) {
@@ -440,7 +563,7 @@ router.post('/sales', async (req: Request, res: Response): Promise<void> => {
     // the same journalId check, self-heals a prior attempt that recorded
     // the sale but never got as far as posting its revenue.
     if (!result.sale.journalId) {
-      const journalId = await postCashSaleRevenue(result.sale, actorFromRequest(req));
+      const journalId = await postCashSaleRevenue(result.sale, actorFromRequest(req), resolvedPaymentMethod);
       if (journalId) result.sale.journalId = journalId;
     }
 
@@ -464,7 +587,9 @@ router.post('/sales', async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: result });
+    const { tenantId: saleTenantId } = requireTenantContext();
+    invalidateCachedList(saleTenantId, 'inventory-items').catch(() => {});
+    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: { ...result, warnings: (result as any).warnings || [] } });
   } catch (error: any) {
     console.error('[CashTill] Error recording cash sale:', error);
     if (error instanceof WarehouseAccessError) {
@@ -612,7 +737,7 @@ async function postCashSaleVoidReversal(
  * voiding a completed sale to quietly pocket the cash while stock and books
  * appear to reconcile.
  */
-router.post('/sales/:id/void', async (req: Request, res: Response): Promise<void> => {
+router.post('/sales/:id/void', checkEmergencyStop, async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
@@ -713,6 +838,8 @@ router.post('/sales/:id/void', async (req: Request, res: Response): Promise<void
       if (voidJournalId) result.voided.voidJournalId = voidJournalId;
     }
 
+    const { tenantId: voidTenantId } = requireTenantContext();
+    invalidateCachedList(voidTenantId, 'inventory-items').catch(() => {});
     res.status(200).json({ success: true, message: 'Sale voided and stock restored.', data: { sale: result.voided } });
   } catch (error: any) {
     console.error('[CashTill] Error voiding sale:', error);
@@ -722,6 +849,131 @@ router.post('/sales/:id/void', async (req: Request, res: Response): Promise<void
     }
     const status = error.message?.includes('not found') ? 404 : 400;
     res.status(status).json({ success: false, error: error.message || 'Failed to void sale.' });
+  }
+});
+
+/**
+ * GET /api/v1/tills/sales/:id/receipt.pdf
+ * Generates a printable thermal-style PDF receipt for a completed (or voided)
+ * POS sale. Accessible by Cashier and above so the cashier can reprint.
+ */
+router.get('/sales/:id/receipt.pdf', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId, tenantName } = requireTenantContext();
+    const { id } = req.params;
+
+    // Fetch sale header (with raw columns not in Prisma schema) + lines
+    const rows: any[] = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).$queryRawUnsafe(
+        `SELECT cs.id, cs.receipt_no AS "receiptNo", cs.amount, cs.cash_given AS "cashGiven",
+                cs.change_given AS "changeGiven", cs.status, cs.payment_method AS "paymentMethod",
+                cs.created_at AS "createdAt",
+                cs.created_by_name AS "createdByName",
+                cs.customer_name AS "customerName", cs.customer_phone AS "customerPhone"
+         FROM cash_sales cs
+         WHERE cs.id = $1 AND cs.tenant_id = $2`,
+        id, tenantId
+      )
+    );
+    if (!rows || rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Sale not found.' });
+      return;
+    }
+    const sale = rows[0];
+
+    const lines: any[] = await withCurrentTenantDb(prisma, (client) =>
+      (client as any).cashSaleLine.findMany({
+        where: { saleId: id, tenantId },
+        orderBy: { createdAt: 'asc' },
+      })
+    );
+
+    // Build receipt PDF (80 mm thermal roll width = 226.77 pt)
+    const W = 226;
+    const MARGIN = 12;
+    const COL = W - MARGIN * 2;
+
+    const buf: Buffer[] = [];
+    const doc = new PDFDocument({ size: [W, 700], margin: MARGIN, bufferPages: true, compress: false, autoFirstPage: true });
+    doc.on('data', (c: Buffer) => buf.push(c));
+
+    const fmt = (n: number) => Number(n).toFixed(2);
+
+    // Header
+    doc.fontSize(10).font('Helvetica-Bold').text(tenantName || 'Store', { align: 'center' });
+    doc.fontSize(7).font('Helvetica').text('POS Receipt', { align: 'center' });
+    doc.moveDown(0.3);
+
+    const dateStr = new Date(sale.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+    doc.text(`Receipt: ${sale.receiptNo}`, { align: 'left' });
+    doc.text(`Date:    ${dateStr}`);
+    if (sale.createdByName) doc.text(`Cashier: ${sale.createdByName}`);
+    if (sale.customerName)  doc.text(`Customer: ${sale.customerName}`);
+    if (sale.customerPhone) doc.text(`Phone:   ${sale.customerPhone}`);
+    doc.text(`Payment: ${sale.paymentMethod}`);
+    if (sale.status === 'VOIDED') {
+      doc.moveDown(0.2).fontSize(8).font('Helvetica-Bold').fillColor('red').text('*** VOIDED ***', { align: 'center' });
+      doc.font('Helvetica').fillColor('black');
+    }
+
+    // Divider
+    doc.moveDown(0.3).moveTo(MARGIN, doc.y).lineTo(W - MARGIN, doc.y).lineWidth(0.5).stroke().moveDown(0.3);
+
+    // Line items
+    doc.fontSize(7).font('Helvetica-Bold');
+    const QW = 22, PW = 38, TW = 38;
+    const DW = COL - QW - PW - TW;
+    const x0 = MARGIN;
+    doc.text('Item', x0, doc.y, { width: DW, continued: true });
+    doc.text('Qty', { width: QW, align: 'right', continued: true });
+    doc.text('Price', { width: PW, align: 'right', continued: true });
+    doc.text('Total', { width: TW, align: 'right' });
+
+    doc.font('Helvetica');
+    for (const l of lines) {
+      const y = doc.y;
+      doc.text(l.itemName, x0, y, { width: DW, continued: true });
+      doc.text(String(l.quantity), { width: QW, align: 'right', continued: true });
+      doc.text(fmt(Number(l.unitPrice)), { width: PW, align: 'right', continued: true });
+      doc.text(fmt(Number(l.lineTotal)), { width: TW, align: 'right' });
+    }
+
+    // Divider
+    doc.moveDown(0.3).moveTo(MARGIN, doc.y).lineTo(W - MARGIN, doc.y).stroke().moveDown(0.3);
+
+    // Totals
+    const totX = x0 + DW + QW;
+    const totW = PW + TW;
+    doc.font('Helvetica-Bold').text('TOTAL', totX, doc.y, { width: PW, continued: true });
+    doc.text(fmt(Number(sale.amount)), { width: TW, align: 'right' });
+    doc.font('Helvetica');
+    if (sale.paymentMethod === 'CASH') {
+      doc.text('Cash given', totX, doc.y, { width: PW, continued: true });
+      doc.text(fmt(Number(sale.cashGiven)), { width: TW, align: 'right' });
+      doc.text('Change', totX, doc.y, { width: PW, continued: true });
+      doc.text(fmt(Number(sale.changeGiven)), { width: TW, align: 'right' });
+    }
+
+    // Footer
+    doc.moveDown(0.5).fontSize(7).text('Thank you for your purchase!', { align: 'center' });
+    doc.moveDown(0.3).text('* * *', { align: 'center' });
+
+    // Trim page height to content
+    const pages = (doc as any).bufferedPageRange();
+    for (let i = pages.start; i < pages.start + pages.count; i++) {
+      (doc as any).switchToPage(i);
+    }
+
+    doc.end();
+    await new Promise<void>((resolve) => doc.on('end', resolve));
+
+    const pdfBuffer = Buffer.concat(buf);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Receipt-${sale.receiptNo}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to generate receipt.' });
   }
 });
 
@@ -980,5 +1232,6 @@ router.get('/closeouts', async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ success: false, error: 'Failed to fetch daily closeout reports.' });
   }
 });
+
 
 export default router;

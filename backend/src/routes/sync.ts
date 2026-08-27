@@ -25,17 +25,27 @@ router.get('/bootstrap', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
 
-    const { accounts, invoices, sequence } = await withCurrentTenantDb(prisma, async (client) => {
-      const [accountRows, invoiceRows, seq] = await Promise.all([
+    const { accounts, invoices, customers, inventoryItems, sequence } = await withCurrentTenantDb(prisma, async (client) => {
+      const [accountRows, invoiceRows, customerRows, itemRows, seq] = await Promise.all([
         accountRepository.listAccounts(client),
         (client as any).invoice.findMany({
           where: { tenantId },
           include: { customer: true, items: true },
           orderBy: { createdAt: 'desc' },
         }),
+        (client as any).customer.findMany({
+          where: { tenantId },
+          select: { id: true, name: true, customerType: true, creditLimit: true },
+          orderBy: { name: 'asc' },
+        }),
+        (client as any).inventoryItem.findMany({
+          where: { tenantId },
+          select: { id: true, sku: true, name: true, sellingPrice: true, wholesalePrice: true, reorderLevel: true },
+          orderBy: { name: 'asc' },
+        }),
         getCurrentSequence(client, tenantId),
       ]);
-      return { accounts: accountRows, invoices: invoiceRows, sequence: seq };
+      return { accounts: accountRows, invoices: invoiceRows, customers: customerRows, inventoryItems: itemRows, sequence: seq };
     });
 
     res.status(200).json({
@@ -44,6 +54,8 @@ router.get('/bootstrap', async (req: Request, res: Response): Promise<void> => {
         sequence: sequence.toString(),
         accounts,
         invoices,
+        customers,
+        inventoryItems,
       },
     });
   } catch (error: any) {

@@ -93,6 +93,8 @@ export function PurchaseOrders() {
   const [isReorderOpen, setIsReorderOpen] = useState(false);
   const [reorderWarehouseId, setReorderWarehouseId] = useState("");
   const [isGeneratingReorder, setIsGeneratingReorder] = useState(false);
+  const [isCreatingPo, setIsCreatingPo] = useState(false);
+  const [isCreatingBill, setIsCreatingBill] = useState(false);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -141,6 +143,7 @@ export function PurchaseOrders() {
       showToast("Select a vendor and at least one valid line item.", "error");
       return;
     }
+    setIsCreatingPo(true);
     try {
       const res = await api.post("/purchase-orders", {
         vendorId: selectedVendor,
@@ -159,6 +162,8 @@ export function PurchaseOrders() {
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to create Purchase Order.", "error");
+    } finally {
+      setIsCreatingPo(false);
     }
   };
 
@@ -197,6 +202,7 @@ export function PurchaseOrders() {
       return;
     }
     const validLines = billLines.filter((l) => l.itemId && Number(l.quantity) > 0 && Number(l.unitCost) >= 0);
+    setIsCreatingBill(true);
     try {
       const res = await api.post("/bills", {
         vendorId: billModalPo.vendor.id,
@@ -216,6 +222,8 @@ export function PurchaseOrders() {
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to create bill from Purchase Order.", "error");
+    } finally {
+      setIsCreatingBill(false);
     }
   };
 
@@ -381,7 +389,7 @@ export function PurchaseOrders() {
           </div>
           <div className="flex justify-end space-x-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="primary">Create Purchase Order</Button>
+            <Button type="submit" variant="primary" disabled={isCreatingPo}>{isCreatingPo ? "Creating..." : "Create Purchase Order"}</Button>
           </div>
         </form>
       </Modal>
@@ -428,7 +436,7 @@ export function PurchaseOrders() {
 
             <div className="flex justify-end space-x-3 pt-2">
               <Button type="button" variant="outline" onClick={() => setBillModalPo(null)}>Close</Button>
-              <Button type="submit" variant="primary">Create Bill &amp; Receive Stock</Button>
+              <Button type="submit" variant="primary" disabled={isCreatingBill}>{isCreatingBill ? "Creating..." : "Create Bill & Receive Stock"}</Button>
             </div>
           </form>
         )}

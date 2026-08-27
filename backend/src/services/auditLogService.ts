@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { createHash } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../config/db';
 import { getTenantContext } from '../context/tenantContext';
@@ -23,15 +24,45 @@ export interface RecordAuditLogInput {
 }
 
 /**
+ * Computes the next hash in the audit log chain.
+ * Input: SHA-256(prevHash + action + entityId + createdAtISO)
+ * The first row for a tenant seeds with SHA-256('GENESIS').
+ */
+function computeAuditHash(prevHash: string, action: string, entityId: string | null, createdAt: Date): string {
+  return createHash('sha256')
+    .update(prevHash + action + (entityId ?? '') + createdAt.toISOString())
+    .digest('hex');
+}
+
+async function getLastAuditHash(tenantId: string | null): Promise<string> {
+  try {
+    const last = await prisma.auditLog.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      select: { prevHash: true, action: true, entityId: true, createdAt: true },
+    });
+    if (!last) return createHash('sha256').update('GENESIS').digest('hex');
+    // The stored prevHash on the last row is the hash of the row before it.
+    // We re-derive the last row's own hash to chain from it.
+    return computeAuditHash(last.prevHash ?? createHash('sha256').update('GENESIS').digest('hex'), last.action, last.entityId, last.createdAt);
+  } catch {
+    return createHash('sha256').update('GENESIS').digest('hex');
+  }
+}
+
+/**
  * Single write path for AuditLog rows. Never throws - a failed audit write
  * must not fail or roll back the business operation it describes - but logs
  * loudly instead of swallowing silently, so a systemic failure is visible.
  */
 export async function recordAuditLog(input: RecordAuditLogInput): Promise<void> {
   try {
+    const tenantId = input.tenantId ?? getTenantContext()?.tenantId ?? null;
+    const prevHash = await getLastAuditHash(tenantId);
+    const now = new Date();
     await prisma.auditLog.create({
       data: {
-        tenantId: input.tenantId ?? getTenantContext()?.tenantId ?? null,
+        tenantId,
         action: input.action,
         entity: input.entity,
         entityId: input.entityId ?? null,
@@ -40,6 +71,8 @@ export async function recordAuditLog(input: RecordAuditLogInput): Promise<void> 
         userEmail: input.actor?.userEmail ?? null,
         ipAddress: input.actor?.ipAddress ?? null,
         changes: (input.changes ?? undefined) as any,
+        prevHash,
+        createdAt: now,
       },
     });
   } catch (err: any) {
@@ -68,9 +101,14 @@ export async function recordAuditLogTx(
   client: Pick<PrismaClient, 'auditLog'>,
   input: RecordAuditLogInput
 ): Promise<void> {
+  const tenantId = input.tenantId ?? getTenantContext()?.tenantId ?? null;
+  // Best-effort hash chain inside a transaction; if fetching the last hash fails
+  // (e.g. concurrent inserts), we fall back to GENESIS rather than aborting the tx.
+  const prevHash = await getLastAuditHash(tenantId);
+  const now = new Date();
   await client.auditLog.create({
     data: {
-      tenantId: input.tenantId ?? getTenantContext()?.tenantId ?? null,
+      tenantId,
       action: input.action,
       entity: input.entity,
       entityId: input.entityId ?? null,
@@ -79,6 +117,8 @@ export async function recordAuditLogTx(
       userEmail: input.actor?.userEmail ?? null,
       ipAddress: input.actor?.ipAddress ?? null,
       changes: (input.changes ?? undefined) as any,
+      prevHash,
+      createdAt: now,
     },
   });
 }

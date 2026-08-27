@@ -15,6 +15,9 @@ export interface JwtPayload {
   // verification but before MFA verification - authMiddleware rejects any
   // request bearing this token outright, see authMiddleware.ts.
   mfaPending?: boolean;
+  // Unix timestamp (seconds) of when TOTP MFA was last verified. Used by
+  // step-up middleware to enforce re-authentication windows on sensitive routes.
+  lastMfaAt?: number;
   iat?: number;
   exp?: number;
   [key: string]: any;
@@ -78,6 +81,11 @@ class LRUCache<K, V> {
 // Token cache: SHA256 hash -> validated payload
 // Max 1000 tokens cached (approx 100KB memory)
 const tokenCache = new LRUCache<string, CachedToken>(1000);
+
+// Short-lived negative cache: tokenHash -> epoch seconds when the "not revoked" check expires.
+// Avoids a Redis round-trip on every cached-token request. Max revocation delay = 30 s.
+const notRevokedCache = new Map<string, number>();
+const NOT_REVOKED_TTL = 30;
 
 // Periodic cleanup of expired tokens (every 5 minutes)
 setInterval(() => {
@@ -184,7 +192,9 @@ export function computeTokenHash(token: string): string {
  * cache for the remainder of its cache entry's life.
  */
 export function evictFromJwtCache(token: string): void {
-  tokenCache.delete(computeTokenHash(token));
+  const hash = computeTokenHash(token);
+  tokenCache.delete(hash);
+  notRevokedCache.delete(hash);
 }
 
 /**
@@ -205,10 +215,14 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
   const cached = tokenCache.get(tokenHash);
 
   if (cached && cached.expiresAt > now) {
-    // Cache hit - still must check revocation, since a logout could have
-    // happened after this token was cached but before it naturally expired.
-    if (await isTokenRevoked(tokenHash)) {
-      throw new Error('Token has been revoked');
+    // Cache hit - check revocation only if the negative-cache entry has expired.
+    const notRevokedUntil = notRevokedCache.get(tokenHash);
+    if (!notRevokedUntil || notRevokedUntil <= now) {
+      if (await isTokenRevoked(tokenHash)) {
+        notRevokedCache.delete(tokenHash);
+        throw new Error('Token has been revoked');
+      }
+      notRevokedCache.set(tokenHash, now + NOT_REVOKED_TTL);
     }
     return cached.payload;
   }

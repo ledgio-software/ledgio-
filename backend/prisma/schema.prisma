@@ -68,15 +68,28 @@ model Tenant {
   paystackAccountNumber   String?   @map("paystack_account_number")
   paystackAccountName     String?   @map("paystack_account_name")
   isLive                  Boolean   @default(false) @map("is_live")
+  // Subscription billing: TRIAL | ACTIVE | GRACE | EXPIRED.
+  // New tenants start as TRIAL with trialEndsAt = +90 days. On payment,
+  // status flips to ACTIVE and subscriptionPaidUntil = +30 days.
+  // Existing tenants (grandfathered) are set to ACTIVE in the migration.
+  subscriptionStatus      String    @default("TRIAL") @map("subscription_status")
+  trialEndsAt             DateTime? @map("trial_ends_at")
+  subscriptionPaidUntil   DateTime? @map("subscription_paid_until")
   // Owner/manager phone number that automated SMS alerts (till-close
   // summaries, cash shortage warnings) go to. Optional - alerts are skipped
   // (not sent to a shared/hardcoded fallback) when unset for this tenant.
   bossPhone               String?   @map("boss_phone")
+  stockValuationMethod    String    @default("AVERAGE") @map("stock_valuation_method")
+  // When false (default), selling more units than on-hand throws a 400.
+  // When true, stock is allowed to go negative and quantityOnHand may become
+  // negative. Useful for businesses that fulfil before receiving stock.
+  allowNegativeStock      Boolean   @default(false) @map("allow_negative_stock")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
   users       User[]
   invitations Invitation[]
+  apiKeys     ApiKey[]
 
   @@index([acceptedTermsVersion, termsAcceptedAt])
   @@map("tenants")
@@ -187,39 +200,96 @@ model Account {
 }
 
 model JournalEntry {
-  id          String             @id @default(uuid())
-  entryNumber String             @unique @map("entry_number")
-  entryDate   DateTime           @default(now()) @map("entry_date")
-  description String?
-  status      JournalEntryStatus @default(DRAFT)
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
+  id              String             @id @default(uuid())
+  entryNumber     String             @unique @map("entry_number")
+  entryDate       DateTime           @default(now()) @map("entry_date")
+  description     String?
+  status          JournalEntryStatus @default(DRAFT)
+  voucherType     String             @default("JOURNAL") @map("voucher_type")
+  scenarioId      String?            @map("scenario_id")
+  voucherClassId  String?            @map("voucher_class_id")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
-  lines   JournalEntryLine[]
-  ledgers Ledger[]
+  lines        JournalEntryLine[]
+  ledgers      Ledger[]
+  scenario     Scenario?     @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+  voucherClass VoucherClass? @relation(fields: [voucherClassId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([entryDate])
   @@index([status, entryDate])
+  @@index([scenarioId])
   @@map("journal_entries")
 }
 
-model JournalEntryLine {
-  id             String   @id @default(uuid())
-  journalEntryId String   @map("journal_entry_id")
-  accountId      String   @map("account_id")
-  debit          Decimal  @default(0.00) @db.Decimal(15, 2)
-  credit         Decimal  @default(0.00) @db.Decimal(15, 2)
-  description    String?
-  createdAt      DateTime @default(now()) @map("created_at")
+model Scenario {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
 
-  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  entries JournalEntry[]
+
+  @@index([tenantId])
+  @@map("scenarios")
+}
+
+model VoucherClass {
+  id                     String   @id @default(uuid())
+  tenantId               String   @map("tenant_id")
+  name                   String
+  voucherType            String   @map("voucher_type")
+  defaultDebitAccountId  String?  @map("default_debit_account_id")
+  defaultCreditAccountId String?  @map("default_credit_account_id")
+  narrationTemplate      String?  @map("narration_template")
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt      @map("updated_at")
+
+  entries JournalEntry[]
+
+  @@index([tenantId])
+  @@map("voucher_classes")
+}
+
+model JournalEntryLine {
+  id               String   @id @default(uuid())
+  journalEntryId   String   @map("journal_entry_id")
+  accountId        String   @map("account_id")
+  debit            Decimal  @default(0.00) @db.Decimal(15, 2)
+  credit           Decimal  @default(0.00) @db.Decimal(15, 2)
+  description      String?
+  costCategoryId   String?  @map("cost_category_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  journalEntry JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCategory CostCategory? @relation(fields: [costCategoryId], references: [id], onDelete: SetNull)
 
   @@index([journalEntryId])
   @@index([accountId])
+  @@index([costCategoryId])
   @@index([journalEntryId, createdAt])
   @@map("journal_entry_lines")
+}
+
+model CostCategory {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  journalLines JournalEntryLine[]
+
+  @@index([tenantId])
+  @@map("cost_categories")
 }
 
 model Ledger {
@@ -256,6 +326,7 @@ model AuditLog {
   userId    String?  @map("user_id")
   userEmail String?  @map("user_email")
   ipAddress String?  @map("ip_address")
+  prevHash  String?  @map("prev_hash")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([createdAt(sort: Desc)])
@@ -347,6 +418,7 @@ model BankTransaction {
   @@index([tenantId])
   @@index([bankAccountId])
   @@index([status])
+  @@index([tenantId, bankAccountId, status])
   @@map("bank_transactions")
 }
 
@@ -377,11 +449,51 @@ model Customer {
   customerType String   @default("RETAIL") @map("customer_type")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  priceListId       String?  @map("price_list_id")
+  priceList         PriceList? @relation(fields: [priceListId], references: [id])
+
   invoices          Invoice[]
   recurringInvoices RecurringInvoice[]
+  salesOrders       SalesOrder[]
+  deliveryNotes     DeliveryNote[]
 
   @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, customerType])
   @@map("customers")
+}
+
+model PriceList {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  currency    String   @default("GHS")
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true)  @map("is_active")
+  entries     PriceListEntry[]
+  customers   Customer[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  @@index([tenantId])
+  @@map("price_lists")
+}
+
+model PriceListEntry {
+  id              String        @id @default(uuid())
+  priceListId     String        @map("price_list_id")
+  priceList       PriceList     @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  tenantId        String        @map("tenant_id")
+  inventoryItemId String        @map("inventory_item_id")
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  unitPrice       Decimal       @db.Decimal(15, 2) @map("unit_price")
+  minQty          Int           @default(1) @map("min_qty")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([tenantId, priceListId])
+  @@index([tenantId, inventoryItemId])
+  @@map("price_list_entries")
 }
 
 // NOT_REQUESTED: default, no GRA clearance has ever been attempted.
@@ -441,6 +553,10 @@ model Invoice {
   // posted at payment time (see invoicePaymentService.markInvoicePaid), so
   // the whole payment stays within one fund by construction.
   fundId             String?   @map("fund_id")
+  // Cost centre dimension for departmental/branch P&L segmentation -
+  // bare nullable UUID (FK to public.cost_centres validated at write time,
+  // not a native FK, same cross-schema pattern as fundId).
+  costCentreId       String?   @map("cost_centre_id")
   // Set together, only on an itemized invoice (mirrors VendorBill's
   // warehouseId/lines shape for the purchase side) - the shop/warehouse
   // stock is deducted from at issue time. Null/false on a plain "Simple
@@ -473,11 +589,15 @@ model Invoice {
   // can safely replay-and-return-existing instead of creating a duplicate
   // invoice (the old `INV-${Date.now()}-${random}` number alone offered no
   // such guarantee).
-  clientTxnId String?  @map("client_txn_id")
+  clientTxnId  String?  @map("client_txn_id")
+  // Back-link to the Sales Order this invoice was converted from (null for
+  // invoices created directly, not from a sales order).
+  salesOrderId String?  @map("sales_order_id")
 
   customer         Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
   taxRate          TaxRate?                 @relation(fields: [taxRateId], references: [id], onDelete: SetNull)
   fund             Fund?                    @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  costCentre       CostCentre?              @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
   warehouse        Warehouse?               @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   items            InvoiceItem[]
   creditNotes      CreditNote[]
@@ -492,6 +612,8 @@ model Invoice {
   @@index([taxRateId])
   @@index([warehouseId])
   @@index([fundId])
+  @@index([costCentreId])
+  @@index([tenantId, status, issueDate])
   @@map("invoices")
 }
 
@@ -514,6 +636,7 @@ model InvoicePayment {
   baseCurrencyAmount Decimal  @map("base_currency_amount") @db.Decimal(15, 2)
   method             String   @default("MANUAL") @map("method")
   journalId          String?  @map("journal_id")
+  idempotencyKey     String?  @map("idempotency_key")
   recordedByUserId   String?  @map("recorded_by_user_id")
   recordedByEmail    String?  @map("recorded_by_email")
   createdAt          DateTime @default(now()) @map("created_at")
@@ -618,11 +741,13 @@ model Vendor {
   address   String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  bills             VendorBill[]
-  purchaseOrders    PurchaseOrder[]
-  preferredForItems InventoryItem[]
+  bills              VendorBill[]
+  purchaseOrders     PurchaseOrder[]
+  preferredForItems  InventoryItem[]
+  goodsReceiptNotes  GoodsReceiptNote[]
 
   @@index([tenantId])
+  @@index([tenantId, name])
   @@map("vendors")
 }
 
@@ -656,6 +781,9 @@ model VendorBill {
   // posted at payment time (see routes/bills.ts POST /:id/pay).
   fundId String? @map("fund_id")
 
+  // Cost centre dimension for departmental/branch P&L segmentation.
+  costCentreId String? @map("cost_centre_id")
+
   // Optional link back to the Purchase Order this bill fulfills - set when
   // a bill is created via "Create Bill from PO" (see purchaseOrders.ts).
   // Nothing here blocks creating a bill without a PO (most bills still
@@ -673,10 +801,18 @@ model VendorBill {
   // manual action.
   scheduledPaymentDate DateTime? @map("scheduled_payment_date")
 
+  // Optional Withholding Tax rate applied to this bill. When set, paying the
+  // bill deducts whtAmount from the cash outflow and posts it to the WHT
+  // Payable liability account instead (see vendorBillPaymentService.ts).
+  whtRateId  String?  @map("wht_rate_id")
+  whtAmount  Decimal? @map("wht_amount") @db.Decimal(15, 2)
+
   vendor        Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   warehouse     Warehouse?       @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   fund          Fund?            @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  costCentre    CostCentre?      @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
   purchaseOrder PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  whtRate       WhtRate?         @relation(fields: [whtRateId], references: [id], onDelete: SetNull)
   lines         VendorBillLine[]
   debitNotes    DebitNote[]
 
@@ -690,8 +826,10 @@ model VendorBill {
   @@index([warehouseId])
   @@index([landedCostForBillId])
   @@index([fundId])
+  @@index([costCentreId])
   @@index([purchaseOrderId])
   @@index([status, scheduledPaymentDate])
+  @@index([tenantId, status, dueDate])
   @@map("vendor_bills")
 }
 
@@ -730,6 +868,7 @@ model PurchaseOrder {
   @@index([tenantId])
   @@index([vendorId])
   @@index([status])
+  @@index([tenantId, status, createdAt])
   @@map("purchase_orders")
 }
 
@@ -807,16 +946,18 @@ model Warehouse {
   isPrimary   Boolean  @default(false) @map("is_primary")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  stocks         WarehouseStock[]
-  fromTransfers  StockTransfer[]       @relation("FromWarehouse")
-  toTransfers    StockTransfer[]       @relation("ToWarehouse")
-  tills          CashTill[]
-  closeouts      DailyCloseoutReport[]
-  adjustments    StockAdjustment[]
-  userAccess     WarehouseAccess[]
-  vendorBills    VendorBill[]
-  invoices       Invoice[]
-  purchaseOrders PurchaseOrder[]
+  stocks           WarehouseStock[]
+  fromTransfers    StockTransfer[]       @relation("FromWarehouse")
+  toTransfers      StockTransfer[]       @relation("ToWarehouse")
+  tills            CashTill[]
+  closeouts        DailyCloseoutReport[]
+  adjustments      StockAdjustment[]
+  userAccess       WarehouseAccess[]
+  vendorBills      VendorBill[]
+  invoices         Invoice[]
+  purchaseOrders   PurchaseOrder[]
+  inventoryBatches InventoryBatch[]
+  productionOrders ProductionOrder[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -829,7 +970,12 @@ model InventoryItem {
   sku               String
   name              String
   category          String   @default("General")
-  unitOfMeasure     String   @default("pcs") @map("unit_of_measure")
+  unitOfMeasure             String   @default("pcs") @map("unit_of_measure")
+  // Dual UoM: e.g. primary = "pcs", secondary = "Carton", conversionFactor = 12
+  // means 1 Carton = 12 pcs. Purchase orders / bill receiving can choose secondary
+  // UoM and the system multiplies qty × conversionFactor before writing to stock.
+  secondaryUnitOfMeasure    String?  @map("secondary_unit_of_measure")
+  conversionFactor          Decimal? @db.Decimal(10, 4) @map("conversion_factor")
   costPrice         Decimal  @map("cost_price") @db.Decimal(15, 2)
   sellingPrice      Decimal  @map("selling_price") @db.Decimal(15, 2)
   // Optional lower price for bulk/trade buyers - null means this item has
@@ -838,12 +984,26 @@ model InventoryItem {
   // auto-fills from this field; the user can still override per-line.
   wholesalePrice    Decimal? @map("wholesale_price") @db.Decimal(15, 2)
   reorderLevel      Int      @default(10) @map("reorder_level")
+  // Guards against repeat low-stock notifications within 24 hours for the same
+  // item (see lowStockAlertService.ts). Null = never alerted.
+  lastLowStockAlertAt DateTime? @map("last_low_stock_alert_at")
   // Which vendor to auto-draft a reorder PO to when this item's stock falls
   // below reorderLevel (see POST /purchase-orders/generate-for-reorder) -
   // optional; an item with no preferred vendor is simply skipped by that
   // endpoint (reported back, not silently dropped) rather than guessing
   // which vendor to order from.
   preferredVendorId String?  @map("preferred_vendor_id")
+  // Pharmacy: Ghana FDA regulatory category for this product.
+  // GENERAL (default) = OTC/no prescription required.
+  // PRESCRIPTION | SCHEDULED_A | SCHEDULED_B | CONTROLLED = requires Rx or
+  // narcotics-log entry. Only meaningful for PHARMACY org-type tenants.
+  regulatoryCategory    String  @default("GENERAL") @map("regulatory_category")
+  // Pharmacy: whether this item must be dispensed from a tracked batch (FEFO).
+  // When true, every POS sale and batch receipt must link to an InventoryBatch row.
+  requiresBatchTracking Boolean @default(false) @map("requires_batch_tracking")
+  // When true, each unit of this item must be assigned a serial number at
+  // point of sale / invoice, and received with a serial number on bills/GRNs.
+  trackSerials      Boolean  @default(false) @map("track_serials")
   createdAt         DateTime @default(now()) @map("created_at")
 
   warehouseStocks    WarehouseStock[]
@@ -852,10 +1012,193 @@ model InventoryItem {
   invoiceLines       InvoiceItem[]
   purchaseOrderLines PurchaseOrderLine[]
   preferredVendor    Vendor?             @relation(fields: [preferredVendorId], references: [id], onDelete: SetNull)
+  inventoryBatches   InventoryBatch[]
+  prescriptionLines  PrescriptionLine[]
+  narcoticsLog       NarcoticsLogEntry[]
+  bomFinishedIn      BomTemplate[]       @relation("BomFinishedItem")
+  bomComponentIn     BomLine[]           @relation("BomComponentItem")
+  serialNumbers      SerialNumber[]
+  priceListEntries   PriceListEntry[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
+  @@index([tenantId, category])
+  @@index([tenantId, name])
   @@map("inventory_items")
+}
+
+// Sub-ledger of stock by batch/lot for items with requiresBatchTracking = true.
+// warehouseStock.quantityOnHand remains the authoritative total; this table is
+// the detail layer used for FEFO (First-Expired-First-Out) dispensing.
+model InventoryBatch {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  itemId         String    @map("item_id")
+  warehouseId    String    @map("warehouse_id")
+  batchNumber    String    @map("batch_number")
+  expiryDate     DateTime? @map("expiry_date")
+  quantityOnHand Int       @default(0) @map("quantity_on_hand")
+  receivedAt     DateTime  @default(now()) @map("received_at")
+  supplierId     String?   @map("supplier_id")
+  costPrice      Decimal   @db.Decimal(15, 2) @map("cost_price")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  item      InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemId, batchNumber])
+  @@index([tenantId])
+  @@index([itemId])
+  @@index([expiryDate])
+  @@map("inventory_batches")
+}
+
+// ── Manufacturing / Bill of Materials ────────────────────────────────────────
+// BomTemplate: defines a finished product and its component items/quantities.
+// ProductionOrder: an actual manufacturing run that consumes component stock
+// and produces finished-goods stock, with a journal entry posting cost.
+model BomTemplate {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  name           String
+  description    String?
+  finishedItemId String   @map("finished_item_id")
+  outputQty      Decimal  @default(1) @map("output_qty") @db.Decimal(15, 4)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  finishedItem     InventoryItem    @relation("BomFinishedItem", fields: [finishedItemId], references: [id], onDelete: Restrict)
+  lines            BomLine[]
+  productionOrders ProductionOrder[]
+
+  @@index([tenantId])
+  @@index([finishedItemId])
+  @@map("bom_templates")
+}
+
+model BomLine {
+  id               String  @id @default(uuid())
+  tenantId         String  @map("tenant_id")
+  bomTemplateId    String  @map("bom_template_id")
+  componentItemId  String  @map("component_item_id")
+  quantity         Decimal @db.Decimal(15, 4)
+
+  bomTemplate    BomTemplate   @relation(fields: [bomTemplateId], references: [id], onDelete: Cascade)
+  componentItem  InventoryItem @relation("BomComponentItem", fields: [componentItemId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([bomTemplateId])
+  @@map("bom_lines")
+}
+
+model ProductionOrder {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  orderNumber   String    @map("order_number")
+  bomTemplateId String    @map("bom_template_id")
+  warehouseId   String    @map("warehouse_id")
+  plannedQty    Decimal   @map("planned_qty") @db.Decimal(15, 4)
+  completedQty  Decimal?  @map("completed_qty") @db.Decimal(15, 4)
+  status        String    @default("DRAFT")
+  notes         String?
+  journalId     String?   @map("journal_id")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  bomTemplate BomTemplate @relation(fields: [bomTemplateId], references: [id], onDelete: Restrict)
+  warehouse   Warehouse   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([bomTemplateId])
+  @@index([status])
+  @@map("production_orders")
+}
+
+// Pharmacy prescription register - required by Ghana FDA for licensed pharmacies.
+model Prescription {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  rxNumber          String    @map("rx_number")
+  patientName       String    @map("patient_name")
+  patientAge        Int?      @map("patient_age")
+  patientPhone      String?   @map("patient_phone")
+  prescribingDoctor String    @map("prescribing_doctor")
+  prescriptionDate  DateTime  @map("prescription_date")
+  dispensedAt       DateTime? @map("dispensed_at")
+  dispensedByName   String?   @map("dispensed_by_name")
+  cashSaleId        String?   @map("cash_sale_id")
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  lines PrescriptionLine[]
+
+  @@unique([tenantId, rxNumber])
+  @@index([tenantId])
+  @@map("prescriptions")
+}
+
+model PrescriptionLine {
+  id             String   @id @default(uuid())
+  prescriptionId String   @map("prescription_id")
+  itemId         String   @map("item_id")
+  prescribedQty  Int      @map("prescribed_qty")
+  dispensedQty   Int      @default(0) @map("dispensed_qty")
+  notes          String?
+
+  prescription Prescription  @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  item         InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId])
+  @@index([itemId])
+  @@map("prescription_lines")
+}
+
+// Ghana FDA mandatory narcotics / controlled-substance register.
+model NarcoticsLogEntry {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  itemId          String   @map("item_id")
+  batchNumber     String?  @map("batch_number")
+  entryDate       DateTime @default(now()) @map("entry_date")
+  // RECEIVED | DISPENSED | DESTROYED | RETURNED
+  operationType   String   @map("operation_type")
+  quantity        Int
+  balanceAfter    Int      @map("balance_after")
+  patientName     String?  @map("patient_name")
+  prescriptionRef String?  @map("prescription_ref")
+  supplierRef     String?  @map("supplier_ref")
+  recordedByName  String   @map("recorded_by_name")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([itemId])
+  @@map("narcotics_log_entries")
+}
+
+model SerialNumber {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  inventoryItemId String   @map("inventory_item_id")
+  warehouseId     String   @map("warehouse_id")
+  serialNumber    String   @map("serial_number")
+  // AVAILABLE | SOLD | RETURNED | DAMAGED
+  status          String   @default("AVAILABLE")
+  invoiceId       String?  @map("invoice_id")
+  billId          String?  @map("bill_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, inventoryItemId, serialNumber])
+  @@index([tenantId, warehouseId, inventoryItemId, status])
+  @@map("serial_numbers")
 }
 
 model WarehouseStock {
@@ -870,6 +1213,7 @@ model WarehouseStock {
 
   @@unique([warehouseId, itemId])
   @@index([tenantId])
+  @@index([tenantId, itemId, warehouseId])
   @@map("warehouse_stocks")
 }
 
@@ -925,6 +1269,7 @@ model StockAdjustment {
   @@index([tenantId])
   @@index([itemId])
   @@index([warehouseId])
+  @@index([tenantId, itemId, createdAt])
   @@map("stock_adjustments")
 }
 
@@ -944,7 +1289,7 @@ model CashTill {
   sales          CashSale[]
   closeoutReport DailyCloseoutReport?
 
-  @@index([tenantId])
+  @@index([tenantId, status])
   @@map("cash_tills")
 }
 
@@ -990,6 +1335,9 @@ model CashSale {
   // RETAIL (default) or WHOLESALE - stamped at sale time so revenue reports
   // can split by sales channel without re-deriving from customer records.
   saleType         String         @default("RETAIL") @map("sale_type")
+  // CASH (default) | MOMO | CARD — recorded at sale time for reporting.
+  // Added via raw SQL migration (same pattern as customer_name/customer_phone).
+  paymentMethod    String         @default("CASH") @map("payment_method")
 
   till  CashTill       @relation(fields: [tillId], references: [id], onDelete: Cascade)
   lines CashSaleLine[]
@@ -998,6 +1346,7 @@ model CashSale {
   @@unique([tenantId, clientTxnId])
   @@index([tenantId])
   @@index([tenantId, createdByUserId])
+  @@index([tenantId, createdAt])
   @@map("cash_sales")
 }
 
@@ -1056,6 +1405,7 @@ model Notification {
   @@index([tenantId])
   @@index([userId])
   @@index([read])
+  @@index([tenantId, userId, read])
   @@map("notifications")
 }
 
@@ -1190,6 +1540,112 @@ model TaxRate {
   @@index([tenantId])
   @@index([isActive, effectiveFrom, effectiveTo])
   @@map("tax_rates")
+}
+
+// Withholding Tax (WHT) rates. Ghana GRA requires WHT deductions (5–15%) on
+// payments to contractors, rent, dividends, and professional fees. When a
+// VendorBill references a WhtRate, paying the bill deducts whtAmount from
+// the cash outflow and credits a WHT Payable liability account instead.
+model WhtRate {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  code        String
+  rate        Decimal  @db.Decimal(5, 4)
+  accountId   String?  @map("account_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  bills VendorBill[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("wht_rates")
+}
+
+// One interest policy per tenant: daily cron charges overdue invoices.
+// account_id (optional) → Interest Income GL; falls back to INTEREST_INCOME role.
+model InterestPolicy {
+  id         String  @id @default(uuid())
+  tenantId   String  @unique @map("tenant_id")
+  annualRate Decimal @db.Decimal(5, 4) @map("annual_rate")
+  graceDays  Int     @default(0) @map("grace_days")
+  accountId  String? @map("account_id")
+  isActive   Boolean @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("interest_policies")
+}
+
+// One row per daily accrual per overdue invoice.
+// journal_id is a plain string ref to a per-tenant journal entry (cross-schema).
+model InterestCharge {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  invoiceId   String   @map("invoice_id")
+  amount      Decimal  @db.Decimal(15, 2)
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  journalId   String?  @map("journal_id")
+  status      String   @default("POSTED") // POSTED | VOIDED
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, invoiceId])
+  @@unique([tenantId, invoiceId, periodStart])
+  @@map("interest_charges")
+}
+
+// Post-Dated Cheque register. RECEIVABLE = customer gives us a future-dated
+// cheque; PAYABLE = we issue one to a supplier. receipt_journal_id and
+// deposit_journal_id are plain UUID strings referencing journal entries in
+// the per-tenant schema (no FK — cross-schema boundary, same constraint
+// pattern as TaxRate.accountId).
+model PostDatedCheque {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  type             String   // 'RECEIVABLE' | 'PAYABLE'
+  partyName        String   @map("party_name")
+  chequeNumber     String   @map("cheque_number")
+  bankName         String   @map("bank_name")
+  amount           Decimal  @db.Decimal(15, 2)
+  currency         String   @default("GHS")
+  dueDate          DateTime @map("due_date")
+  status           String   @default("PENDING") // PENDING | DEPOSITED | BOUNCED | CANCELLED
+  invoiceId        String?  @map("invoice_id")
+  billId           String?  @map("bill_id")
+  receiptJournalId String?  @map("receipt_journal_id")
+  depositJournalId String?  @map("deposit_journal_id")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@map("post_dated_cheques")
+}
+
+// FIFO stock valuation: one row per purchase lot. remainingQty decrements
+// as stock is sold (FIFO depletion). Only populated when the tenant's
+// stockValuationMethod = 'FIFO'; AVERAGE-cost tenants never touch this table.
+model StockLayer {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  warehouseId  String   @map("warehouse_id")
+  itemId       String   @map("item_id")
+  unitCost     Decimal  @db.Decimal(15, 4) @map("unit_cost")
+  originalQty  Int      @map("original_qty")
+  remainingQty Int      @map("remaining_qty")
+  purchasedAt  DateTime @default(now()) @map("purchased_at")
+  sourceRef    String?  @map("source_ref")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, itemId, purchasedAt])
+  @@map("stock_layers")
 }
 
 // Restricted/unrestricted fund for nonprofit-tenant fund accounting (e.g.
@@ -1559,6 +2015,7 @@ model SyncChangeLog {
 
   @@unique([tenantId, sequence])
   @@index([tenantId, entityType])
+  @@index([tenantId, occurredAt])
   @@map("sync_change_log")
 }
 
@@ -1599,14 +2056,286 @@ model ExpenseClaim {
   approvalWorkflowId String?   @map("approval_workflow_id")
   journalId          String?   @map("journal_id")
   reimbursedAt       DateTime? @map("reimbursed_at")
+  // Cost centre dimension for departmental/branch P&L segmentation.
+  costCentreId       String?   @map("cost_centre_id")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  costCentre CostCentre? @relation(fields: [costCentreId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, claimNumber])
   @@index([tenantId])
   @@index([status])
   @@index([submittedBy])
+  @@index([costCentreId])
+  @@index([tenantId, status, createdAt])
   @@map("expense_claims")
+}
+
+// Sales Orders (SO): a customer's confirmed purchase request, upstream of
+// invoice creation. Status flow: DRAFT -> CONFIRMED -> INVOICED (or CANCELLED
+// at any pre-INVOICED stage). Converting to invoice creates a real Invoice row
+// and flips status to INVOICED; the salesOrderId on the Invoice back-links them.
+model SalesOrder {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  soNumber    String   @map("so_number")
+  customerId  String   @map("customer_id")
+  orderDate   DateTime @default(now()) @map("order_date")
+  expectedDate DateTime? @map("expected_date")
+  currency    String   @default("USD")
+  notes       String?
+  status      String   @default("DRAFT")
+  invoiceId   String?  @map("invoice_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  customer Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lines    SalesOrderLine[]
+
+  @@unique([tenantId, soNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@index([tenantId, status, createdAt])
+  @@map("sales_orders")
+}
+
+model SalesOrderLine {
+  id           String  @id @default(uuid())
+  tenantId     String  @map("tenant_id")
+  salesOrderId String  @map("sales_order_id")
+  description  String
+  quantity     Decimal @db.Decimal(15, 4)
+  unitPrice    Decimal @map("unit_price") @db.Decimal(15, 2)
+  amount       Decimal @db.Decimal(15, 2)
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([salesOrderId])
+  @@map("sales_order_lines")
+}
+
+// Payment Batch: one payment event from a customer (or to a vendor) that is
+// explicitly allocated across multiple outstanding invoices/bills. Stores the
+// master record; individual InvoicePayment / VendorBill.status rows are still
+// written by the existing recordInvoicePayment / payVendorBill services so all
+// downstream logic (journal entries, status transitions, audit log) stays
+// unchanged. The batch is purely an allocation record.
+model PaymentBatch {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  batchNumber String   @map("batch_number")
+  // CUSTOMER = payment received from a customer covering ≥1 invoices
+  // VENDOR   = payment made to a vendor covering ≥1 bills
+  batchType   String   @map("batch_type")
+  // customerId for CUSTOMER batches, vendorId for VENDOR batches
+  entityId    String   @map("entity_id")
+  currency    String   @default("USD")
+  paymentDate DateTime @default(now()) @map("payment_date")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  allocations PaymentBatchAllocation[]
+
+  @@unique([tenantId, batchNumber])
+  @@index([tenantId])
+  @@index([entityId])
+  @@map("payment_batches")
+}
+
+// One row per invoice/bill covered by a PaymentBatch.
+model PaymentBatchAllocation {
+  id              String  @id @default(uuid())
+  tenantId        String  @map("tenant_id")
+  batchId         String  @map("batch_id")
+  invoiceId       String? @map("invoice_id")
+  vendorBillId    String? @map("vendor_bill_id")
+  allocatedAmount Decimal @map("allocated_amount") @db.Decimal(15, 2)
+
+  batch PaymentBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([batchId])
+  @@index([invoiceId])
+  @@index([vendorBillId])
+  @@map("payment_batch_allocations")
+}
+
+// Job Costing: tracks material, labour, overhead, and subcontract costs per job.
+// Status: OPEN → IN_PROGRESS → COMPLETED | CANCELLED
+model Job {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  jobNumber   String   @map("job_number")
+  name        String
+  customerId  String?  @map("customer_id")
+  status      String   @default("OPEN")
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+  description String?
+  invoiceId   String?  @map("invoice_id")
+  budget      Decimal? @db.Decimal(15, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt      @map("updated_at")
+
+  costLines   JobCostLine[]
+  workOrders  JobWorkOrder[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("jobs")
+}
+
+model JobCostLine {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  jobId       String   @map("job_id")
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  // MATERIAL | LABOUR | OVERHEAD | SUBCONTRACT
+  type        String
+  description String
+  quantity    Decimal  @db.Decimal(15, 4)
+  unitCost    Decimal  @db.Decimal(15, 4) @map("unit_cost")
+  amount      Decimal  @db.Decimal(15, 2)
+  accountId   String?  @map("account_id")
+  journalId   String?  @map("journal_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, jobId])
+  @@map("job_cost_lines")
+}
+
+model JobWorkOrder {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  jobId           String?  @map("job_id")
+  job             Job?     @relation(fields: [jobId], references: [id])
+  // IN | OUT  (OUT = goods sent to sub-contractor; IN = goods received from sub-contractor)
+  type            String
+  vendorId        String?  @map("vendor_id")
+  itemId          String?  @map("item_id")
+  quantity        Decimal  @db.Decimal(15, 4)
+  dueDate         DateTime? @map("due_date")
+  // PENDING | SENT | RECEIVED | CANCELLED
+  status          String   @default("PENDING")
+  billId          String?  @map("bill_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, jobId])
+  @@map("job_work_orders")
+}
+
+// Delivery Note (DN): formal document recording goods physically dispatched to
+// a customer, optionally linked to an Invoice or SalesOrder. DRAFT → DISPATCHED.
+// Stock deduction still happens at invoice-creation time (existing behaviour);
+// the DN is the paper/audit trail of what actually left the warehouse.
+model DeliveryNote {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  dnNumber     String    @map("dn_number")
+  customerId   String    @map("customer_id")
+  invoiceId    String?   @map("invoice_id")
+  salesOrderId String?   @map("sales_order_id")
+  status       String    @default("DRAFT")
+  dispatchDate DateTime? @map("dispatch_date")
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  customer Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lines    DeliveryNoteLine[]
+
+  @@unique([tenantId, dnNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@index([tenantId, status, createdAt])
+  @@map("delivery_notes")
+}
+
+model DeliveryNoteLine {
+  id             String  @id @default(uuid())
+  tenantId       String  @map("tenant_id")
+  deliveryNoteId String  @map("delivery_note_id")
+  description    String
+  quantity       Decimal @db.Decimal(15, 4)
+
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([deliveryNoteId])
+  @@map("delivery_note_lines")
+}
+
+// Goods Receipt Note (GRN): formal document recording goods physically received
+// from a supplier, optionally linked to a PurchaseOrder or VendorBill.
+// DRAFT → RECEIVED. Stock increment still happens at bill-creation time
+// (existing behaviour); the GRN is the paper/audit trail of what actually
+// arrived.
+model GoodsReceiptNote {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  grnNumber       String    @map("grn_number")
+  vendorId        String    @map("vendor_id")
+  purchaseOrderId String?   @map("purchase_order_id")
+  vendorBillId    String?   @map("vendor_bill_id")
+  status          String    @default("DRAFT")
+  receiptDate     DateTime? @map("receipt_date")
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  vendor Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  lines  GoodsReceiptNoteLine[]
+
+  @@unique([tenantId, grnNumber])
+  @@index([tenantId])
+  @@index([vendorId])
+  @@index([status])
+  @@index([tenantId, status, createdAt])
+  @@map("goods_receipt_notes")
+}
+
+model GoodsReceiptNoteLine {
+  id               String  @id @default(uuid())
+  tenantId         String  @map("tenant_id")
+  goodsReceiptNoteId String @map("goods_receipt_note_id")
+  description      String
+  quantity         Decimal @db.Decimal(15, 4)
+
+  goodsReceiptNote GoodsReceiptNote @relation(fields: [goodsReceiptNoteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([goodsReceiptNoteId])
+  @@map("goods_receipt_note_lines")
+}
+
+// Cost centre dimension for departmental/branch/project P&L segmentation.
+// Follows the same cross-schema pattern as Fund: real FKs from public schema
+// models (Invoice, VendorBill, ExpenseClaim); bare UUID columns on per-tenant
+// journal_entry_lines and ledgers (tenant migration v19) validated at write
+// time, not native FKs across schemas.
+model CostCentre {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  code        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  invoices      Invoice[]
+  vendorBills   VendorBill[]
+  expenseClaims ExpenseClaim[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("cost_centres")
 }
 
 // Platform-wide (no tenantId - the same tax/regulatory rules apply to every
@@ -1629,4 +2358,25 @@ model ComplianceUpdate {
 
   @@index([verifiedAt(sort: Desc)])
   @@map("compliance_updates")
+}
+
+// Public-schema API key for machine-to-machine integration (external systems
+// posting invoices/payments via X-API-Key authentication). Stored in the
+// public schema (alongside Tenant) so the auth middleware can look up which
+// tenant a key belongs to before setting tenant context for the request.
+model ApiKey {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  keyHash     String    @map("key_hash")
+  keyPrefix   String    @map("key_prefix")
+  lastUsedAt  DateTime? @map("last_used_at")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([keyPrefix])
+  @@map("api_keys")
 }

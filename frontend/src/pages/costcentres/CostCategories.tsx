@@ -1,0 +1,185 @@
+import { useState, useEffect } from "react";
+import { api } from "../../lib/api";
+
+interface CostCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export function CostCategories() {
+  const [categories, setCategories] = useState<CostCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<CostCategory | null>(null);
+  const [form, setForm] = useState({ name: "", description: "", isActive: true });
+  const [submitting, setSubmitting] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await api.get("/cost-categories");
+      setCategories(res.data.data ?? []);
+    } catch (e: any) {
+      setError(e.response?.data?.error ?? e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ name: "", description: "", isActive: true });
+    setShowModal(true);
+  }
+
+  function openEdit(cat: CostCategory) {
+    setEditing(cat);
+    setForm({ name: cat.name, description: cat.description ?? "", isActive: cat.isActive });
+    setShowModal(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (editing) {
+        await api.put(`/cost-categories/${editing.id}`, {
+          name: form.name,
+          description: form.description || null,
+          isActive: form.isActive,
+        });
+      } else {
+        await api.post("/cost-categories", {
+          name: form.name,
+          description: form.description || null,
+        });
+      }
+      setShowModal(false);
+      await load();
+    } catch (e: any) {
+      alert(e.response?.data?.error ?? e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(cat: CostCategory) {
+    if (!confirm(`Delete cost category "${cat.name}"?`)) return;
+    try {
+      await api.delete(`/cost-categories/${cat.id}`);
+      await load();
+    } catch (e: any) {
+      alert(e.response?.data?.error ?? e.message);
+    }
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-secondary-900 dark:text-secondary-50">Cost Categories</h1>
+          <p className="text-sm text-secondary-500 dark:text-secondary-400 mt-1">Tag journal entry lines to group costs for departmental analysis</p>
+        </div>
+        <button
+          onClick={openCreate}
+          className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
+        >
+          + New Category
+        </button>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-secondary-800 rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-50 mb-4">
+              {editing ? "Edit Category" : "New Cost Category"}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Name</label>
+                <input
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full border border-secondary-300 dark:border-secondary-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-secondary-700 text-secondary-900 dark:text-secondary-100"
+                  placeholder="e.g. Marketing, R&D, Operations"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Description (optional)</label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  rows={3}
+                  className="w-full border border-secondary-300 dark:border-secondary-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-secondary-700 text-secondary-900 dark:text-secondary-100 resize-none"
+                />
+              </div>
+              {editing && (
+                <label className="flex items-center gap-2 text-sm text-secondary-700 dark:text-secondary-300">
+                  <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded" />
+                  Active
+                </label>
+              )}
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 rounded-lg border border-secondary-300 dark:border-secondary-600 text-sm text-secondary-700 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-700">Cancel</button>
+                <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50">
+                  {submitting ? "Saving…" : editing ? "Update" : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-12 text-secondary-500">Loading…</div>
+      ) : error ? (
+        <div className="text-center py-12 text-red-500">{error}</div>
+      ) : categories.length === 0 ? (
+        <div className="text-center py-16 text-secondary-400 dark:text-secondary-500">
+          <p className="text-lg font-medium">No cost categories yet</p>
+          <p className="text-sm mt-1">Create categories to tag journal lines and analyse costs by department or function.</p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-secondary-200 dark:border-secondary-700 bg-secondary-50 dark:bg-secondary-800/50">
+                <th className="text-left px-4 py-3 font-medium text-secondary-600 dark:text-secondary-400">Name</th>
+                <th className="text-left px-4 py-3 font-medium text-secondary-600 dark:text-secondary-400">Description</th>
+                <th className="text-left px-4 py-3 font-medium text-secondary-600 dark:text-secondary-400">Status</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-secondary-100 dark:divide-secondary-700">
+              {categories.map(cat => (
+                <tr key={cat.id} className="hover:bg-secondary-50 dark:hover:bg-secondary-700/30">
+                  <td className="px-4 py-3 font-medium text-secondary-900 dark:text-secondary-100">{cat.name}</td>
+                  <td className="px-4 py-3 text-secondary-600 dark:text-secondary-400">{cat.description ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cat.isActive ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"}`}>
+                      {cat.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => openEdit(cat)} className="text-xs px-2 py-1 rounded border border-secondary-300 dark:border-secondary-600 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-700">Edit</button>
+                      <button onClick={() => handleDelete(cat)} className="text-xs px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

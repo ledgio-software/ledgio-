@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileSpreadsheet,
   PieChart,
+  Hash,
   Users,
   ShieldCheck,
   FileUp,
@@ -27,11 +28,19 @@ import {
   Clock,
   Wallet2,
   Building2,
-  MessageSquare,
   Store,
   GitBranch,
   Anchor,
   BadgeDollarSign,
+  LineChart,
+  ClipboardList,
+  ShieldAlert,
+  AlertTriangle,
+  Truck,
+  CreditCard,
+  Layers,
+  Cog,
+  Key,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -46,6 +55,8 @@ export interface NavItem {
 export interface NavGroup {
   sectionTitle: string;
   items: NavItem[];
+  /** When set, this group is only shown for tenants whose orgType matches this value. */
+  orgTypeOnly?: string;
 }
 
 // Hrefs hidden from unrestricted roles in simplified workspace modes.
@@ -54,11 +65,14 @@ export interface NavGroup {
 // Professional = unrestricted (full accounting view).
 const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/accounts', '/journals', '/banking',
-  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions',
-  '/fixed-assets', '/recurring-invoices',
+  '/settings/tax-rates', '/settings/fiscal-periods', '/settings/recurring-transactions', '/settings/wht-rates', '/settings/price-lists',
+  '/inventory/serial-numbers',
+  '/manufacturing/jobs', '/manufacturing/job-work-orders',
+  '/pdc', '/reports/interest-charges',
+  '/fixed-assets', '/recurring-invoices', '/cost-centres', '/manufacturing',
   '/reports/ledger', '/reports/balance-sheet', '/reports/cash-flow',
   '/reports/cash-flow-forecast', '/reports/kpis', '/reports/aging',
-  '/reports/landed-costs', '/reports/budgets', '/reports/branch-comparison',
+  '/reports/landed-costs', '/reports/budgets', '/reports/analytics', '/reports/branch-comparison',
   '/payroll/employees', '/payroll/runs', '/payroll/loans', '/payroll/leave',
   '/approvals', '/audit-logs', '/help-assistant/activity', '/import',
 ]);
@@ -113,6 +127,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Warehouses & Stock", href: "/inventory", icon: Warehouse },
       { name: "Stock Intelligence", href: "/analytics/inventory", icon: Lightbulb, minTier: 2 },
+      { name: "Serial Numbers", href: "/inventory/serial-numbers", icon: Hash, minTier: 2 },
     ],
   },
   {
@@ -120,8 +135,12 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Point of Sale", href: "/pos", icon: ShoppingCart },
       { name: "Invoices (AR)", href: "/invoices", icon: FileText },
+      { name: "Customers", href: "/customers", icon: Users },
       { name: "Vendor Bills (AP)", href: "/bills", icon: Receipt },
       { name: "Purchase Orders", href: "/purchase-orders", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Sales Orders", href: "/sales-orders", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Delivery Notes & GRN", href: "/delivery-notes", icon: Truck, minTier: 2 },
+      { name: "Payment Matching", href: "/payment-matching", icon: CreditCard, minTier: 2 },
       { name: "Recurring Invoices", href: "/recurring-invoices", icon: Repeat, minTier: 2 },
       { name: "Expense Claims", href: "/expenses", icon: Wallet },
       { name: "Petty Cash", href: "/petty-cash", icon: Wallet2 },
@@ -137,6 +156,17 @@ export const navigationGroups: NavGroup[] = [
       { name: "Fiscal Periods", href: "/settings/fiscal-periods", icon: CalendarClock },
       { name: "Recurring Transactions", href: "/settings/recurring-transactions", icon: Repeat, minTier: 2 },
       { name: "Fixed Assets", href: "/fixed-assets", icon: Building2, minTier: 2 },
+      { name: "Cost Centres", href: "/cost-centres", icon: Layers, minTier: 2 },
+      { name: "Manufacturing", href: "/manufacturing", icon: Cog, minTier: 2 },
+      { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent, minTier: 2 },
+      { name: "Price Lists", href: "/settings/price-lists", icon: BadgeDollarSign, minTier: 2 },
+      { name: "Job Costing", href: "/manufacturing/jobs", icon: ClipboardList, minTier: 2 },
+      { name: "Job Work Orders", href: "/manufacturing/job-work-orders", icon: Truck, minTier: 2 },
+      { name: "Cost Categories", href: "/cost-categories", icon: Layers, minTier: 2 },
+      { name: "Scenarios", href: "/settings/scenarios", icon: GitBranch, minTier: 2 },
+      { name: "Voucher Classes", href: "/settings/voucher-classes", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Post-Dated Cheques", href: "/pdc", icon: CreditCard, minTier: 2 },
+      { name: "Interest Charges", href: "/reports/interest-charges", icon: TrendingUp, minTier: 2 },
     ],
   },
   {
@@ -144,6 +174,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Executive Reports", href: "/reports/executive", icon: BarChart3 },
       { name: "General Ledger", href: "/reports/ledger", icon: BookOpen, minTier: 2 },
+      { name: "Trial Balance", href: "/reports/trial-balance", icon: Scale, minTier: 2 },
       { name: "Profit & Loss", href: "/reports/pnl", icon: PieChart },
       { name: "Balance Sheet", href: "/reports/balance-sheet", icon: Scale },
       { name: "Cash Flow Statement", href: "/reports/cash-flow", icon: Waves },
@@ -154,6 +185,15 @@ export const navigationGroups: NavGroup[] = [
       { name: "Branch Comparison", href: "/reports/branch-comparison", icon: GitBranch },
       { name: "Landed Cost", href: "/reports/landed-costs", icon: Anchor },
       { name: "Budgets", href: "/reports/budgets", icon: Target, minTier: 2 },
+      { name: "Analytics Dashboard", href: "/reports/analytics", icon: LineChart, minTier: 2 },
+      { name: "Daybook", href: "/reports/daybook", icon: BookOpen, minTier: 2 },
+      { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp, minTier: 2 },
+      { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet, minTier: 2 },
+      { name: "VAT Return", href: "/reports/vat-return", icon: Percent, minTier: 2 },
+      { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock, minTier: 2 },
+      { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3, minTier: 2 },
+      { name: "Benford Analysis", href: "/reports/benford-analysis", icon: ShieldAlert, minTier: 2 },
+      { name: "Fraud Alerts", href: "/reports/fraud-alerts", icon: AlertTriangle, minTier: 2 },
     ],
   },
   {
@@ -171,9 +211,18 @@ export const navigationGroups: NavGroup[] = [
       { name: "Approvals", href: "/approvals", icon: ShieldCheck, minTier: 2 },
       { name: "Audit Trail", href: "/audit-logs", icon: ShieldCheck },
       { name: "AI Assistant Activity", href: "/help-assistant/activity", icon: Bot },
-      { name: "Feedback Inbox", href: "/feedback", icon: MessageSquare },
       { name: "Bulk Data Import", href: "/import", icon: FileUp },
       { name: "Team Management", href: "/team", icon: Users },
+      { name: "API Keys", href: "/settings/api-keys", icon: Key },
+    ],
+  },
+  {
+    sectionTitle: "PHARMACY",
+    orgTypeOnly: "PHARMACY",
+    items: [
+      { name: "Prescription Register", href: "/pharmacy/prescriptions", icon: ClipboardList },
+      { name: "Narcotics Register", href: "/pharmacy/narcotics", icon: ShieldAlert },
+      { name: "Expiry Alerts", href: "/pharmacy/expiry", icon: AlertTriangle },
     ],
   },
 ];
@@ -195,8 +244,8 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
   hr: ["/dashboard", "/team", "/expenses", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave"],
   "payroll officer": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
   "payroll approver": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
-  "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/expenses", "/inventory", "/vendors"],
-  "accounts receivable clerk": ["/dashboard", "/invoices", "/recurring-invoices", "/customers", "/expenses"],
+  "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/delivery-notes", "/payment-matching", "/expenses", "/inventory", "/vendors"],
+  "accounts receivable clerk": ["/dashboard", "/invoices", "/sales-orders", "/delivery-notes", "/payment-matching", "/recurring-invoices", "/customers", "/expenses"],
   "external accountant": [
     "/dashboard",
     "/accounts",
@@ -205,7 +254,12 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/fixed-assets",
     "/invoices",
     "/bills",
+    "/sales-orders",
+    "/delivery-notes",
+    "/payment-matching",
     "/expenses",
+    "/cost-centres",
+    "/manufacturing",
     "/reports/executive",
     "/reports/ledger",
     "/reports/pnl",
@@ -214,6 +268,9 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/reports/kpis",
     "/reports/aging",
     "/reports/budgets",
+    "/reports/daybook",
+    "/reports/stock-movement",
+    "/reports/registers",
   ],
   viewer: [
     "/dashboard",
@@ -230,6 +287,8 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/banking",
     "/fixed-assets",
     "/invoices",
+    "/sales-orders",
+    "/delivery-notes",
     "/bills",
     "/recurring-invoices",
     "/expenses",
@@ -245,9 +304,15 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/reports/branch-comparison",
     "/reports/landed-costs",
     "/reports/budgets",
+    "/reports/analytics",
+    "/reports/daybook",
+    "/reports/stock-movement",
+    "/reports/registers",
     "/audit-logs",
     "/help-assistant/activity",
     "/feedback",
+    "/reports/benford-analysis",
+    "/reports/fraud-alerts",
   ],
 };
 
@@ -292,7 +357,10 @@ export function getVisibleNavGroups(
   mode: WorkspaceMode = 'professional',
   tier: number = 1,
 ): NavGroup[] {
-  let groups = navigationGroups;
+  // Filter groups restricted to a specific org type (e.g. PHARMACY section)
+  let groups = navigationGroups.filter(
+    (group) => !group.orgTypeOnly || group.orgTypeOnly === orgType
+  );
 
   if (orgType === "NONPROFIT") {
     groups = groups
