@@ -3,6 +3,7 @@ import { useKpiDashboard } from "../../hooks/useKpiDashboard";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { Button } from "../../components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { exportToCsv } from "../../lib/exportCsv";
 
 function formatPct(value: number | null): string {
@@ -14,7 +15,7 @@ function formatRatio(value: number | null): string {
 }
 
 export function KpiDashboard() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const {
     netIncome,
     totalRevenue,
@@ -37,6 +38,10 @@ export function KpiDashboard() {
       currency: settings.baseCurrency,
     }).format(amount);
   };
+
+  if (!isLoadingTenantSettings && settings.tier < 2) {
+    return <UpgradeRequired featureLabel="KPI Dashboard" requiredTier={2} currentTier={settings.tier} />;
+  }
 
   const handleExport = () => {
     exportToCsv(`kpi_dashboard_${new Date().toISOString().split('T')[0]}`, [
