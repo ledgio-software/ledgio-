@@ -465,3 +465,133 @@ export async function getBenfordAnalysis(startDate?: string, endDate?: string): 
     endDate,
   };
 }
+
+// ─── Fraud Alert: Duplicate Payments ────────────────────────────────────────
+
+export interface DuplicatePaymentGroup {
+  vendorName: string | null;
+  amount: string;
+  paymentDate: string;
+  count: number;
+  paymentIds: string[];
+}
+
+/**
+ * Flags groups of invoice payments that share the same vendor name, amount,
+ * and payment date. Identical amount + payee + date appearing more than once
+ * within the same tenant is a classic duplicate-payment indicator.
+ */
+export async function getDuplicatePayments(startDate?: string, endDate?: string): Promise<DuplicatePaymentGroup[]> {
+  if (startDate) validateDateFormat(startDate, 'startDate');
+  if (endDate) validateDateFormat(endDate, 'endDate');
+
+  const { tenantId } = requireTenantContext();
+
+  type DupRow = { vendor_name: string | null; amount: string; payment_date: string; cnt: string; payment_ids: string };
+
+  const rows = (await withCurrentTenantDb(prisma, async (client) => {
+    const params: (string | Date)[] = [tenantId];
+    let dateFilter = '';
+    if (startDate || endDate) {
+      params.push(startDate ? new Date(startDate) : new Date('1900-01-01'));
+      params.push(endDate ? new Date(endDate) : new Date('9999-12-31'));
+      dateFilter = `AND ip.payment_date BETWEEN $2 AND $3`;
+    }
+
+    return (client as any).$queryRawUnsafe(
+      `SELECT
+         i.customer_name AS vendor_name,
+         ip.amount::TEXT AS amount,
+         ip.payment_date::DATE::TEXT AS payment_date,
+         COUNT(*) AS cnt,
+         STRING_AGG(ip.id::TEXT, ',' ORDER BY ip.created_at) AS payment_ids
+       FROM invoice_payments ip
+       JOIN invoices i ON i.id = ip.invoice_id
+       WHERE ip.tenant_id = $1
+         ${dateFilter}
+       GROUP BY i.customer_name, ip.amount, ip.payment_date::DATE
+       HAVING COUNT(*) > 1
+       ORDER BY cnt DESC, payment_date DESC`,
+      ...params
+    );
+  })) as DupRow[];
+
+  return rows.map((r) => ({
+    vendorName: r.vendor_name,
+    amount: r.amount,
+    paymentDate: r.payment_date,
+    count: parseInt(r.cnt, 10),
+    paymentIds: r.payment_ids ? r.payment_ids.split(',') : [],
+  }));
+}
+
+// ─── Fraud Alert: Round-Amount Transactions ──────────────────────────────────
+
+export interface RoundAmountTransaction {
+  journalEntryId: string;
+  lineId: string;
+  amount: string;
+  description: string | null;
+  entryDate: string;
+  accountName: string | null;
+}
+
+/**
+ * Returns posted journal entry lines whose absolute amount is a round multiple
+ * of `roundingThreshold` (default 100) and >= `minAmount` (default 500).
+ * Round amounts in accounting (e.g. GH₵1,000, GH₵5,000) warrant scrutiny
+ * as they often indicate estimates, fabrications, or expense-splitting schemes.
+ */
+export async function getRoundAmountTransactions(
+  minAmount: number = 500,
+  roundingThreshold: number = 100,
+  startDate?: string,
+  endDate?: string
+): Promise<RoundAmountTransaction[]> {
+  if (startDate) validateDateFormat(startDate, 'startDate');
+  if (endDate) validateDateFormat(endDate, 'endDate');
+
+  const { tenantId } = requireTenantContext();
+
+  type RoundRow = { journal_entry_id: string; line_id: string; amount: string; description: string | null; entry_date: string; account_name: string | null };
+
+  const rows = (await withCurrentTenantDb(prisma, async (client) => {
+    const params: (string | number | Date)[] = [tenantId, minAmount, roundingThreshold];
+    let dateFilter = '';
+    if (startDate || endDate) {
+      params.push(startDate ? new Date(startDate) : new Date('1900-01-01'));
+      params.push(endDate ? new Date(endDate) : new Date('9999-12-31'));
+      dateFilter = `AND je.entry_date BETWEEN $4 AND $5`;
+    }
+
+    return (client as any).$queryRawUnsafe(
+      `SELECT
+         jel.journal_entry_id,
+         jel.id AS line_id,
+         jel.amount::TEXT AS amount,
+         jel.description,
+         je.entry_date::DATE::TEXT AS entry_date,
+         a.name AS account_name
+       FROM journal_entry_lines jel
+       JOIN journal_entries je ON je.id = jel.journal_entry_id
+       LEFT JOIN accounts a ON a.id = jel.account_id
+       WHERE jel.tenant_id = $1
+         AND je.status = 'POSTED'
+         AND ABS(jel.amount) >= $2
+         AND MOD(ABS(jel.amount)::NUMERIC, $3::NUMERIC) = 0
+         ${dateFilter}
+       ORDER BY je.entry_date DESC, ABS(jel.amount) DESC
+       LIMIT 500`,
+      ...params
+    );
+  })) as RoundRow[];
+
+  return rows.map((r) => ({
+    journalEntryId: r.journal_entry_id,
+    lineId: r.line_id,
+    amount: r.amount,
+    description: r.description,
+    entryDate: r.entry_date,
+    accountName: r.account_name,
+  }));
+}

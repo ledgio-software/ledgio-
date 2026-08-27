@@ -97,6 +97,13 @@ export async function decideApprovalStep(
     throw new ApprovalWorkflowServiceError(`Step ${level} has already been decided.`, 400);
   }
 
+  if (actor?.userId && workflow.requestedBy === actor.userId) {
+    throw new ApprovalWorkflowServiceError(
+      'You cannot approve a workflow you submitted. Another authorized user must approve it.',
+      403
+    );
+  }
+
   if (decision === 'REJECT') {
     const rejected = await prisma.$transaction(async (tx) => {
       await approvalWorkflowRepository.decideApprovalStep(tx as any, step.id, 'REJECTED', comments);

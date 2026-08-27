@@ -101,10 +101,44 @@ router.post('/', requireRole('Accountant'), async (req: Request, res: Response):
     });
   } catch (error: any) {
     if (error instanceof AccountServiceError) {
+      // When a 409 conflict races with a duplicate clientTxnId, the service retry
+      // may time out before the winner is visible. One final lookup ensures the
+      // idempotency contract is honoured at the route level.
+      if (error.statusCode === 409 && req.body?.clientTxnId) {
+        try {
+          const existing = await accountService.findAccountByClientTxnId(req.body.clientTxnId);
+          if (existing) {
+            res.status(201).json({ success: true, message: 'Account created successfully', data: { account: existing } });
+            return;
+          }
+        } catch {}
+      }
       res.status(error.statusCode).json({
         success: false,
         error: error.message,
       });
+      return;
+    }
+    // Unique constraint violation — Prisma model-level (P2002) or raw SQL path
+    // (P2010 wrapping Postgres 23505). Both mean a duplicate account code.
+    // Treat as 409; if a clientTxnId was supplied, attempt one final lookup
+    // so the idempotency contract is still honoured.
+    const isUniqueViolation =
+      error.code === 'P2002' ||
+      (error.code === 'P2010' && (error.meta?.code === '23505' || String(error.message).includes('23505'))) ||
+      error.cause?.code === '23505' ||
+      String(error.message).toLowerCase().includes('unique constraint');
+    if (isUniqueViolation) {
+      if (req.body?.clientTxnId) {
+        try {
+          const existing = await accountService.findAccountByClientTxnId(req.body.clientTxnId);
+          if (existing) {
+            res.status(201).json({ success: true, message: 'Account created successfully', data: { account: existing } });
+            return;
+          }
+        } catch {}
+      }
+      res.status(409).json({ success: false, error: 'An account with that code already exists.' });
       return;
     }
     res.status(500).json({

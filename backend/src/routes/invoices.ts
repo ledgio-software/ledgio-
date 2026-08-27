@@ -4,6 +4,8 @@ import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { checkEmergencyStop } from '../middleware/emergencyStopMiddleware';
+import { requireRecentMfa } from '../middleware/stepUpMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import * as taxRateService from '../services/taxRateService';
 import { TaxRateServiceError } from '../services/taxRateService';
@@ -259,7 +261,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * below so they can only sell out of a warehouse they're actually assigned
  * to, mirroring how they're already scoped for Inventory and POS.
  */
-router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createInvoiceSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireRole('Accountant', 'Shop Manager'), checkEmergencyStop, validateBody(createInvoiceSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { customerId, dueDate, currency = 'USD', exchangeRate = 1.0, items, taxRateId, fundId, warehouseId, clientTxnId } = req.body;
@@ -733,7 +735,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createI
  * Shop Manager can record payment here too - a walk-in customer they just
  * invoiced (POST / above) often pays on the spot.
  */
-router.post('/:id/pay', requireRole('Accountant', 'Shop Manager'), async (req: Request, res: Response): Promise<void> => {
+router.post('/:id/pay', requireRole('Accountant', 'Shop Manager'), checkEmergencyStop, requireRecentMfa, async (req: Request, res: Response): Promise<void> => {
   try {
     const actor = actorFromRequest(req);
     // `amount` is optional - omitted (or the existing no-body call every

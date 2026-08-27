@@ -99,6 +99,7 @@ const StockAging = lazy(() => import("./pages/reports/StockAging").then(m => ({ 
 const TrialBalance = lazy(() => import("./pages/reports/TrialBalance").then(m => ({ default: m.TrialBalance })));
 const FinancialRatios = lazy(() => import("./pages/reports/FinancialRatios").then(m => ({ default: m.FinancialRatios })));
 const BenfordAnalysis = lazy(() => import("./pages/reports/BenfordAnalysis").then(m => ({ default: m.BenfordAnalysis })));
+const FraudAlerts = lazy(() => import("./pages/reports/FraudAlerts").then(m => ({ default: m.FraudAlerts })));
 const PriceLists = lazy(() => import("./pages/settings/PriceLists").then(m => ({ default: m.PriceLists })));
 const SerialNumbers = lazy(() => import("./pages/inventory/SerialNumbers").then(m => ({ default: m.SerialNumbers })));
 const Jobs = lazy(() => import("./pages/manufacturing/Jobs").then(m => ({ default: m.Jobs })));
@@ -612,6 +613,7 @@ function App() {
               <Route path="/reports/trial-balance" element={<ProtectedRoute><MainLayout><TrialBalance /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/financial-ratios" element={<ProtectedRoute><MainLayout><FinancialRatios /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/benford-analysis" element={<ProtectedRoute><MainLayout><BenfordAnalysis /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/fraud-alerts" element={<ProtectedRoute><MainLayout><FraudAlerts /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/price-lists" element={<ProtectedRoute><MainLayout><PriceLists /></MainLayout></ProtectedRoute>} />
               <Route path="/inventory/serial-numbers" element={<ProtectedRoute><MainLayout><SerialNumbers /></MainLayout></ProtectedRoute>} />
               <Route path="/petty-cash" element={<ProtectedRoute><MainLayout><PettyCash /></MainLayout></ProtectedRoute>} />

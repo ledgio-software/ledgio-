@@ -4,6 +4,7 @@ import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { checkEmergencyStop } from '../middleware/emergencyStopMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { assertWarehouseAccess, getAccessibleWarehouseIds, WarehouseAccessError } from '../services/warehouseAccessService';
 import { z } from 'zod';
@@ -286,7 +287,7 @@ router.post('/open', async (req: Request, res: Response): Promise<void> => {
  * stock deduction across every line. Body: { tillId, items: [{itemId,
  * quantity}], cashGiven }.
  */
-router.post('/sales', validateBody(createSaleSchema), async (req: Request, res: Response): Promise<void> => {
+router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { tillId, items, cashGiven, clientTxnId, clientOccurredAt, saleType, customerPhone, customerName, rxNumber, paymentMethod } = req.body;
@@ -736,7 +737,7 @@ async function postCashSaleVoidReversal(
  * voiding a completed sale to quietly pocket the cash while stock and books
  * appear to reconcile.
  */
-router.post('/sales/:id/void', async (req: Request, res: Response): Promise<void> => {
+router.post('/sales/:id/void', checkEmergencyStop, async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;

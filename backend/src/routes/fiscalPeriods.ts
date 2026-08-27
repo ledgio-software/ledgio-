@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { requireRecentMfa } from '../middleware/stepUpMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import * as fiscalPeriodService from '../services/fiscalPeriodService';
 import { FiscalPeriodServiceError } from '../services/fiscalPeriodService';
@@ -84,7 +85,7 @@ router.patch('/:id/close', requireRole('Accountant'), async (req: Request, res: 
  * PATCH /api/v1/fiscal-periods/:id/lock
  * Access: Admin role only - locking is a stronger, harder-to-reverse action than closing.
  */
-router.patch('/:id/lock', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+router.patch('/:id/lock', requireRole('Admin'), requireRecentMfa, async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const fiscalPeriod = await fiscalPeriodService.lockFiscalPeriod(tenantId, req.params.id, actorFromRequest(req));

@@ -62,7 +62,7 @@ export function AdminCoreEngine() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -925,6 +925,15 @@ export function AdminCoreEngine() {
                     </span>
                   )}
                 </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("safety")}
+                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                  activeTab === "safety" ? "border-red-500 text-red-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <ShieldAlert className="h-4 w-4" />
+                <span>Safety</span>
               </button>
             </div>
 
@@ -2391,9 +2400,153 @@ export function AdminCoreEngine() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Tab: Safety — Emergency Stop */}
+            {activeTab === "safety" && (
+              <EmergencyStopPanel passcode={passcode} />
+            )}
           </div>
         )}
       </main>
     </div>
+  );
+}
+
+function EmergencyStopPanel({ passcode }: { passcode: string }) {
+  const [state, setState] = useState<{ active: boolean; reason?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [reason, setReason] = useState("");
+  const [ttlSeconds, setTtlSeconds] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const headers = { "x-admin-passcode": passcode };
+
+  const fetchState = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get("/admin/emergency-stop", { headers });
+      setState(res.data.data);
+    } catch {
+      setError("Failed to fetch emergency stop state.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchState(); }, []); // eslint-disable-line
+
+  const activate = async () => {
+    if (!reason.trim()) { setError("A reason is required."); return; }
+    setLoading(true);
+    setError(null);
+    setMsg(null);
+    try {
+      const body: Record<string, any> = { reason: reason.trim() };
+      if (ttlSeconds) body.ttlSeconds = Number(ttlSeconds);
+      await api.post("/admin/emergency-stop", body, { headers });
+      setMsg("Emergency stop activated.");
+      await fetchState();
+    } catch (e: any) {
+      setError(e?.response?.data?.error || "Failed to activate.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clear = async () => {
+    setLoading(true);
+    setError(null);
+    setMsg(null);
+    try {
+      await api.delete("/admin/emergency-stop", { headers });
+      setMsg("Emergency stop cleared. Operations resumed.");
+      setReason("");
+      setTtlSeconds("");
+      await fetchState();
+    } catch (e: any) {
+      setError(e?.response?.data?.error || "Failed to clear.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="bg-secondary-900 border-secondary-800 text-white">
+      <CardHeader>
+        <CardTitle className="text-xl font-bold flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-red-500" />
+          Emergency Stop
+        </CardTitle>
+        <CardDescription className="text-secondary-400 text-xs">
+          Halt all financial movement (invoice creation, payments, journal posting, POS sales) instantly.
+          This does not affect read operations or authentication.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {loading && !state && <p className="text-secondary-400 text-sm">Loading…</p>}
+
+        {state && (
+          <div className={`flex items-center gap-3 p-4 rounded-lg border ${state.active ? "border-red-600 bg-red-950/40" : "border-green-700 bg-green-950/30"}`}>
+            <span className={`inline-block h-3 w-3 rounded-full ${state.active ? "bg-red-500 animate-pulse" : "bg-green-500"}`} />
+            <div>
+              <p className={`font-semibold ${state.active ? "text-red-400" : "text-green-400"}`}>
+                {state.active ? "EMERGENCY STOP ACTIVE" : "System Running Normally"}
+              </p>
+              {state.active && state.reason && (
+                <p className="text-xs text-red-300 mt-0.5">{state.reason}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {error && <p className="text-red-400 text-sm">{error}</p>}
+        {msg && <p className="text-green-400 text-sm">{msg}</p>}
+
+        {!state?.active ? (
+          <div className="space-y-3">
+            <p className="text-secondary-300 text-sm font-medium">Activate Emergency Stop</p>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Reason (required)</label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="e.g. Suspected fraud — pausing all transactions pending investigation"
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-2 text-sm text-white placeholder-secondary-500 resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Auto-expire after (seconds, optional)</label>
+              <input
+                type="number"
+                value={ttlSeconds}
+                onChange={(e) => setTtlSeconds(e.target.value)}
+                placeholder="Leave blank to keep until manually cleared"
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-2 text-sm text-white placeholder-secondary-500"
+              />
+            </div>
+            <button
+              onClick={activate}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
+            >
+              Activate Emergency Stop
+            </button>
+          </div>
+        ) : (
+          <div>
+            <button
+              onClick={clear}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
+            >
+              Clear Emergency Stop — Resume Operations
+            </button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

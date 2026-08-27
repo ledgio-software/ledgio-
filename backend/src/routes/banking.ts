@@ -4,6 +4,7 @@ import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { checkEmergencyStop } from '../middleware/emergencyStopMiddleware';
 import { requireTier } from '../middleware/tierEnforcementMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import * as monoService from '../services/monoService';
@@ -338,7 +339,7 @@ router.get('/transactions/:id/suggestions', async (req: Request, res: Response):
  * matching a ledger row that's already linked to a different bank
  * transaction.
  */
-router.post('/reconcile', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.post('/reconcile', requireRole('Accountant'), checkEmergencyStop, async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { transactionId, ledgerId } = req.body;

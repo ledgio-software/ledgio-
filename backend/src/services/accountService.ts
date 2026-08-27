@@ -232,6 +232,12 @@ export async function createAccount(data: CreateAccountData, actor?: AuditActor)
   return created;
 }
 
+export async function findAccountByClientTxnId(clientTxnId: string): Promise<AccountRecord | null> {
+  return withCurrentTenantDb(prisma, (client) =>
+    accountRepository.getAccountByClientTxnId(client, clientTxnId)
+  );
+}
+
 export async function getAccountById(id: string): Promise<AccountRecord | null> {
   if (!id || typeof id !== 'string') {
     return null;

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { createHash } from 'crypto';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
@@ -185,6 +186,73 @@ router.get('/export', requireRole('Auditor'), async (req: Request, res: Response
   } catch (error: any) {
     console.error('[AuditLogs] Error exporting logs:', error);
     res.status(500).json({ success: false, error: 'Failed to export audit logs.' });
+  }
+});
+
+/**
+ * GET /api/v1/audit-logs/verify-chain
+ * Description: Walks all audit log rows for the tenant in chronological order,
+ *   re-computes expected hashes, and reports the first broken link or confirms
+ *   the chain is intact. Rows without a prevHash (pre-migration entries) are skipped.
+ * Access: Auditor role or higher
+ */
+router.get('/verify-chain', requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+
+    const logs = await withCurrentTenantDb(prisma, async (client) => {
+      return (client as any).auditLog.findMany({
+        where: { tenantId, prevHash: { not: null } },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, action: true, entityId: true, createdAt: true, prevHash: true },
+      });
+    });
+
+    if (logs.length === 0) {
+      res.json({ success: true, data: { intact: true, checkedRows: 0, message: 'No chained entries to verify.' } });
+      return;
+    }
+
+    const genesisHash = createHash('sha256').update('GENESIS').digest('hex');
+
+    let expectedPrevHash = genesisHash;
+    let brokenAt: { id: string; index: number } | null = null;
+
+    for (let i = 0; i < logs.length; i++) {
+      const row = logs[i];
+      if (row.prevHash !== expectedPrevHash) {
+        brokenAt = { id: row.id, index: i + 1 };
+        break;
+      }
+      // Advance: compute this row's own hash to use as the next row's prevHash
+      expectedPrevHash = createHash('sha256')
+        .update(row.prevHash + row.action + (row.entityId ?? '') + new Date(row.createdAt).toISOString())
+        .digest('hex');
+    }
+
+    if (brokenAt) {
+      res.json({
+        success: true,
+        data: {
+          intact: false,
+          checkedRows: brokenAt.index,
+          brokenAtId: brokenAt.id,
+          message: `Chain broken at row ${brokenAt.index} (id: ${brokenAt.id}). This may indicate a tampered or deleted audit entry.`,
+        },
+      });
+    } else {
+      res.json({
+        success: true,
+        data: {
+          intact: true,
+          checkedRows: logs.length,
+          message: `Chain intact across ${logs.length} entries.`,
+        },
+      });
+    }
+  } catch (error: any) {
+    console.error('[AuditLogs] Chain verification error:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify audit log chain.' });
   }
 });
 

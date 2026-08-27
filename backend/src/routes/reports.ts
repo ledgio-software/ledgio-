@@ -1604,4 +1604,76 @@ router.get('/benford-analysis', requireRole('Accountant'), async (req: Request, 
   }
 });
 
+/**
+ * GET /api/v1/reports/fraud/duplicate-payments
+ * Description: Lists payment groups where the same customer name, amount, and payment date
+ *   appear more than once — a common indicator of accidental double-entry or intentional fraud.
+ * Query params: startDate, endDate (YYYY-MM-DD, optional)
+ * Access: Auditor role or higher
+ */
+router.get('/fraud/duplicate-payments', requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { startDate, endDate } = req.query;
+    const params = { startDate: startDate as string, endDate: endDate as string };
+
+    const cached = await getCachedReport(tenantId, 'fraud-duplicate-payments', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getDuplicatePayments(
+      startDate ? (startDate as string) : undefined,
+      endDate ? (endDate as string) : undefined
+    );
+    void setCachedReport(tenantId, 'fraud-duplicate-payments', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] Duplicate payments error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to run duplicate payment analysis.' });
+  }
+});
+
+/**
+ * GET /api/v1/reports/fraud/round-amounts
+ * Description: Lists posted journal entry lines whose absolute amount is a round multiple of
+ *   the specified threshold (default 100) and above a minimum (default 500). Round amounts
+ *   can indicate estimates, fabrications, or expense-splitting schemes.
+ * Query params: minAmount (default 500), roundingThreshold (default 100), startDate, endDate
+ * Access: Auditor role or higher
+ */
+router.get('/fraud/round-amounts', requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { minAmount, roundingThreshold, startDate, endDate } = req.query;
+    const params = {
+      minAmount: minAmount as string,
+      roundingThreshold: roundingThreshold as string,
+      startDate: startDate as string,
+      endDate: endDate as string,
+    };
+
+    const cached = await getCachedReport(tenantId, 'fraud-round-amounts', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const report = await reportingService.getRoundAmountTransactions(
+      minAmount ? Number(minAmount) : undefined,
+      roundingThreshold ? Number(roundingThreshold) : undefined,
+      startDate ? (startDate as string) : undefined,
+      endDate ? (endDate as string) : undefined
+    );
+    void setCachedReport(tenantId, 'fraud-round-amounts', params, report);
+    res.json({ success: true, data: report });
+  } catch (error: any) {
+    if (error instanceof ReportingServiceError) {
+      res.status(error.statusCode).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('[Reports] Round amounts error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to run round-amount analysis.' });
+  }
+});
+
 export default router;
