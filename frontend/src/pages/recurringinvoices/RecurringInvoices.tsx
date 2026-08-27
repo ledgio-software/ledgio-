@@ -4,6 +4,8 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/Card";
 import { api } from "../../lib/api";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 
 interface Customer {
   id: string;
@@ -40,6 +42,7 @@ interface RecurringInvoice {
 const emptyLine: RecurringInvoiceLine = { description: "", quantity: 1, unitPrice: 0 };
 
 export function RecurringInvoices() {
+  const { settings: tenantSettings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [items, setItems] = useState<RecurringInvoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
@@ -77,8 +80,10 @@ export function RecurringInvoices() {
   }, []);
 
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+    if (!isLoadingTenantSettings && tenantSettings.tier >= 2) {
+      fetchAll();
+    }
+  }, [fetchAll, isLoadingTenantSettings, tenantSettings.tier]);
 
   const updateLine = (index: number, patch: Partial<RecurringInvoiceLine>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
@@ -120,6 +125,10 @@ export function RecurringInvoices() {
       setMessage(`❌ ${err.response?.data?.error || "Failed to update recurring invoice."}`);
     }
   };
+
+  if (!isLoadingTenantSettings && tenantSettings.tier < 2) {
+    return <UpgradeRequired featureLabel="Recurring Invoices" requiredTier={2} currentTier={tenantSettings.tier} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto">

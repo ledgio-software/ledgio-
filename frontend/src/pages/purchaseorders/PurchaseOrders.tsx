@@ -6,6 +6,8 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { Plus, FileSpreadsheet, Trash2, Send, XCircle, ReceiptText, AlertTriangle, RefreshCcw } from "lucide-react";
 
 interface Vendor {
@@ -70,6 +72,7 @@ const STATUS_COLORS: Record<string, string> = {
 // genuinely partial or price-varied receipt is representable, which is what
 // makes the resulting ordered-vs-billed variance check meaningful.
 export function PurchaseOrders() {
+  const { settings: tenantSettings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const { showToast } = useToast();
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -112,8 +115,10 @@ export function PurchaseOrders() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!isLoadingTenantSettings && tenantSettings.tier >= 2) {
+      fetchData();
+    }
+  }, [fetchData, isLoadingTenantSettings, tenantSettings.tier]);
 
   const updatePoLine = (idx: number, field: keyof PoLine, value: string) => {
     setPoLines((prev) => {
@@ -237,6 +242,10 @@ export function PurchaseOrders() {
       setIsGeneratingReorder(false);
     }
   };
+
+  if (!isLoadingTenantSettings && tenantSettings.tier < 2) {
+    return <UpgradeRequired featureLabel="Purchase Orders" requiredTier={2} currentTier={tenantSettings.tier} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

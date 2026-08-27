@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/Card";
 import { api } from "../../lib/api";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 
 interface ForecastEvent {
   date: string;
@@ -38,7 +39,7 @@ const sourceLabel: Record<string, string> = {
 };
 
 export function CashFlowForecast() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [days, setDays] = useState(180);
   const [forecast, setForecast] = useState<ForecastData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,8 +57,14 @@ export function CashFlowForecast() {
   }, [days]);
 
   useEffect(() => {
-    fetchForecast();
-  }, [fetchForecast]);
+    if (!isLoadingTenantSettings && settings.tier >= 2) {
+      fetchForecast();
+    }
+  }, [fetchForecast, isLoadingTenantSettings, settings.tier]);
+
+  if (!isLoadingTenantSettings && settings.tier < 2) {
+    return <UpgradeRequired featureLabel="Cash Flow Forecast" requiredTier={2} currentTier={settings.tier} />;
+  }
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: settings.baseCurrency }).format(amount);
