@@ -52,6 +52,7 @@ describe('Fixed Asset Management + Depreciation', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'FA Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
     tenantId = onboard.tenant.id;
@@ -245,6 +246,7 @@ describe('Fixed Asset Management + Depreciation', () => {
       adminEmail: `admin_fa_unconfigured_${runId}@corp.com`,
       adminPassword: 'Password123!',
       adminName: 'FA Admin 2',
+      tier: 2,
     });
     const tenantId2 = onboard2.tenant.id;
 

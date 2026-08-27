@@ -44,6 +44,7 @@ describe('AP/AR Aging Analysis', () => {
       adminName: 'Aging Admin',
     });
     adminToken = onboard.token;
+    await prisma.tenant.update({ where: { slug: tenantSlug }, data: { tier: 2 } });
 
     const customer = await authed(request(app).post('/api/v1/invoices/customers')).send({
       name: 'Aging Client',
