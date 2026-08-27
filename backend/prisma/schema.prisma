@@ -326,6 +326,7 @@ model AuditLog {
   userId    String?  @map("user_id")
   userEmail String?  @map("user_email")
   ipAddress String?  @map("ip_address")
+  prevHash  String?  @map("prev_hash")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([createdAt(sort: Desc)])

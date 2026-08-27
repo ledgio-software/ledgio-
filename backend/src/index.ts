@@ -77,6 +77,11 @@ const startServer = async () => {
     InterestChargeCronService.init();
     registerJob('Interest Charges', '0 0 * * *', 'Daily interest accrual on overdue invoices', () => InterestChargeCronService.processInterestCharges?.() ?? Promise.resolve());
 
+    // Daily 2:30 AM GL vs subledger reconciliation
+    const { GlReconciliationCronService } = require('./services/glReconciliationCronService');
+    GlReconciliationCronService.init();
+    registerJob('GL Reconciliation', '30 2 * * *', 'Daily AR/AP subledger vs GL control account balance check', () => GlReconciliationCronService.runJob());
+
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
     migrateCustomerPii().catch((err: unknown) => console.error('[CustomerPiiMigration] Backfill failed:', err));

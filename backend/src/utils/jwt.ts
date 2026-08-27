@@ -15,6 +15,9 @@ export interface JwtPayload {
   // verification but before MFA verification - authMiddleware rejects any
   // request bearing this token outright, see authMiddleware.ts.
   mfaPending?: boolean;
+  // Unix timestamp (seconds) of when TOTP MFA was last verified. Used by
+  // step-up middleware to enforce re-authentication windows on sensitive routes.
+  lastMfaAt?: number;
   iat?: number;
   exp?: number;
   [key: string]: any;

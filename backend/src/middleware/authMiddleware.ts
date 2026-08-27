@@ -43,6 +43,31 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions = {}) {
         return;
       }
       req.user = payload;
+
+      // Privileged roles must have MFA enabled. Exempt: MFA setup/disable routes
+      // so an admin who has not yet enrolled can actually reach the setup flow.
+      const MFA_EXEMPT_PATHS = [
+        '/auth/mfa/setup',
+        '/auth/mfa/verify-setup',
+        '/auth/mfa/disable',
+        '/auth/login/verify-mfa',
+        '/auth/logout',
+        '/auth/profile',
+      ];
+      if (
+        ['Admin', 'Auditor'].includes(payload.role ?? '') &&
+        !payload.isMfaEnabled &&
+        !MFA_EXEMPT_PATHS.some((p) => req.path.endsWith(p))
+      ) {
+        res.status(403).json({
+          success: false,
+          error:
+            'Administrators and Auditors must enable two-factor authentication before accessing the system. Set it up in Settings → Security.',
+          code: 'MFA_REQUIRED',
+        });
+        return;
+      }
+
       next();
     } catch (error: any) {
       if (options.optional) {

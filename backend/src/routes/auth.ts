@@ -319,7 +319,7 @@ router.post('/resend-verification', authRateLimiter, async (req: Request, res: R
  * success response. Shared by the direct (no-MFA) login path and the
  * post-MFA-verification path so both end up with byte-identical behavior.
  */
-async function completeLogin(user: UserRecord, req: Request, res: Response): Promise<void> {
+async function completeLogin(user: UserRecord, req: Request, res: Response, mfaVerifiedNow = false): Promise<void> {
   // Org type rides on the token so nav filtering never needs an extra DB
   // round trip on later requests - only fetched here at login time.
   const loginTenant = user.tenantId
@@ -333,6 +333,8 @@ async function completeLogin(user: UserRecord, req: Request, res: Response): Pro
     role: user.role,
     tenantId: user.tenantId || undefined,
     orgType: loginTenant?.orgType,
+    isMfaEnabled: user.isMfaEnabled || false,
+    ...(mfaVerifiedNow ? { lastMfaAt: Math.floor(Date.now() / 1000) } : {}),
   };
   const token = generateJwtToken(tokenPayload);
 
@@ -535,7 +537,7 @@ router.post('/login/verify-mfa', authRateLimiter, async (req: Request, res: Resp
       });
     }
 
-    await completeLogin(user, req, res);
+    await completeLogin(user, req, res, true);
   } catch (error: any) {
     console.error('[Auth Service] MFA verification error:', error);
     res.status(500).json({

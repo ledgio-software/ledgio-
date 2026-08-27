@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { checkEmergencyStop } from '../middleware/emergencyStopMiddleware';
+import { requireRecentMfa } from '../middleware/stepUpMiddleware';
 import * as journalEntryService from '../services/journalEntryService';
 import { JournalEntryServiceError } from '../services/journalEntryService';
 import { JournalEntryStatus } from '../repository/journalEntryRepository';
@@ -92,7 +94,7 @@ router.get('/:id', requireRole('Viewer'), async (req: Request, res: Response): P
  * Description: Create a new journal entry (Draft or Posted) with line items.
  * Access: Accountant role or higher
  */
-router.post('/', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireRole('Accountant'), checkEmergencyStop, async (req: Request, res: Response): Promise<void> => {
   try {
     const journalEntry = await journalEntryService.createJournalEntry(req.body, actorFromRequest(req));
     res.status(201).json({
@@ -161,7 +163,7 @@ router.post('/contra', requireRole('Accountant'), async (req: Request, res: Resp
  * Description: Post a draft journal entry to the general ledger.
  * Access: Accountant role or higher
  */
-router.post('/:id/post', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.post('/:id/post', requireRole('Accountant'), checkEmergencyStop, requireRecentMfa, async (req: Request, res: Response): Promise<void> => {
   try {
     const journalEntry = await journalEntryService.postJournalEntry(req.params.id, actorFromRequest(req));
     res.status(200).json({
