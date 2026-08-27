@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-27] - Hide Tier-2 Nav Items from Shop Plan Sidebar
+
+**What/Why:** After the previous PR gated the backend routes and added UpgradeRequired guards inside page components, Shop plan (tier=1) tenants could still see all tier-2 nav links in the sidebar and command palette (Cmd+K). The page-level guard only triggers after navigation — the sidebar should not advertise features that are inaccessible. Added plan-tier filtering directly to the navigation layer so tier-1 tenants never see nav items that require tier 2+.
+
+**Changes:**
+- **`frontend/src/lib/navigation.ts`** — Added `minTier?: number` to `NavItem` interface. Tagged 15 nav items with `minTier: 2`: Stock Intelligence, Purchase Orders, Recurring Invoices, Banking & Feeds, Recurring Transactions, Fixed Assets, General Ledger, KPI Dashboard, AP/AR Aging, Budgets, all 4 Payroll items, and Approvals. Updated `getVisibleNavGroups` signature to accept `tier: number = 1` as a fourth parameter; added a plan-tier filter pass (after org-type, before role/mode filtering) that drops any item where `minTier > tier` and removes now-empty sections.
+- **`frontend/src/components/layout/Sidebar.tsx`** — Added `useTenantSettings` import; destructures `settings` from the hook and passes `settings.tier` to `getVisibleNavGroups`.
+- **`frontend/src/components/ui/CommandMenu.tsx`** — Same change: added `useTenantSettings` import and passes `settings.tier` to `getVisibleNavGroups` so Cmd+K also respects plan tier.
+
+---
+
 ## [Date: 2026-08-27] - Shop Plan Tier Gates: Analytics, Trial Balance, KPI Dashboard, General Ledger
 
 **What/Why:** Shop-plan tenants (tier=1) were able to access Stock Intelligence / Executive Summary analytics, Trial Balance, and KPI Dashboard — features that require deeper accounting context and are overkill for a basic retail shop. Added Business-plan (tier≥2) gates to these routes and their corresponding frontend pages so Shop tenants see a clear UpgradeRequired screen instead of confusing empty-state data.

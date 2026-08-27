@@ -4,6 +4,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import type { WorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import { getVisibleNavGroups, getVisibleHrefs } from "../../lib/navigation";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { Settings } from "lucide-react";
 
 const MODE_LABELS: Record<WorkspaceMode, string> = {
@@ -22,8 +23,9 @@ export function Sidebar() {
   const location = useLocation();
   const { user } = useAuth();
   const { mode, setMode } = useWorkspaceMode();
+  const { settings } = useTenantSettings();
   const isRestricted = getVisibleHrefs(user?.role) !== null;
-  const visibleGroups = getVisibleNavGroups(user?.role, user?.orgType, isRestricted ? 'professional' : mode);
+  const visibleGroups = getVisibleNavGroups(user?.role, user?.orgType, isRestricted ? 'professional' : mode, settings.tier);
 
   return (
     <aside className="w-64 bg-white dark:bg-secondary-900 border-r border-secondary-200 dark:border-secondary-800 hidden md:flex flex-col transition-colors duration-200">

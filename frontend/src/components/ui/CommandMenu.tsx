@@ -7,6 +7,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import { getVisibleNavGroups, getVisibleHrefs } from "../../lib/navigation";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 
 const ITEM_CLASSNAME =
   "flex items-center px-2 py-2 mt-1 rounded-md text-sm cursor-pointer aria-selected:bg-primary-50 aria-selected:text-primary-700 dark:aria-selected:bg-primary-900/50 dark:aria-selected:text-primary-300";
@@ -17,10 +18,11 @@ export function CommandMenu() {
   const { setTheme } = useTheme();
   const { user } = useAuth();
   const { mode } = useWorkspaceMode();
+  const { settings } = useTenantSettings();
 
-  // Same source of truth (role + workspace mode filtering) as the sidebar, so
+  // Same source of truth (role + workspace mode + tier filtering) as the sidebar, so
   // Cmd+K never offers a page the sidebar currently hides from this user.
-  const navGroups = getVisibleNavGroups(user?.role, user?.orgType, mode);
+  const navGroups = getVisibleNavGroups(user?.role, user?.orgType, mode, settings.tier);
   // "Preferences" (/settings) is blocked for the same roles at the route
   // level (App.tsx's SETTINGS_RESTRICTED_ROLES) - offering it here would be
   // a dead-end navigation that immediately redirects.
