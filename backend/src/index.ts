@@ -62,6 +62,11 @@ const startServer = async () => {
     RecurringInvoiceCronService.init();
     registerJob('Recurring Invoices', '0 6 * * *', 'Daily recurring invoice generation', () => RecurringInvoiceCronService.generateRecurringInvoices?.() ?? Promise.resolve());
 
+    // Initialize GRA E-VAT VSDC 15-minute clearance retry sweep
+    const { GraEvatCronService } = require('./services/graEvatCronService');
+    GraEvatCronService.init();
+    registerJob('GRA E-VAT Sync', '*/15 * * * *', '15-minute sweep to clear pending/failed GRA VSDC invoices within the 48-hour mandate window', () => GraEvatCronService.runSync());
+
     // Initialize daily fixed-asset depreciation sweep
     const { FixedAssetDepreciationCronService } = require('./services/fixedAssetDepreciationCronService');
     FixedAssetDepreciationCronService.init();

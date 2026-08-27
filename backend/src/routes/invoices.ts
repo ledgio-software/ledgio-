@@ -612,6 +612,98 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), validateBody(createI
     if (created?.stockDeducted) {
       invalidateCachedList(tenantId, 'inventory-items').catch(() => {});
     }
+
+    // Fire async GRA clearance immediately for GRA-configured tenants so the
+    // IRN appears on the invoice without waiting for the 15-minute cron sweep.
+    // Fire-and-forget: the response is sent first; any failure is captured
+    // in graClearanceStatus=FAILED so the cron will retry within 48 hours.
+    // Skipped in test environment — graEvat.test.ts drives clearance manually
+    // and the unexpected extra axios call would break its mock call counts.
+    if (!replayed && process.env.NODE_ENV !== 'test') {
+      (async () => {
+        try {
+          const tenant = await tenantRepository.findTenantById(prisma, tenantId);
+          if (!tenant || !graEvatService.isGraEvatConfigured({
+            tin: tenant.graTin ?? null,
+            deviceNumber: tenant.graDeviceNumber ?? null,
+            securityKeyEncrypted: tenant.graSecurityKeyEncrypted ?? null,
+          })) return;
+
+          // Mark PENDING immediately so the cron skips it while we work.
+          await withCurrentTenantDb(prisma, async (client) => {
+            await (client as any).invoice.update({
+              where: { id: created.id },
+              data: { graClearanceStatus: 'PENDING' },
+            });
+          });
+
+          const invoiceWithDetails = await withCurrentTenantDb(prisma, async (client) => {
+            return (client as any).invoice.findFirst({
+              where: { id: created.id },
+              include: { customer: true, items: { include: { inventoryItem: true } } },
+            });
+          });
+          if (!invoiceWithDetails) return;
+
+          invoiceWithDetails.customer = decryptCustomer(invoiceWithDetails.customer);
+
+          const result = await graEvatService.requestClearance(
+            {
+              tin: tenant.graTin ?? null,
+              deviceNumber: tenant.graDeviceNumber ?? null,
+              securityKeyEncrypted: tenant.graSecurityKeyEncrypted ?? null,
+            },
+            {
+              invoiceNumber: invoiceWithDetails.invoiceNumber,
+              issueDate: invoiceWithDetails.issueDate,
+              currency: invoiceWithDetails.currency,
+              exchangeRate: Number(invoiceWithDetails.exchangeRate),
+              subtotal: Number(invoiceWithDetails.subtotal),
+              tax: Number(invoiceWithDetails.tax),
+              total: Number(invoiceWithDetails.total),
+              taxBreakdown: (invoiceWithDetails.taxBreakdown as any) ?? null,
+              customerName: invoiceWithDetails.customer?.name ?? 'Unknown',
+              customerTin: invoiceWithDetails.customer?.tin ?? null,
+              userName: (req as any).user?.name || (req as any).user?.email || 'Ledgio User',
+              items: invoiceWithDetails.items.map((item: any) => ({
+                id: item.id,
+                description: item.description,
+                quantity: Number(item.quantity),
+                unitPrice: Number(item.unitPrice),
+                amount: Number(item.amount),
+                sku: item.inventoryItem?.sku ?? null,
+              })),
+            }
+          );
+          const qrCodeDataUrl = await graEvatService.renderClearanceQrCode(result.qrCodeData);
+          await withCurrentTenantDb(prisma, async (client) => {
+            await (client as any).invoice.update({
+              where: { id: created.id },
+              data: {
+                graClearanceStatus: 'CLEARED',
+                graVerificationEngineId: result.verificationEngineId,
+                graQrCodeData: qrCodeDataUrl,
+                graSignature: result.signature,
+                graEncryptedData: result.encryptedData,
+                graClearedAt: result.clearedAt,
+                graClearanceError: null,
+              },
+            });
+          });
+          console.log(`[Invoices] GRA auto-clearance succeeded for ${invoiceWithDetails.invoiceNumber}`);
+        } catch (graErr: any) {
+          const msg = graErr instanceof GraEvatServiceError ? graErr.message : 'GRA auto-clearance failed.';
+          await withCurrentTenantDb(prisma, async (client) => {
+            await (client as any).invoice.update({
+              where: { id: created.id },
+              data: { graClearanceStatus: 'FAILED', graClearanceError: msg },
+            });
+          }).catch(() => {});
+          console.error(`[Invoices] GRA auto-clearance failed for invoice ${created.id}:`, msg);
+        }
+      })();
+    }
+
     res.status(replayed ? 200 : 201).json({ success: true, message: 'Invoice created successfully', data: { invoice: created } });
   } catch (error: any) {
     console.error('[Invoices] Error creating invoice:', error);

@@ -191,6 +191,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "VAT Return", href: "/reports/vat-return", icon: Percent },
       { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock },
       { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3 },
+      { name: "Benford Analysis", href: "/reports/benford-analysis", icon: ShieldAlert },
     ],
   },
   {

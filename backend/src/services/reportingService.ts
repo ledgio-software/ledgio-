@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { requireTenantContext } from '../context/tenantContext';
@@ -121,40 +122,41 @@ export async function getVatReturn(startDate?: string, endDate?: string) {
       orderBy: { createdAt: 'asc' },
     });
 
-    const outputVatMap = new Map<string, { taxRateName: string; taxRate: number; taxableAmount: number; taxAmount: number }>();
+    const outputVatMap = new Map<string, { taxRateName: string; taxRate: number; taxableAmount: Decimal; taxAmount: Decimal }>();
 
     for (const payment of payments) {
       const invoice = payment.invoice;
       if (!invoice) continue;
-      const invoiceTotal = Number(invoice.total);
-      const invoiceTax = Number(invoice.tax ?? 0);
-      if (invoiceTax <= 0 || invoiceTotal <= 0) continue;
+      const invoiceTotal = new Decimal(invoice.total);
+      const invoiceTax = new Decimal(invoice.tax ?? 0);
+      if (invoiceTax.lte(0) || invoiceTotal.lte(0)) continue;
 
-      const paymentAmount = Number(payment.amount);
-      const paymentShare = paymentAmount / invoiceTotal;
-      const taxForPayment = Math.round(invoiceTax * paymentShare * 100) / 100;
-      const taxableForPayment = Math.round((paymentAmount - taxForPayment) * 100) / 100;
+      const paymentAmount = new Decimal(payment.amount);
+      const paymentShare = paymentAmount.div(invoiceTotal);
+      const taxForPayment = invoiceTax.times(paymentShare).toDecimalPlaces(2);
+      const taxableForPayment = paymentAmount.minus(taxForPayment).toDecimalPlaces(2);
 
       const taxRateName = invoice.taxRate?.name ?? 'Standard VAT';
       const taxRatePercent = invoice.taxRate?.rate != null ? Number(invoice.taxRate.rate) : 0;
 
       const existing = outputVatMap.get(taxRateName);
       if (existing) {
-        existing.taxableAmount += taxableForPayment;
-        existing.taxAmount += taxForPayment;
+        existing.taxableAmount = existing.taxableAmount.plus(taxableForPayment);
+        existing.taxAmount = existing.taxAmount.plus(taxForPayment);
       } else {
         outputVatMap.set(taxRateName, { taxRateName, taxRate: taxRatePercent, taxableAmount: taxableForPayment, taxAmount: taxForPayment });
       }
     }
 
     const outputVatLines = Array.from(outputVatMap.values()).map((l) => ({
-      ...l,
-      taxableAmount: Math.round(l.taxableAmount * 100) / 100,
-      taxAmount: Math.round(l.taxAmount * 100) / 100,
+      taxRateName: l.taxRateName,
+      taxRate: l.taxRate,
+      taxableAmount: l.taxableAmount.toDecimalPlaces(2).toNumber(),
+      taxAmount: l.taxAmount.toDecimalPlaces(2).toNumber(),
     }));
 
-    const totalOutputTaxable = Math.round(outputVatLines.reduce((s, l) => s + l.taxableAmount, 0) * 100) / 100;
-    const totalOutputVat = Math.round(outputVatLines.reduce((s, l) => s + l.taxAmount, 0) * 100) / 100;
+    const totalOutputTaxable = outputVatLines.reduce((s, l) => s.plus(l.taxableAmount), new Decimal(0)).toDecimalPlaces(2).toNumber();
+    const totalOutputVat = outputVatLines.reduce((s, l) => s.plus(l.taxAmount), new Decimal(0)).toDecimalPlaces(2).toNumber();
 
     return {
       startDate: startDate ?? null,
@@ -177,7 +179,7 @@ function _buildStockAgingResult(
   for (const row of rows) {
     const daysOnHand = Math.floor((asOf.getTime() - row.purchasedAt.getTime()) / 86400000);
     const bucket = daysOnHand <= 30 ? '0-30' : daysOnHand <= 60 ? '31-60' : daysOnHand <= 90 ? '61-90' : '90+';
-    const value = Math.round(row.qty * row.unitCost * 100) / 100;
+    const value = new Decimal(row.qty).times(row.unitCost).toDecimalPlaces(2).toNumber();
     buckets[bucket] += row.qty;
     bucketValue[bucket] += value;
     items.push({ ...row, daysOnHand, bucket, value });
@@ -186,13 +188,13 @@ function _buildStockAgingResult(
   return {
     asOfDate: asOf.toISOString().split('T')[0],
     bucketSummary: {
-      '0-30':  { qty: buckets['0-30'],  value: Math.round(bucketValue['0-30']  * 100) / 100 },
-      '31-60': { qty: buckets['31-60'], value: Math.round(bucketValue['31-60'] * 100) / 100 },
-      '61-90': { qty: buckets['61-90'], value: Math.round(bucketValue['61-90'] * 100) / 100 },
-      '90+':   { qty: buckets['90+'],   value: Math.round(bucketValue['90+']   * 100) / 100 },
+      '0-30':  { qty: buckets['0-30'],  value: new Decimal(bucketValue['0-30']).toDecimalPlaces(2).toNumber() },
+      '31-60': { qty: buckets['31-60'], value: new Decimal(bucketValue['31-60']).toDecimalPlaces(2).toNumber() },
+      '61-90': { qty: buckets['61-90'], value: new Decimal(bucketValue['61-90']).toDecimalPlaces(2).toNumber() },
+      '90+':   { qty: buckets['90+'],   value: new Decimal(bucketValue['90+']).toDecimalPlaces(2).toNumber() },
     },
     totalQty: items.reduce((s, i) => s + i.qty, 0),
-    totalValue: Math.round(items.reduce((s, i) => s + i.value, 0) * 100) / 100,
+    totalValue: items.reduce((s, i) => s.plus(i.value), new Decimal(0)).toDecimalPlaces(2).toNumber(),
     items: items.sort((a, b) => b.daysOnHand - a.daysOnHand),
   };
 }
@@ -345,13 +347,13 @@ export async function getCostCategoryPnl(costCategoryId: string, startDate?: str
       orderBy: { journalEntry: { entryDate: 'asc' } },
     });
 
-    let totalDebit = 0;
-    let totalCredit = 0;
+    let totalDebit = new Decimal(0);
+    let totalCredit = new Decimal(0);
     const rows = lines.map((l: any) => {
-      const debit = Number(l.debit);
-      const credit = Number(l.credit);
-      totalDebit += debit;
-      totalCredit += credit;
+      const debit = new Decimal(l.debit ?? 0).toDecimalPlaces(2).toNumber();
+      const credit = new Decimal(l.credit ?? 0).toDecimalPlaces(2).toNumber();
+      totalDebit = totalDebit.plus(debit);
+      totalCredit = totalCredit.plus(credit);
       return {
         date: l.journalEntry.entryDate,
         entryNumber: l.journalEntry.entryNumber,
@@ -363,6 +365,103 @@ export async function getCostCategoryPnl(costCategoryId: string, startDate?: str
       };
     });
 
-    return { category: { id: category.id, name: category.name }, lines: rows, totalDebit, totalCredit, net: totalCredit - totalDebit };
+    const totalDebitNum = totalDebit.toDecimalPlaces(2).toNumber();
+    const totalCreditNum = totalCredit.toDecimalPlaces(2).toNumber();
+    return { category: { id: category.id, name: category.name }, lines: rows, totalDebit: totalDebitNum, totalCredit: totalCreditNum, net: totalCredit.minus(totalDebit).toDecimalPlaces(2).toNumber() };
   });
+}
+
+export interface BenfordDigitResult {
+  digit: number;
+  expected: number;        // Benford expected probability 0–1
+  actual: number;          // observed probability 0–1
+  count: number;
+  zScore: number;          // |observed - expected| / sqrt(expected*(1-expected)/n)
+  flagged: boolean;        // |z| > 1.96 (95% confidence)
+}
+
+export interface BenfordAnalysisResult {
+  totalTransactions: number;
+  digits: BenfordDigitResult[];
+  chiSquare: number;
+  overallFlagged: boolean; // chi-square > 15.51 (df=8, p<0.05)
+  startDate?: string;
+  endDate?: string;
+}
+
+// Benford's Law: P(d) = log10(1 + 1/d)
+const BENFORD_EXPECTED: Record<number, number> = Object.fromEntries(
+  [1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => [d, Math.log10(1 + 1 / d)])
+);
+
+export async function getBenfordAnalysis(startDate?: string, endDate?: string): Promise<BenfordAnalysisResult> {
+  if (startDate) validateDateFormat(startDate, 'startDate');
+  if (endDate) validateDateFormat(endDate, 'endDate');
+
+  const { tenantId } = requireTenantContext();
+
+  type DigitRow = { digit: string; cnt: string };
+
+  const rows = (await withCurrentTenantDb(prisma, async (client) => {
+    // Extract the leading digit from the absolute value of each non-zero line amount.
+    // SUBSTRING(LTRIM(...,'0.'), 1, 1) gives the first significant digit as text.
+    const dateFilter = startDate || endDate
+      ? `AND je.entry_date BETWEEN $2 AND $3`
+      : '';
+    const params: (string | Date)[] = [tenantId];
+    if (startDate || endDate) {
+      params.push(startDate ? new Date(startDate) : new Date('1900-01-01'));
+      params.push(endDate ? new Date(endDate) : new Date('9999-12-31'));
+    }
+
+    return (client as any).$queryRawUnsafe(
+      `SELECT
+         SUBSTRING(LTRIM(CAST(ABS(jel.amount) AS TEXT), '0.'), 1, 1) AS digit,
+         COUNT(*) AS cnt
+       FROM journal_entry_lines jel
+       JOIN journal_entries je ON je.id = jel.journal_entry_id
+       WHERE jel.tenant_id = $1
+         AND je.status = 'POSTED'
+         AND jel.amount <> 0
+         ${dateFilter}
+       GROUP BY digit
+       ORDER BY digit`,
+      ...params
+    );
+  })) as DigitRow[];
+
+  // Build digit → count map, filter to valid leading digits 1–9
+  const countMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
+  for (const row of rows) {
+    const d = parseInt(row.digit, 10);
+    if (d >= 1 && d <= 9) countMap[d] = parseInt(row.cnt, 10);
+  }
+
+  const total = Object.values(countMap).reduce((s, c) => s + c, 0);
+
+  const digits: BenfordDigitResult[] = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => {
+    const expected = BENFORD_EXPECTED[d];
+    const count = countMap[d];
+    const actual = total > 0 ? count / total : 0;
+    const stdErr = total > 0 ? Math.sqrt((expected * (1 - expected)) / total) : 1;
+    const zScore = stdErr > 0 ? Math.abs(actual - expected) / stdErr : 0;
+    return { digit: d, expected: parseFloat(expected.toFixed(4)), actual: parseFloat(actual.toFixed(4)), count, zScore: parseFloat(zScore.toFixed(3)), flagged: zScore > 1.96 };
+  });
+
+  // Chi-square goodness-of-fit: sum((observed - expected)^2 / expected) across digits
+  const chiSquare = total > 0
+    ? digits.reduce((sum, d) => {
+        const expectedCount = BENFORD_EXPECTED[d.digit] * total;
+        return sum + Math.pow(d.count - expectedCount, 2) / expectedCount;
+      }, 0)
+    : 0;
+
+  return {
+    totalTransactions: total,
+    digits,
+    chiSquare: parseFloat(chiSquare.toFixed(3)),
+    overallFlagged: chiSquare > 15.507, // chi-square critical value df=8, p=0.05
+    startDate,
+    endDate,
+  };
 }
