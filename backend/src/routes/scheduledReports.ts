@@ -3,6 +3,7 @@ import { prisma } from '../config/db';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import * as reportingService from '../services/reportingService';
 import { computeWeeklyReportData, computeMonthlyReportData } from '../services/scheduledEmailService';
@@ -11,6 +12,7 @@ const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Scheduled Reports'));
 
 /**
  * POST /api/v1/reports/schedule

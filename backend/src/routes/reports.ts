@@ -344,7 +344,7 @@ router.get('/kpis', requireRole('Viewer'), async (req: Request, res: Response): 
  * bucketed by days past its dueDate (Current / 1-30 / 31-60 / 61-90 / 90+).
  * Access: Viewer role or higher.
  */
-router.get('/aging/ar', requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
+router.get('/aging/ar', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const result = await withCurrentTenantDb(prisma, (client) => agingReportService.getArAging(client as any, tenantId));
@@ -362,7 +362,7 @@ router.get('/aging/ar', requireRole('Viewer'), async (_req: Request, res: Respon
  * balance due is always its full amount).
  * Access: Viewer role or higher.
  */
-router.get('/aging/ap', requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
+router.get('/aging/ap', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const result = await withCurrentTenantDb(prisma, (client) => agingReportService.getApAging(client as any, tenantId));
@@ -383,7 +383,7 @@ router.get('/aging/ap', requireRole('Viewer'), async (_req: Request, res: Respon
  * submitted as a formal document).
  * Access: Viewer role or higher.
  */
-router.get('/cash-flow-forecast', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/cash-flow-forecast', requireTier(2, 'Cash Flow Forecast'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const days = req.query.days ? Number(req.query.days) : 180;
     const forecast = await cashFlowForecastService.getCashFlowForecast(days);

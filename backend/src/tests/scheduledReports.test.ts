@@ -42,6 +42,7 @@ describe('Scheduled Reports API', () => {
       adminEmail: admin1Email,
       adminPassword: 'Password123!',
       adminName: 'Sched Corp 1 Admin',
+      tier: 2,
     });
     token1 = onboard1.token;
 
@@ -51,6 +52,7 @@ describe('Scheduled Reports API', () => {
       adminEmail: admin2Email,
       adminPassword: 'Password123!',
       adminName: 'Sched Corp 2 Admin',
+      tier: 2,
     });
     token2 = onboard2.token;
   });
@@ -190,6 +192,7 @@ describe('Scheduled Reports Dispatcher (runDueSchedulesJob)', () => {
       adminEmail: dueAdminEmail,
       adminPassword: 'Password123!',
       adminName: 'Sched Due Admin',
+      tier: 2,
     });
     dueTenantId = dueOnboard.tenant.id;
 
@@ -199,6 +202,7 @@ describe('Scheduled Reports Dispatcher (runDueSchedulesJob)', () => {
       adminEmail: notDueAdminEmail,
       adminPassword: 'Password123!',
       adminName: 'Sched Not Due Admin',
+      tier: 2,
     });
     notDueTenantId = notDueOnboard.tenant.id;
 
@@ -208,6 +212,7 @@ describe('Scheduled Reports Dispatcher (runDueSchedulesJob)', () => {
       adminEmail: disabledAdminEmail,
       adminPassword: 'Password123!',
       adminName: 'Sched Disabled Admin',
+      tier: 2,
     });
     disabledTenantId = disabledOnboard.tenant.id;
 

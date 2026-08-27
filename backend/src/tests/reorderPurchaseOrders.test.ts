@@ -38,6 +38,7 @@ describe('Auto-generate Purchase Orders on reorder threshold', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'Reorder Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
 

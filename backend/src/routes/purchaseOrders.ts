@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import * as purchaseOrderService from '../services/purchaseOrderService';
 import { PurchaseOrderServiceError } from '../services/purchaseOrderService';
@@ -10,6 +11,7 @@ const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Purchase Orders'));
 
 router.get('/', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
