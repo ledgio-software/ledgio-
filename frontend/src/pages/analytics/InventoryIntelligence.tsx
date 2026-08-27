@@ -5,6 +5,8 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { downloadBlobResponse } from "../../lib/downloadBlob";
 import { useToast } from "../../contexts/ToastContext";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { Flame, Clock, Lightbulb, Download, FileSpreadsheet, FileType, RefreshCw, ArrowRight } from "lucide-react";
 
 interface FastSeller {
@@ -35,6 +37,7 @@ interface Suggestion {
 }
 
 export function InventoryIntelligence() {
+  const { settings: tenantSettings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [fastSellers, setFastSellers] = useState<FastSeller[]>([]);
   const [slowMoving, setSlowMoving] = useState<SlowMoving[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -59,8 +62,12 @@ export function InventoryIntelligence() {
   };
 
   useEffect(() => {
-    fetchIntelligence();
-  }, []);
+    if (!isLoadingTenantSettings && tenantSettings.tier >= 2) {
+      fetchIntelligence();
+    } else if (!isLoadingTenantSettings) {
+      setIsLoading(false);
+    }
+  }, [isLoadingTenantSettings, tenantSettings.tier]);
 
   const handleExportCSV = async () => {
     try {
@@ -82,6 +89,10 @@ export function InventoryIntelligence() {
       setIsExporting(null);
     }
   };
+
+  if (!isLoadingTenantSettings && tenantSettings.tier < 2) {
+    return <UpgradeRequired featureLabel="Stock Intelligence" requiredTier={2} currentTier={tenantSettings.tier} />;
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

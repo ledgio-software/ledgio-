@@ -30,7 +30,7 @@ router.use(tenantContextMiddleware);
  * Description: Trial Balance report listing accounts with Debit/Credit balances verifying total debits == total credits.
  * Access: Viewer role or higher
  */
-router.get('/trial-balance', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/trial-balance', requireTier(2, 'Trial Balance'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { startDate, endDate, asOfDate } = req.query;
     const report = await reportingService.getTrialBalance(
@@ -319,7 +319,7 @@ router.get('/cash-flow/export', requireRole('Viewer'), async (req: Request, res:
  * this schema has no COGS or current-vs-non-current classification to compute those honestly.
  * Access: Viewer role or higher
  */
-router.get('/kpis', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/kpis', requireTier(2, 'KPI Dashboard'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { startDate, endDate } = req.query;
     const report = await reportingService.getKpiDashboard(

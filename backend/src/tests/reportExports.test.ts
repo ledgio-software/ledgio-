@@ -65,6 +65,7 @@ describe('Real PDF/Word/CSV export for reports (replaces window.print() and fake
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'Report Export Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
     tenantId = onboard.tenant.id;

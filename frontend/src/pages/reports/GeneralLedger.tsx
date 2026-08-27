@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/Button";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { exportToCsv } from "../../lib/exportCsv";
 import { api } from "../../lib/api";
 import {
@@ -38,10 +39,10 @@ interface JournalEntryDetail {
 }
 
 export function GeneralLedger() {
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const { accounts } = useAccounts();
   const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id || "");
   const { account, lines, openingBalance, totalDebit, totalCredit, closingBalance } = useLedgerReport(selectedAccountId);
-  const { settings } = useTenantSettings();
 
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
   const [journalEntry, setJournalEntry] = useState<JournalEntryDetail | null>(null);
@@ -76,6 +77,10 @@ export function GeneralLedger() {
       currency: settings.baseCurrency,
     }).format(amount);
   };
+
+  if (!isLoadingTenantSettings && settings.tier < 2) {
+    return <UpgradeRequired featureLabel="General Ledger" requiredTier={2} currentTier={settings.tier} />;
+  }
 
   const handleExport = () => {
     if (!account || lines.length === 0) return;
