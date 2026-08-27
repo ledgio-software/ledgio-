@@ -30,7 +30,7 @@ export async function migrateCustomerPii(): Promise<void> {
     await prisma.customer.update({
       where: { id: c.id },
       data: {
-        email: c.email ? encryptCredential(c.email) : null,
+        ...(c.email ? { email: encryptCredential(c.email) } : {}),
         phone: c.phone ? encryptCredential(c.phone) : null,
         tin: c.tin ? encryptCredential(c.tin) : null,
       },
