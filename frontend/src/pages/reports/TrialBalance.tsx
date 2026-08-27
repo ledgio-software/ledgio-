@@ -18,9 +18,11 @@ interface TrialBalanceReport {
   endDate?: string;
   asOfDate?: string;
   accounts: TrialBalanceAccount[];
-  totalDebit: number;
-  totalCredit: number;
-  isBalanced: boolean;
+  totals: {
+    totalDebit: number;
+    totalCredit: number;
+    isBalanced: boolean;
+  };
 }
 
 export function TrialBalance() {
@@ -129,11 +131,11 @@ export function TrialBalance() {
         <>
           {/* Balance status banner */}
           <div className={`flex items-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium ${
-            report.isBalanced
+            report.totals.isBalanced
               ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400"
               : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
           }`}>
-            {report.isBalanced
+            {report.totals.isBalanced
               ? <><CheckCircle2 size={15} /> Trial Balance is balanced — Total Debits = Total Credits</>
               : <><AlertTriangle size={15} /> Trial Balance is OUT OF BALANCE — check for posting errors</>
             }
@@ -169,8 +171,8 @@ export function TrialBalance() {
               <tfoot>
                 <tr className="border-t-2 border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-700/50 font-semibold">
                   <td className="px-4 py-3" colSpan={3}>Total</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(report.totalDebit)}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(report.totalCredit)}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(report.totals.totalDebit)}</td>
+                  <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(report.totals.totalCredit)}</td>
                 </tr>
               </tfoot>
             </table>
