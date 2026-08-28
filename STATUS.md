@@ -2,6 +2,19 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Fix: Concurrent-race 409 in idempotent invoice payment
+
+**What/Why:** PR #133 CI was still failing after the URL fix: the "concurrent race" test sent two simultaneous `POST /invoices/:id/pay` requests with the same `idempotencyKey` and expected both to return 200. The second request received 409 because: (a) both passed the pre-transaction duplicate check (no payment row yet), (b) the first committed and set the invoice to PAID, (c) the second re-read inside the row lock, saw `status=PAID`, and threw 409 — the existing catch block only handled P2002 constraint violations, not this earlier PAID-status guard.
+
+**Fix:** Inside the locked transaction, before throwing "Invoice is already paid", if an `idempotencyKey` is present, re-query `invoicePayment` for that key. If found (meaning the race partner already committed), return the invoice with 200 — the same idempotent short-circuit as the pre-transaction check.
+
+**Changes:**
+- **`backend/src/services/invoicePaymentService.ts`** — Added idempotency re-check inside the row-locked transaction when `fresh.status === 'PAID'`; also split the `!fresh || fresh.status === 'PAID'` guard into two separate conditions so a missing invoice still returns 404.
+
+**Applied to:** `feature/phase1-idempotent-payments` (PR #133) and `feature/phase2-db-hardening` (PR #134) via merge.
+
+---
+
 ## [Date: 2026-08-28] - Fix: CI test URL bug in idempotency test suite
 
 **What/Why:** PR #133 CI was failing all 6 tests in `invoicePaymentIdempotency.test.ts` with `TypeError: Cannot read properties of undefined (reading 'customer')` at line 65. Root cause: both `POST /customers` calls in the test used path `/api/v1/customers` which does not exist — the customer routes are registered under the invoices router, making the correct path `/api/v1/invoices/customers`. The 404 response had no `data.customer`, so `customerId` was never set and all downstream tests cascaded to fail.
