@@ -2,6 +2,27 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Phase 4: Report Separation
+
+**What/Why:** Heavy report queries (full-ledger aggregations, multi-table UNIONs, paginated result sets) were executing without any caching on 12 of the 22 report endpoints, letting repeated page refreshes and concurrent users hammer the PostgreSQL connection pool and starve OLTP write paths. Phase 4 adds Redis result caching to every previously uncached endpoint and caps the analytics-trends fan-out to prevent connection exhaustion on cold-cache requests.
+
+**Changes:**
+
+1. **Caching added to 12 uncached report endpoints** in `routes/reports.ts` — all now follow the same `getCachedReport` → compute → `setCachedReport` pattern already used by trial-balance, P&L, balance-sheet, KPIs, and others. Newly cached endpoints: `/cash-flow`, `/aging/ar`, `/aging/ap`, `/cash-flow-forecast`, `/sales-channel`, `/branch-comparison`, `/landed-costs`, `/stock-movement`, `/sales-register`, `/purchase-register`, `/daybook`, `/cost-centre-pnl`. Cache key includes `tenantId + reportType + hash(params)` so paginated and filtered variants cache independently. TTL is 5 minutes (same as existing cached endpoints).
+
+2. **Analytics-trends connection-pool cap** — `GET /reports/analytics/trends` previously fanned out up to 24 parallel `getProfitAndLoss` calls (one per month) inside a single `Promise.all`, saturating the connection pool on cold-cache requests. Replaced with a batched loop (6 P&L calls per batch), maintaining correctness while capping concurrent DB connections per request to 6.
+
+3. **`setCachedReport` defensive catch** — `reportCache.ts:setCachedReport` now wraps the Redis write in a try/catch so a cache-layer error (Redis restart, network partition) can never propagate up to the route handler and cause a 500 on a read-only report request.
+
+4. **Tests** — New `src/tests/reportCache.test.ts` with 9 unit tests (Redis mocked): cache miss returns null, cache hit returns stored payload, tenant isolation (different tenants get different keys), param isolation (different params hash to different keys), TTL is 300 seconds, set and get use the same key, write error never throws, invalidate calls delPattern with the right tenant-scoped wildcard, invalidate pattern does not touch other tenants.
+
+**Files:**
+- `backend/src/routes/reports.ts`
+- `backend/src/cache/reportCache.ts`
+- `backend/src/tests/reportCache.test.ts`
+
+---
+
 ## [Date: 2026-08-28] - Phase 3: Offline Sync Robustness
 
 **What/Why:** Three hardening improvements to the local-first sync infrastructure to prevent data loss and resource exhaustion for long-offline clients.

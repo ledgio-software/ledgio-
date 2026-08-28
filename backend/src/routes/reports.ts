@@ -233,11 +233,18 @@ router.get('/profit-loss/export', requireRole('Viewer'), async (req: Request, re
  */
 router.get('/cash-flow', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
+    const params = { startDate: startDate as string, endDate: endDate as string };
+
+    const cached = await getCachedReport(tenantId, 'cash-flow', params);
+    if (cached) { res.status(200).json({ success: true, data: cached }); return; }
+
     const report = await reportingService.getCashFlowStatement(
       startDate ? (startDate as string) : undefined,
       endDate ? (endDate as string) : undefined
     );
+    void setCachedReport(tenantId, 'cash-flow', params, report);
     res.status(200).json({
       success: true,
       data: report,
@@ -347,7 +354,12 @@ router.get('/kpis', requireTier(2, 'KPI Dashboard'), requireRole('Viewer'), asyn
 router.get('/aging/ar', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
+
+    const cached = await getCachedReport(tenantId, 'aging-ar', {});
+    if (cached) { res.status(200).json({ success: true, data: cached }); return; }
+
     const result = await withCurrentTenantDb(prisma, (client) => agingReportService.getArAging(client as any, tenantId));
+    void setCachedReport(tenantId, 'aging-ar', {}, result);
     res.status(200).json({ success: true, data: result });
   } catch (error: any) {
     console.error('[Reports] Error generating AR aging:', error);
@@ -365,7 +377,12 @@ router.get('/aging/ar', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Vie
 router.get('/aging/ap', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
+
+    const cached = await getCachedReport(tenantId, 'aging-ap', {});
+    if (cached) { res.status(200).json({ success: true, data: cached }); return; }
+
     const result = await withCurrentTenantDb(prisma, (client) => agingReportService.getApAging(client as any, tenantId));
+    void setCachedReport(tenantId, 'aging-ap', {}, result);
     res.status(200).json({ success: true, data: result });
   } catch (error: any) {
     console.error('[Reports] Error generating AP aging:', error);
@@ -385,8 +402,15 @@ router.get('/aging/ap', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Vie
  */
 router.get('/cash-flow-forecast', requireTier(2, 'Cash Flow Forecast'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const { tenantId } = requireTenantContext();
     const days = req.query.days ? Number(req.query.days) : 180;
+    const params = { days: String(days) };
+
+    const cached = await getCachedReport(tenantId, 'cash-flow-forecast', params);
+    if (cached) { res.status(200).json({ success: true, data: cached }); return; }
+
     const forecast = await cashFlowForecastService.getCashFlowForecast(days);
+    void setCachedReport(tenantId, 'cash-flow-forecast', params, forecast);
     res.status(200).json({
       success: true,
       data: forecast,
@@ -414,6 +438,10 @@ router.get('/sales-channel', requireRole('Viewer'), async (req: Request, res: Re
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
+    const cacheParams = { startDate: startDate as string, endDate: endDate as string };
+
+    const cached = await getCachedReport(tenantId, 'sales-channel', cacheParams);
+    if (cached) { res.status(200).json({ success: true, data: cached }); return; }
 
     const where: any = { tenantId, status: 'COMPLETED' };
     if (startDate || endDate) {
@@ -462,25 +490,27 @@ router.get('/sales-channel', requireRole('Viewer'), async (req: Request, res: Re
       summary.TOTAL.count += 1;
     }
 
+    const responseData = {
+      summary,
+      sales: sales.map((s: any) => ({
+        id: s.id,
+        receiptNo: s.receiptNo,
+        saleType: s.saleType,
+        amount: Number(s.amount),
+        createdAt: s.createdAt,
+        lines: s.lines.map((l: any) => ({
+          itemName: l.itemName,
+          itemSku: l.itemSku,
+          quantity: l.quantity,
+          unitPrice: Number(l.unitPrice),
+          lineTotal: Number(l.lineTotal),
+        })),
+      })),
+    };
+    void setCachedReport(tenantId, 'sales-channel', cacheParams, responseData);
     res.status(200).json({
       success: true,
-      data: {
-        summary,
-        sales: sales.map((s: any) => ({
-          id: s.id,
-          receiptNo: s.receiptNo,
-          saleType: s.saleType,
-          amount: Number(s.amount),
-          createdAt: s.createdAt,
-          lines: s.lines.map((l: any) => ({
-            itemName: l.itemName,
-            itemSku: l.itemSku,
-            quantity: l.quantity,
-            unitPrice: Number(l.unitPrice),
-            lineTotal: Number(l.lineTotal),
-          })),
-        })),
-      },
+      data: responseData,
     });
   } catch (error: any) {
     console.error('[Reports] Sales Channel error:', error);
@@ -501,6 +531,10 @@ router.get(
     try {
       const { tenantId } = requireTenantContext();
       const { startDate, endDate } = req.query;
+      const cacheParams = { startDate: startDate as string, endDate: endDate as string };
+
+      const cached = await getCachedReport(tenantId, 'branch-comparison', cacheParams);
+      if (cached) { res.status(200).json({ success: true, data: cached }); return; }
 
       const dateFilter: any = {};
       if (startDate) dateFilter.gte = new Date(startDate as string);
@@ -579,6 +613,7 @@ router.get(
         transfersOut: transfersOut[w.id] ?? 0,
       }));
 
+      void setCachedReport(tenantId, 'branch-comparison', cacheParams, { branches });
       res.status(200).json({ success: true, data: { branches } });
     } catch (error: any) {
       console.error('[Reports] Branch Comparison error:', error);
@@ -601,6 +636,10 @@ router.get(
     try {
       const { tenantId } = requireTenantContext();
       const { from, to } = req.query as { from?: string; to?: string };
+      const cacheParams = { from: from ?? '', to: to ?? '' };
+
+      const cached = await getCachedReport(tenantId, 'landed-costs', cacheParams);
+      if (cached) { res.status(200).json({ success: true, data: cached }); return; }
 
       const dateFilter: any = {};
       if (from) dateFilter.gte = new Date(from);
@@ -680,6 +719,7 @@ router.get(
         };
       });
 
+      void setCachedReport(tenantId, 'landed-costs', cacheParams, result);
       res.status(200).json({ success: true, data: result });
     } catch (error: any) {
       console.error('[Reports] Landed Cost Report error:', error);
@@ -715,19 +755,27 @@ router.get('/analytics/trends', requireRole('Viewer'), async (req: Request, res:
       return { startDate, endDate, label };
     });
 
-    const series = await Promise.all(
-      ranges.map(async ({ startDate, endDate, label }) => {
-        const pnl = await reportingService.getProfitAndLoss(startDate, endDate, undefined, undefined);
-        return {
-          month: startDate.slice(0, 7),
-          label,
-          revenue: pnl.totalRevenue,
-          cogs: pnl.totalCostOfSales,
-          expenses: pnl.totalExpenses,
-          netProfit: pnl.netProfit,
-        };
-      })
-    );
+    // Run P&L calls in batches of 6 to avoid exhausting the connection pool on a
+    // cold-cache request for a large trend window (up to 24 months = 24 parallel DB ops).
+    const TREND_BATCH_SIZE = 6;
+    const series: Array<{ month: string; label: string; revenue: number; cogs: number; expenses: number; netProfit: number }> = [];
+    for (let i = 0; i < ranges.length; i += TREND_BATCH_SIZE) {
+      const chunk = ranges.slice(i, i + TREND_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        chunk.map(async ({ startDate, endDate, label }) => {
+          const pnl = await reportingService.getProfitAndLoss(startDate, endDate, undefined, undefined);
+          return {
+            month: startDate.slice(0, 7),
+            label,
+            revenue: pnl.totalRevenue,
+            cogs: pnl.totalCostOfSales,
+            expenses: pnl.totalExpenses,
+            netProfit: pnl.netProfit,
+          };
+        })
+      );
+      series.push(...batchResults);
+    }
 
     void setCachedReport(tenantId, 'analytics-trends', params, { series });
     res.json({ success: true, data: { series } });
@@ -893,6 +941,15 @@ router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: R
       res.status(400).json({ success: false, error: 'itemId is required.' });
       return;
     }
+
+    const cacheParams = {
+      itemId: itemId as string,
+      warehouseId: warehouseId as string ?? '',
+      startDate: startDate as string ?? '',
+      endDate: endDate as string ?? '',
+    };
+    const cached = await getCachedReport(tenantId, 'stock-movement', cacheParams);
+    if (cached) { res.json({ success: true, data: cached }); return; }
 
     // Build the UNION query for stock movements, accepting up to 6 positional params:
     // $1 = tenantId, $2 = itemId, $3 = warehouseId or null, $4 = startDate, $5 = endDate
@@ -1078,14 +1135,16 @@ router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: R
       })
     );
 
+    const stockMovementData = {
+      item: item ? { id: itemId, name: (item as any).name, sku: (item as any).sku } : { id: itemId },
+      openingBalance,
+      closingBalance: runningBalance,
+      movements: rows,
+    };
+    void setCachedReport(tenantId, 'stock-movement', cacheParams, stockMovementData);
     res.json({
       success: true,
-      data: {
-        item: item ? { id: itemId, name: (item as any).name, sku: (item as any).sku } : { id: itemId },
-        openingBalance,
-        closingBalance: runningBalance,
-        movements: rows,
-      },
+      data: stockMovementData,
     });
   } catch (error: any) {
     console.error('[Reports] Stock movement error:', error);
@@ -1106,6 +1165,10 @@ router.get('/sales-register', requireRole('Viewer'), async (req: Request, res: R
     const { startDate, endDate } = req.query;
     const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
     const pageSize = Math.min(500, Math.max(1, parseInt((req.query.pageSize as string) || '100', 10) || 100));
+    const cacheParams = { startDate: startDate as string, endDate: endDate as string, page: String(page), pageSize: String(pageSize) };
+
+    const cached = await getCachedReport(tenantId, 'sales-register', cacheParams);
+    if (cached) { res.json({ success: true, data: cached }); return; }
 
     const dateFilter: { gte?: Date; lte?: Date } = {};
     if (startDate) dateFilter.gte = new Date(startDate as string);
@@ -1150,13 +1213,15 @@ router.get('/sales-register', requireRole('Viewer'), async (req: Request, res: R
       total: Math.round(rows.reduce((s, r) => s + r.total, 0) * 100) / 100,
     };
 
+    const salesRegisterData = {
+      rows,
+      totals,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    };
+    void setCachedReport(tenantId, 'sales-register', cacheParams, salesRegisterData);
     res.json({
       success: true,
-      data: {
-        rows,
-        totals,
-        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
-      },
+      data: salesRegisterData,
     });
   } catch (error: any) {
     console.error('[Reports] Sales register error:', error);
@@ -1177,6 +1242,10 @@ router.get('/purchase-register', requireRole('Viewer'), async (req: Request, res
     const { startDate, endDate } = req.query;
     const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
     const pageSize = Math.min(500, Math.max(1, parseInt((req.query.pageSize as string) || '100', 10) || 100));
+    const cacheParams = { startDate: startDate as string, endDate: endDate as string, page: String(page), pageSize: String(pageSize) };
+
+    const cached = await getCachedReport(tenantId, 'purchase-register', cacheParams);
+    if (cached) { res.json({ success: true, data: cached }); return; }
 
     const dateFilter: { gte?: Date; lte?: Date } = {};
     if (startDate) dateFilter.gte = new Date(startDate as string);
@@ -1218,13 +1287,15 @@ router.get('/purchase-register', requireRole('Viewer'), async (req: Request, res
       amount: Math.round(rows.reduce((s, r) => s + r.amount, 0) * 100) / 100,
     };
 
+    const purchaseRegisterData = {
+      rows,
+      totals,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    };
+    void setCachedReport(tenantId, 'purchase-register', cacheParams, purchaseRegisterData);
     res.json({
       success: true,
-      data: {
-        rows,
-        totals,
-        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
-      },
+      data: purchaseRegisterData,
     });
   } catch (error: any) {
     console.error('[Reports] Purchase register error:', error);
@@ -1241,9 +1312,14 @@ router.get('/purchase-register', requireRole('Viewer'), async (req: Request, res
  */
 router.get('/daybook', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
     const page = Math.max(1, parseInt((req.query.page as string) || '1', 10) || 1);
     const pageSize = Math.min(200, Math.max(1, parseInt((req.query.pageSize as string) || '50', 10) || 50));
+    const cacheParams = { startDate: startDate as string, endDate: endDate as string, page: String(page), pageSize: String(pageSize) };
+
+    const cached = await getCachedReport(tenantId, 'daybook', cacheParams);
+    if (cached) { res.json({ success: true, data: cached }); return; }
 
     const dateFilter: string[] = [];
     const values: any[] = [];
@@ -1324,12 +1400,14 @@ router.get('/daybook', requireRole('Viewer'), async (req: Request, res: Response
 
     const vouchers = Array.from(voucherMap.values());
 
+    const daybookData = {
+      vouchers,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    };
+    void setCachedReport(tenantId, 'daybook', cacheParams, daybookData);
     res.json({
       success: true,
-      data: {
-        vouchers,
-        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
-      },
+      data: daybookData,
     });
   } catch (error: any) {
     console.error('[Reports] Daybook error:', error);
@@ -1351,6 +1429,10 @@ router.get('/cost-centre-pnl', requireRole('Viewer'), async (req: Request, res: 
       res.status(400).json({ success: false, error: 'costCentreId is required.' });
       return;
     }
+
+    const cacheParams = { costCentreId: costCentreId as string, startDate: startDate as string, endDate: endDate as string };
+    const cached = await getCachedReport(tenantId, 'cost-centre-pnl', cacheParams);
+    if (cached) { res.json({ success: true, data: cached }); return; }
 
     // Validate cost centre belongs to this tenant
     const cc = await (prisma as any).costCentre.findFirst({
@@ -1439,6 +1521,7 @@ router.get('/cost-centre-pnl', requireRole('Viewer'), async (req: Request, res: 
       };
     });
 
+    void setCachedReport(tenantId, 'cost-centre-pnl', cacheParams, report);
     res.json({ success: true, data: report });
   } catch (err: any) {
     console.error('[Reports] cost-centre-pnl error:', err);
