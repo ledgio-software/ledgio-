@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Fix: Concurrent-race 409 in idempotent invoice payment
+
+**What/Why:** The "concurrent race" idempotency test was failing with resB returning 409. Both concurrent requests with the same `idempotencyKey` passed the pre-transaction duplicate check (no payment row yet). The first to acquire the row lock committed and set the invoice to PAID. The second, inside the lock, saw `status=PAID` and threw 409 — the P2002 catch block didn't cover this earlier guard.
+
+**Fix:** Inside the locked transaction, before throwing "Invoice is already paid", re-query `invoicePayment` for the idempotency key. If found, return the invoice with 200 (idempotent short-circuit).
+
+**Changes:**
+- **`backend/src/services/invoicePaymentService.ts`** — Added idempotency re-check inside the row-locked transaction when `fresh.status === 'PAID'`.
+
+---
+
 ## [Date: 2026-08-28] - Phase 1: Idempotent Invoice Payments (Hardening Plan)
 
 **What/Why:** Addressed a financial-safety gap: `POST /invoices/:id/pay` had no idempotency key support, so a POS terminal or mobile client that retried a payment after a network timeout could create duplicate `InvoicePayment` records and double-post a journal entry. This is Phase 1 of the 6-phase system hardening plan recommended by the architecture review.
