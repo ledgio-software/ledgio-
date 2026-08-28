@@ -106,9 +106,15 @@ export function AdminCoreEngine() {
   const fetchMetrics = useCallback(() => {
     setIsLoadingMetrics(true);
     setMetricsError(null);
-    return api
-      .get("/admin/metrics", { headers: { 'x-admin-passcode': passcode } })
-      .then((res) => setMetricsData(res.data.data))
+    const headers = { 'x-admin-passcode': passcode };
+    return Promise.all([
+      api.get("/admin/metrics", { headers }),
+      api.get("/admin/error-logs/grouped", { headers }),
+    ])
+      .then(([metricsRes, errRes]) => {
+        setMetricsData(metricsRes.data.data);
+        setErrorGroups(errRes.data.data?.groups ?? []);
+      })
       .catch(() => setMetricsError("Failed to load performance metrics."))
       .finally(() => setIsLoadingMetrics(false));
   }, [passcode]);
@@ -254,9 +260,16 @@ export function AdminCoreEngine() {
     uptime: number;
     nodeVersion: string;
     buckets: { ts: number; requests: number; errors: number; avgMs: number }[];
+    statusDist?: { ok: number; redirect: number; clientErr: number; serverErr: number };
+    topRoutesByTraffic?: { route: string; requests: number; errors: number; errorRate: number; avgMs: number }[];
+    topRoutesByErrors?: { route: string; requests: number; errors: number; errorRate: number; avgMs: number }[];
   } | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  const [errorGroups, setErrorGroups] = useState<{
+    key: string; status: number; method: string; error: string;
+    source?: string; fn?: string; count: number; firstSeen: string; lastSeen: string;
+  }[]>([]);
 
   // Cron jobs state
   const [jobsData, setJobsData] = useState<{
@@ -2001,9 +2014,9 @@ export function AdminCoreEngine() {
                   <div>
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                       <Activity className="h-5 w-5 text-amber-400" />
-                      API Performance (last hour)
+                      System Performance
                     </h2>
-                    <p className="text-xs text-secondary-400 mt-0.5">5-minute rolling buckets — refreshes every 30 s.</p>
+                    <p className="text-xs text-secondary-400 mt-0.5">5-min rolling buckets (last hour) · route stats since last deploy · refreshes every 30 s.</p>
                   </div>
                   <button
                     onClick={fetchMetrics}
@@ -2025,6 +2038,7 @@ export function AdminCoreEngine() {
                 )}
                 {metricsData && (
                   <>
+                    {/* Summary KPI cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       {[
                         { label: "Requests (1hr)", value: metricsData.requests.toLocaleString(), color: "text-blue-400" },
@@ -2041,55 +2055,223 @@ export function AdminCoreEngine() {
                       ))}
                     </div>
 
-                    {/* Sparkline */}
+                    {/* Status code distribution */}
+                    {metricsData.statusDist && (() => {
+                      const sd = metricsData.statusDist!;
+                      const total = sd.ok + sd.redirect + sd.clientErr + sd.serverErr || 1;
+                      const bars = [
+                        { label: "2xx OK", count: sd.ok, color: "bg-emerald-500", text: "text-emerald-400" },
+                        { label: "3xx Redirect", count: sd.redirect, color: "bg-blue-500", text: "text-blue-400" },
+                        { label: "4xx Client Error", count: sd.clientErr, color: "bg-amber-500", text: "text-amber-400" },
+                        { label: "5xx Server Error", count: sd.serverErr, color: "bg-rose-500", text: "text-rose-400" },
+                      ];
+                      return (
+                        <Card className="bg-secondary-900 border-secondary-800 text-white">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-bold">Response Status Distribution (since last deploy)</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex h-5 w-full rounded overflow-hidden gap-px mb-3">
+                              {bars.map(bar => bar.count > 0 && (
+                                <div key={bar.label} title={`${bar.label}: ${bar.count}`}
+                                  className={`${bar.color} transition-all`}
+                                  style={{ width: `${(bar.count / total * 100).toFixed(1)}%` }} />
+                              ))}
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {bars.map(bar => (
+                                <div key={bar.label} className="flex items-center gap-2">
+                                  <span className={`inline-block w-2.5 h-2.5 rounded-sm ${bar.color}`} />
+                                  <div>
+                                    <div className="text-[10px] text-secondary-400">{bar.label}</div>
+                                    <div className={`font-mono font-bold text-sm ${bar.text}`}>{bar.count.toLocaleString()}</div>
+                                    <div className="text-[10px] text-secondary-500">{(bar.count / total * 100).toFixed(1)}%</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+
+                    {/* Request + Latency sparklines */}
                     {metricsData.buckets.length > 0 && (
                       <Card className="bg-secondary-900 border-secondary-800 text-white">
-                        <CardHeader>
-                          <CardTitle className="text-sm font-bold">Request / Error Rate — last {metricsData.buckets.length} × 5 min</CardTitle>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold">Traffic & Latency — last {metricsData.buckets.length} × 5 min</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="overflow-x-auto">
-                            <svg width={Math.max(metricsData.buckets.length * 48, 400)} height={80} className="w-full h-20">
-                              {(() => {
-                                const maxReq = Math.max(...metricsData.buckets.map((b) => b.requests), 1);
-                                const w = Math.max(metricsData.buckets.length * 48, 400);
-                                const bw = w / metricsData.buckets.length;
-                                return metricsData.buckets.map((b, i) => {
-                                  const reqH = Math.round((b.requests / maxReq) * 64);
-                                  const errH = b.requests > 0 ? Math.round((b.errors / b.requests) * reqH) : 0;
-                                  const x = i * bw;
-                                  return (
-                                    <g key={b.ts}>
-                                      <rect x={x + 2} y={80 - reqH} width={bw - 4} height={reqH} rx={2} fill="#3b82f6" opacity={0.6} />
-                                      {errH > 0 && <rect x={x + 2} y={80 - errH} width={bw - 4} height={errH} rx={2} fill="#ef4444" opacity={0.8} />}
-                                    </g>
-                                  );
-                                });
-                              })()}
-                            </svg>
+                        <CardContent className="space-y-4">
+                          {/* Request/Error bars */}
+                          <div>
+                            <div className="text-[10px] text-secondary-400 mb-1">Requests / Errors</div>
+                            <div className="overflow-x-auto">
+                              <svg width={Math.max(metricsData.buckets.length * 48, 400)} height={72} className="w-full" style={{ height: 72 }}>
+                                {(() => {
+                                  const maxReq = Math.max(...metricsData.buckets.map((b) => b.requests), 1);
+                                  const w = Math.max(metricsData.buckets.length * 48, 400);
+                                  const bw = w / metricsData.buckets.length;
+                                  return metricsData.buckets.map((b, i) => {
+                                    const reqH = Math.round((b.requests / maxReq) * 56);
+                                    const errH = b.requests > 0 ? Math.round((b.errors / b.requests) * reqH) : 0;
+                                    const x = i * bw;
+                                    return (
+                                      <g key={b.ts}>
+                                        <title>{new Date(b.ts).toLocaleTimeString()} · {b.requests} req · {b.errors} err · {b.avgMs}ms avg</title>
+                                        <rect x={x + 2} y={72 - reqH} width={bw - 4} height={reqH} rx={2} fill="#3b82f6" opacity={0.55} />
+                                        {errH > 0 && <rect x={x + 2} y={72 - errH} width={bw - 4} height={errH} rx={2} fill="#ef4444" opacity={0.85} />}
+                                      </g>
+                                    );
+                                  });
+                                })()}
+                              </svg>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4 mt-2 text-[10px] text-secondary-400">
-                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-blue-500/60 rounded-sm" /> Requests</span>
-                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-red-500/80 rounded-sm" /> Errors</span>
+                          {/* Latency line chart */}
+                          <div>
+                            <div className="text-[10px] text-secondary-400 mb-1">Avg Response Time (ms)</div>
+                            <div className="overflow-x-auto">
+                              <svg width={Math.max(metricsData.buckets.length * 48, 400)} height={56} className="w-full" style={{ height: 56 }}>
+                                {(() => {
+                                  const maxMs = Math.max(...metricsData.buckets.map(b => b.avgMs), 1);
+                                  const w = Math.max(metricsData.buckets.length * 48, 400);
+                                  const bw = w / metricsData.buckets.length;
+                                  const pts = metricsData.buckets.map((b, i) => {
+                                    const x = i * bw + bw / 2;
+                                    const y = 48 - Math.round((b.avgMs / maxMs) * 40);
+                                    return `${x},${y}`;
+                                  }).join(' ');
+                                  return (
+                                    <>
+                                      <polyline points={pts} fill="none" stroke="#a78bfa" strokeWidth={2} strokeLinejoin="round" />
+                                      {metricsData.buckets.map((b, i) => (
+                                        <circle key={b.ts} cx={i * bw + bw / 2} cy={48 - Math.round((b.avgMs / maxMs) * 40)} r={3} fill="#a78bfa">
+                                          <title>{new Date(b.ts).toLocaleTimeString()} · {b.avgMs} ms</title>
+                                        </circle>
+                                      ))}
+                                    </>
+                                  );
+                                })()}
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-[10px] text-secondary-400">
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-blue-500/55 rounded-sm" /> Requests</span>
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-red-500/85 rounded-sm" /> Errors</span>
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-violet-400 rounded" /> Avg Latency</span>
                           </div>
                         </CardContent>
                       </Card>
                     )}
 
+                    {/* Top Routes by Traffic */}
+                    {metricsData.topRoutesByTraffic && metricsData.topRoutesByTraffic.length > 0 && (
+                      <Card className="bg-secondary-900 border-secondary-800 text-white">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold">Top Routes by Traffic (since last deploy)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-secondary-400 border-b border-secondary-800">
+                                  <th className="text-left pb-2 pr-4 font-medium">Route</th>
+                                  <th className="text-right pb-2 pr-4 font-medium">Requests</th>
+                                  <th className="text-right pb-2 pr-4 font-medium">Errors</th>
+                                  <th className="text-right pb-2 pr-4 font-medium">Error Rate</th>
+                                  <th className="text-right pb-2 font-medium">Avg Latency</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {metricsData.topRoutesByTraffic.map((r) => (
+                                  <tr key={r.route} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
+                                    <td className="py-2 pr-4 font-mono text-[11px] text-secondary-300 max-w-[260px] truncate">{r.route}</td>
+                                    <td className="py-2 pr-4 text-right font-mono text-blue-300">{r.requests.toLocaleString()}</td>
+                                    <td className="py-2 pr-4 text-right font-mono">{r.errors > 0 ? <span className="text-rose-400">{r.errors}</span> : <span className="text-secondary-500">0</span>}</td>
+                                    <td className="py-2 pr-4 text-right font-mono">
+                                      <span className={r.errorRate > 10 ? "text-rose-400" : r.errorRate > 1 ? "text-amber-400" : "text-emerald-400"}>
+                                        {r.errorRate.toFixed(1)}%
+                                      </span>
+                                    </td>
+                                    <td className="py-2 text-right font-mono">
+                                      <span className={r.avgMs > 500 ? "text-rose-400" : r.avgMs > 200 ? "text-amber-400" : "text-secondary-300"}>
+                                        {r.avgMs} ms
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Top Error Sources from error log */}
+                    {errorGroups.length > 0 && (
+                      <Card className="bg-secondary-900 border-secondary-800 text-white">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 rounded-full bg-rose-500" />
+                            Top Error Sources
+                            <span className="text-xs font-normal text-secondary-400 ml-1">({errorGroups.length} distinct error{errorGroups.length !== 1 ? "s" : ""})</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-secondary-400 border-b border-secondary-800">
+                                  <th className="text-left pb-2 pr-3 font-medium">Route</th>
+                                  <th className="text-left pb-2 pr-3 font-medium">Error</th>
+                                  <th className="text-left pb-2 pr-3 font-medium">Source</th>
+                                  <th className="text-right pb-2 pr-3 font-medium">Status</th>
+                                  <th className="text-right pb-2 font-medium">Count</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {errorGroups.slice(0, 10).map((g) => (
+                                  <tr key={g.key} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
+                                    <td className="py-2 pr-3 font-mono text-[10px] text-secondary-300 max-w-[180px] truncate">
+                                      <span className="text-secondary-500 mr-1">{g.method}</span>{g.sample?.path ?? '—'}
+                                    </td>
+                                    <td className="py-2 pr-3 text-rose-300 max-w-[200px] truncate" title={g.error}>{g.error}</td>
+                                    <td className="py-2 pr-3 font-mono text-[10px] text-violet-300 max-w-[160px] truncate" title={g.source}>
+                                      {g.fn ? `${g.fn} ` : ''}{g.source ?? '—'}
+                                    </td>
+                                    <td className="py-2 pr-3 text-right">
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${g.status >= 500 ? "bg-rose-900/60 text-rose-300" : "bg-amber-900/60 text-amber-300"}`}>
+                                        {g.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 text-right font-mono font-bold text-rose-400">{g.count}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {errorGroups.length === 0 && metricsData && (
+                      <div className="p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-lg text-emerald-400 text-xs flex items-center gap-2">
+                        <span>✓</span> No errors in the log buffer. All good.
+                      </div>
+                    )}
+
                     {/* System info */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
-                        <div className="text-secondary-400 mb-1">Node.js</div>
-                        <div className="font-mono text-white">{metricsData.nodeVersion}</div>
-                      </div>
-                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
-                        <div className="text-secondary-400 mb-1">Process Uptime</div>
-                        <div className="font-mono text-white">{Math.floor(metricsData.uptime / 3600)}h {Math.floor((metricsData.uptime % 3600) / 60)}m</div>
-                      </div>
-                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
-                        <div className="text-secondary-400 mb-1">RSS Memory</div>
-                        <div className="font-mono text-white">{metricsData.memory.rssMb.toFixed(1)} MB</div>
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+                      {[
+                        { label: "Node.js", value: metricsData.nodeVersion },
+                        { label: "Process Uptime", value: `${Math.floor(metricsData.uptime / 3600)}h ${Math.floor((metricsData.uptime % 3600) / 60)}m` },
+                        { label: "Heap Used", value: `${metricsData.memory.heapUsedMb.toFixed(1)} MB` },
+                        { label: "RSS Memory", value: `${metricsData.memory.rssMb.toFixed(1)} MB` },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
+                          <div className="text-secondary-400 mb-1">{label}</div>
+                          <div className="font-mono text-white">{value}</div>
+                        </div>
+                      ))}
                     </div>
                   </>
                 )}
