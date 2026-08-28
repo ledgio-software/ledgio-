@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { runWithTenantContext } from '../context/tenantContext';
@@ -25,10 +26,10 @@ export class VendorPaymentSchedulingCronService {
     // Once daily at 8am UTC - ahead of the 9am dunning-reminder sweep, so a
     // scheduled outgoing payment posts before that day's incoming-reminder
     // pass runs.
-    this.task = cron.schedule('0 8 * * *', async () => {
+    this.task = cron.schedule('0 8 * * *', wrapCronTick('Vendor Payment Scheduling', async () => {
       console.log('[VendorPaymentSchedulingCron] Executing daily scheduled-payments sweep...');
       await this.runScheduledPaymentsJob();
-    });
+    }));
 
     console.log('[VendorPaymentSchedulingCron] Daily Vendor Payment Scheduling Cron Job Initialized.');
   }

@@ -3,6 +3,7 @@ import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { runWithTenantContext } from '../context/tenantContext';
 import * as recurringInvoiceService from './recurringInvoiceService';
+import { wrapCronTick } from './cronJobRegistry';
 
 /**
  * Daily sweep generating a real Invoice from every active, due
@@ -16,10 +17,10 @@ export class RecurringInvoiceCronService {
   public static init(): void {
     if (this.task) return;
 
-    this.task = cron.schedule('0 6 * * *', async () => {
+    this.task = cron.schedule('0 6 * * *', wrapCronTick('Recurring Invoices', async () => {
       console.log('[RecurringInvoiceCron] Executing daily recurring-invoice generation sweep...');
       await this.runDueRecurringInvoicesJob();
-    });
+    }));
 
     console.log('[RecurringInvoiceCron] Daily Recurring Invoice Cron Job Initialized.');
   }

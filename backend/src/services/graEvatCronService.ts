@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { runWithTenantContext } from '../context/tenantContext';
@@ -33,10 +34,10 @@ export class GraEvatCronService {
   public static init(): void {
     if (this.task) return;
 
-    this.task = cron.schedule('*/15 * * * *', async () => {
+    this.task = cron.schedule('*/15 * * * *', wrapCronTick('GRA E-VAT Sync', async () => {
       console.log('[GraEvatCron] Running 15-minute VSDC clearance sweep...');
       await this.runSync();
-    });
+    }));
 
     console.log('[GraEvatCron] GRA E-VAT Sync Cron Initialized (every 15 minutes).');
   }

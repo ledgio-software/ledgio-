@@ -35,7 +35,12 @@ export async function setCachedReport(
   params: Record<string, string | undefined>,
   data: unknown
 ): Promise<void> {
-  await cacheUtils.set(buildKey(tenantId, reportType, params), data, REPORT_TTL_SECONDS);
+  try {
+    await cacheUtils.set(buildKey(tenantId, reportType, params), data, REPORT_TTL_SECONDS);
+  } catch {
+    // Intentionally swallowed: a cache write failure is non-fatal.
+    // The next request will recompute the report and try again.
+  }
 }
 
 /**
