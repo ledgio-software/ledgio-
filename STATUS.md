@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Phase 6: Observability & Load Testing
+
+**What/Why:** Final phase of the 6-phase hardening plan. Observability infrastructure (structured JSON request logger with X-Request-ID + W3C traceparent, 5-minute bucket metrics, `/health`/`/live`/`/ready` probes, `/api/v1/admin/metrics`, `/api/v1/admin/jobs`) was already fully implemented and wired into app.ts from prior work. The only new deliverable for Phase 6 is the k6 smoke / baseline load test script — committed so any engineer can run a pre-release performance check without reinventing the test parameters.
+
+**Changes:**
+
+- `backend/load-tests/smoke.js` — **New file.** k6 script covering the 6 highest-traffic endpoints (health probe, login, accounts list, journal-entries list, AR aging report, cash-flow statement). Defaults to 10 VUs for 30 s. Thresholds: overall p95 < 500 ms; per-endpoint p95 targets; error rate < 2 %. Accepts `BASE_URL`, `TENANT_SLUG`, `EMAIL`, `PASSWORD` via `-e` env vars. Includes a `setup()` phase that authenticates once and shares the token across VUs. Not wired into CI — intended for manual pre-release runs (`k6 run ... backend/load-tests/smoke.js`).
+
+**Files affected:** `backend/load-tests/smoke.js`
+
+---
+
 ## [Date: 2026-08-28] - Fix: agingReport test cache interference
 
 **What/Why:** Phase 4's Redis caching of `/reports/aging/ar` broke one test in `agingReport.test.ts`. The test suite reuses the same tenant across all five test cases. An earlier test populated the cache; a later test then created a new invoice and called the same endpoint, but received the cached (stale) response which omitted the new invoice — causing `.find()` to return `undefined` and `row.bucket` to throw.
