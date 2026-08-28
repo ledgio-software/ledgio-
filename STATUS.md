@@ -2,15 +2,16 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
-## [Date: 2026-08-28] - Fix: Render production build failure (@types/compression)
+## [Date: 2026-08-28] - Fix: Render production build failure (@types/compression not installed)
 
-**What/Why:** Render's `npm ci && npm run build` failed with `TS7016: Could not find a declaration file for module 'compression'`. Root cause: `@types/compression` was listed in `devDependencies` with version `^1.8.1`, which does not exist on npm (latest is `1.7.5`). Because `npm ci` installs exactly what is in the lockfile and the lockfile had no resolved entry for `@types/compression`, the package was never installed — leaving compression's types absent at compile time.
+**What/Why:** Render's build kept failing with `TS7016: Could not find a declaration file for module 'compression'` even after the `@types/compression` version fix landed. True root cause: `render.yaml` sets `NODE_ENV=production` for the whole service, and `npm ci` with `NODE_ENV=production` silently skips all devDependencies — so `@types/compression` (and all other type packages) are never installed during the build step. The earlier version fix (`^1.8.1` → `^1.7.5`) was also necessary (the old version doesn't exist on npm), but the environment variable is what actually caused the type resolution to fail.
 
 **Changes:**
-- `backend/package.json` — Changed `"@types/compression": "^1.8.1"` → `"@types/compression": "^1.7.5"` in `devDependencies`.
-- `backend/package-lock.json` — Regenerated via `npm install --package-lock-only`; now contains a resolved `node_modules/@types/compression` entry so `npm ci` installs it correctly.
+- `render.yaml` — `buildCommand` changed from `npm ci` to `npm ci --include=dev`. The `--include=dev` flag forces npm to install devDependencies regardless of `NODE_ENV`, so TypeScript, `@types/*`, and other build-time packages are present when `tsc` runs.
+- `backend/package.json` — `@types/compression` version corrected to `^1.7.5` (already landed in previous commit).
+- `backend/package-lock.json` — Updated lockfile (already landed in previous commit).
 
-**Files affected:** `backend/package.json`, `backend/package-lock.json`
+**Files affected:** `render.yaml`
 
 ---
 
