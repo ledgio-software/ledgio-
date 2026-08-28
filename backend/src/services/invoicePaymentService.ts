@@ -286,7 +286,24 @@ export async function recordInvoicePayment(
       where: { id: invoiceId, tenantId },
       select: { amountPaid: true, status: true, total: true },
     });
-    if (!fresh || fresh.status === 'PAID') {
+    if (!fresh) {
+      throw new InvoicePaymentServiceError('Invoice not found.', 404);
+    }
+    if (fresh.status === 'PAID') {
+      // A concurrent request with the same idempotency key may have committed
+      // just before we acquired the row lock. Re-check within the lock so both
+      // requests return the same idempotent 200 instead of a 409.
+      if (options.idempotencyKey) {
+        const racePayment = await (client as any).invoicePayment.findFirst({
+          where: { tenantId, idempotencyKey: options.idempotencyKey },
+        });
+        if (racePayment) {
+          return (client as any).invoice.findFirst({
+            where: { id: invoiceId, tenantId },
+            include: { customer: true },
+          });
+        }
+      }
       throw new InvoicePaymentServiceError('Invoice is already paid.', 409);
     }
     const freshAlreadyPaid = new Decimal(fresh.amountPaid);
