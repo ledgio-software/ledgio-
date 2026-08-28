@@ -269,6 +269,7 @@ export function AdminCoreEngine() {
   const [errorGroups, setErrorGroups] = useState<{
     key: string; status: number; method: string; error: string;
     source?: string; fn?: string; count: number; firstSeen: string; lastSeen: string;
+    sample?: { path: string; [key: string]: unknown };
   }[]>([]);
 
   // Cron jobs state
