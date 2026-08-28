@@ -2420,16 +2420,24 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const headers = { "x-admin-passcode": passcode };
+  const adminBase = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/admin/emergency-stop`;
+  const adminHeaders = { "x-admin-passcode": passcode, "Content-Type": "application/json" };
+
+  async function adminFetch(url: string, init?: RequestInit) {
+    const res = await fetch(url, { ...init, headers: { ...adminHeaders, ...init?.headers } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    return body;
+  }
 
   const fetchState = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get("/admin/emergency-stop", { headers });
-      setState(res.data.data);
-    } catch {
-      setError("Failed to fetch emergency stop state.");
+      const body = await adminFetch(adminBase);
+      setState(body.data);
+    } catch (e: any) {
+      setError(e?.message || "Failed to fetch emergency stop state.");
     } finally {
       setLoading(false);
     }
@@ -2443,13 +2451,13 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
     setError(null);
     setMsg(null);
     try {
-      const body: Record<string, any> = { reason: reason.trim() };
-      if (ttlSeconds) body.ttlSeconds = Number(ttlSeconds);
-      await api.post("/admin/emergency-stop", body, { headers });
+      const payload: Record<string, any> = { reason: reason.trim() };
+      if (ttlSeconds) payload.ttlSeconds = Number(ttlSeconds);
+      await adminFetch(adminBase, { method: "POST", body: JSON.stringify(payload) });
       setMsg("Emergency stop activated.");
       await fetchState();
     } catch (e: any) {
-      setError(e?.response?.data?.error || "Failed to activate.");
+      setError(e?.message || "Failed to activate.");
     } finally {
       setLoading(false);
     }
@@ -2460,13 +2468,13 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
     setError(null);
     setMsg(null);
     try {
-      await api.delete("/admin/emergency-stop", { headers });
+      await adminFetch(adminBase, { method: "DELETE" });
       setMsg("Emergency stop cleared. Operations resumed.");
       setReason("");
       setTtlSeconds("");
       await fetchState();
     } catch (e: any) {
-      setError(e?.response?.data?.error || "Failed to clear.");
+      setError(e?.message || "Failed to clear.");
     } finally {
       setLoading(false);
     }
