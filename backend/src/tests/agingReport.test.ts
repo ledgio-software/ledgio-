@@ -5,6 +5,7 @@ import { onboardTenant } from '../services/tenantService';
 import { deleteTenantBySlug, ensureTenantTableExists } from '../repository/tenantRepository';
 import { deleteUserByEmail, ensureUserTableExists } from '../repository/userRepository';
 import { dropTenantSchema } from '../database/tenantSchemaManager';
+import { invalidateReportCache } from '../cache/reportCache';
 
 describe('AP/AR Aging Analysis', () => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -13,6 +14,7 @@ describe('AP/AR Aging Analysis', () => {
   const adminEmail = `admin_aging_${runId}@corp.com`;
 
   let adminToken: string;
+  let tenantId: string;
   let customerId: string;
   let vendorId: string;
 
@@ -44,6 +46,7 @@ describe('AP/AR Aging Analysis', () => {
       adminName: 'Aging Admin',
     });
     adminToken = onboard.token;
+    tenantId = onboard.tenant.id;
     await prisma.tenant.update({ where: { slug: tenantSlug }, data: { tier: 2 } });
 
     const customer = await authed(request(app).post('/api/v1/invoices/customers')).send({
@@ -62,6 +65,10 @@ describe('AP/AR Aging Analysis', () => {
   afterAll(async () => {
     await cleanupTestData();
     await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await invalidateReportCache(tenantId).catch(() => {});
   });
 
   it('buckets an overdue unpaid invoice into the right AR bucket, using balance due not the original total', async () => {
