@@ -173,11 +173,6 @@ export function AdminCoreEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUnlocked, activeTab]);
 
-  useEffect(() => {
-    if (!isUnlocked || activeTab !== "errors" || !errorsAutoRefresh) return;
-    const id = setInterval(() => { fetchErrors(); }, 30_000);
-    return () => clearInterval(id);
-  }, [isUnlocked, activeTab, errorsAutoRefresh, fetchErrors]);
 
   const handleClearErrors = async () => {
     setIsClearingErrors(true);
@@ -292,6 +287,12 @@ export function AdminCoreEngine() {
   const [errorsView, setErrorsView] = useState<'individual' | 'grouped'>('grouped');
   const [errorsFilter, setErrorsFilter] = useState('');
   const [errorsAutoRefresh, setErrorsAutoRefresh] = useState(false);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "errors" || !errorsAutoRefresh) return;
+    const id = setInterval(() => { fetchErrors(); }, 30_000);
+    return () => clearInterval(id);
+  }, [isUnlocked, activeTab, errorsAutoRefresh, fetchErrors]);
 
   // Expanded tenant user rows in schemas tab
   const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null);
