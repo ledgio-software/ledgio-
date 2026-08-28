@@ -59,6 +59,7 @@ const OPERATIONAL_ROLES = new Set(['admin', 'owner', 'accountant', 'finance cont
 const ROLE_IMPLIES: Record<string, string[]> = {
   'finance controller': ['accountant', 'viewer', 'auditor'],
   'external accountant': ['viewer', 'auditor'],
+  'auditor': ['viewer'],
   'payroll officer': ['hr'],
   'payroll approver': ['hr', 'payroll officer'],
   'warehouse manager': ['shop manager', 'viewer'],

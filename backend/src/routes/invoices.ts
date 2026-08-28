@@ -246,7 +246,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       });
     });
 
-    res.status(200).json({ success: true, data: { invoices } });
+    const decrypted = invoices.map((inv: any) => ({
+      ...inv,
+      customer: inv.customer ? decryptCustomer(inv.customer) : inv.customer,
+    }));
+    res.status(200).json({ success: true, data: { invoices: decrypted } });
   } catch (error: any) {
     console.error('[Invoices] Error fetching invoices:', error);
     res.status(500).json({ success: false, error: 'Failed to retrieve invoices.' });
