@@ -323,7 +323,7 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
   // Org type rides on the token so nav filtering never needs an extra DB
   // round trip on later requests - only fetched here at login time.
   const loginTenant = user.tenantId
-    ? await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { orgType: true } })
+    ? await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { orgType: true, isLive: true } })
     : null;
 
   const tokenPayload = {
@@ -333,6 +333,7 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
     role: user.role,
     tenantId: user.tenantId || undefined,
     orgType: loginTenant?.orgType,
+    isLive: loginTenant?.isLive ?? false,
     isMfaEnabled: user.isMfaEnabled || false,
     ...(mfaVerifiedNow ? { lastMfaAt: Math.floor(Date.now() / 1000) } : {}),
   };
