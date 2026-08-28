@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Fix: CI test URL bug in idempotency test suite
+
+**What/Why:** PR #133 CI was failing all 6 tests in `invoicePaymentIdempotency.test.ts` with `TypeError: Cannot read properties of undefined (reading 'customer')` at line 65. Root cause: both `POST /customers` calls in the test used path `/api/v1/customers` which does not exist — the customer routes are registered under the invoices router, making the correct path `/api/v1/invoices/customers`. The 404 response had no `data.customer`, so `customerId` was never set and all downstream tests cascaded to fail.
+
+**Changes:**
+- **`backend/src/tests/invoicePaymentIdempotency.test.ts`** — Fixed two wrong URL references: `beforeAll` customer creation (line 61) and cross-tenant test customer creation (line 172), both changed from `/api/v1/customers` to `/api/v1/invoices/customers`.
+
+**Fix propagated to:** `feature/phase2-db-hardening` via merge from `feature/phase1-idempotent-payments`.
+
+---
+
 ## [Date: 2026-08-28] - Phase 2: DB Connection Pooling & Query Hardening
 
 **What/Why:** Phase 2 of the 6-phase system hardening plan. The connection pool was already sized (50 connections, statement_timeout=30 s via DATABASE_URL). This phase closes the remaining gaps: missing composite indexes on hot query paths and an ORM-level query timeout that fires before PostgreSQL's hard kill, providing a cleaner structured error to callers.
