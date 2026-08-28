@@ -2,6 +2,26 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Phase 2: DB Connection Pooling & Query Hardening
+
+**What/Why:** Phase 2 of the 6-phase system hardening plan. The connection pool was already sized (50 connections, statement_timeout=30 s via DATABASE_URL). This phase closes the remaining gaps: missing composite indexes on hot query paths and an ORM-level query timeout that fires before PostgreSQL's hard kill, providing a cleaner structured error to callers.
+
+**N+1 audit findings:** All hot list routes (invoices, reports, aging, purchase register) already use `Promise.all` or batched `findMany` — no serial N+1 loops found. The audit confirmed that `reports.ts` analytics trends (line 718) uses `Promise.all(ranges.map(...))` correctly.
+
+**Changes:**
+- **`backend/prisma/migrations/20260828000001_phase2_db_hardening_indexes/migration.sql`** — Adds 4 missing composite indexes:
+  - `invoice_payments(tenant_id, invoice_id)` — compound for idempotency pre-check and payment history
+  - `invoice_payments(invoice_id, created_at DESC)` — for invoice detail view payment list (ordered by time)
+  - `invoices(tenant_id, status, due_date)` — for AR aging report (`WHERE status IN (...) ORDER BY due_date`; existing index covered filter but forced a re-sort)
+  - `vendor_bills(tenant_id, bill_type, bill_date)` — for purchase register (`WHERE billType = 'STANDARD' AND billDate BETWEEN ? AND ?`)
+- **`backend/prisma/schema.prisma`** — Added matching `@@index` declarations to `Invoice`, `InvoicePayment`, and `VendorBill` models.
+- **`backend/src/config/db.ts`** — Three improvements:
+  1. ORM-level query timeout via `$use` middleware (`QUERY_TIMEOUT_MS` env var, default 25 s) — fires 5 s before PostgreSQL's own `statement_timeout=30000`, so callers receive a descriptive `Error` instead of raw Prisma P2024
+  2. Critical slow query logging at >5 000 ms (`logger.error`) in addition to the existing >100 ms warning
+  3. Configurable slow query threshold via `SLOW_QUERY_MS` env var (default 100 ms)
+
+---
+
 ## [Date: 2026-08-28] - Phase 1: Idempotent Invoice Payments (Hardening Plan)
 
 **What/Why:** Addressed a financial-safety gap: `POST /invoices/:id/pay` had no idempotency key support, so a POS terminal or mobile client that retried a payment after a network timeout could create duplicate `InvoicePayment` records and double-post a journal entry. This is Phase 1 of the 6-phase system hardening plan recommended by the architecture review.
