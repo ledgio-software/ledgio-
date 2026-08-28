@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Fix: Render production build failure (@types/compression)
+
+**What/Why:** Render's `npm ci && npm run build` failed with `TS7016: Could not find a declaration file for module 'compression'`. Root cause: `@types/compression` was listed in `devDependencies` with version `^1.8.1`, which does not exist on npm (latest is `1.7.5`). Because `npm ci` installs exactly what is in the lockfile and the lockfile had no resolved entry for `@types/compression`, the package was never installed — leaving compression's types absent at compile time.
+
+**Changes:**
+- `backend/package.json` — Changed `"@types/compression": "^1.8.1"` → `"@types/compression": "^1.7.5"` in `devDependencies`.
+- `backend/package-lock.json` — Regenerated via `npm install --package-lock-only`; now contains a resolved `node_modules/@types/compression` entry so `npm ci` installs it correctly.
+
+**Files affected:** `backend/package.json`, `backend/package-lock.json`
+
+---
+
 ## [Date: 2026-08-28] - Phase 6: Observability & Load Testing
 
 **What/Why:** Final phase of the 6-phase hardening plan. Observability infrastructure (structured JSON request logger with X-Request-ID + W3C traceparent, 5-minute bucket metrics, `/health`/`/live`/`/ready` probes, `/api/v1/admin/metrics`, `/api/v1/admin/jobs`) was already fully implemented and wired into app.ts from prior work. The only new deliverable for Phase 6 is the k6 smoke / baseline load test script — committed so any engineer can run a pre-release performance check without reinventing the test parameters.
