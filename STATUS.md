@@ -2,6 +2,23 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Phase 1: Idempotent Invoice Payments (Hardening Plan)
+
+**What/Why:** Addressed a financial-safety gap: `POST /invoices/:id/pay` had no idempotency key support, so a POS terminal or mobile client that retried a payment after a network timeout could create duplicate `InvoicePayment` records and double-post a journal entry. This is Phase 1 of the 6-phase system hardening plan recommended by the architecture review.
+
+**Root cause:** The existing `InvoicePayment` model only had a pre-check `findFirst` for deduplication, which is not race-safe — two concurrent requests can both pass the check before either commits. Additionally, the route did not accept an `idempotencyKey` parameter at all.
+
+**Changes:**
+- **`backend/prisma/migrations/20260827000001_add_invoice_payment_idempotency_key/migration.sql`** — Already applied in previous session: adds `idempotency_key TEXT` column and a partial unique index `WHERE idempotency_key IS NOT NULL` on `(tenant_id, idempotency_key)`. The partial index allows multiple NULL keys (backward compat) while enforcing uniqueness for non-null keys per tenant.
+- **`backend/prisma/schema.prisma`** — `InvoicePayment` model has `idempotencyKey String? @map("idempotency_key")`. No `@@unique` added (partial index already exists at DB level; Prisma `@@unique` would conflict).
+- **`backend/src/services/invoicePaymentService.ts`** — Added race-safe P2002 catch **outside** the `withCurrentTenantDb` transaction block. When the DB's partial unique index fires (two concurrent retries with the same `idempotencyKey`), the losing transaction gets P2002, is caught, and the service returns the existing invoice — same as a sequential replay. The existing `findFirst` pre-check is kept as a fast path to avoid a full transaction on obvious replays.
+- **`backend/src/routes/invoices.ts`** — `POST /:id/pay` now reads `idempotencyKey` from request body, validates it's a non-empty string if provided, and passes it to `recordInvoicePayment`. Callers omitting the key get the old behavior (each call creates a new payment — backward compatible).
+- **`backend/src/tests/invoicePaymentIdempotency.test.ts`** — New test suite: sequential retry dedup, concurrent race dedup, distinct keys create distinct payments, omitting key still works, empty key returns 400, cross-tenant isolation.
+
+**Why P2002 catch must be outside the transaction:** PostgreSQL aborts the entire transaction on any constraint violation. Any query after a P2002 inside the same `$transaction` block will fail with "current transaction is aborted." The catch must be in the outer scope after `withCurrentTenantDb` resolves/rejects.
+
+---
+
 ## [Date: 2026-08-27] - Hide Tier-2 Nav Items from Shop Plan Sidebar
 
 **What/Why:** After the previous PR gated the backend routes and added UpgradeRequired guards inside page components, Shop plan (tier=1) tenants could still see all tier-2 nav links in the sidebar and command palette (Cmd+K). The page-level guard only triggers after navigation — the sidebar should not advertise features that are inaccessible. Added plan-tier filtering directly to the navigation layer so tier-1 tenants never see nav items that require tier 2+.

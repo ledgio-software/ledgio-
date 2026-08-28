@@ -740,9 +740,17 @@ router.post('/:id/pay', requireRole('Accountant', 'Shop Manager'), checkEmergenc
     const actor = actorFromRequest(req);
     // `amount` is optional - omitted (or the existing no-body call every
     // pre-partial-payment client still makes) pays off whatever remains.
-    const { amount } = req.body || {};
+    // `idempotencyKey` is optional - callers (e.g. a POS terminal replaying a
+    // payment after a network drop) supply a client-generated UUID so the
+    // server returns the existing result instead of posting a second payment.
+    const { amount, idempotencyKey } = req.body || {};
+    if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string' || !idempotencyKey)) {
+      res.status(400).json({ success: false, error: 'idempotencyKey, if provided, must be a non-empty string.' });
+      return;
+    }
     const updated = await invoicePaymentService.recordInvoicePayment(req.params.id, actor, {
       amount: amount !== undefined ? Number(amount) : undefined,
+      idempotencyKey: idempotencyKey || undefined,
     });
 
     res.status(200).json({
