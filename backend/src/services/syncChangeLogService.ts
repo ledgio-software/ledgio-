@@ -7,7 +7,7 @@ export function syncChannelForTenant(tenantId: string): string {
   return `sync:tenant:${tenantId}`;
 }
 
-export type SyncEntityType = 'Account' | 'Invoice';
+export type SyncEntityType = 'Account' | 'Invoice' | 'Customer';
 
 export interface RecordChangeInput {
   tenantId: string;
@@ -159,6 +159,43 @@ export function invoiceToSyncPayload(invoice: any): Record<string, unknown> {
 }
 
 /**
+ * JSON-safe snapshot of a Customer for sync_change_log payloads. Skips
+ * PII fields that are stored encrypted (email, phone, tin) since a
+ * syncing client has no decryption key and the bootstrap snapshot already
+ * omits those fields for the same reason.
+ */
+export function customerToSyncPayload(customer: any): Record<string, unknown> {
+  return {
+    id: customer.id,
+    tenantId: customer.tenantId,
+    name: customer.name,
+    customerType: customer.customerType,
+    creditLimit: customer.creditLimit !== null && customer.creditLimit !== undefined
+      ? Number(customer.creditLimit)
+      : null,
+    createdAt: customer.createdAt?.toISOString?.() ?? customer.createdAt ?? null,
+  };
+}
+
+/**
+ * Deletes change-log entries older than the given sequence (exclusive) for a
+ * tenant. Returns the count of rows deleted. Intended for periodic housekeeping
+ * — callers own deciding what's safe to prune (a client that has already
+ * acknowledged a full bootstrap up to a known sequence can safely prune
+ * everything before it).
+ */
+export async function pruneChangesBefore(
+  client: PrismaClient,
+  tenantId: string,
+  beforeSequence: bigint
+): Promise<number> {
+  const result = await client.syncChangeLog.deleteMany({
+    where: { tenantId, sequence: { lt: beforeSequence } },
+  });
+  return result.count;
+}
+
+/**
  * Everything appended to the log after `since` (exclusive), oldest first -
  * what a client applies, in order, to catch up after being offline or
  * backgrounded. Ordinary read, no transaction pinning required, but still
@@ -168,11 +205,13 @@ export function invoiceToSyncPayload(invoice: any): Record<string, unknown> {
 export async function getChangesSince(
   client: PrismaClient,
   tenantId: string,
-  since: bigint
+  since: bigint,
+  limit?: number
 ): Promise<ChangeLogEntry[]> {
   const rows = await client.syncChangeLog.findMany({
     where: { tenantId, sequence: { gt: since } },
     orderBy: { sequence: 'asc' },
+    ...(limit !== undefined ? { take: limit } : {}),
   });
 
   return rows.map((row) => ({

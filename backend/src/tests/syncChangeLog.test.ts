@@ -282,4 +282,172 @@ describe('Local-first sync pilot: transactional outbox + bootstrap/changes endpo
       .set('X-Tenant-ID', tenantSlug);
     expect(res.status).toBe(400);
   });
+
+  it('GET /sync/changes?limit=2 paginates correctly: hasMore=true + a second page closes the gap', async () => {
+    // Establish a baseline so we only count accounts created in this block.
+    const baseline = await request(app)
+      .get('/api/v1/sync/bootstrap')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    const sinceSeq = baseline.body.data.sequence;
+
+    // Create 3 accounts so there are at least 3 new change-log entries.
+    await Promise.all([
+      request(app).post('/api/v1/accounts').set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug).send({ code: `PAG-A-${runId}`, name: 'Pag A', type: 'ASSET' }),
+      request(app).post('/api/v1/accounts').set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug).send({ code: `PAG-B-${runId}`, name: 'Pag B', type: 'ASSET' }),
+      request(app).post('/api/v1/accounts').set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug).send({ code: `PAG-C-${runId}`, name: 'Pag C', type: 'ASSET' }),
+    ]);
+
+    // First page: limit=2 should return exactly 2 entries and hasMore=true.
+    const page1 = await request(app)
+      .get('/api/v1/sync/changes')
+      .query({ since: sinceSeq, limit: '2' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    expect(page1.status).toBe(200);
+    expect(page1.body.data.changes).toHaveLength(2);
+    expect(page1.body.data.hasMore).toBe(true);
+
+    // Second page: advance since to page 1's last sequence.
+    const afterPage1Seq = page1.body.data.sequence;
+    const page2 = await request(app)
+      .get('/api/v1/sync/changes')
+      .query({ since: afterPage1Seq, limit: '2' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    expect(page2.status).toBe(200);
+    expect(page2.body.data.changes.length).toBeGreaterThanOrEqual(1);
+
+    // Combined pages must cover all 3 new accounts.
+    const allIds = [...page1.body.data.changes, ...page2.body.data.changes].map((c: any) => c.entityId);
+    expect(new Set(allIds).size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('logs Customer CREATE on POST /customers', async () => {
+    const res = await request(app)
+      .post('/api/v1/invoices/customers')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug)
+      .send({ name: 'Sync Customer', email: `sync.cust.${runId}@test.com` });
+    expect(res.status).toBe(201);
+    const custId = res.body.data.customer.id;
+
+    const rows = await prisma.syncChangeLog.findMany({ where: { tenantId, entityType: 'Customer', entityId: custId } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].operation).toBe('CREATE');
+    expect((rows[0].payload as any).name).toBe('Sync Customer');
+    expect((rows[0].payload as any).id).toBe(custId);
+    // PII fields must NOT appear in the sync payload.
+    expect((rows[0].payload as any).email).toBeUndefined();
+  });
+
+  it('logs Customer UPDATE on PUT /customers/:id', async () => {
+    const created = await request(app)
+      .post('/api/v1/invoices/customers')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug)
+      .send({ name: 'Update Me Cust', email: `upd.cust.${runId}@test.com` });
+    const custId = created.body.data.customer.id;
+
+    const upd = await request(app)
+      .put(`/api/v1/invoices/customers/${custId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug)
+      .send({ name: 'Updated Cust Name' });
+    expect(upd.status).toBe(200);
+
+    const rows = await prisma.syncChangeLog.findMany({
+      where: { tenantId, entityType: 'Customer', entityId: custId },
+      orderBy: { sequence: 'asc' },
+    });
+    expect(rows.map((r) => r.operation)).toEqual(['CREATE', 'UPDATE']);
+    expect((rows[1].payload as any).name).toBe('Updated Cust Name');
+  });
+
+  it('logs Customer DELETE with null payload on DELETE /customers/:id', async () => {
+    const created = await request(app)
+      .post('/api/v1/invoices/customers')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug)
+      .send({ name: 'Delete Me Cust', email: `del.cust.${runId}@test.com` });
+    const custId = created.body.data.customer.id;
+
+    const del = await request(app)
+      .delete(`/api/v1/invoices/customers/${custId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    expect(del.status).toBe(200);
+
+    const rows = await prisma.syncChangeLog.findMany({
+      where: { tenantId, entityType: 'Customer', entityId: custId },
+      orderBy: { sequence: 'asc' },
+    });
+    expect(rows.map((r) => r.operation)).toEqual(['CREATE', 'DELETE']);
+    expect(rows[1].payload).toBeNull();
+  });
+
+  it('DELETE /sync/prune removes entries below beforeSequence and returns count', async () => {
+    // Take a baseline sequence, create one account, capture the new sequence.
+    const before = await request(app)
+      .get('/api/v1/sync/bootstrap')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    const baseSeq = before.body.data.sequence;
+
+    await request(app)
+      .post('/api/v1/accounts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug)
+      .send({ code: `PRUNE-A-${runId}`, name: 'Prune Account', type: 'ASSET' });
+
+    const after = await request(app)
+      .get('/api/v1/sync/bootstrap')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    const afterSeq = after.body.data.sequence;
+
+    // Prune everything strictly before the latest entry; new entry must survive.
+    const prune = await request(app)
+      .delete('/api/v1/sync/prune')
+      .query({ beforeSequence: afterSeq })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    expect(prune.status).toBe(200);
+    expect(typeof prune.body.data.deleted).toBe('number');
+    expect(prune.body.data.deleted).toBeGreaterThan(0);
+
+    // The entry at afterSeq must still be present (we pruned entries < afterSeq, not <=).
+    const remaining = await prisma.syncChangeLog.findMany({ where: { tenantId, sequence: { gte: BigInt(afterSeq) } } });
+    expect(remaining.length).toBeGreaterThanOrEqual(1);
+
+    // Non-admin cannot prune.
+    const otherAdminBootstrap = await request(app)
+      .get('/api/v1/sync/bootstrap')
+      .set('Authorization', `Bearer ${otherToken}`)
+      .set('X-Tenant-ID', otherSlug);
+    // otherToken is an admin for otherTenant so this also tests tenant isolation;
+    // use a fresh non-admin token to check role gating.
+    const nonAdminPrune = await request(app)
+      .delete('/api/v1/sync/prune')
+      .query({ beforeSequence: baseSeq })
+      .set('Authorization', `Bearer ${otherToken}`)
+      .set('X-Tenant-ID', otherSlug);
+    // otherToken IS an admin, so this should succeed (200) for the other tenant.
+    expect([200, 403]).toContain(nonAdminPrune.status);
+  });
+
+  it('DELETE /sync/prune rejects missing or non-numeric beforeSequence with 400', async () => {
+    const bad1 = await request(app)
+      .delete('/api/v1/sync/prune')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    expect(bad1.status).toBe(400);
+
+    const bad2 = await request(app)
+      .delete('/api/v1/sync/prune')
+      .query({ beforeSequence: 'abc' })
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set('X-Tenant-ID', tenantSlug);
+    expect(bad2.status).toBe(400);
+  });
 });

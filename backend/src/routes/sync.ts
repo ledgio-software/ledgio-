@@ -6,7 +6,8 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import * as accountRepository from '../repository/accountRepository';
-import { getCurrentSequence, getChangesSince } from '../services/syncChangeLogService';
+import { getCurrentSequence, getChangesSince, pruneChangesBefore } from '../services/syncChangeLogService';
+import { requireRole } from '../middleware/rbacMiddleware';
 import { redis } from '../config/redis';
 
 const router = Router();
@@ -65,13 +66,11 @@ router.get('/bootstrap', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
- * GET /api/v1/sync/changes?since=<sequence>
+ * GET /api/v1/sync/changes?since=<sequence>[&limit=<n>]
  * Everything appended to this tenant's change log after `since`, oldest
- * first - what a client applies, in order, to catch up after being offline
- * or backgrounded. `since=0` (or omitted) returns the tenant's entire
- * history, which is unbounded in principle but in practice never larger
- * than what GET /sync/bootstrap already covers for a fresh device, so real
- * callers always pass a real cursor from their last bootstrap/changes call.
+ * first. `limit` caps the page size (1–2000, default 500). When `hasMore`
+ * is true the caller should advance `since` to the last returned sequence
+ * and repeat until `hasMore` is false.
  */
 router.get('/changes', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -84,22 +83,63 @@ router.get('/changes', async (req: Request, res: Response): Promise<void> => {
     }
     const since = BigInt(sinceRaw);
 
-    const changes = await withCurrentTenantDb(prisma, async (client) => {
-      return getChangesSince(client, tenantId, since);
+    const limitRaw = typeof req.query.limit === 'string' ? req.query.limit : '500';
+    if (!/^\d+$/.test(limitRaw)) {
+      res.status(400).json({ success: false, error: '"limit" must be a positive integer.' });
+      return;
+    }
+    const limitNum = Math.min(Math.max(parseInt(limitRaw, 10) || 500, 1), 2000);
+
+    // Fetch one extra row to detect whether a next page exists without a
+    // separate COUNT query.
+    const allRows = await withCurrentTenantDb(prisma, async (client) => {
+      return getChangesSince(client, tenantId, since, limitNum + 1);
     });
 
+    const hasMore = allRows.length > limitNum;
+    const changes = hasMore ? allRows.slice(0, limitNum) : allRows;
     const newSequence = changes.length > 0 ? changes[changes.length - 1].sequence : sinceRaw;
 
     res.status(200).json({
       success: true,
       data: {
         sequence: newSequence,
+        hasMore,
         changes,
       },
     });
   } catch (error: any) {
     console.error('[Sync] Error fetching changes:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch sync changes.' });
+  }
+});
+
+/**
+ * DELETE /api/v1/sync/prune?beforeSequence=<n>
+ * Removes change-log entries with sequence < beforeSequence for this tenant.
+ * Admin-only: a prune cannot be undone and permanently removes catch-up data
+ * for any client that hasn't yet applied those entries. Operators should only
+ * prune after verifying all clients are caught up to at least beforeSequence.
+ */
+router.delete('/prune', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+
+    const beforeRaw = typeof req.query.beforeSequence === 'string' ? req.query.beforeSequence : '';
+    if (!beforeRaw || !/^\d+$/.test(beforeRaw)) {
+      res.status(400).json({ success: false, error: '"beforeSequence" must be a non-negative integer sequence number.' });
+      return;
+    }
+    const beforeSequence = BigInt(beforeRaw);
+
+    const deleted = await withCurrentTenantDb(prisma, async (client) => {
+      return pruneChangesBefore(client, tenantId, beforeSequence);
+    });
+
+    res.status(200).json({ success: true, data: { deleted } });
+  } catch (error: any) {
+    console.error('[Sync] Error pruning change log:', error);
+    res.status(500).json({ success: false, error: 'Failed to prune sync change log.' });
   }
 });
 
