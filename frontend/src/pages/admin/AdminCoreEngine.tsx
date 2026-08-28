@@ -155,9 +155,14 @@ export function AdminCoreEngine() {
   const fetchErrors = useCallback(() => {
     setIsLoadingErrors(true);
     setErrorsError(null);
-    return api
-      .get("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } })
-      .then((res) => setErrorsData(res.data.data.errors))
+    return Promise.all([
+      api.get("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } }),
+      api.get("/admin/error-logs/grouped", { headers: { 'x-admin-passcode': passcode } }),
+    ])
+      .then(([indRes, grpRes]) => {
+        setErrorsData(indRes.data.data.errors);
+        setErrorsGrouped(grpRes.data.data.groups);
+      })
       .catch(() => setErrorsError("Failed to load error logs."))
       .finally(() => setIsLoadingErrors(false));
   }, [passcode]);
@@ -167,6 +172,12 @@ export function AdminCoreEngine() {
     fetchErrors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUnlocked, activeTab]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "errors" || !errorsAutoRefresh) return;
+    const id = setInterval(() => { fetchErrors(); }, 30_000);
+    return () => clearInterval(id);
+  }, [isUnlocked, activeTab, errorsAutoRefresh, fetchErrors]);
 
   const handleClearErrors = async () => {
     setIsClearingErrors(true);
@@ -265,12 +276,22 @@ export function AdminCoreEngine() {
 
   // Error log state
   const [errorsData, setErrorsData] = useState<{
-    ts: string; method: string; path: string; status: number; error: string; stack?: string;
+    id: string; ts: string; method: string; path: string; status: number; error: string;
+    stack?: string; source?: string; fn?: string; tenantId?: string; userId?: string;
+    ip?: string; userAgent?: string; bodyKeys?: string[]; count: number; lastSeen: string;
+  }[] | null>(null);
+  const [errorsGrouped, setErrorsGrouped] = useState<{
+    key: string; status: number; method: string; error: string; source?: string; fn?: string;
+    count: number; firstSeen: string; lastSeen: string;
+    sample: { id: string; ts: string; method: string; path: string; status: number; error: string; stack?: string; source?: string; fn?: string; tenantId?: string; userId?: string; ip?: string; userAgent?: string; bodyKeys?: string[]; count: number; lastSeen: string };
   }[] | null>(null);
   const [errorsError, setErrorsError] = useState<string | null>(null);
   const [isLoadingErrors, setIsLoadingErrors] = useState(false);
   const [isClearingErrors, setIsClearingErrors] = useState(false);
-  const [expandedErrorIdx, setExpandedErrorIdx] = useState<number | null>(null);
+  const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
+  const [errorsView, setErrorsView] = useState<'individual' | 'grouped'>('grouped');
+  const [errorsFilter, setErrorsFilter] = useState('');
+  const [errorsAutoRefresh, setErrorsAutoRefresh] = useState(false);
 
   // Expanded tenant user rows in schemas tab
   const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null);
@@ -2164,38 +2185,63 @@ export function AdminCoreEngine() {
             {/* Tab: Error Log */}
             {activeTab === "errors" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
-                <CardHeader className="flex flex-row items-start justify-between">
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
                     <CardTitle className="text-xl font-bold flex items-center gap-2">
                       <XCircle className="h-5 w-5 text-rose-400" />
-                      In-Memory Error Log
+                      Server Error Log
+                      {errorsData && errorsData.length > 0 && (
+                        <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-900/50 text-rose-300 text-xs font-mono font-bold">
+                          {errorsData.reduce((s, e) => s + e.count, 0)} total
+                        </span>
+                      )}
                     </CardTitle>
                     <CardDescription className="text-secondary-400 text-xs">
-                      Last 100 unhandled server errors — ring buffer, newest first. Click a row for the stack trace.
+                      Last 200 unhandled server errors — enriched with source location, tenant, and request context.
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {/* View toggle */}
+                    <div className="flex rounded-lg overflow-hidden border border-secondary-700 text-xs">
+                      <button onClick={() => setErrorsView('grouped')} className={`px-3 py-1.5 font-medium transition-colors ${errorsView === 'grouped' ? 'bg-secondary-700 text-white' : 'text-secondary-400 hover:text-white'}`}>Grouped</button>
+                      <button onClick={() => setErrorsView('individual')} className={`px-3 py-1.5 font-medium transition-colors ${errorsView === 'individual' ? 'bg-secondary-700 text-white' : 'text-secondary-400 hover:text-white'}`}>Individual</button>
+                    </div>
+                    {/* Auto-refresh */}
                     <button
-                      onClick={fetchErrors}
-                      disabled={isLoadingErrors}
-                      className="h-9 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 border border-secondary-700 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                      onClick={() => setErrorsAutoRefresh((v) => !v)}
+                      className={`h-8 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${errorsAutoRefresh ? 'bg-emerald-900/40 border-emerald-700 text-emerald-400' : 'bg-secondary-800 border-secondary-700 text-secondary-400 hover:text-white'}`}
+                      title="Auto-refresh every 30 s"
                     >
-                      <RefreshCw className={`h-3.5 w-3.5 ${isLoadingErrors ? "animate-spin" : ""}`} />
+                      <RefreshCw className={`h-3 w-3 ${errorsAutoRefresh ? 'animate-spin' : ''}`} />
+                      {errorsAutoRefresh ? 'Live' : 'Auto'}
+                    </button>
+                    <button onClick={fetchErrors} disabled={isLoadingErrors} className="h-8 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 border border-secondary-700 text-xs font-medium flex items-center gap-1.5 transition-colors">
+                      <RefreshCw className={`h-3 w-3 ${isLoadingErrors ? "animate-spin" : ""}`} />
                       Refresh
                     </button>
                     {errorsData && errorsData.length > 0 && (
-                      <button
-                        onClick={handleClearErrors}
-                        disabled={isClearingErrors}
-                        className="h-9 px-3 rounded-lg bg-rose-950/40 hover:bg-rose-950/70 border border-rose-800 text-rose-400 text-xs font-medium flex items-center gap-1.5 transition-colors"
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
+                      <button onClick={handleClearErrors} disabled={isClearingErrors} className="h-8 px-3 rounded-lg bg-rose-950/40 hover:bg-rose-950/70 border border-rose-800 text-rose-400 text-xs font-medium flex items-center gap-1.5 transition-colors">
+                        <XCircle className="h-3 w-3" />
                         {isClearingErrors ? "Clearing…" : "Clear"}
                       </button>
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
+                  {/* Filter bar */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Filter by error message, path, source file, tenant…"
+                      value={errorsFilter}
+                      onChange={(e) => setErrorsFilter(e.target.value)}
+                      className="flex-1 h-8 bg-secondary-950 border border-secondary-700 rounded-lg px-3 text-xs text-white placeholder-secondary-500 focus:outline-none focus:border-secondary-500"
+                    />
+                    {errorsFilter && (
+                      <button onClick={() => setErrorsFilter('')} className="h-8 px-2 text-secondary-400 hover:text-white text-xs">✕</button>
+                    )}
+                  </div>
+
                   {isLoadingErrors && !errorsData && (
                     <div className="flex items-center justify-center py-16 text-secondary-400 gap-2">
                       <Loader2 className="h-5 w-5 animate-spin" /> Loading errors…
@@ -2204,69 +2250,248 @@ export function AdminCoreEngine() {
                   {errorsError && (
                     <div className="p-4 bg-red-950/30 border border-red-900 rounded-lg text-red-300 text-xs">{errorsError}</div>
                   )}
-                  {errorsData !== null && !isLoadingErrors && (
+
+                  {/* GROUPED VIEW */}
+                  {errorsView === 'grouped' && errorsGrouped !== null && !isLoadingErrors && (
+                    errorsGrouped.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-secondary-500 gap-2">
+                        <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                        <p className="text-sm">No errors logged — system is clean.</p>
+                      </div>
+                    ) : (() => {
+                      const q = errorsFilter.toLowerCase();
+                      const filtered = errorsGrouped.filter((g) =>
+                        !q || g.error.toLowerCase().includes(q) || (g.source ?? '').toLowerCase().includes(q) || (g.fn ?? '').toLowerCase().includes(q)
+                      );
+                      return (
+                        <div className="space-y-2">
+                          {filtered.length === 0 && <p className="text-secondary-500 text-xs text-center py-8">No results match your filter.</p>}
+                          {filtered.map((g) => {
+                            const isExpanded = expandedErrorId === g.key;
+                            return (
+                              <div key={g.key} className={`rounded-lg border transition-colors ${isExpanded ? 'border-rose-700 bg-secondary-950' : 'border-secondary-800 bg-secondary-950/40 hover:border-secondary-700'}`}>
+                                <button
+                                  className="w-full text-left p-3 flex items-start gap-3"
+                                  onClick={() => setExpandedErrorId(isExpanded ? null : g.key)}
+                                >
+                                  {/* Count badge */}
+                                  <div className="shrink-0 mt-0.5">
+                                    <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-md text-xs font-bold font-mono ${g.count >= 10 ? 'bg-rose-900/60 text-rose-300' : g.count >= 3 ? 'bg-amber-900/50 text-amber-300' : 'bg-secondary-800 text-secondary-300'}`}>
+                                      {g.count}×
+                                    </span>
+                                  </div>
+                                  {/* Status + method */}
+                                  <div className="shrink-0 flex flex-col gap-1 mt-0.5">
+                                    <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${g.status >= 500 ? 'bg-rose-900/40 text-rose-400' : g.status >= 400 ? 'bg-amber-900/40 text-amber-400' : 'bg-secondary-800 text-secondary-400'}`}>{g.status}</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${g.method === 'GET' ? 'bg-blue-900/40 text-blue-400' : g.method === 'POST' ? 'bg-emerald-900/40 text-emerald-400' : g.method === 'DELETE' ? 'bg-rose-900/40 text-rose-400' : 'bg-secondary-800 text-secondary-300'}`}>{g.method}</span>
+                                  </div>
+                                  {/* Error + source */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-white font-medium truncate">{g.error}</p>
+                                    {g.source && (
+                                      <p className="text-[11px] text-rose-400/80 font-mono mt-0.5 truncate">
+                                        📍 {g.fn ? `${g.fn} @ ` : ''}{g.source}
+                                      </p>
+                                    )}
+                                    <p className="text-[10px] text-secondary-500 mt-1">
+                                      First: {new Date(g.firstSeen).toLocaleString()} · Last: {new Date(g.lastSeen).toLocaleString()}
+                                    </p>
+                                  </div>
+                                  <span className="shrink-0 text-secondary-600 text-xs">{isExpanded ? '▲' : '▼'}</span>
+                                </button>
+
+                                {/* Expanded detail for grouped */}
+                                {isExpanded && (
+                                  <div className="border-t border-secondary-800 p-4 space-y-3">
+                                    {/* Sample request context */}
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                      <div className="space-y-1">
+                                        <p className="text-secondary-500 uppercase tracking-wide text-[10px] font-semibold">Sample Request</p>
+                                        <p className="font-mono text-secondary-300 break-all">{g.sample.path}</p>
+                                        {g.sample.ip && <p className="text-secondary-500">IP: <span className="text-secondary-300 font-mono">{g.sample.ip}</span></p>}
+                                        {g.sample.tenantId && <p className="text-secondary-500">Tenant: <span className="text-secondary-300 font-mono">{g.sample.tenantId}</span></p>}
+                                        {g.sample.userId && <p className="text-secondary-500">User: <span className="text-secondary-300 font-mono">{g.sample.userId}</span></p>}
+                                        {g.sample.bodyKeys && g.sample.bodyKeys.length > 0 && (
+                                          <p className="text-secondary-500">Body keys: <span className="text-secondary-300 font-mono">{g.sample.bodyKeys.join(', ')}</span></p>
+                                        )}
+                                        {g.sample.userAgent && <p className="text-secondary-500 break-all">UA: <span className="text-secondary-400">{g.sample.userAgent.slice(0, 80)}{g.sample.userAgent.length > 80 ? '…' : ''}</span></p>}
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-secondary-500 uppercase tracking-wide text-[10px] font-semibold">Source Location</p>
+                                        {g.source ? (
+                                          <>
+                                            <p className="font-mono text-rose-400 break-all">{g.source}</p>
+                                            {g.fn && <p className="text-secondary-400">Function: <span className="font-mono text-white">{g.fn}</span></p>}
+                                          </>
+                                        ) : (
+                                          <p className="text-secondary-600 italic">No source frame (external or built-in error)</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {/* Stack trace */}
+                                    {g.sample.stack && (
+                                      <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                          <p className="text-secondary-500 uppercase tracking-wide text-[10px] font-semibold">Stack Trace (sample)</p>
+                                          <button
+                                            onClick={() => navigator.clipboard?.writeText(g.sample.stack ?? '')}
+                                            className="text-[10px] text-secondary-500 hover:text-white px-2 py-0.5 rounded border border-secondary-700 hover:border-secondary-500 transition-colors"
+                                          >
+                                            Copy
+                                          </button>
+                                        </div>
+                                        <div className="rounded-lg bg-black/40 border border-secondary-800 overflow-x-auto max-h-64 overflow-y-auto">
+                                          <pre className="p-3 text-[10px] font-mono leading-relaxed">
+                                            {g.sample.stack.split('\n').map((line, i) => {
+                                              const isAppLine = line.includes('/src/') && !line.includes('node_modules');
+                                              return (
+                                                <span key={i} className={isAppLine ? 'text-rose-300' : 'text-secondary-500'}>
+                                                  {line}{'\n'}
+                                                </span>
+                                              );
+                                            })}
+                                          </pre>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()
+                  )}
+
+                  {/* INDIVIDUAL VIEW */}
+                  {errorsView === 'individual' && errorsData !== null && !isLoadingErrors && (
                     errorsData.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-secondary-500 gap-2">
                         <CheckCircle2 className="h-8 w-8 text-emerald-600" />
                         <p className="text-sm">No errors logged — system is clean.</p>
                       </div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-lg border border-secondary-800">
-                        <Table>
-                          <TableHeader className="!bg-secondary-950">
-                            <TableRow className="border-secondary-800 hover:bg-transparent">
-                              <TableHead className="text-secondary-400">Timestamp</TableHead>
-                              <TableHead className="text-secondary-400">Method</TableHead>
-                              <TableHead className="text-secondary-400">Path</TableHead>
-                              <TableHead className="text-secondary-400">Status</TableHead>
-                              <TableHead className="text-secondary-400">Error</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {errorsData.map((err, idx) => {
-                              const isExpanded = expandedErrorIdx === idx;
-                              return (
-                                <>
-                                  <TableRow
-                                    key={idx}
-                                    className="border-secondary-800 hover:bg-secondary-950/60 cursor-pointer"
-                                    onClick={() => setExpandedErrorIdx(isExpanded ? null : idx)}
-                                  >
-                                    <TableCell className="text-secondary-400 text-xs whitespace-nowrap">{new Date(err.ts).toLocaleString()}</TableCell>
-                                    <TableCell>
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${
-                                        err.method === "GET" ? "bg-blue-900/40 text-blue-400" :
-                                        err.method === "POST" ? "bg-emerald-900/40 text-emerald-400" :
-                                        err.method === "DELETE" ? "bg-rose-900/40 text-rose-400" :
-                                        "bg-secondary-800 text-secondary-300"
-                                      }`}>{err.method}</span>
-                                    </TableCell>
-                                    <TableCell className="font-mono text-secondary-300 text-xs">{err.path}</TableCell>
-                                    <TableCell>
-                                      <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${err.status >= 500 ? "bg-rose-900/40 text-rose-400" : "bg-amber-900/40 text-amber-400"}`}>
-                                        {err.status}
-                                      </span>
-                                    </TableCell>
-                                    <TableCell className="text-secondary-300 text-xs max-w-xs truncate" title={err.error}>
-                                      {err.error}
-                                    </TableCell>
-                                  </TableRow>
-                                  {isExpanded && err.stack && (
-                                    <TableRow key={`${idx}-stack`} className="border-secondary-800 bg-secondary-950/60">
-                                      <TableCell colSpan={5} className="p-0">
-                                        <pre className="px-6 py-3 text-[10px] font-mono text-rose-300/80 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
-                                          {err.stack}
-                                        </pre>
+                    ) : (() => {
+                      const q = errorsFilter.toLowerCase();
+                      const filtered = errorsData.filter((e) =>
+                        !q || e.error.toLowerCase().includes(q) || e.path.toLowerCase().includes(q) || (e.source ?? '').toLowerCase().includes(q) || (e.tenantId ?? '').toLowerCase().includes(q)
+                      );
+                      return (
+                        <div className="overflow-x-auto rounded-lg border border-secondary-800">
+                          <Table>
+                            <TableHeader className="!bg-secondary-950">
+                              <TableRow className="border-secondary-800 hover:bg-transparent">
+                                <TableHead className="text-secondary-400 text-[10px] uppercase">Time</TableHead>
+                                <TableHead className="text-secondary-400 text-[10px] uppercase">Req</TableHead>
+                                <TableHead className="text-secondary-400 text-[10px] uppercase">Status</TableHead>
+                                <TableHead className="text-secondary-400 text-[10px] uppercase">Source</TableHead>
+                                <TableHead className="text-secondary-400 text-[10px] uppercase">Error</TableHead>
+                                <TableHead className="text-secondary-400 text-[10px] uppercase">Context</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filtered.length === 0 && (
+                                <TableRow><TableCell colSpan={6} className="text-center text-secondary-500 py-8 text-xs">No results match your filter.</TableCell></TableRow>
+                              )}
+                              {filtered.map((err) => {
+                                const isExpanded = expandedErrorId === err.id;
+                                return (
+                                  <>
+                                    <TableRow
+                                      key={err.id}
+                                      className="border-secondary-800 hover:bg-secondary-950/60 cursor-pointer"
+                                      onClick={() => setExpandedErrorId(isExpanded ? null : err.id)}
+                                    >
+                                      <TableCell className="text-secondary-400 text-[10px] whitespace-nowrap align-top py-2">
+                                        {new Date(err.ts).toLocaleString()}
+                                        {err.count > 1 && <span className="ml-1 px-1 py-0.5 rounded bg-amber-900/40 text-amber-400 text-[9px] font-bold">{err.count}×</span>}
+                                      </TableCell>
+                                      <TableCell className="align-top py-2">
+                                        <div className="flex flex-col gap-1">
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono w-fit ${err.method === 'GET' ? 'bg-blue-900/40 text-blue-400' : err.method === 'POST' ? 'bg-emerald-900/40 text-emerald-400' : err.method === 'DELETE' ? 'bg-rose-900/40 text-rose-400' : 'bg-secondary-800 text-secondary-300'}`}>{err.method}</span>
+                                          <span className="font-mono text-[10px] text-secondary-400 max-w-[140px] truncate" title={err.path}>{err.path}</span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="align-top py-2">
+                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${err.status >= 500 ? 'bg-rose-900/40 text-rose-400' : 'bg-amber-900/40 text-amber-400'}`}>{err.status}</span>
+                                      </TableCell>
+                                      <TableCell className="align-top py-2 max-w-[160px]">
+                                        {err.source ? (
+                                          <div>
+                                            <p className="font-mono text-[10px] text-rose-400/90 truncate" title={err.source}>{err.source}</p>
+                                            {err.fn && <p className="text-[9px] text-secondary-500 truncate">{err.fn}</p>}
+                                          </div>
+                                        ) : <span className="text-secondary-600 text-[10px]">—</span>}
+                                      </TableCell>
+                                      <TableCell className="text-secondary-300 text-xs max-w-xs truncate align-top py-2" title={err.error}>{err.error}</TableCell>
+                                      <TableCell className="align-top py-2">
+                                        <div className="flex flex-col gap-0.5 text-[9px]">
+                                          {err.tenantId && <span className="text-secondary-500">T: <span className="text-secondary-400 font-mono">{err.tenantId.slice(0, 8)}</span></span>}
+                                          {err.userId && <span className="text-secondary-500">U: <span className="text-secondary-400 font-mono">{err.userId.slice(0, 8)}</span></span>}
+                                          {err.ip && <span className="text-secondary-500">IP: <span className="text-secondary-400 font-mono">{err.ip}</span></span>}
+                                        </div>
                                       </TableCell>
                                     </TableRow>
-                                  )}
-                                </>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )
+                                    {isExpanded && (
+                                      <TableRow key={`${err.id}-exp`} className="border-secondary-800 bg-secondary-950/70">
+                                        <TableCell colSpan={6} className="p-0">
+                                          <div className="px-4 py-3 space-y-3">
+                                            {/* Context grid */}
+                                            <div className="grid grid-cols-3 gap-4 text-xs">
+                                              <div className="space-y-1">
+                                                <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Request</p>
+                                                <p className="font-mono text-secondary-300 break-all text-[10px]">{err.path}</p>
+                                                {err.bodyKeys && err.bodyKeys.length > 0 && <p className="text-secondary-500 text-[10px]">Body: <span className="font-mono text-secondary-300">{err.bodyKeys.join(', ')}</span></p>}
+                                                {err.ip && <p className="text-secondary-500 text-[10px]">IP: <span className="font-mono text-secondary-300">{err.ip}</span></p>}
+                                              </div>
+                                              <div className="space-y-1">
+                                                <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Identity</p>
+                                                {err.tenantId ? <p className="text-secondary-500 text-[10px]">Tenant: <span className="font-mono text-secondary-300">{err.tenantId}</span></p> : <p className="text-secondary-600 text-[10px] italic">No tenant</p>}
+                                                {err.userId && <p className="text-secondary-500 text-[10px]">User: <span className="font-mono text-secondary-300">{err.userId}</span></p>}
+                                                {err.userAgent && <p className="text-secondary-500 text-[10px] break-all">UA: <span className="text-secondary-400">{err.userAgent.slice(0, 100)}</span></p>}
+                                              </div>
+                                              <div className="space-y-1">
+                                                <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Source</p>
+                                                {err.source ? <p className="font-mono text-rose-400 text-[10px] break-all">{err.source}</p> : <p className="text-secondary-600 text-[10px] italic">No source frame</p>}
+                                                {err.fn && <p className="text-secondary-400 text-[10px]">fn: <span className="font-mono">{err.fn}</span></p>}
+                                              </div>
+                                            </div>
+                                            {/* Stack trace */}
+                                            {err.stack && (
+                                              <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                  <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Stack Trace</p>
+                                                  <button
+                                                    onClick={(ev) => { ev.stopPropagation(); navigator.clipboard?.writeText(err.stack ?? ''); }}
+                                                    className="text-[10px] text-secondary-500 hover:text-white px-2 py-0.5 rounded border border-secondary-700 hover:border-secondary-500 transition-colors"
+                                                  >Copy</button>
+                                                </div>
+                                                <div className="rounded-lg bg-black/50 border border-secondary-800 overflow-x-auto max-h-48 overflow-y-auto">
+                                                  <pre className="p-3 text-[10px] font-mono leading-relaxed">
+                                                    {err.stack.split('\n').map((line, i) => {
+                                                      const isAppLine = line.includes('/src/') && !line.includes('node_modules');
+                                                      return (
+                                                        <span key={i} className={isAppLine ? 'text-rose-300' : 'text-secondary-500'}>
+                                                          {line}{'\n'}
+                                                        </span>
+                                                      );
+                                                    })}
+                                                  </pre>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      );
+                    })()
                   )}
                 </CardContent>
               </Card>
