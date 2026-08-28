@@ -47,9 +47,11 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions = {}) {
       // Privileged roles must have MFA enabled. Exempt: MFA setup/disable routes
       // so an admin who has not yet enrolled can actually reach the setup flow.
       // These paths are exempt from MFA enforcement so Admin/Auditor users can
-      // reach MFA setup and basic profile even before enabling 2FA. Use
-      // req.originalUrl (always the full path) because req.path is relative
-      // to the router mount point and would not match these prefixes.
+      // reach MFA setup and basic profile even before enabling 2FA. Infrastructure
+      // routes (sync, notifications) are also exempt — they don't expose financial
+      // data and blocking them breaks the app shell entirely. Use req.originalUrl
+      // (always the full path) because req.path is relative to the router mount
+      // point and would not match these prefixes.
       const MFA_EXEMPT_PATHS = [
         '/auth/me',
         '/auth/mfa/setup',
@@ -58,6 +60,11 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions = {}) {
         '/auth/login/verify-mfa',
         '/auth/logout',
         '/auth/profile',
+        // Sync + notification infrastructure — exempt so the app shell works
+        '/sync/ticket',
+        '/sync/bootstrap',
+        '/sync/changes',
+        '/notifications',
       ];
       if (
         process.env.NODE_ENV !== 'test' &&
