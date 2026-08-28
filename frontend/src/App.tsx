@@ -342,13 +342,18 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
   type AgingTotals = { current: number; days1to30: number; days31to60: number; days61to90: number; days90plus: number; total: number };
   const [arTotals, setArTotals] = useState<AgingTotals | null>(null);
   const [apTotals, setApTotals] = useState<AgingTotals | null>(null);
+  const [agingError, setAgingError] = useState<number | null>(null);
   const [hidden, setHidden] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem('dash-widgets-hidden') || '{}'); } catch { return {}; }
   });
 
   useEffect(() => {
-    api.get('/reports/aging/ar').then(r => setArTotals(r.data.data?.totals ?? null)).catch(() => {});
-    api.get('/reports/aging/ap').then(r => setApTotals(r.data.data?.totals ?? null)).catch(() => {});
+    api.get('/reports/aging/ar')
+      .then(r => setArTotals(r.data.data?.totals ?? null))
+      .catch((e) => { setAgingError(e?.response?.status ?? 0); });
+    api.get('/reports/aging/ap')
+      .then(r => setApTotals(r.data.data?.totals ?? null))
+      .catch(() => {});
   }, []);
 
   const toggleWidget = (key: string) => {
@@ -391,6 +396,22 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
           </button>
         ))}
       </div>
+
+      {/* MFA / auth error banner */}
+      {agingError === 403 && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>
+            Dashboard widgets are unavailable — your account requires two-factor authentication.
+            {' '}<a href="/settings/security" className="underline font-medium">Enable MFA in Settings → Security</a> to restore access.
+          </span>
+        </div>
+      )}
+      {agingError !== null && agingError !== 403 && (
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          Could not load dashboard data. Please refresh the page.
+        </div>
+      )}
 
       {/* AR KPI cards */}
       {!hidden['kpi'] && (
