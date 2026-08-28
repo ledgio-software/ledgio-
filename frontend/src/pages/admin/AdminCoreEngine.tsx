@@ -284,9 +284,14 @@ export function AdminCoreEngine() {
   const [isLoadingErrors, setIsLoadingErrors] = useState(false);
   const [isClearingErrors, setIsClearingErrors] = useState(false);
   const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
-  const [errorsView, setErrorsView] = useState<'individual' | 'grouped'>('grouped');
+  const [errorsView, setErrorsView] = useState<'individual' | 'grouped'>('individual');
   const [errorsFilter, setErrorsFilter] = useState('');
   const [errorsAutoRefresh, setErrorsAutoRefresh] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<{
+    id: string; ts: string; method: string; path: string; status: number; error: string;
+    stack?: string; source?: string; fn?: string; tenantId?: string; userId?: string;
+    ip?: string; userAgent?: string; bodyKeys?: string[]; count: number; lastSeen: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "errors" || !errorsAutoRefresh) return;
@@ -2183,6 +2188,136 @@ export function AdminCoreEngine() {
               </Card>
             )}
 
+            {/* Ticket detail modal */}
+            {selectedTicket && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+                onClick={() => setSelectedTicket(null)}
+              >
+                <div
+                  className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-secondary-700 bg-secondary-950 shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal header */}
+                  <div className={`flex items-start justify-between gap-4 p-5 border-b ${selectedTicket.status >= 500 ? 'border-rose-900/60 bg-rose-950/20' : 'border-amber-900/60 bg-amber-950/20'}`}>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className={`shrink-0 mt-0.5 flex flex-col items-center gap-1.5`}>
+                        <span className={`text-xs font-black px-2.5 py-1 rounded-lg font-mono tracking-wider ${selectedTicket.status >= 500 ? 'bg-rose-900 text-rose-200' : 'bg-amber-900 text-amber-200'}`}>
+                          {selectedTicket.status >= 500 ? 'CRITICAL' : 'ERROR'}
+                        </span>
+                        <span className="text-[10px] font-bold font-mono text-secondary-400 px-1.5 py-0.5 rounded bg-secondary-800">{selectedTicket.status}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-base font-semibold leading-snug ${selectedTicket.status >= 500 ? 'text-rose-200' : 'text-amber-200'}`}>{selectedTicket.error}</p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${selectedTicket.method === 'GET' ? 'bg-blue-900/60 text-blue-300' : selectedTicket.method === 'POST' ? 'bg-emerald-900/60 text-emerald-300' : selectedTicket.method === 'DELETE' ? 'bg-rose-900/60 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{selectedTicket.method}</span>
+                          <span className="font-mono text-xs text-secondary-300 break-all">{selectedTicket.path}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => setSelectedTicket(null)} className="shrink-0 text-secondary-500 hover:text-white transition-colors p-1">
+                      <XCircle className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="p-5 space-y-5">
+                    {/* Metadata row */}
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-xs">
+                      <div className="space-y-0.5">
+                        <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">First Seen</p>
+                        <p className="text-secondary-200 font-mono">{new Date(selectedTicket.ts).toLocaleString()}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Last Seen</p>
+                        <p className="text-secondary-200 font-mono">{new Date(selectedTicket.lastSeen).toLocaleString()}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Occurrences</p>
+                        <p className={`font-mono font-bold ${selectedTicket.count >= 10 ? 'text-rose-400' : selectedTicket.count >= 3 ? 'text-amber-400' : 'text-secondary-200'}`}>{selectedTicket.count}×</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Ticket ID</p>
+                        <p className="text-secondary-400 font-mono text-[10px] break-all">{selectedTicket.id}</p>
+                      </div>
+                    </div>
+
+                    {/* Source location */}
+                    {(selectedTicket.source || selectedTicket.fn) && (
+                      <div className="rounded-xl bg-rose-950/20 border border-rose-900/40 p-4 space-y-1">
+                        <p className="text-rose-400 uppercase tracking-widest text-[9px] font-bold mb-2">📍 Source Location</p>
+                        {selectedTicket.fn && <p className="text-white text-sm font-semibold">{selectedTicket.fn}<span className="text-secondary-500">()</span></p>}
+                        {selectedTicket.source && <p className="text-rose-300 font-mono text-xs break-all">{selectedTicket.source}</p>}
+                      </div>
+                    )}
+
+                    {/* Request + Identity */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="rounded-xl bg-secondary-900 border border-secondary-800 p-4 space-y-2">
+                        <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold mb-3">🔗 Request Context</p>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Method</span><span className={`font-mono font-bold ${selectedTicket.method === 'GET' ? 'text-blue-400' : selectedTicket.method === 'POST' ? 'text-emerald-400' : selectedTicket.method === 'DELETE' ? 'text-rose-400' : 'text-secondary-300'}`}>{selectedTicket.method}</span></div>
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Path</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.path}</span></div>
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Status</span><span className={`font-mono font-bold ${selectedTicket.status >= 500 ? 'text-rose-400' : 'text-amber-400'}`}>{selectedTicket.status}</span></div>
+                          {selectedTicket.ip && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">IP</span><span className="font-mono text-secondary-200">{selectedTicket.ip}</span></div>}
+                          {selectedTicket.bodyKeys && selectedTicket.bodyKeys.length > 0 && (
+                            <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Body</span><span className="font-mono text-secondary-300">{selectedTicket.bodyKeys.join(', ')}</span></div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-secondary-900 border border-secondary-800 p-4 space-y-2">
+                        <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold mb-3">🏢 Identity</p>
+                        <div className="space-y-1.5 text-xs">
+                          {selectedTicket.tenantId
+                            ? <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Tenant</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.tenantId}</span></div>
+                            : <p className="text-secondary-600 italic text-xs">No tenant context (platform-level)</p>
+                          }
+                          {selectedTicket.userId && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">User</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.userId}</span></div>}
+                          {selectedTicket.userAgent && (
+                            <div className="flex gap-2">
+                              <span className="text-secondary-500 w-14 shrink-0">UA</span>
+                              <span className="text-secondary-400 break-all leading-relaxed">{selectedTicket.userAgent}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stack trace */}
+                    {selectedTicket.stack && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">📋 Stack Trace</p>
+                          <button
+                            onClick={() => navigator.clipboard?.writeText(selectedTicket.stack ?? '')}
+                            className="text-[10px] text-secondary-500 hover:text-white px-2.5 py-1 rounded-lg border border-secondary-700 hover:border-secondary-500 transition-colors"
+                          >Copy stack</button>
+                        </div>
+                        <div className="rounded-xl bg-black/60 border border-secondary-800 overflow-x-auto max-h-72 overflow-y-auto">
+                          <pre className="p-4 text-[11px] font-mono leading-relaxed">
+                            {selectedTicket.stack.split('\n').map((line, i) => {
+                              const isAppLine = line.includes('/src/') && !line.includes('node_modules');
+                              const isAt = line.trim().startsWith('at ');
+                              return (
+                                <span key={i} className={
+                                  isAppLine
+                                    ? 'text-rose-300 font-semibold'
+                                    : isAt
+                                    ? 'text-secondary-600'
+                                    : 'text-secondary-300'
+                                }>
+                                  {line}{'\n'}
+                                </span>
+                              );
+                            })}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Tab: Error Log */}
             {activeTab === "errors" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
@@ -2365,7 +2500,7 @@ export function AdminCoreEngine() {
                     })()
                   )}
 
-                  {/* INDIVIDUAL VIEW */}
+                  {/* INDIVIDUAL TICKET VIEW */}
                   {errorsView === 'individual' && errorsData !== null && !isLoadingErrors && (
                     errorsData.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-secondary-500 gap-2">
@@ -2378,118 +2513,106 @@ export function AdminCoreEngine() {
                         !q || e.error.toLowerCase().includes(q) || e.path.toLowerCase().includes(q) || (e.source ?? '').toLowerCase().includes(q) || (e.tenantId ?? '').toLowerCase().includes(q)
                       );
                       return (
-                        <div className="overflow-x-auto rounded-lg border border-secondary-800">
-                          <Table>
-                            <TableHeader className="!bg-secondary-950">
-                              <TableRow className="border-secondary-800 hover:bg-transparent">
-                                <TableHead className="text-secondary-400 text-[10px] uppercase">Time</TableHead>
-                                <TableHead className="text-secondary-400 text-[10px] uppercase">Req</TableHead>
-                                <TableHead className="text-secondary-400 text-[10px] uppercase">Status</TableHead>
-                                <TableHead className="text-secondary-400 text-[10px] uppercase">Source</TableHead>
-                                <TableHead className="text-secondary-400 text-[10px] uppercase">Error</TableHead>
-                                <TableHead className="text-secondary-400 text-[10px] uppercase">Context</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filtered.length === 0 && (
-                                <TableRow><TableCell colSpan={6} className="text-center text-secondary-500 py-8 text-xs">No results match your filter.</TableCell></TableRow>
-                              )}
-                              {filtered.map((err) => {
-                                const isExpanded = expandedErrorId === err.id;
-                                return (
-                                  <>
-                                    <TableRow
-                                      key={err.id}
-                                      className="border-secondary-800 hover:bg-secondary-950/60 cursor-pointer"
-                                      onClick={() => setExpandedErrorId(isExpanded ? null : err.id)}
-                                    >
-                                      <TableCell className="text-secondary-400 text-[10px] whitespace-nowrap align-top py-2">
-                                        {new Date(err.ts).toLocaleString()}
-                                        {err.count > 1 && <span className="ml-1 px-1 py-0.5 rounded bg-amber-900/40 text-amber-400 text-[9px] font-bold">{err.count}×</span>}
-                                      </TableCell>
-                                      <TableCell className="align-top py-2">
-                                        <div className="flex flex-col gap-1">
-                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono w-fit ${err.method === 'GET' ? 'bg-blue-900/40 text-blue-400' : err.method === 'POST' ? 'bg-emerald-900/40 text-emerald-400' : err.method === 'DELETE' ? 'bg-rose-900/40 text-rose-400' : 'bg-secondary-800 text-secondary-300'}`}>{err.method}</span>
-                                          <span className="font-mono text-[10px] text-secondary-400 max-w-[140px] truncate" title={err.path}>{err.path}</span>
+                        <div className="space-y-3">
+                          {filtered.length === 0 && <p className="text-secondary-500 text-xs text-center py-8">No results match your filter.</p>}
+                          {filtered.map((err) => {
+                            const isCritical = err.status >= 500;
+                            const isExpanded = expandedErrorId === err.id;
+                            return (
+                              <div
+                                key={err.id}
+                                className={`rounded-xl border transition-all ${isCritical ? 'border-rose-800/60 bg-rose-950/10' : 'border-amber-800/40 bg-amber-950/10'} ${isExpanded ? 'shadow-lg' : 'hover:border-secondary-600'}`}
+                              >
+                                {/* Ticket header - always visible */}
+                                <div className="p-4">
+                                  <div className="flex items-start gap-3">
+                                    {/* Severity + status */}
+                                    <div className="shrink-0 flex flex-col items-center gap-1.5 pt-0.5">
+                                      <span className={`text-[9px] font-black px-2 py-1 rounded-md tracking-widest ${isCritical ? 'bg-rose-900/70 text-rose-200' : 'bg-amber-900/60 text-amber-200'}`}>
+                                        {isCritical ? 'CRITICAL' : 'ERROR'}
+                                      </span>
+                                      <span className={`text-[11px] font-bold font-mono px-1.5 py-0.5 rounded ${isCritical ? 'bg-rose-900/40 text-rose-400' : 'bg-amber-900/40 text-amber-400'}`}>{err.status}</span>
+                                      {err.count > 1 && (
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${err.count >= 10 ? 'bg-rose-900/50 text-rose-300' : 'bg-amber-900/40 text-amber-300'}`}>{err.count}×</span>
+                                      )}
+                                    </div>
+
+                                    {/* Main content */}
+                                    <div className="flex-1 min-w-0 space-y-2">
+                                      {/* Error message */}
+                                      <p className={`text-sm font-semibold leading-snug ${isCritical ? 'text-rose-200' : 'text-amber-200'}`}>{err.error}</p>
+
+                                      {/* Method + path */}
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${err.method === 'GET' ? 'bg-blue-900/50 text-blue-300' : err.method === 'POST' ? 'bg-emerald-900/50 text-emerald-300' : err.method === 'DELETE' ? 'bg-rose-900/50 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{err.method}</span>
+                                        <span className="font-mono text-xs text-secondary-300 truncate max-w-xs" title={err.path}>{err.path}</span>
+                                      </div>
+
+                                      {/* Source location — the key detail */}
+                                      {err.source && (
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[9px] text-secondary-500 uppercase tracking-widest font-bold">📍 Source</span>
+                                          <span className="font-mono text-[11px] text-rose-400">{err.fn ? `${err.fn} @ ` : ''}{err.source}</span>
                                         </div>
-                                      </TableCell>
-                                      <TableCell className="align-top py-2">
-                                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${err.status >= 500 ? 'bg-rose-900/40 text-rose-400' : 'bg-amber-900/40 text-amber-400'}`}>{err.status}</span>
-                                      </TableCell>
-                                      <TableCell className="align-top py-2 max-w-[160px]">
-                                        {err.source ? (
-                                          <div>
-                                            <p className="font-mono text-[10px] text-rose-400/90 truncate" title={err.source}>{err.source}</p>
-                                            {err.fn && <p className="text-[9px] text-secondary-500 truncate">{err.fn}</p>}
-                                          </div>
-                                        ) : <span className="text-secondary-600 text-[10px]">—</span>}
-                                      </TableCell>
-                                      <TableCell className="text-secondary-300 text-xs max-w-xs truncate align-top py-2" title={err.error}>{err.error}</TableCell>
-                                      <TableCell className="align-top py-2">
-                                        <div className="flex flex-col gap-0.5 text-[9px]">
-                                          {err.tenantId && <span className="text-secondary-500">T: <span className="text-secondary-400 font-mono">{err.tenantId.slice(0, 8)}</span></span>}
-                                          {err.userId && <span className="text-secondary-500">U: <span className="text-secondary-400 font-mono">{err.userId.slice(0, 8)}</span></span>}
-                                          {err.ip && <span className="text-secondary-500">IP: <span className="text-secondary-400 font-mono">{err.ip}</span></span>}
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                    {isExpanded && (
-                                      <TableRow key={`${err.id}-exp`} className="border-secondary-800 bg-secondary-950/70">
-                                        <TableCell colSpan={6} className="p-0">
-                                          <div className="px-4 py-3 space-y-3">
-                                            {/* Context grid */}
-                                            <div className="grid grid-cols-3 gap-4 text-xs">
-                                              <div className="space-y-1">
-                                                <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Request</p>
-                                                <p className="font-mono text-secondary-300 break-all text-[10px]">{err.path}</p>
-                                                {err.bodyKeys && err.bodyKeys.length > 0 && <p className="text-secondary-500 text-[10px]">Body: <span className="font-mono text-secondary-300">{err.bodyKeys.join(', ')}</span></p>}
-                                                {err.ip && <p className="text-secondary-500 text-[10px]">IP: <span className="font-mono text-secondary-300">{err.ip}</span></p>}
-                                              </div>
-                                              <div className="space-y-1">
-                                                <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Identity</p>
-                                                {err.tenantId ? <p className="text-secondary-500 text-[10px]">Tenant: <span className="font-mono text-secondary-300">{err.tenantId}</span></p> : <p className="text-secondary-600 text-[10px] italic">No tenant</p>}
-                                                {err.userId && <p className="text-secondary-500 text-[10px]">User: <span className="font-mono text-secondary-300">{err.userId}</span></p>}
-                                                {err.userAgent && <p className="text-secondary-500 text-[10px] break-all">UA: <span className="text-secondary-400">{err.userAgent.slice(0, 100)}</span></p>}
-                                              </div>
-                                              <div className="space-y-1">
-                                                <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Source</p>
-                                                {err.source ? <p className="font-mono text-rose-400 text-[10px] break-all">{err.source}</p> : <p className="text-secondary-600 text-[10px] italic">No source frame</p>}
-                                                {err.fn && <p className="text-secondary-400 text-[10px]">fn: <span className="font-mono">{err.fn}</span></p>}
-                                              </div>
-                                            </div>
-                                            {/* Stack trace */}
-                                            {err.stack && (
-                                              <div>
-                                                <div className="flex items-center justify-between mb-1">
-                                                  <p className="text-secondary-500 uppercase text-[10px] font-semibold tracking-wide">Stack Trace</p>
-                                                  <button
-                                                    onClick={(ev) => { ev.stopPropagation(); navigator.clipboard?.writeText(err.stack ?? ''); }}
-                                                    className="text-[10px] text-secondary-500 hover:text-white px-2 py-0.5 rounded border border-secondary-700 hover:border-secondary-500 transition-colors"
-                                                  >Copy</button>
-                                                </div>
-                                                <div className="rounded-lg bg-black/50 border border-secondary-800 overflow-x-auto max-h-48 overflow-y-auto">
-                                                  <pre className="p-3 text-[10px] font-mono leading-relaxed">
-                                                    {err.stack.split('\n').map((line, i) => {
-                                                      const isAppLine = line.includes('/src/') && !line.includes('node_modules');
-                                                      return (
-                                                        <span key={i} className={isAppLine ? 'text-rose-300' : 'text-secondary-500'}>
-                                                          {line}{'\n'}
-                                                        </span>
-                                                      );
-                                                    })}
-                                                  </pre>
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </TableCell>
-                                      </TableRow>
-                                    )}
-                                  </>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                                      )}
+
+                                      {/* Context chips */}
+                                      <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                                        <span className="text-secondary-500 font-mono">{new Date(err.ts).toLocaleString()}</span>
+                                        {err.ip && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono">{err.ip}</span>}
+                                        {err.tenantId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono" title={err.tenantId}>T:{err.tenantId.slice(0, 8)}</span>}
+                                        {err.userId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono" title={err.userId}>U:{err.userId.slice(0, 8)}</span>}
+                                        {err.bodyKeys && err.bodyKeys.length > 0 && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400">body: {err.bodyKeys.join(', ')}</span>}
+                                      </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="shrink-0 flex flex-col gap-1.5">
+                                      <button
+                                        onClick={() => setSelectedTicket(err)}
+                                        className="h-7 px-2.5 rounded-lg bg-secondary-800 hover:bg-secondary-700 border border-secondary-700 text-[10px] font-medium text-secondary-200 transition-colors whitespace-nowrap"
+                                      >
+                                        Full Ticket
+                                      </button>
+                                      {err.stack && (
+                                        <button
+                                          onClick={() => setExpandedErrorId(isExpanded ? null : err.id)}
+                                          className="h-7 px-2.5 rounded-lg bg-secondary-900 hover:bg-secondary-800 border border-secondary-800 text-[10px] font-medium text-secondary-400 transition-colors whitespace-nowrap"
+                                        >
+                                          {isExpanded ? 'Hide stack' : 'Stack trace'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Inline stack trace (toggled) */}
+                                {isExpanded && err.stack && (
+                                  <div className="border-t border-secondary-800 px-4 pb-4 pt-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Stack Trace</p>
+                                      <button
+                                        onClick={() => navigator.clipboard?.writeText(err.stack ?? '')}
+                                        className="text-[10px] text-secondary-500 hover:text-white px-2 py-0.5 rounded border border-secondary-700 hover:border-secondary-500 transition-colors"
+                                      >Copy</button>
+                                    </div>
+                                    <div className="rounded-lg bg-black/50 border border-secondary-800 overflow-x-auto max-h-52 overflow-y-auto">
+                                      <pre className="p-3 text-[10px] font-mono leading-relaxed">
+                                        {err.stack.split('\n').map((line, i) => {
+                                          const isAppLine = line.includes('/src/') && !line.includes('node_modules');
+                                          return (
+                                            <span key={i} className={isAppLine ? 'text-rose-300 font-semibold' : 'text-secondary-600'}>
+                                              {line}{'\n'}
+                                            </span>
+                                          );
+                                        })}
+                                      </pre>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })()
