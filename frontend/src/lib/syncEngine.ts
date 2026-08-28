@@ -336,7 +336,22 @@ export function connectSyncSocket(token: string): void {
         socket?.close();
       };
     })
-    .catch(() => scheduleReconnect(token));
+    .catch((err) => {
+      const status = (err as any)?.response?.status as number | undefined;
+      // 429 Too Many Requests — back off much longer to let the rate limit recover.
+      if (status === 429) {
+        reconnectDelayMs = Math.max(reconnectDelayMs, 60_000);
+        scheduleReconnect(token);
+        return;
+      }
+      // Non-retryable client errors (403, 404, etc.) — don't hammer the server;
+      // wait at the max delay. A 401 means the token expired and logout() will
+      // fire from the api interceptor, which tears down the socket lifecycle.
+      if (status && status >= 400 && status < 500 && status !== 401) {
+        reconnectDelayMs = MAX_RECONNECT_DELAY_MS;
+      }
+      scheduleReconnect(token);
+    });
 }
 
 function scheduleReconnect(token: string): void {

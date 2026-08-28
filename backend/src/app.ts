@@ -351,13 +351,23 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     return;
   }
   const status = (err as any).status || (err as any).statusCode || 500;
+  // Capture body keys only (never values) so we can see what kind of request
+  // caused the error without logging any sensitive data.
+  const bodyKeys = req.body && typeof req.body === 'object'
+    ? Object.keys(req.body).filter((k) => !['password', 'token', 'secret', 'key'].includes(k.toLowerCase()))
+    : undefined;
   recordError({
     ts: new Date().toISOString(),
     method: req.method,
-    path: req.path,
+    path: req.originalUrl ?? req.path,
     status,
     error: err.message ?? 'Unknown error',
     stack: err.stack,
+    tenantId: (req as any).tenantId ?? (req as any).user?.tenantId,
+    userId: (req as any).user?.id,
+    ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ?? req.socket?.remoteAddress,
+    userAgent: req.headers['user-agent'],
+    bodyKeys: bodyKeys?.length ? bodyKeys : undefined,
   });
   next(err);
 });
