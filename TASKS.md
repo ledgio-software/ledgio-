@@ -2,6 +2,15 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## System Hardening Plan (2026-08-28)
+
+- [x] **Phase 1 — Idempotent Invoice Payments** (2026-08-28) — Added `idempotencyKey` parameter to `POST /invoices/:id/pay`. Route validates the key; service uses existing fast-path `findFirst` pre-check plus a new race-safe P2002 catch **outside** the transaction block so concurrent retries with the same key collapse to a single payment. DB-level enforcement via partial unique index on `(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL` (migration `20260827000001`). New test suite `invoicePaymentIdempotency.test.ts` covers sequential retry, concurrent race, distinct keys, backward-compat (no key), validation, and cross-tenant isolation.
+- [ ] **Phase 2 — DB Connection Pooling & Query Hardening** — PgBouncer transaction-mode, connection pool sizing, N+1 audit, index review on hot query paths.
+- [ ] **Phase 3 — Offline Sync Robustness** — Idempotency on all sync endpoints, conflict resolution strategy, sync-failure audit log for all entities (not just CashSale).
+- [ ] **Phase 4 — Report Separation** — Move heavy report queries off the OLTP connection pool; read-replica routing or async queue.
+- [ ] **Phase 5 — Queue Durability** — Replace in-process cron jobs with durable queue (BullMQ/pg-boss) so jobs survive restarts.
+- [ ] **Phase 6 — Observability & Load Testing** — Structured logging, distributed tracing, k6/Artillery load test suite, alerting thresholds.
+
 ## Pharmacy Module (2026-08-24)
 
 - [x] **Pharmacy Module Phase 2 — NHIS Billing, Low-Stock Alerts, Daily Count** (2026-08-24) — NHIS/insurance payment method on POS (CASH/NHIS/MoMo/CARD toggle); NHIS Receivable account (code 1020, auto-created); outstanding-claims tracker page; settle endpoint with journal reversal. Low-stock in-app notifications (broadcast, 24-hour dedup, SMS optional) fired after sales, REMOVE adjustments, and transfer-outs. End-of-day narcotics Daily Count endpoint (Accountant role, absolute balance override) with discrepancy logging; Daily Count modal in NarcoticsRegister UI; PDF export grey row with Δ annotation. Backend and frontend tsc clean.
