@@ -413,7 +413,7 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
           <span>⚠️</span>
           <span>
             Dashboard widgets are unavailable — your account requires two-factor authentication.
-            {' '}<a href="/settings/security" className="underline font-medium">Enable MFA in Settings → Security</a> to restore access.
+            {' '}<Link to="/settings?tab=security" className="underline font-medium">Enable MFA in Settings → Security</Link> to restore access.
           </span>
         </div>
       )}
@@ -777,6 +777,7 @@ function App() {
               <Route path="/accounts" element={<ProtectedRoute><MainLayout><ChartOfAccounts /></MainLayout></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><OnboardingWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/security" element={<Navigate to="/settings?tab=security" replace />} />
               <Route path="/settings/tax-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><TaxRates /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/wht-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><WhtRates /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/funds" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Funds /></MainLayout></ProtectedRoute>} />
