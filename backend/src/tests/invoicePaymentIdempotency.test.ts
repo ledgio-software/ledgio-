@@ -58,7 +58,7 @@ describe('Invoice payment idempotency (offline-sync retry safety)', () => {
     tenantId = onboard.tenant.id;
 
     const customer = await request(app)
-      .post('/api/v1/customers')
+      .post('/api/v1/invoices/customers')
       .set('Authorization', `Bearer ${adminToken}`)
       .set('X-Tenant-ID', tenantSlug)
       .send({ name: 'Idem Customer', email: 'idem@customer.com' });
@@ -169,7 +169,7 @@ describe('Invoice payment idempotency (offline-sync retry safety)', () => {
       tenantId2 = onboard2.tenant.id;
 
       const customer2 = await request(app)
-        .post('/api/v1/customers')
+        .post('/api/v1/invoices/customers')
         .set('Authorization', `Bearer ${adminToken2}`)
         .set('X-Tenant-ID', tenantSlug2)
         .send({ name: 'Idem Customer B', email: 'idemb@customer.com' });
