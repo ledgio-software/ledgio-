@@ -2,6 +2,26 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Phase 5: Queue Durability
+
+**What/Why:** All 11 cron services (recurring transactions, invoices, dunning reminders, FX rate refresh, vendor payment scheduling, GRA E-VAT sync, fixed-asset depreciation, interest charges, GL reconciliation, help-assistant maintenance, scheduled email reports) were scheduling their `node-cron` callbacks independently and bypassing `wrapCronTick`. This meant two failure modes went unguarded: (a) if a job's workload exceeds its scheduling interval (especially the hourly recurring-transactions sweep under heavy load), the next tick would start a parallel run creating duplicate journal entries; (b) on horizontal scale-out to multiple pods, every pod would fire the same job simultaneously. Phase 5 adds a Redis-based distributed lock (SET NX EX 1800) inside `wrapCronTick` and wires it into all 11 services, so duplicate firings are skipped regardless of cause. Lock acquisition is fail-open: if Redis is unavailable the job still runs on a single instance.
+
+**Changes:**
+
+- `backend/src/services/cronJobRegistry.ts` — Added `acquireCronLock`/`releaseCronLock` using Redis `SET NX EX` (30-minute TTL). Updated `wrapCronTick` to acquire the lock before running and release it in `finally`; if the lock is already held, the tick is logged and skipped. If Redis throws (unavailable), acquisition returns `true` (fail-open).
+- `backend/src/services/recurringTransactionService.ts` — Wrapped `cron.schedule` callback with `wrapCronTick('Recurring Transactions', ...)`.
+- `backend/src/services/recurringInvoiceCronService.ts` — Wrapped with `wrapCronTick('Recurring Invoices', ...)`.
+- `backend/src/services/dunningReminderService.ts` — Wrapped with `wrapCronTick('Dunning Reminders', ...)`.
+- `backend/src/services/fxRateCronService.ts` — Wrapped with `wrapCronTick('FX Rate Refresh', ...)`.
+- `backend/src/services/vendorPaymentSchedulingCronService.ts` — Wrapped with `wrapCronTick('Vendor Payment Scheduling', ...)`.
+- `backend/src/services/graEvatCronService.ts` — Wrapped with `wrapCronTick('GRA E-VAT Sync', ...)`.
+- `backend/src/services/fixedAssetDepreciationCronService.ts` — Wrapped with `wrapCronTick('Fixed Asset Depreciation', ...)`.
+- `backend/src/services/interestChargeCronService.ts` — Wrapped with `wrapCronTick('Interest Charges', ...)`.
+- `backend/src/services/glReconciliationCronService.ts` — Wrapped with `wrapCronTick('GL Reconciliation', ...)`.
+- `backend/src/services/helpAssistantMaintenanceCronService.ts` — Wrapped with `wrapCronTick('Help Assistant Maintenance', ...)`.
+- `backend/src/services/scheduledEmailService.ts` — Wrapped with `wrapCronTick('Scheduled Email Reports', ...)`.
+- `backend/src/tests/cronJobRegistry.test.ts` — **New file.** 8 unit tests covering: lock acquired → job runs; lock held → job skipped; lock released after success; lock released after throw; fail-open when Redis down; correct lock key format; successful run recorded in registry; failed run recorded with error message. All 8 pass.
+
 ## [Date: 2026-08-28] - Phase 4: Report Separation
 
 **What/Why:** Heavy report queries (full-ledger aggregations, multi-table UNIONs, paginated result sets) were executing without any caching on 12 of the 22 report endpoints, letting repeated page refreshes and concurrent users hammer the PostgreSQL connection pool and starve OLTP write paths. Phase 4 adds Redis result caching to every previously uncached endpoint and caps the analytics-trends fan-out to prevent connection exhaustion on cold-cache requests.

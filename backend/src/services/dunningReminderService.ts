@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { runWithTenantContext } from '../context/tenantContext';
@@ -36,10 +37,10 @@ export class DunningReminderCronService {
 
     // Once daily at 9am UTC - a reminder email landing in a business's inbox
     // first thing in the morning is more useful than one sent overnight.
-    this.task = cron.schedule('0 9 * * *', async () => {
+    this.task = cron.schedule('0 9 * * *', wrapCronTick('Dunning Reminders', async () => {
       console.log('[DunningReminderCron] Executing daily overdue-invoices sweep...');
       await this.runOverdueInvoicesJob();
-    });
+    }));
 
     console.log('[DunningReminderCron] Daily Dunning Reminder Cron Job Initialized.');
   }
