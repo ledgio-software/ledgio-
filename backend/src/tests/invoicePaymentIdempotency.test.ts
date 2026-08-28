@@ -153,9 +153,9 @@ describe('Invoice payment idempotency (offline-sync retry safety)', () => {
     const tenantSchema2 = `tenant_inv_pay_idem_b_${runId2}`;
     const adminEmail2 = `admin_invpayidemb_${runId2}@corp.com`;
 
-    let tenantId2: string;
-    let adminToken2: string;
-    let customerId2: string;
+    let tenantId2 = '';
+    let adminToken2 = '';
+    let customerId2 = '';
 
     try {
       const onboard2 = await onboardTenant(prisma, {
