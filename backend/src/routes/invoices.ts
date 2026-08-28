@@ -23,7 +23,7 @@ import * as invoicePaymentService from '../services/invoicePaymentService';
 import { InvoicePaymentServiceError } from '../services/invoicePaymentService';
 import * as invoiceEmailService from '../services/invoiceEmailService';
 import { InvoiceEmailServiceError } from '../services/invoiceEmailService';
-import { recordChange, notifyChange, invoiceToSyncPayload } from '../services/syncChangeLogService';
+import { recordChange, notifyChange, invoiceToSyncPayload, customerToSyncPayload } from '../services/syncChangeLogService';
 import * as graEvatService from '../services/graEvatService';
 import { GraEvatServiceError } from '../services/graEvatService';
 import { generateInvoicePdf } from '../services/pdfGenerationService';
@@ -132,8 +132,11 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), validateBod
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
     const resolvedType = customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL';
 
+    let syncSeq: bigint | null = null;
+    let createdCustomer: any;
+
     const created = await withCurrentTenantDb(prisma, async (client) => {
-      return (client as any).customer.create({
+      createdCustomer = await (client as any).customer.create({
         data: {
           tenantId,
           name: name.trim(),
@@ -145,7 +148,19 @@ router.post('/customers', requireRole('Accountant', 'Shop Manager'), validateBod
           customerType: resolvedType,
         },
       });
+      syncSeq = await recordChange(client, {
+        tenantId,
+        entityType: 'Customer',
+        entityId: createdCustomer.id,
+        operation: 'CREATE',
+        payload: customerToSyncPayload(createdCustomer),
+      });
+      return createdCustomer;
     });
+
+    if (syncSeq !== null) {
+      notifyChange({ tenantId, entityType: 'Customer', entityId: created.id, operation: 'CREATE', payload: customerToSyncPayload(created), sequence: syncSeq });
+    }
 
     res.status(201).json({ success: true, data: { customer: decryptCustomer(created) } });
   } catch (error: any) {
@@ -164,10 +179,12 @@ router.put('/customers/:id', requireRole('Accountant'), validateBody(updateCusto
     const { id } = req.params;
     const { name, email, phone, address, creditLimit, tin, customerType } = req.body;
 
+    let syncSeq: bigint | null = null;
+
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).customer.findFirst({ where: { id, tenantId } });
       if (!existing) return null;
-      return (client as any).customer.update({
+      const row = await (client as any).customer.update({
         where: { id },
         data: {
           ...(name !== undefined && { name: String(name).trim() }),
@@ -179,11 +196,23 @@ router.put('/customers/:id', requireRole('Accountant'), validateBody(updateCusto
           ...(customerType !== undefined && { customerType: customerType === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL' }),
         },
       });
+      syncSeq = await recordChange(client, {
+        tenantId,
+        entityType: 'Customer',
+        entityId: id,
+        operation: 'UPDATE',
+        payload: customerToSyncPayload(row),
+      });
+      return row;
     });
 
     if (!updated) {
       res.status(404).json({ success: false, error: 'Customer not found.' });
       return;
+    }
+
+    if (syncSeq !== null) {
+      notifyChange({ tenantId, entityType: 'Customer', entityId: id, operation: 'UPDATE', payload: customerToSyncPayload(updated), sequence: syncSeq });
     }
 
     res.status(200).json({ success: true, data: { customer: decryptCustomer(updated) } });
@@ -210,15 +239,28 @@ router.delete('/customers/:id', requireRole('Admin', 'Accountant'), async (req: 
       return;
     }
 
+    let syncSeq: bigint | null = null;
+
     const deleted = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).customer.findFirst({ where: { id, tenantId } });
       if (!existing) return null;
-      return (client as any).customer.delete({ where: { id } });
+      const row = await (client as any).customer.delete({ where: { id } });
+      syncSeq = await recordChange(client, {
+        tenantId,
+        entityType: 'Customer',
+        entityId: id,
+        operation: 'DELETE',
+      });
+      return row;
     });
 
     if (!deleted) {
       res.status(404).json({ success: false, error: 'Customer not found.' });
       return;
+    }
+
+    if (syncSeq !== null) {
+      notifyChange({ tenantId, entityType: 'Customer', entityId: id, operation: 'DELETE', sequence: syncSeq });
     }
 
     res.json({ success: true });

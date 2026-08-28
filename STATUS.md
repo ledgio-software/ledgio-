@@ -2,6 +2,28 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Phase 3: Offline Sync Robustness
+
+**What/Why:** Three hardening improvements to the local-first sync infrastructure to prevent data loss and resource exhaustion for long-offline clients.
+
+**Changes:**
+
+1. **Paginated `GET /sync/changes`** — Added `limit` query param (1–2000, default 500). The handler fetches `limit + 1` rows, sets `hasMore: true` when more remain, and slices to `limit`. Clients advance `since` to the last returned sequence and repeat until `hasMore` is false. Prevents unbounded result sets from long-offline clients.
+
+2. **Customer sync** — Extended `SyncEntityType` to include `'Customer'`. Added `customerToSyncPayload()` in `syncChangeLogService.ts` (PII fields excluded). Hooked `recordChange`/`notifyChange` into `POST /customers` (CREATE), `PUT /customers/:id` (UPDATE), and `DELETE /customers/:id` (DELETE) in `routes/invoices.ts`. Customers now appear in the change log and are pushed to connected WebSocket clients immediately on write.
+
+3. **Change log prune endpoint** — `DELETE /api/v1/sync/prune?beforeSequence=<n>` (Admin-only). Delegates to new `pruneChangesBefore(client, tenantId, beforeSequence)` in `syncChangeLogService.ts`. Removes entries with `sequence < beforeSequence` for the tenant. Guards: non-numeric param → 400; non-Admin → 403.
+
+4. **Tests** — Extended `syncChangeLog.test.ts` with 6 new cases: pagination (hasMore + multi-page), Customer CREATE/UPDATE/DELETE log entries (PII absence verified), prune count return, prune entry survival, prune input validation.
+
+**Files:**
+- `backend/src/services/syncChangeLogService.ts`
+- `backend/src/routes/sync.ts`
+- `backend/src/routes/invoices.ts`
+- `backend/src/tests/syncChangeLog.test.ts`
+
+---
+
 ## [Date: 2026-08-28] - Fix: Concurrent-race 409 in idempotent invoice payment
 
 **What/Why:** The "concurrent race" idempotency test was failing with resB returning 409. Both concurrent requests with the same `idempotencyKey` passed the pre-transaction duplicate check (no payment row yet). The first to acquire the row lock committed and set the invoice to PAID. The second, inside the lock, saw `status=PAID` and threw 409 — the P2002 catch block didn't cover this earlier guard.
