@@ -72,13 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error: any) {
         console.error("Token verification failed:", error);
-        // A plain network failure (no HTTP response at all - offline, DNS,
-        // server unreachable) is not proof the token is invalid. Only a
-        // genuine HTTP rejection (e.g. an actual 401) means the session is
-        // really dead. Logging out on a connectivity blip would clear
-        // `token`, which cascades into useSyncEngineLifecycle wiping the
-        // entire local-first offline cache purely because the network hiccuped.
-        if (error?.response) {
+        // Only a genuine 401 means the session token is invalid — log out.
+        // 403 means the token is valid but the user lacks permission (e.g.
+        // MFA_REQUIRED); do not wipe the session on permission errors.
+        // No response at all (offline, DNS, server down) is also not proof
+        // the token is invalid — logging out on a connectivity blip would
+        // wipe the local-first offline cache unnecessarily.
+        if (error?.response?.status === 401) {
           logout();
         }
       } finally {
