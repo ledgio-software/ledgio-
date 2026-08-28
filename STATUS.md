@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-28] - Fix: agingReport test cache interference
+
+**What/Why:** Phase 4's Redis caching of `/reports/aging/ar` broke one test in `agingReport.test.ts`. The test suite reuses the same tenant across all five test cases. An earlier test populated the cache; a later test then created a new invoice and called the same endpoint, but received the cached (stale) response which omitted the new invoice — causing `.find()` to return `undefined` and `row.bucket` to throw.
+
+**Changes:**
+- `backend/src/tests/agingReport.test.ts` — Imported `invalidateReportCache` from `../cache/reportCache`; captured `tenantId` from the `onboardTenant` result in `beforeAll`; added `beforeEach` to call `invalidateReportCache(tenantId)` so every test case in the suite starts with a fresh, uncached response.
+
+**Files affected:** `backend/src/tests/agingReport.test.ts`
+
+---
+
 ## [Date: 2026-08-28] - Phase 5: Queue Durability
 
 **What/Why:** All 11 cron services (recurring transactions, invoices, dunning reminders, FX rate refresh, vendor payment scheduling, GRA E-VAT sync, fixed-asset depreciation, interest charges, GL reconciliation, help-assistant maintenance, scheduled email reports) were scheduling their `node-cron` callbacks independently and bypassing `wrapCronTick`. This meant two failure modes went unguarded: (a) if a job's workload exceeds its scheduling interval (especially the hourly recurring-transactions sweep under heavy load), the next tick would start a parallel run creating duplicate journal entries; (b) on horizontal scale-out to multiple pods, every pod would fire the same job simultaneously. Phase 5 adds a Redis-based distributed lock (SET NX EX 1800) inside `wrapCronTick` and wires it into all 11 services, so duplicate firings are skipped regardless of cause. Lock acquisition is fail-open: if Redis is unavailable the job still runs on a single instance.
