@@ -65,6 +65,11 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions = {}) {
         '/sync/bootstrap',
         '/sync/changes',
         '/notifications',
+        // Tenant + subscription shell routes — exempt so the user can reach
+        // Settings → Security to enable MFA; these don't expose financial data.
+        '/tenants/current',
+        '/tenants/members',
+        '/subscription/status',
       ];
       if (
         process.env.NODE_ENV !== 'test' &&
