@@ -25,7 +25,7 @@ function handleError(res: Response, error: any, fallbackMessage: string): void {
  * GET /api/v1/wht-rates
  * Lists all WHT rates for the active tenant.
  */
-router.get('/', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/', requireRole('Viewer', 'Cashier', 'Shop Manager', 'HR'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const whtRates = await whtRateService.listWhtRates(tenantId);
@@ -38,7 +38,7 @@ router.get('/', requireRole('Viewer'), async (req: Request, res: Response): Prom
 /**
  * GET /api/v1/wht-rates/:id
  */
-router.get('/:id', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/:id', requireRole('Viewer', 'Cashier', 'Shop Manager', 'HR'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const whtRate = await whtRateService.getWhtRateById(tenantId, req.params.id);
