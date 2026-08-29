@@ -60,12 +60,13 @@ const ROLE_IMPLIES: Record<string, string[]> = {
   'finance controller': ['accountant', 'viewer', 'auditor'],
   'external accountant': ['viewer', 'auditor'],
   'auditor': ['viewer'],
+  // Payroll staff get viewer so they can see financial data needed for payroll processing.
   'payroll officer': ['hr', 'viewer'],
   'payroll approver': ['hr', 'payroll officer', 'viewer'],
   'warehouse manager': ['shop manager', 'viewer'],
-  'shop manager': ['viewer'],
-  'cashier': ['viewer'],
-  'hr': ['viewer'],
+  // Cashier / Shop Manager / HR are operational roles — they do NOT imply viewer
+  // so they remain blocked from financial reports. Routes they need access to
+  // (e.g. WHT rates) must name them explicitly in requireRole().
   'accounts payable clerk': ['viewer'],
   'accounts receivable clerk': ['viewer'],
 };
