@@ -156,6 +156,9 @@ app.use('/api/', apiRateLimiter);
 // Metrics endpoint (no auth required for Prometheus scraping)
 app.use('/metrics', metricsRouter);
 
+// Root HEAD handler for uptime monitors that probe HEAD /
+app.head('/', (_req, res) => res.sendStatus(200));
+
 // Health check endpoints
 app.use('/health', healthRouter);
 app.use('/api/v1/health', healthRouter);

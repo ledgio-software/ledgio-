@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
@@ -64,16 +63,14 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // 3. DB query — only on cache miss
-    const notifications = await withCurrentTenantDb(prisma, async (client) => {
-      return (client as any).notification.findMany({
-        where: {
-          tenantId,
-          OR: [{ userId: null }, { userId }],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 30,
-      });
+    // 3. DB query — only on cache miss (Notification is a public-schema model; no withCurrentTenantDb needed)
+    const notifications = await (prisma as any).notification.findMany({
+      where: {
+        tenantId,
+        OR: [{ userId: null }, { userId }],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
     });
 
     const unreadCount = notifications.filter((n: any) => !n.read).length;
@@ -102,17 +99,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const created = await withCurrentTenantDb(prisma, async (client) => {
-      return (client as any).notification.create({
-        data: {
-          tenantId,
-          title,
-          message,
-          type,
-          link,
-          userId: userId || null,
-        },
-      });
+    const created = await (prisma as any).notification.create({
+      data: {
+        tenantId,
+        title,
+        message,
+        type,
+        link,
+        userId: userId || null,
+      },
     });
 
     // Broadcast notification: wipe all per-user caches for this tenant
@@ -135,18 +130,16 @@ router.put('/:id/read', async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params;
     const userId = (req as any).user?.id;
 
-    const updated = await withCurrentTenantDb(prisma, async (client) => {
-      const existing = await (client as any).notification.findFirst({
-        where: { id, tenantId, OR: [{ userId: null }, { userId }] },
-      });
-      if (!existing) {
-        throw new Error('Notification not found.');
-      }
-
-      return (client as any).notification.update({
-        where: { id },
-        data: { read: true },
-      });
+    const existing = await (prisma as any).notification.findFirst({
+      where: { id, tenantId, OR: [{ userId: null }, { userId }] },
+    });
+    if (!existing) {
+      res.status(404).json({ success: false, error: 'Notification not found.' });
+      return;
+    }
+    const updated = await (prisma as any).notification.update({
+      where: { id },
+      data: { read: true },
     });
 
     void invalidateNotificationCache(tenantId, userId);
@@ -154,10 +147,6 @@ router.put('/:id/read', async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({ success: true, data: { notification: updated } });
   } catch (error: any) {
     console.error('[Notifications] Error marking notification as read:', error);
-    if (error.message === 'Notification not found.') {
-      res.status(404).json({ success: false, error: error.message });
-      return;
-    }
     res.status(500).json({ success: false, error: 'Failed to update notification.' });
   }
 });
@@ -171,15 +160,13 @@ router.put('/read-all', async (req: Request, res: Response): Promise<void> => {
     const { tenantId } = requireTenantContext();
     const userId = (req as any).user?.id;
 
-    await withCurrentTenantDb(prisma, async (client) => {
-      return (client as any).notification.updateMany({
-        where: {
-          tenantId,
-          read: false,
-          OR: [{ userId: null }, { userId }],
-        },
-        data: { read: true },
-      });
+    await (prisma as any).notification.updateMany({
+      where: {
+        tenantId,
+        read: false,
+        OR: [{ userId: null }, { userId }],
+      },
+      data: { read: true },
     });
 
     void invalidateNotificationCache(tenantId, userId);
