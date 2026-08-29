@@ -1406,6 +1406,7 @@ model Notification {
   @@index([userId])
   @@index([read])
   @@index([tenantId, userId, read])
+  @@index([tenantId, userId, createdAt(sort: Desc)])
   @@map("notifications")
 }
 
