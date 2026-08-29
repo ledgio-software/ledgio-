@@ -120,30 +120,30 @@ export function SerialNumbers() {
 
       {/* Receive Panel */}
       {showReceive && (
-        <div className="border rounded-lg p-5 bg-white dark:bg-gray-800 dark:border-gray-700 space-y-4">
+        <div className="border rounded-lg p-5 bg-white dark:bg-secondary-800 dark:border-gray-700 space-y-4">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Receive Serial Numbers</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Item *</label>
-              <select value={receiveForm.inventoryItemId} onChange={(e) => setReceiveForm((f) => ({ ...f, inventoryItemId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600">
+              <select value={receiveForm.inventoryItemId} onChange={(e) => setReceiveForm((f) => ({ ...f, inventoryItemId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600">
                 <option value="">Select item…</option>
                 {items.map((it) => <option key={it.id} value={it.id}>{it.name} ({it.sku})</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Warehouse *</label>
-              <select value={receiveForm.warehouseId} onChange={(e) => setReceiveForm((f) => ({ ...f, warehouseId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600">
+              <select value={receiveForm.warehouseId} onChange={(e) => setReceiveForm((f) => ({ ...f, warehouseId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600">
                 <option value="">Select warehouse…</option>
                 {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Serial Numbers (one per line, or comma-separated) *</label>
-              <textarea value={receiveForm.serialsText} onChange={(e) => setReceiveForm((f) => ({ ...f, serialsText: e.target.value }))} rows={4} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600 font-mono" placeholder="SN-001&#10;SN-002&#10;SN-003" />
+              <textarea value={receiveForm.serialsText} onChange={(e) => setReceiveForm((f) => ({ ...f, serialsText: e.target.value }))} rows={4} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600 font-mono" placeholder="SN-001&#10;SN-002&#10;SN-003" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Bill ID (optional)</label>
-              <input value={receiveForm.billId} onChange={(e) => setReceiveForm((f) => ({ ...f, billId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" placeholder="Link to vendor bill UUID" />
+              <input value={receiveForm.billId} onChange={(e) => setReceiveForm((f) => ({ ...f, billId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600" placeholder="Link to vendor bill UUID" />
             </div>
           </div>
           <div className="flex gap-2">
@@ -159,17 +159,17 @@ export function SerialNumbers() {
       <div className="flex flex-wrap gap-2">
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search serial / item…" className="pl-8 pr-3 py-2 border rounded text-sm bg-white dark:bg-gray-800 dark:border-gray-600 w-52" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search serial / item…" className="pl-8 pr-3 py-2 border rounded text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600 w-52" />
         </div>
-        <select value={filterItem} onChange={(e) => setFilterItem(e.target.value)} className="border rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-600">
+        <select value={filterItem} onChange={(e) => setFilterItem(e.target.value)} className="border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600">
           <option value="">All Items</option>
           {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
         </select>
-        <select value={filterWarehouse} onChange={(e) => setFilterWarehouse(e.target.value)} className="border rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-600">
+        <select value={filterWarehouse} onChange={(e) => setFilterWarehouse(e.target.value)} className="border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600">
           <option value="">All Warehouses</option>
           {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-600">
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600">
           <option value="">All Statuses</option>
           {["AVAILABLE", "SOLD", "RETURNED", "DAMAGED"].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
