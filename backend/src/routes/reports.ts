@@ -544,40 +544,40 @@ router.get(
         dateFilter.lte = end;
       }
 
-      const [warehouses, sales, transfersRaw, stocksRaw] = (await withCurrentTenantDb(prisma, (client) =>
-        Promise.all([
-          (client as any).warehouse.findMany({
-            where: { tenantId },
-            select: { id: true, name: true, location: true },
-            orderBy: { name: 'asc' },
-          }),
-          (client as any).cashSale.groupBy({
-            by: ['warehouseId'],
-            where: {
-              tenantId,
-              status: 'COMPLETED',
-              ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
-            },
-            _sum: { amount: true },
-            _count: { id: true },
-          }),
-          (client as any).stockTransfer.findMany({
-            where: {
-              tenantId,
-              ...(Object.keys(dateFilter).length ? { transferDate: dateFilter } : {}),
-            },
-            select: { fromWarehouseId: true, toWarehouseId: true },
-          }),
-          (client as any).warehouseStock.findMany({
-            where: { tenantId },
-            select: {
-              warehouseId: true,
-              quantityOnHand: true,
-              item: { select: { costPrice: true } },
-            },
-          }),
-        ])
-      )) as any[];
+      // All four models are public-schema Prisma models with tenantId; use prisma directly
+      // (no withCurrentTenantDb needed — tenantId filter provides isolation).
+      const [warehouses, sales, transfersRaw, stocksRaw] = await Promise.all([
+        (prisma as any).warehouse.findMany({
+          where: { tenantId },
+          select: { id: true, name: true, location: true },
+          orderBy: { name: 'asc' },
+        }),
+        (prisma as any).cashSale.groupBy({
+          by: ['warehouseId'],
+          where: {
+            tenantId,
+            status: 'COMPLETED',
+            ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
+          },
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        (prisma as any).stockTransfer.findMany({
+          where: {
+            tenantId,
+            ...(Object.keys(dateFilter).length ? { transferDate: dateFilter } : {}),
+          },
+          select: { fromWarehouseId: true, toWarehouseId: true },
+        }),
+        (prisma as any).warehouseStock.findMany({
+          where: { tenantId },
+          select: {
+            warehouseId: true,
+            quantityOnHand: true,
+            item: { select: { costPrice: true } },
+          },
+        }),
+      ]);
 
       // Index sales by warehouseId
       const salesByWarehouse: Record<string, { revenue: number; saleCount: number }> = {};
@@ -808,17 +808,16 @@ router.get('/analytics/top-customers', requireTier(2, 'Analytics Dashboard'), re
     }
 
     // Fetch invoice summaries and group in JS (avoids groupBy + tenant search_path issues).
-    const invoiceRows = await withCurrentTenantDb(prisma, (client) =>
-      (client as any).invoice.findMany({
-        where: {
-          tenantId,
-          customerId: { not: null },
-          amountPaid: { gt: 0 },
-          ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
-        },
-        select: { customerId: true, amountPaid: true },
-      })
-    ) as any[];
+    // Invoice and Customer are public-schema Prisma models with tenantId; use prisma directly.
+    const invoiceRows = await (prisma as any).invoice.findMany({
+      where: {
+        tenantId,
+        customerId: { not: null },
+        amountPaid: { gt: 0 },
+        ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
+      },
+      select: { customerId: true, amountPaid: true },
+    }) as any[];
 
     const revenueMap: Record<string, { revenue: number; count: number }> = {};
     for (const row of invoiceRows) {
@@ -834,12 +833,10 @@ router.get('/analytics/top-customers', requireTier(2, 'Analytics Dashboard'), re
       .map(([id]) => id);
 
     const customerRecords = topIds.length
-      ? await withCurrentTenantDb(prisma, (client) =>
-          (client as any).customer.findMany({
-            where: { id: { in: topIds } },
-            select: { id: true, name: true, email: true, customerType: true },
-          })
-        ) as any[]
+      ? await (prisma as any).customer.findMany({
+          where: { id: { in: topIds }, tenantId },
+          select: { id: true, name: true, email: true, customerType: true },
+        }) as any[]
       : [];
 
     const customerMap = Object.fromEntries(customerRecords.map((c: any) => [c.id, c]));
