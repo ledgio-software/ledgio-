@@ -404,11 +404,12 @@ export async function getBenfordAnalysis(startDate?: string, endDate?: string): 
 
   const rows = (await withCurrentTenantDb(prisma, async (client) => {
     // Extract the leading digit from the absolute value of each non-zero line amount.
-    // SUBSTRING(LTRIM(...,'0.'), 1, 1) gives the first significant digit as text.
+    // journal_entry_lines in the tenant schema uses debit/credit columns (not amount).
+    // Exactly one of debit/credit is non-zero per line, so debit+credit gives the amount.
     const dateFilter = startDate || endDate
-      ? `AND je.entry_date BETWEEN $2 AND $3`
+      ? `AND je.entry_date BETWEEN $1 AND $2`
       : '';
-    const params: (string | Date)[] = [tenantId];
+    const params: Date[] = [];
     if (startDate || endDate) {
       params.push(startDate ? new Date(startDate) : new Date('1900-01-01'));
       params.push(endDate ? new Date(endDate) : new Date('9999-12-31'));
@@ -416,13 +417,12 @@ export async function getBenfordAnalysis(startDate?: string, endDate?: string): 
 
     return (client as any).$queryRawUnsafe(
       `SELECT
-         SUBSTRING(LTRIM(CAST(ABS(jel.amount) AS TEXT), '0.'), 1, 1) AS digit,
+         SUBSTRING(LTRIM(CAST((jel.debit + jel.credit) AS TEXT), '0.'), 1, 1) AS digit,
          COUNT(*) AS cnt
        FROM journal_entry_lines jel
        JOIN journal_entries je ON je.id = jel.journal_entry_id
-       WHERE jel.tenant_id = $1
-         AND je.status = 'POSTED'
-         AND jel.amount <> 0
+       WHERE je.status = 'POSTED'
+         AND (jel.debit + jel.credit) <> 0
          ${dateFilter}
        GROUP BY digit
        ORDER BY digit`,
@@ -490,26 +490,27 @@ export async function getDuplicatePayments(startDate?: string, endDate?: string)
   type DupRow = { vendor_name: string | null; amount: string; payment_date: string; cnt: string; payment_ids: string };
 
   const rows = (await withCurrentTenantDb(prisma, async (client) => {
+    // InvoicePayment has no payment_date column; use created_at as the payment date proxy.
     const params: (string | Date)[] = [tenantId];
     let dateFilter = '';
     if (startDate || endDate) {
       params.push(startDate ? new Date(startDate) : new Date('1900-01-01'));
       params.push(endDate ? new Date(endDate) : new Date('9999-12-31'));
-      dateFilter = `AND ip.payment_date BETWEEN $2 AND $3`;
+      dateFilter = `AND ip.created_at BETWEEN $2 AND $3`;
     }
 
     return (client as any).$queryRawUnsafe(
       `SELECT
          i.customer_name AS vendor_name,
          ip.amount::TEXT AS amount,
-         ip.payment_date::DATE::TEXT AS payment_date,
+         ip.created_at::DATE::TEXT AS payment_date,
          COUNT(*) AS cnt,
          STRING_AGG(ip.id::TEXT, ',' ORDER BY ip.created_at) AS payment_ids
        FROM invoice_payments ip
        JOIN invoices i ON i.id = ip.invoice_id
        WHERE ip.tenant_id = $1
          ${dateFilter}
-       GROUP BY i.customer_name, ip.amount, ip.payment_date::DATE
+       GROUP BY i.customer_name, ip.amount, ip.created_at::DATE
        HAVING COUNT(*) > 1
        ORDER BY cnt DESC, payment_date DESC`,
       ...params
@@ -556,31 +557,32 @@ export async function getRoundAmountTransactions(
   type RoundRow = { journal_entry_id: string; line_id: string; amount: string; description: string | null; entry_date: string; account_name: string | null };
 
   const rows = (await withCurrentTenantDb(prisma, async (client) => {
-    const params: (string | number | Date)[] = [tenantId, minAmount, roundingThreshold];
+    // journal_entry_lines in the tenant schema uses debit/credit columns (not amount/tenant_id).
+    // Exactly one of debit/credit is non-zero per line, so debit+credit gives the line value.
+    const params: (number | Date)[] = [minAmount, roundingThreshold];
     let dateFilter = '';
     if (startDate || endDate) {
       params.push(startDate ? new Date(startDate) : new Date('1900-01-01'));
       params.push(endDate ? new Date(endDate) : new Date('9999-12-31'));
-      dateFilter = `AND je.entry_date BETWEEN $4 AND $5`;
+      dateFilter = `AND je.entry_date BETWEEN $3 AND $4`;
     }
 
     return (client as any).$queryRawUnsafe(
       `SELECT
          jel.journal_entry_id,
          jel.id AS line_id,
-         jel.amount::TEXT AS amount,
+         (jel.debit + jel.credit)::TEXT AS amount,
          jel.description,
          je.entry_date::DATE::TEXT AS entry_date,
          a.name AS account_name
        FROM journal_entry_lines jel
        JOIN journal_entries je ON je.id = jel.journal_entry_id
        LEFT JOIN accounts a ON a.id = jel.account_id
-       WHERE jel.tenant_id = $1
-         AND je.status = 'POSTED'
-         AND ABS(jel.amount) >= $2
-         AND MOD(ABS(jel.amount)::NUMERIC, $3::NUMERIC) = 0
+       WHERE je.status = 'POSTED'
+         AND (jel.debit + jel.credit) >= $1
+         AND MOD((jel.debit + jel.credit)::NUMERIC, $2::NUMERIC) = 0
          ${dateFilter}
-       ORDER BY je.entry_date DESC, ABS(jel.amount) DESC
+       ORDER BY je.entry_date DESC, (jel.debit + jel.credit) DESC
        LIMIT 500`,
       ...params
     );
