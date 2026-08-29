@@ -181,20 +181,20 @@ export function PriceLists() {
 
       {/* Create/Edit Form */}
       {showCreateForm && (
-        <div className="border rounded-lg p-5 bg-white dark:bg-gray-800 dark:border-gray-700 space-y-4">
+        <div className="border rounded-lg p-5 bg-white dark:bg-secondary-800 dark:border-gray-700 space-y-4">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{editingId ? "Edit Price List" : "New Price List"}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Name *</label>
-              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" placeholder="e.g. Wholesale Prices" />
+              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600" placeholder="e.g. Wholesale Prices" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Currency</label>
-              <input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase().slice(0, 3) }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" maxLength={3} />
+              <input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase().slice(0, 3) }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600" maxLength={3} />
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
-              <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 dark:border-gray-600" placeholder="Optional" />
+              <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600" placeholder="Optional" />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
@@ -214,7 +214,7 @@ export function PriceLists() {
         <div className="text-center py-12 text-gray-400 text-sm">No price lists yet. Create one to get started.</div>
       )}
       {!loading && lists.map((list) => (
-        <div key={list.id} className="border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700">
+        <div key={list.id} className="border rounded-lg bg-white dark:bg-secondary-800 dark:border-gray-700">
           <div className="flex items-center justify-between gap-3 p-4">
             <div className="flex items-center gap-3 min-w-0">
               <button onClick={() => setExpandedId(expandedId === list.id ? null : list.id)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 shrink-0">
@@ -296,17 +296,17 @@ export function PriceLists() {
                     {/* Add entry row */}
                     <tr className="bg-gray-50 dark:bg-gray-700/20">
                       <td className="px-4 py-2">
-                        <select value={newEntry.inventoryItemId} onChange={(e) => setNewEntry((n) => ({ ...n, inventoryItemId: e.target.value }))} className="w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-900 dark:border-gray-600">
+                        <select value={newEntry.inventoryItemId} onChange={(e) => setNewEntry((n) => ({ ...n, inventoryItemId: e.target.value }))} className="w-full border rounded px-2 py-1 text-xs bg-white dark:bg-secondary-800 dark:border-secondary-600">
                           <option value="">Select item…</option>
                           {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
                         </select>
                       </td>
                       <td className="px-4 py-2 text-gray-400 text-xs">{items.find((i) => i.id === newEntry.inventoryItemId)?.sku || "—"}</td>
                       <td className="px-4 py-2">
-                        <input type="number" min="1" value={newEntry.minQty} onChange={(e) => setNewEntry((n) => ({ ...n, minQty: e.target.value }))} className="w-full border rounded px-2 py-1 text-xs text-right bg-white dark:bg-gray-900 dark:border-gray-600" placeholder="1" />
+                        <input type="number" min="1" value={newEntry.minQty} onChange={(e) => setNewEntry((n) => ({ ...n, minQty: e.target.value }))} className="w-full border rounded px-2 py-1 text-xs text-right bg-white dark:bg-secondary-800 dark:border-secondary-600" placeholder="1" />
                       </td>
                       <td className="px-4 py-2">
-                        <input type="number" min="0" step="0.01" value={newEntry.unitPrice} onChange={(e) => setNewEntry((n) => ({ ...n, unitPrice: e.target.value }))} className="w-full border rounded px-2 py-1 text-xs text-right bg-white dark:bg-gray-900 dark:border-gray-600" placeholder="0.00" />
+                        <input type="number" min="0" step="0.01" value={newEntry.unitPrice} onChange={(e) => setNewEntry((n) => ({ ...n, unitPrice: e.target.value }))} className="w-full border rounded px-2 py-1 text-xs text-right bg-white dark:bg-secondary-800 dark:border-secondary-600" placeholder="0.00" />
                       </td>
                       <td className="px-4 py-2 text-center">
                         <button onClick={() => handleAddEntry(list.id)} className="text-blue-600 hover:text-blue-800"><Plus size={15} /></button>
