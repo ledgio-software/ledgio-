@@ -12,7 +12,7 @@ import {
 
 // In-process fallback cache so notification polls are fast even when Redis is unavailable.
 // TTL is 30 s — matches the frontend poll interval with a comfortable buffer.
-const MEM_TTL_MS = 30_000;
+const MEM_TTL_MS = 300_000; // 5 minutes; write-path invalidation handles freshness
 const memCache = new Map<string, { data: unknown; expiresAt: number }>();
 
 function memGet<T>(key: string): T | null {
@@ -49,17 +49,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
     type NotifPayload = { notifications: any[]; unreadCount: number };
 
-    // 1. Try Redis cache
-    const redisCached = await getCachedNotifications<NotifPayload>(tenantId, userId);
-    if (redisCached) {
-      res.status(200).json({ success: true, data: redisCached });
-      return;
-    }
-
-    // 2. Try in-process fallback (fast path when Redis is unavailable)
+    // 1. Try in-process cache first — zero latency, avoids Redis round-trip on every poll
     const memCached = memGet<NotifPayload>(cacheKey);
     if (memCached) {
       res.status(200).json({ success: true, data: memCached });
+      return;
+    }
+
+    // 2. Try Redis (shared across instances; warm mem cache on hit)
+    const redisCached = await getCachedNotifications<NotifPayload>(tenantId, userId);
+    if (redisCached) {
+      memSet(cacheKey, redisCached);
+      res.status(200).json({ success: true, data: redisCached });
       return;
     }
 
