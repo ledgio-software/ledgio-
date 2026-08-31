@@ -2,6 +2,11 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes (2026-08-31)
+
+- [x] **Fix POS revenue doubling** (2026-08-31) — Atomic claim sentinel in `POST /tills/backfill-revenue` prevents concurrent requests from double-posting the same sale. (`backend/src/routes/cashTill.ts`)
+- [x] **Fix MFA banner persisting after setup** (2026-08-31) — `POST /auth/mfa/verify-setup` now issues a fresh JWT with `isMfaEnabled: true`; frontend stores it in localStorage so the MFA gate lifts immediately. (`backend/src/routes/auth.ts`, `frontend/src/pages/settings/Settings.tsx`)
+
 ## System Hardening Plan (2026-08-28)
 
 - [x] **Phase 1 — Idempotent Invoice Payments** (2026-08-28) — Added `idempotencyKey` parameter to `POST /invoices/:id/pay`. Route validates the key; service uses existing fast-path `findFirst` pre-check plus a new race-safe P2002 catch **outside** the transaction block so concurrent retries with the same key collapse to a single payment. DB-level enforcement via partial unique index on `(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL` (migration `20260827000001`). New test suite `invoicePaymentIdempotency.test.ts` covers sequential retry, concurrent race, distinct keys, backward-compat (no key), validation, and cross-tenant isolation.

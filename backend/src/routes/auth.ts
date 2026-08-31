@@ -752,10 +752,15 @@ router.post('/mfa/verify-setup', authenticateJwt, async (req: Request, res: Resp
       actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
     });
 
+    // Issue a refreshed JWT so isMfaEnabled flips to true immediately.
+    // Without this, the old token (isMfaEnabled: false) would keep triggering
+    // the MFA gate on protected routes until the user logs out and back in.
+    const freshToken = generateJwtToken({ ...req.user!, isMfaEnabled: true });
+
     res.status(200).json({
       success: true,
       message: 'MFA enabled successfully. Save these backup codes somewhere safe - each one can be used once if you lose access to your authenticator app, and they will not be shown again.',
-      data: { backupCodes },
+      data: { backupCodes, token: freshToken },
     });
   } catch (error: any) {
     console.error('[Auth Service] MFA setup verification error:', error);
