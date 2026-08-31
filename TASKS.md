@@ -2,10 +2,11 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
-## Bug Fixes (2026-08-31)
+## Bug Fixes & Features (2026-08-31)
 
 - [x] **Fix POS revenue doubling** (2026-08-31) — Atomic claim sentinel in `POST /tills/backfill-revenue` prevents concurrent requests from double-posting the same sale. (`backend/src/routes/cashTill.ts`)
 - [x] **Fix MFA banner persisting after setup** (2026-08-31) — `POST /auth/mfa/verify-setup` now issues a fresh JWT with `isMfaEnabled: true`; frontend stores it in localStorage so the MFA gate lifts immediately. (`backend/src/routes/auth.ts`, `frontend/src/pages/settings/Settings.tsx`)
+- [x] **Tenant deletion via Admin Core Engine** (2026-08-31) — `DELETE /api/v1/tenants/:id` drops tenant schema, removes users, deletes tenant row; frontend adds per-row delete button in Tenant Schemas tab with slug-confirmation modal. (`backend/src/routes/tenants.ts`, `frontend/src/pages/admin/AdminCoreEngine.tsx`)
 
 ## System Hardening Plan (2026-08-28)
 

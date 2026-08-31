@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { prisma } from '../config/db';
 import { onboardTenant, TenantOnboardingError } from '../services/tenantService';
 import * as tenantRepository from '../repository/tenantRepository';
+import { dropTenantSchema } from '../database/tenantSchemaManager';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
@@ -752,6 +753,59 @@ router.delete('/members/:id', authenticateJwt, tenantContextMiddleware, requireR
   } catch (error: any) {
     console.error('[TenantMembers] Error removing member:', error);
     return res.status(500).json({ success: false, error: 'Failed to remove team member.' });
+  }
+});
+
+/**
+ * DELETE /api/v1/tenants/:id
+ * Permanently deletes a tenant: drops its PostgreSQL schema (CASCADE), removes
+ * all its users from public.users, then deletes the tenant row itself.
+ * Gated by the master broadcast passcode - this is a platform-operator
+ * operation, never tenant-scoped. An audit log entry is recorded before any
+ * destructive step so there is always a trace even if a later step fails.
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const passcode = (req.headers['x-admin-passcode'] as string | undefined) ?? '';
+    if (!BroadcastService.verifyPasscode(passcode)) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
+    }
+
+    const tenant = await tenantRepository.findTenantById(prisma, req.params.id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, error: 'Tenant not found.' });
+    }
+
+    // Write the audit record first — if later steps fail we still have a trace.
+    await recordAuditLog({
+      action: 'TENANT.DELETED',
+      entity: 'Tenant',
+      entityId: tenant.id,
+      tenantId: tenant.id,
+      actor: { ipAddress: req.ip || req.socket?.remoteAddress || null },
+      details: `Platform admin deleted tenant "${tenant.name}" (slug: ${tenant.slug}, schema: ${tenant.schema}). All associated users and schema data permanently removed.`,
+    });
+
+    // 1. Drop the tenant's isolated PostgreSQL schema and all its tables.
+    await dropTenantSchema(prisma, tenant.schema);
+
+    // 2. Remove all users that belonged to this tenant.
+    await prisma.user.deleteMany({ where: { tenantId: tenant.id } });
+
+    // 3. Remove the tenant row (and cache entries) from the platform registry.
+    await tenantRepository.deleteTenantBySlug(prisma, tenant.slug);
+
+    return res.status(200).json({
+      success: true,
+      message: `Tenant "${tenant.name}" has been permanently deleted.`,
+      data: { id: tenant.id, slug: tenant.slug, name: tenant.name },
+    });
+  } catch (error: any) {
+    console.error('[TenantDelete] Unexpected error:', error?.stack || error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Failed to delete tenant.',
+    });
   }
 });
 
