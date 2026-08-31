@@ -1086,7 +1086,7 @@ router.post('/backfill-revenue', requireRole('Admin', 'Accountant'), async (req:
           where: { id: sale.id, tenantId, journalId: null },
           data: { journalId: 'POSTING' },
         })
-      );
+      ) as { count: number };
       if (claimed.count === 0) continue; // already claimed by a concurrent request
 
       const journalId = await postCashSaleRevenue(sale, actor);
