@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Fix: Dashboard widget tier-gating + Sales Channel Report nav fix
+
+**What/Why:** Shop-tier (tier 1) tenants saw a spurious "two-factor authentication required" banner on their dashboard. Root cause: the `DashboardFinanceWidgets` component was calling tier-2-gated backend aging routes (`/reports/aging/ar`, `/reports/aging/ap`) for every tenant regardless of plan. Shop tenants received 403 responses, which the frontend MFA error handler was misinterpreting as an MFA gate error. Additionally, "Sales Channel Report" in the sidebar was visible to Shop tenants while all other analytics reports in that section already required tier 2.
+
+**How:**
+- **`frontend/src/App.tsx`** — `DashboardFinanceWidgets` now reads `settings?.tier` via `useTenantSettings()`. If tier < 2 (Shop plan), the component returns an "upgrade your plan" placeholder div instead of rendering the AR KPIs, AR Aging, and AP Aging widgets — preventing the spurious 403 calls and the MFA banner.
+- **`frontend/src/lib/navigation.ts`** — Added `minTier: 2` to the "Sales Channel Report" nav entry, matching all other analytics reports in that section.
+
+**Files affected:**
+- `frontend/src/App.tsx` — Added `useTenantSettings()` call + tier < 2 early-return in `DashboardFinanceWidgets`.
+- `frontend/src/lib/navigation.ts` — `minTier: 2` on Sales Channel Report.
+
+---
+
 ## [Date: 2026-08-31] - Feature: Tenant Deletion via Admin Core Engine
 
 **What/Why:** No mechanism existed to permanently delete a tenant from the platform. The user requested removal of a specific contracted client whose account needed to be offboarded. Built a full delete flow — backend endpoint + frontend confirmation dialog — gated by the master admin passcode.

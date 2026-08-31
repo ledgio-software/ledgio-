@@ -337,6 +337,7 @@ function DonutChart({ segments, size = 110 }: {
 
 // ── Dashboard finance widgets (AR/AP aging donuts + KPI cards) ────────────────
 function DashboardFinanceWidgets({ currency }: { currency: string }) {
+  const { settings } = useTenantSettings();
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
 
   type AgingTotals = { current: number; days1to30: number; days31to60: number; days61to90: number; days90plus: number; total: number };
@@ -378,6 +379,15 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
   const arOverdue = arTotals ? arTotals.days1to30 + arTotals.days31to60 + arTotals.days61to90 + arTotals.days90plus : 0;
   const arOver30  = arTotals ? arTotals.days31to60 + arTotals.days61to90 + arTotals.days90plus : 0;
   const arOver90  = arTotals ? arTotals.days90plus : 0;
+
+  if ((settings?.tier ?? 1) < 2) {
+    return (
+      <div className="rounded-lg border border-secondary-200 dark:border-secondary-700 bg-secondary-50 dark:bg-secondary-800/40 p-6 text-center text-sm text-secondary-500 dark:text-secondary-400">
+        AR/AP aging reports and KPI widgets are available on the <span className="font-semibold text-secondary-700 dark:text-secondary-300">Business</span> plan and above.
+        Upgrade your plan to unlock these insights.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

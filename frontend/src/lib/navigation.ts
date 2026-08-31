@@ -181,7 +181,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Cash Flow Forecast", href: "/reports/cash-flow-forecast", icon: TrendingUp, minTier: 2 },
       { name: "KPI Dashboard", href: "/reports/kpis", icon: Gauge, minTier: 2 },
       { name: "AP/AR Aging", href: "/reports/aging", icon: Clock, minTier: 2 },
-      { name: "Sales Channel Report", href: "/reports/sales-channel", icon: Store },
+      { name: "Sales Channel Report", href: "/reports/sales-channel", icon: Store, minTier: 2 },
       { name: "Branch Comparison", href: "/reports/branch-comparison", icon: GitBranch, minTier: 2 },
       { name: "Landed Cost", href: "/reports/landed-costs", icon: Anchor, minTier: 2 },
       { name: "Budgets", href: "/reports/budgets", icon: Target, minTier: 2 },
