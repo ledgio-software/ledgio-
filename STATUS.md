@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Feature: Tenant Deletion via Admin Core Engine
+
+**What/Why:** No mechanism existed to permanently delete a tenant from the platform. The user requested removal of a specific contracted client whose account needed to be offboarded. Built a full delete flow — backend endpoint + frontend confirmation dialog — gated by the master admin passcode.
+
+**How:**
+- **Backend:** Added `DELETE /api/v1/tenants/:id` to `routes/tenants.ts`. Verifies master passcode, writes an audit log entry first (so there is always a trace), then: (1) drops the tenant's PostgreSQL schema with `CASCADE` via `dropTenantSchema()`, (2) deletes all tenant users from `public.users`, (3) deletes the tenant row and invalidates its Redis cache entries via `deleteTenantBySlug()`.
+- **Frontend:** Added a red `XCircle` delete button on each row in the "Tenant Schemas & Tiers" tab. Clicking it opens a modal that shows the tenant name/slug and requires typing the exact slug to confirm — preventing accidental deletion. Submitting calls the backend endpoint and refreshes the tenant roster on success.
+
+**Files affected:**
+- `backend/src/routes/tenants.ts` — New `DELETE /:id` handler; imports `dropTenantSchema`.
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — Delete state, `handleDeleteTenant`, delete button in table row, confirmation modal.
+
+---
+
 ## [Date: 2026-08-31] - Fix: POS revenue doubling + MFA banner persisting after setup
 
 **What/Why:** Two production bugs reported from the live dashboard:

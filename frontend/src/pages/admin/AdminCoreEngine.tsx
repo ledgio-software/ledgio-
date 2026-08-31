@@ -331,6 +331,12 @@ export function AdminCoreEngine() {
   const [tierDrafts, setTierDrafts] = useState<Record<string, number>>({});
   const [savingTierId, setSavingTierId] = useState<string | null>(null);
 
+  // Tenant deletion state — requires typing the slug to confirm, to prevent
+  // accidental deletion of a live business's entire dataset.
+  const [deletingTenant, setDeletingTenant] = useState<{ id: string; name: string; slug: string } | null>(null);
+  const [deleteConfirmSlug, setDeleteConfirmSlug] = useState("");
+  const [isDeletingTenant, setIsDeletingTenant] = useState(false);
+
   // Platform-wide Audit Logs state
   const [auditLogs, setAuditLogs] = useState<
     {
@@ -493,6 +499,22 @@ export function AdminCoreEngine() {
       showToast(err.response?.data?.error || "Failed to update tenant plan.", "error");
     } finally {
       setSavingTierId(null);
+    }
+  };
+
+  const handleDeleteTenant = async () => {
+    if (!deletingTenant || deleteConfirmSlug !== deletingTenant.slug) return;
+    setIsDeletingTenant(true);
+    try {
+      await api.delete(`/tenants/${deletingTenant.id}`, { headers: { 'x-admin-passcode': passcode } });
+      showToast(`Tenant "${deletingTenant.name}" permanently deleted.`, "success");
+      setDeletingTenant(null);
+      setDeleteConfirmSlug("");
+      fetchTenants();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to delete tenant.", "error");
+    } finally {
+      setIsDeletingTenant(false);
     }
   };
 
@@ -702,6 +724,61 @@ export function AdminCoreEngine() {
 
   return (
     <div className="min-h-screen bg-secondary-950 text-white font-sans selection:bg-amber-500 selection:text-secondary-950">
+      {/* Tenant Deletion Confirmation Modal */}
+      {deletingTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-secondary-900 border border-rose-800 rounded-2xl shadow-2xl p-6 space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-rose-500/10 rounded-lg text-rose-400 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Permanently Delete Tenant</h3>
+                <p className="text-xs text-secondary-400 mt-1">
+                  This will drop the PostgreSQL schema <span className="font-mono text-rose-300">{deletingTenant.slug}</span>, delete all its users, and remove it from the platform roster. <strong className="text-white">This cannot be undone.</strong>
+                </p>
+              </div>
+            </div>
+            <div className="p-3 bg-rose-950/40 border border-rose-900 rounded-lg text-xs text-rose-300 space-y-1">
+              <div><span className="text-secondary-400">Tenant:</span> <span className="font-semibold text-white">{deletingTenant.name}</span></div>
+              <div><span className="text-secondary-400">Slug:</span> <span className="font-mono">{deletingTenant.slug}</span></div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-secondary-300">
+                Type the slug <span className="font-mono text-rose-300">{deletingTenant.slug}</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmSlug}
+                onChange={(e) => setDeleteConfirmSlug(e.target.value)}
+                placeholder={deletingTenant.slug}
+                className="w-full h-9 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs font-mono focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 border-secondary-700 text-secondary-300 hover:bg-secondary-800 text-xs"
+                onClick={() => { setDeletingTenant(null); setDeleteConfirmSlug(""); }}
+                disabled={isDeletingTenant}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1 bg-rose-700 hover:bg-rose-600 text-white text-xs disabled:opacity-40"
+                onClick={handleDeleteTenant}
+                disabled={deleteConfirmSlug !== deletingTenant.slug || isDeletingTenant}
+              >
+                {isDeletingTenant ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                Delete Permanently
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Engine Navigation Header */}
       <header className="border-b border-secondary-800 bg-secondary-900/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -1332,6 +1409,7 @@ export function AdminCoreEngine() {
                             <TableHead className="text-secondary-400">Status</TableHead>
                             <TableHead className="text-secondary-400">Users</TableHead>
                             <TableHead className="text-secondary-400">Onboarded</TableHead>
+                            <TableHead className="text-secondary-400"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1396,10 +1474,19 @@ export function AdminCoreEngine() {
                                   </TableCell>
                                   <TableCell className="text-secondary-300 font-mono text-center">{t.userCount ?? "—"}</TableCell>
                                   <TableCell className="text-secondary-300">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      className="p-1.5 rounded-md text-rose-500 hover:bg-rose-950/50 hover:text-rose-400 transition-colors"
+                                      title="Delete tenant permanently"
+                                      onClick={() => { setDeletingTenant({ id: t.id, name: t.name, slug: t.slug }); setDeleteConfirmSlug(""); }}
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </button>
+                                  </TableCell>
                                 </TableRow>
                                 {isExpanded && (
                                   <TableRow key={`${t.id}-users`} className="border-secondary-800 bg-secondary-950/40">
-                                    <TableCell colSpan={8} className="p-0">
+                                    <TableCell colSpan={9} className="p-0">
                                       <div className="px-6 py-4 space-y-2">
                                         <div className="text-xs font-bold text-secondary-300 mb-2 flex items-center gap-2">
                                           <Users className="h-3.5 w-3.5" /> Users in {t.name}
