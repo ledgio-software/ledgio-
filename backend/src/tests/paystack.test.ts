@@ -184,6 +184,7 @@ describe('Paystack pay-now link on invoices - Subaccounts (platform-wide key + p
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'Paystack Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
     tenantId = onboard.tenant.id;
