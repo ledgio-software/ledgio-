@@ -2,6 +2,24 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Fix: Upgrade test tenants to tier 2 for ledger-endpoint access
+
+**What/Why:** Adding `requireTier(2, 'General Ledger')` to `routes/ledgers.ts` broke 8 test files whose `onboardTenant()` calls defaulted to tier 1. Any test asserting ledger balances received a 403 instead of data, causing `TypeError: Cannot read properties of undefined (reading 'accounts')`. Fixed by adding `tier: 2` to each affected `onboardTenant()` call.
+
+**Files affected:**
+- `backend/src/tests/accountDefaultRole.test.ts`
+- `backend/src/tests/creditDebitNotes.test.ts`
+- `backend/src/tests/invoicePartialPayments.test.ts`
+- `backend/src/tests/journalEntries.test.ts`
+- `backend/src/tests/ledgers.test.ts`
+- `backend/src/tests/multiCurrency.test.ts`
+- `backend/src/tests/pettyCash.test.ts`
+- `backend/src/tests/paystack.test.ts`
+
+**Verification:** CI passed (all 723 tests, 95 suites) on commit `27feec8`.
+
+---
+
 ## [Date: 2026-08-31] - Security: Comprehensive tier-gating audit and enforcement patch
 
 **What/Why:** A full audit revealed that 17 backend route files and 16 `reports.ts` endpoints were missing `requireTier(2, ...)` enforcement, meaning Shop-tier (tier 1) tenants could access Business-tier features by hitting API endpoints directly (the nav-sidebar filter is presentation-only and does not block direct URL or API access). The missing gates covered Sales Orders, Delivery Notes, GRNs, Payment Matching, Cost Centres, Cost Categories, Manufacturing, Job Costing, Job Work Orders, WHT Rates, Price Lists, Scenarios, Voucher Classes, Post-Dated Cheques, Interest Policy, Serial Numbers, General Ledger, and ~16 report endpoints (Sales Channel, Analytics sub-reports, Stock Movement, Registers, Daybook, VAT Return, Stock Aging, Financial Ratios, Cost Centre P&L, Cost Category P&L, Benford Analysis, Fraud Detection).
