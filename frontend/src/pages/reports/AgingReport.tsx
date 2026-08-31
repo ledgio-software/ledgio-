@@ -97,7 +97,11 @@ export function AgingReport() {
   const totals = tab === "ar" ? arTotals : apTotals;
   const rows = tab === "ar" ? arRows : apRows;
 
-  if (!isLoadingTenantSettings && settings.tier < 2) {
+  if (isLoadingTenantSettings) {
+    return <div className="py-8 text-center text-secondary-500">Loading...</div>;
+  }
+
+  if (settings.tier < 2) {
     return <UpgradeRequired featureLabel="AP/AR Aging Analysis" requiredTier={2} currentTier={settings.tier} />;
   }
 
