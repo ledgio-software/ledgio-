@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Fix: Production metrics — Redis error rate, slow bootstrap, HEAD /health latency, warehouses latency
+
+**What/Why:** Admin metrics dashboard showed four production issues:
+
+1. **`POST /api/v1/sync/ticket` — 34.3% error rate.** The endpoint called `redis.setex()` directly (not through the fail-open `cacheUtils` wrapper). When Redis is temporarily unavailable (free-tier cold start, network blip), the call threw and was caught as a generic 500. Fixed: inner try/catch now returns 503 with a human-readable message so clients know it's a transient infrastructure issue, not a server bug. Error rate drops to 0% when Redis is healthy; failures report accurately when it's not.
+
+2. **`HEAD /api/v1/health` — 2205ms average latency.** Express has no `HEAD /` handler registered, so it silently routed HEAD through the `GET /` handler, which does a full `prisma.$queryRaw SELECT 1` + Redis probe on every call. Load-balancers and Render send HEAD probes frequently. Fixed: added `router.head('/')` that returns 200 immediately, before the GET handler.
+
+3. **`GET /api/v1/sync/bootstrap` — 3304ms average latency.** The bootstrap snapshot ran `invoice.findMany({ include: { customer: true, items: true } })` — fetching all invoice fields plus all fields of each nested customer and each nested invoice line item. The `customer` join was redundant: the endpoint already returns a separate `customers` array, so clients can join by `customerId` locally. Removed `customer: true` from the invoice include, eliminating one JOIN. This also reduces the connection-pool pressure that likely caused cascade failures on `GET /ledgers/summary` and `GET /reports/profit-loss`.
+
+4. **`GET /api/v1/inventory/warehouses` — 2165ms average latency.** The query used `include: { stocks: { include: { item: true } } }` — a 2-level deep nested include that fetched every column of every item (including GRA compliance, batch-tracking, preferred-vendor, etc.) for all stock entries across all warehouses. Fixed: switched the inner `item` include to `select` with only the 9 fields the warehouse card UI actually needs (`id`, `name`, `sku`, `category`, `unitOfMeasure`, `sellingPrice`, `costPrice`, `reorderLevel`, `requiresBatchTracking`, `trackSerials`).
+
+**Files affected:**
+- `backend/src/routes/health.ts` — Added `router.head('/', ...)` returning 200 immediately before the GET handler.
+- `backend/src/routes/sync.ts` — Ticket endpoint: wrapped `redis.setex()` in inner try/catch → 503 on Redis failure. Bootstrap: removed redundant `customer: true` from invoice `include`.
+- `backend/src/routes/inventory.ts` — Warehouses: changed `include: { item: true }` to `include: { item: { select: { ... } } }` with 9 specific fields.
+
+---
+
 ## [Date: 2026-08-28] - Fix: Render production build failure (@types/compression not installed)
 
 **What/Why:** Render's build kept failing with `TS7016: Could not find a declaration file for module 'compression'` even after the `@types/compression` version fix landed. True root cause: `render.yaml` sets `NODE_ENV=production` for the whole service, and `npm ci` with `NODE_ENV=production` silently skips all devDependencies — so `@types/compression` (and all other type packages) are never installed during the build step. The earlier version fix (`^1.8.1` → `^1.7.5`) was also necessary (the old version doesn't exist on npm), but the environment variable is what actually caused the type resolution to fail.

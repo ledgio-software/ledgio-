@@ -4,6 +4,13 @@ import { isRedisHealthy } from '../config/redis';
 
 const router = Router();
 
+// HEAD /health — return 200 immediately without hitting the DB/Redis.
+// Render and load-balancers send HEAD probes; routing through the full GET
+// handler costs a DB round-trip per probe, showing up as ~2s in metrics.
+router.head('/', (_req: Request, res: Response) => {
+  res.status(200).end();
+});
+
 router.get('/', async (_req: Request, res: Response) => {
   const health = {
     status: 'healthy',

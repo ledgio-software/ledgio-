@@ -31,7 +31,10 @@ router.get('/bootstrap', async (req: Request, res: Response): Promise<void> => {
         accountRepository.listAccounts(client),
         (client as any).invoice.findMany({
           where: { tenantId },
-          include: { customer: true, items: true },
+          // customer is omitted here — the full customers list is already returned
+          // separately below, so clients join by customerId to avoid a redundant JOIN
+          // on every invoice row (previously doubled round-trip cost for large sets).
+          include: { items: true },
           orderBy: { createdAt: 'desc' },
         }),
         (client as any).customer.findMany({
@@ -154,13 +157,22 @@ router.post('/ticket', async (req: Request, res: Response): Promise<void> => {
     const { tenantId } = requireTenantContext();
     const user = (req as any).user;
     const ticket = crypto.randomBytes(24).toString('hex');
-    await redis.setex(`ws-ticket:${ticket}`, 30, JSON.stringify({
-      tenantId,
-      userId: user?.id,
-      name: user?.name,
-      email: user?.email,
-      role: user?.role,
-    }));
+    try {
+      await redis.setex(`ws-ticket:${ticket}`, 30, JSON.stringify({
+        tenantId,
+        userId: user?.id,
+        name: user?.name,
+        email: user?.email,
+        role: user?.role,
+      }));
+    } catch (redisErr: any) {
+      // Redis unavailable — ticket cannot be stored, so WS auth would fail anyway.
+      // Return 503 so the client knows this is a transient infrastructure issue
+      // rather than a bug (avoids misleading 500 in error-rate metrics).
+      console.error('[Sync] Redis unavailable when issuing WebSocket ticket:', redisErr);
+      res.status(503).json({ success: false, error: 'Real-time service temporarily unavailable. Please try again shortly.' });
+      return;
+    }
     res.json({ success: true, data: { ticket } });
   } catch (error: any) {
     console.error('[Sync] Error issuing WebSocket ticket:', error);

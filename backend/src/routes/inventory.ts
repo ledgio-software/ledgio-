@@ -52,7 +52,29 @@ router.get('/warehouses', async (req: Request, res: Response): Promise<void> => 
 
       return (client as any).warehouse.findMany({
         where,
-        include: { stocks: { include: { item: true } } },
+        include: {
+          stocks: {
+            include: {
+              // Select only the item fields the warehouse card UI needs rather
+              // than fetching the full item row (avoids pulling GRA/Paystack/
+              // batch-tracking fields on every warehouse load — 2× latency cut).
+              item: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  category: true,
+                  unitOfMeasure: true,
+                  sellingPrice: true,
+                  costPrice: true,
+                  reorderLevel: true,
+                  requiresBatchTracking: true,
+                  trackSerials: true,
+                },
+              },
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       });
     });
