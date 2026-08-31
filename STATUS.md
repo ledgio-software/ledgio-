@@ -2,6 +2,50 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Security: Comprehensive tier-gating audit and enforcement patch
+
+**What/Why:** A full audit revealed that 17 backend route files and 16 `reports.ts` endpoints were missing `requireTier(2, ...)` enforcement, meaning Shop-tier (tier 1) tenants could access Business-tier features by hitting API endpoints directly (the nav-sidebar filter is presentation-only and does not block direct URL or API access). The missing gates covered Sales Orders, Delivery Notes, GRNs, Payment Matching, Cost Centres, Cost Categories, Manufacturing, Job Costing, Job Work Orders, WHT Rates, Price Lists, Scenarios, Voucher Classes, Post-Dated Cheques, Interest Policy, Serial Numbers, General Ledger, and ~16 report endpoints (Sales Channel, Analytics sub-reports, Stock Movement, Registers, Daybook, VAT Return, Stock Aging, Financial Ratios, Cost Centre P&L, Cost Category P&L, Benford Analysis, Fraud Detection).
+
+**How:** Added `import { requireTier } from '../middleware/tierEnforcementMiddleware'` and `router.use(requireTier(2, 'Feature Name'))` to each affected route file immediately after the existing `authenticateJwt + tenantContextMiddleware` setup. For `reports.ts` individual endpoints, inserted `requireTier(2, '...')` as the first middleware argument before `requireRole(...)`. All changes are additive — no logic altered, no data models changed.
+
+**Files affected (backend only — no frontend changes needed):**
+- `backend/src/routes/salesOrders.ts` — added `requireTier(2, 'Sales Orders')`
+- `backend/src/routes/deliveryNotes.ts` — added `requireTier(2, 'Delivery Notes & GRN')`
+- `backend/src/routes/goodsReceiptNotes.ts` — added `requireTier(2, 'Delivery Notes & GRN')`
+- `backend/src/routes/paymentBatches.ts` — added `requireTier(2, 'Payment Matching')`
+- `backend/src/routes/costCentres.ts` — added `requireTier(2, 'Cost Centres')`
+- `backend/src/routes/manufacturing.ts` — added `requireTier(2, 'Manufacturing')`
+- `backend/src/routes/whtRates.ts` — added `requireTier(2, 'Withholding Tax')`
+- `backend/src/routes/priceLists.ts` — added `requireTier(2, 'Price Lists')`
+- `backend/src/routes/jobs.ts` — added `requireTier(2, 'Job Costing')`
+- `backend/src/routes/jobWorkOrders.ts` — added `requireTier(2, 'Job Work Orders')`
+- `backend/src/routes/costCategories.ts` — added `requireTier(2, 'Cost Categories')`
+- `backend/src/routes/scenarios.ts` — added `requireTier(2, 'Scenarios')`
+- `backend/src/routes/voucherClasses.ts` — added `requireTier(2, 'Voucher Classes')`
+- `backend/src/routes/postDatedCheques.ts` — added `requireTier(2, 'Post-Dated Cheques')`
+- `backend/src/routes/interestPolicy.ts` — added `requireTier(2, 'Interest Charges')`
+- `backend/src/routes/serialNumbers.ts` — added `requireTier(2, 'Serial Numbers')`
+- `backend/src/routes/ledgers.ts` — added `requireTier(2, 'General Ledger')`
+- `backend/src/routes/reports.ts` — 16 endpoints gated: `/sales-channel`, `/analytics/trends`, `/analytics/top-customers`, `/analytics/top-items`, `/stock-movement`, `/sales-register`, `/purchase-register`, `/daybook`, `/cost-centre-pnl`, `/cost-category-pnl`, `/vat-return`, `/stock-aging`, `/financial-ratios`, `/benford-analysis`, `/fraud/duplicate-payments`, `/fraud/round-amounts`
+
+**TypeScript verification:** `npx tsc --noEmit` passes with zero errors.
+
+---
+
+## [Date: 2026-08-31] - Feature: Admin-initiated password reset for team members
+
+**What/Why:** Workspace admins had no way to reset a staff member's password when they were locked out or forgot it. Built an admin-triggered reset that generates a secure 12-character temporary password, persists it hashed, and emails it to the member so they can log in and change it from Settings.
+
+**How:**
+- **Backend:** Added `POST /api/v1/tenants/members/:id/reset-password` (Admin-only, tenant-scoped). Uses `crypto.randomInt` to build a 12-char alphanumeric temp password from a curated alphabet (no ambiguous chars like 0/O/1/l). Hashes it with `hashPassword`, updates the user row in a transaction that also records a `TEAM_MEMBER.PASSWORD_RESET` audit log. Emails the plain-text temp password to the member via `EmailService.sendMail`; if email is unconfigured, returns the temp password in the JSON response so the admin can deliver it manually.
+- **Frontend:** Added `handleResetPassword` + `resettingPasswordId` state in `TeamManagement.tsx`. New amber "Reset Password" button (KeyRound icon) appears in the Admin actions column for each member row, between "Manage Access" and "Remove". Prompts for confirmation before firing, shows a success toast with the email confirmation message (or the temp password itself if email is unconfigured).
+
+**Files affected:**
+- `backend/src/routes/tenants.ts` — New `POST /members/:id/reset-password` handler; added `hashPassword` and `EmailService` imports.
+- `frontend/src/pages/team/TeamManagement.tsx` — `handleResetPassword`, `resettingPasswordId` state, Reset Password button, `KeyRound` icon import.
+
+---
+
 ## [Date: 2026-08-31] - Fix: Dashboard widget tier-gating + Sales Channel Report nav fix
 
 **What/Why:** Shop-tier (tier 1) tenants saw a spurious "two-factor authentication required" banner on their dashboard. Root cause: the `DashboardFinanceWidgets` component was calling tier-2-gated backend aging routes (`/reports/aging/ar`, `/reports/aging/ap`) for every tenant regardless of plan. Shop tenants received 403 responses, which the frontend MFA error handler was misinterpreting as an MFA gate error. Additionally, "Sales Channel Report" in the sidebar was visible to Shop tenants while all other analytics reports in that section already required tier 2.

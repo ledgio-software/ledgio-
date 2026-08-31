@@ -6,11 +6,13 @@ import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { prisma } from '../config/db';
 import { recordAuditLogTx, actorFromRequest, AuditChanges } from '../services/auditLogService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Cost Centres'));
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),

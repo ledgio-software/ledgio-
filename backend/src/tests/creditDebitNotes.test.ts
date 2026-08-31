@@ -81,6 +81,7 @@ describe('Credit Notes (AR) and Debit Notes (AP)', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'Notes Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
     tenantId = onboard.tenant.id;

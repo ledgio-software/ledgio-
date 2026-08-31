@@ -434,7 +434,7 @@ router.get('/cash-flow-forecast', requireTier(2, 'Cash Flow Forecast'), requireR
  * based on POS cash sales. Includes per-channel totals and item-level detail.
  * Access: Viewer role or higher.
  */
-router.get('/sales-channel', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/sales-channel', requireTier(2, 'Sales Channel Report'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -735,7 +735,7 @@ router.get(
  * the accountant already trusts. months: 3 | 6 | 12 (default 12, max 24).
  * Access: Viewer role or higher.
  */
-router.get('/analytics/trends', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/analytics/trends', requireTier(2, 'Analytics Dashboard'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const months = Math.min(24, Math.max(1, parseInt((req.query.months as string) || '12', 10) || 12));
@@ -790,7 +790,7 @@ router.get('/analytics/trends', requireRole('Viewer'), async (req: Request, res:
  * Top customers ranked by total invoiced-and-paid revenue in the date range.
  * Access: Viewer role or higher.
  */
-router.get('/analytics/top-customers', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/analytics/top-customers', requireTier(2, 'Analytics Dashboard'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -869,7 +869,7 @@ router.get('/analytics/top-customers', requireRole('Viewer'), async (req: Reques
  * Top-selling items ranked by total POS line revenue in the date range.
  * Access: Viewer role or higher.
  */
-router.get('/analytics/top-items', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/analytics/top-items', requireTier(2, 'Analytics Dashboard'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -929,7 +929,7 @@ router.get('/analytics/top-items', requireRole('Viewer'), async (req: Request, r
  * vendor bill goods-receipts, stock adjustments, inter-warehouse transfers.
  * Access: Viewer role or higher.
  */
-router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/stock-movement', requireTier(2, 'Stock Movement Report'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { itemId, warehouseId, startDate, endDate } = req.query;
@@ -1156,7 +1156,7 @@ router.get('/stock-movement', requireRole('Viewer'), async (req: Request, res: R
  * Standard statutory report used by VAT filers to reconcile output tax.
  * Access: Viewer role or higher.
  */
-router.get('/sales-register', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/sales-register', requireTier(2, 'Sales & Purchase Registers'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -1233,7 +1233,7 @@ router.get('/sales-register', requireRole('Viewer'), async (req: Request, res: R
  * Standard statutory report used by VAT filers to reconcile input tax.
  * Access: Viewer role or higher.
  */
-router.get('/purchase-register', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/purchase-register', requireTier(2, 'Sales & Purchase Registers'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -1307,7 +1307,7 @@ router.get('/purchase-register', requireRole('Viewer'), async (req: Request, res
  * financial events for a date range, showing the full double-entry breakdown per voucher.
  * Access: Viewer role or higher.
  */
-router.get('/daybook', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/daybook', requireTier(2, 'Daybook'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -1417,7 +1417,7 @@ router.get('/daybook', requireRole('Viewer'), async (req: Request, res: Response
  * Cost-centre filtered P&L: filters ledger rows tagged to the given cost_centre_id.
  * Access: Viewer role or higher.
  */
-router.get('/cost-centre-pnl', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/cost-centre-pnl', requireTier(2, 'Cost Centre P&L'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { costCentreId, startDate, endDate } = req.query;
@@ -1532,7 +1532,7 @@ router.get('/cost-centre-pnl', requireRole('Viewer'), async (req: Request, res: 
  * grouped by tax rate. Input VAT from bills is not separately tracked — note is returned.
  * Access: Viewer role or higher.
  */
-router.get('/vat-return', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/vat-return', requireTier(2, 'VAT Return Report'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -1563,7 +1563,7 @@ router.get('/vat-return', requireRole('Viewer'), async (req: Request, res: Respo
  * FIFO tenants use actual stock lots; Average-cost tenants use warehouse stock + oldest adjustment date.
  * Access: Viewer role or higher.
  */
-router.get('/stock-aging', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/stock-aging', requireTier(2, 'Stock Aging Report'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { asOfDate } = req.query;
@@ -1592,7 +1592,7 @@ router.get('/stock-aging', requireRole('Viewer'), async (req: Request, res: Resp
  * because current vs non-current classification is not tracked in the schema.
  * Access: Viewer role or higher.
  */
-router.get('/financial-ratios', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/financial-ratios', requireTier(2, 'Financial Ratios'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate, asOfDate } = req.query;
@@ -1623,7 +1623,7 @@ router.get('/financial-ratios', requireRole('Viewer'), async (req: Request, res:
  * P&L breakdown for a single cost category (journal lines tagged with the category).
  * Access: Viewer role or higher.
  */
-router.get('/cost-category-pnl', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+router.get('/cost-category-pnl', requireTier(2, 'Cost Centre P&L'), requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { costCategoryId, startDate, endDate } = req.query;
@@ -1659,7 +1659,7 @@ router.get('/cost-category-pnl', requireRole('Viewer'), async (req: Request, res
  * Query params: startDate, endDate (YYYY-MM-DD, optional)
  * Access: Accountant role or higher
  */
-router.get('/benford-analysis', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+router.get('/benford-analysis', requireTier(2, 'Benford Analysis'), requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -1691,7 +1691,7 @@ router.get('/benford-analysis', requireRole('Accountant'), async (req: Request, 
  * Query params: startDate, endDate (YYYY-MM-DD, optional)
  * Access: Auditor role or higher
  */
-router.get('/fraud/duplicate-payments', requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
+router.get('/fraud/duplicate-payments', requireTier(2, 'Fraud Detection'), requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { startDate, endDate } = req.query;
@@ -1724,7 +1724,7 @@ router.get('/fraud/duplicate-payments', requireRole('Auditor'), async (req: Requ
  * Query params: minAmount (default 500), roundingThreshold (default 100), startDate, endDate
  * Access: Auditor role or higher
  */
-router.get('/fraud/round-amounts', requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
+router.get('/fraud/round-amounts', requireTier(2, 'Fraud Detection'), requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const { minAmount, roundingThreshold, startDate, endDate } = req.query;

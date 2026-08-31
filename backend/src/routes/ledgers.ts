@@ -4,12 +4,14 @@ import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import * as ledgerService from '../services/ledgerService';
 import { LedgerServiceError } from '../services/ledgerService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 // Enforce authentication & tenant context on all ledger endpoints
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'General Ledger'));
 
 /**
  * GET /api/v1/ledgers

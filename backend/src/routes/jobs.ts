@@ -7,9 +7,11 @@ import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { resolveDefaultAccount, listAccounts } from '../repository/accountRepository';
 import * as journalEntryService from '../services/journalEntryService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 router.use(authenticateJwt, tenantContextMiddleware);
+router.use(requireTier(2, 'Job Costing'));
 
 const costLineSchema = z.object({
   type: z.enum(['MATERIAL', 'LABOUR', 'OVERHEAD', 'SUBCONTRACT']),

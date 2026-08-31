@@ -7,9 +7,11 @@ import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { recordAuditLogTx, AuditActor, AuditChanges } from '../services/auditLogService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 router.use(authenticateJwt, tenantContextMiddleware);
+router.use(requireTier(2, 'Sales Orders'));
 
 const lineSchema = z.object({
   description: z.string().min(1),
