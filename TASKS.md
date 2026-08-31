@@ -6,6 +6,7 @@ This file lists the development tasks for the Multi-Tenant Web-Based Accounting 
 
 - [x] **Fix POS revenue doubling** (2026-08-31) — Atomic claim sentinel in `POST /tills/backfill-revenue` prevents concurrent requests from double-posting the same sale. (`backend/src/routes/cashTill.ts`)
 - [x] **Fix MFA banner persisting after setup** (2026-08-31) — `POST /auth/mfa/verify-setup` now issues a fresh JWT with `isMfaEnabled: true`; frontend stores it in localStorage so the MFA gate lifts immediately. (`backend/src/routes/auth.ts`, `frontend/src/pages/settings/Settings.tsx`)
+- [x] **Dashboard widget tier-gating + Sales Channel Report nav fix** (2026-08-31) — `DashboardFinanceWidgets` now renders an upgrade placeholder for Shop-tier tenants instead of calling tier-2-gated aging routes; eliminates spurious MFA banner on Shop dashboards. `minTier: 2` added to Sales Channel Report nav entry. (`frontend/src/App.tsx`, `frontend/src/lib/navigation.ts`)
 - [x] **Tenant deletion via Admin Core Engine** (2026-08-31) — `DELETE /api/v1/tenants/:id` drops tenant schema, removes users, deletes tenant row; frontend adds per-row delete button in Tenant Schemas tab with slug-confirmation modal. (`backend/src/routes/tenants.ts`, `frontend/src/pages/admin/AdminCoreEngine.tsx`)
 
 ## System Hardening Plan (2026-08-28)
