@@ -8,6 +8,8 @@ import { requireTenantContext } from '../context/tenantContext';
 
 const router = Router();
 
+router.use(authenticateJwt, tenantContextMiddleware, requireTier(3, 'Custom Fields'));
+
 const VALID_FIELD_TYPES = ['TEXT', 'NUMBER', 'DATE', 'BOOLEAN', 'SELECT', 'MULTI_SELECT'];
 
 /**
@@ -16,8 +18,6 @@ const VALID_FIELD_TYPES = ['TEXT', 'NUMBER', 'DATE', 'BOOLEAN', 'SELECT', 'MULTI
  */
 router.get(
   '/',
-  authenticateJwt,
-  tenantContextMiddleware,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { tenantId } = requireTenantContext();
@@ -47,9 +47,6 @@ router.get(
  */
 router.post(
   '/',
-  authenticateJwt,
-  tenantContextMiddleware,
-  requireTier(2, 'Custom Fields'),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { tenantId } = requireTenantContext();

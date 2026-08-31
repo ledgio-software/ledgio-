@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { ShieldAlert, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
 import { api } from "../../lib/api";
 import { exportToCsv } from "../../lib/exportCsv";
+import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 
 interface BenfordDigitResult {
   digit: number;
@@ -24,6 +26,7 @@ interface BenfordReport {
 const BAR_MAX_WIDTH = 220; // px
 
 export function BenfordAnalysis() {
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [report, setReport] = useState<BenfordReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,9 @@ export function BenfordAnalysis() {
     }
   };
 
-  useEffect(() => { fetchReport(); }, [startDate, endDate]); // eslint-disable-line
+  useEffect(() => {
+    if (!isLoadingTenantSettings && settings.tier >= 2) fetchReport();
+  }, [startDate, endDate, isLoadingTenantSettings, settings.tier]); // eslint-disable-line
 
   const handleExport = () => {
     if (!report) return;
@@ -60,6 +65,9 @@ export function BenfordAnalysis() {
   };
 
   const maxActual = report ? Math.max(...report.digits.map((d) => Math.max(d.actual, d.expected))) : 0.32;
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="Benford's Law Analysis" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

@@ -4,10 +4,15 @@ This file lists the development tasks for the Multi-Tenant Web-Based Accounting 
 
 ## Bug Fixes & Features (2026-08-31)
 
+- [x] **Frontend tier-gate enforcement + customFields backend fix** (2026-08-31) — Fixed live 403 errors for tier-1 tenants. 12 frontend report components now gate `useEffect` API calls with `useTenantSettings()` tier check; `customFields.ts` backend upgraded to router-level `requireTier(3)`. Eliminates 403s on `/reports/aging/ap`, `/reports/aging/ar`, `/ledgers/summary`, `/reports/sales-channel` for Shop-tier tenants.
+
+
+
 - [x] **Fix POS revenue doubling** (2026-08-31) — Atomic claim sentinel in `POST /tills/backfill-revenue` prevents concurrent requests from double-posting the same sale. (`backend/src/routes/cashTill.ts`)
 - [x] **Fix MFA banner persisting after setup** (2026-08-31) — `POST /auth/mfa/verify-setup` now issues a fresh JWT with `isMfaEnabled: true`; frontend stores it in localStorage so the MFA gate lifts immediately. (`backend/src/routes/auth.ts`, `frontend/src/pages/settings/Settings.tsx`)
 - [x] **Admin-initiated password reset for team members** (2026-08-31) — `POST /tenants/members/:id/reset-password` generates a 12-char temp password, hashes it, saves it, emails it to the member; frontend adds Reset Password button in Team Management. (`backend/src/routes/tenants.ts`, `frontend/src/pages/team/TeamManagement.tsx`)
 - [x] **Dashboard widget tier-gating + Sales Channel Report nav fix** (2026-08-31) — `DashboardFinanceWidgets` now renders an upgrade placeholder for Shop-tier tenants instead of calling tier-2-gated aging routes; eliminates spurious MFA banner on Shop dashboards. `minTier: 2` added to Sales Channel Report nav entry. (`frontend/src/App.tsx`, `frontend/src/lib/navigation.ts`)
+- [x] **Fix: upgrade test tenants to tier 2 for ledger-endpoint access** (2026-08-31) — Eight test files called `/api/v1/ledgers/*` with tier-1 tenants after `requireTier(2, 'General Ledger')` was added; added `tier: 2` to each `onboardTenant()` call so tests get real ledger data. All 723 tests pass. (`backend/src/tests/accountDefaultRole.test.ts`, `creditDebitNotes.test.ts`, `invoicePartialPayments.test.ts`, `journalEntries.test.ts`, `ledgers.test.ts`, `multiCurrency.test.ts`, `pettyCash.test.ts`, `paystack.test.ts`)
 - [x] **Tenant deletion via Admin Core Engine** (2026-08-31) — `DELETE /api/v1/tenants/:id` drops tenant schema, removes users, deletes tenant row; frontend adds per-row delete button in Tenant Schemas tab with slug-confirmation modal. (`backend/src/routes/tenants.ts`, `frontend/src/pages/admin/AdminCoreEngine.tsx`)
 
 ## System Hardening Plan (2026-08-28)

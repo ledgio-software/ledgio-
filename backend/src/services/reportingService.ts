@@ -501,16 +501,17 @@ export async function getDuplicatePayments(startDate?: string, endDate?: string)
 
     return (client as any).$queryRawUnsafe(
       `SELECT
-         i.customer_name AS vendor_name,
+         c.name AS vendor_name,
          ip.amount::TEXT AS amount,
          ip.created_at::DATE::TEXT AS payment_date,
          COUNT(*) AS cnt,
          STRING_AGG(ip.id::TEXT, ',' ORDER BY ip.created_at) AS payment_ids
        FROM invoice_payments ip
        JOIN invoices i ON i.id = ip.invoice_id
+       JOIN customers c ON c.id = i.customer_id
        WHERE ip.tenant_id = $1
          ${dateFilter}
-       GROUP BY i.customer_name, ip.amount, ip.created_at::DATE
+       GROUP BY c.name, ip.amount, ip.created_at::DATE
        HAVING COUNT(*) > 1
        ORDER BY cnt DESC, payment_date DESC`,
       ...params

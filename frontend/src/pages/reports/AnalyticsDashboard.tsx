@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { TrendingUp, TrendingDown, Users, ShoppingBag, BarChart3, Award } from "lucide-react";
 import { api } from "../../lib/api";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 
@@ -203,7 +204,7 @@ function ShareBar({ pct }: { pct: number }) {
 }
 
 export function AnalyticsDashboard() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [period, setPeriod] = useState<Period>(12);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [customers, setCustomers] = useState<TopCustomer[]>([]);
@@ -235,31 +236,34 @@ export function AnalyticsDashboard() {
   }, [period]);
 
   useEffect(() => {
+    if (isLoadingTenantSettings || settings.tier < 2) return;
     setIsLoadingTrends(true);
     api
       .get(`/reports/analytics/trends?months=${period}`)
       .then((res) => setTrends(res.data.data?.series ?? []))
       .catch(() => setTrends([]))
       .finally(() => setIsLoadingTrends(false));
-  }, [period]);
+  }, [period, isLoadingTenantSettings, settings.tier]);
 
   useEffect(() => {
+    if (isLoadingTenantSettings || settings.tier < 2) return;
     setIsLoadingCustomers(true);
     api
       .get(`/reports/analytics/top-customers?startDate=${startDate}&endDate=${endDate}&limit=5`)
       .then((res) => setCustomers(res.data.data?.customers ?? []))
       .catch(() => setCustomers([]))
       .finally(() => setIsLoadingCustomers(false));
-  }, [startDate, endDate]);
+  }, [startDate, endDate, isLoadingTenantSettings, settings.tier]);
 
   useEffect(() => {
+    if (isLoadingTenantSettings || settings.tier < 2) return;
     setIsLoadingItems(true);
     api
       .get(`/reports/analytics/top-items?startDate=${startDate}&endDate=${endDate}&limit=5`)
       .then((res) => setItems(res.data.data?.items ?? []))
       .catch(() => setItems([]))
       .finally(() => setIsLoadingItems(false));
-  }, [startDate, endDate]);
+  }, [startDate, endDate, isLoadingTenantSettings, settings.tier]);
 
   // Summary KPIs from the trend series
   const summary = useMemo(() => {
@@ -277,6 +281,9 @@ export function AnalyticsDashboard() {
 
   const maxCustomerRev = customers[0]?.revenue ?? 1;
   const maxItemRev = items[0]?.revenue ?? 1;
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="Analytics Dashboard" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
