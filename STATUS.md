@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Feature: Admin-initiated password reset for team members
+
+**What/Why:** Workspace admins had no way to reset a staff member's password when they were locked out or forgot it. Built an admin-triggered reset that generates a secure 12-character temporary password, persists it hashed, and emails it to the member so they can log in and change it from Settings.
+
+**How:**
+- **Backend:** Added `POST /api/v1/tenants/members/:id/reset-password` (Admin-only, tenant-scoped). Uses `crypto.randomInt` to build a 12-char alphanumeric temp password from a curated alphabet (no ambiguous chars like 0/O/1/l). Hashes it with `hashPassword`, updates the user row in a transaction that also records a `TEAM_MEMBER.PASSWORD_RESET` audit log. Emails the plain-text temp password to the member via `EmailService.sendMail`; if email is unconfigured, returns the temp password in the JSON response so the admin can deliver it manually.
+- **Frontend:** Added `handleResetPassword` + `resettingPasswordId` state in `TeamManagement.tsx`. New amber "Reset Password" button (KeyRound icon) appears in the Admin actions column for each member row, between "Manage Access" and "Remove". Prompts for confirmation before firing, shows a success toast with the email confirmation message (or the temp password itself if email is unconfigured).
+
+**Files affected:**
+- `backend/src/routes/tenants.ts` — New `POST /members/:id/reset-password` handler; added `hashPassword` and `EmailService` imports.
+- `frontend/src/pages/team/TeamManagement.tsx` — `handleResetPassword`, `resettingPasswordId` state, Reset Password button, `KeyRound` icon import.
+
+---
+
 ## [Date: 2026-08-31] - Fix: Dashboard widget tier-gating + Sales Channel Report nav fix
 
 **What/Why:** Shop-tier (tier 1) tenants saw a spurious "two-factor authentication required" banner on their dashboard. Root cause: the `DashboardFinanceWidgets` component was calling tier-2-gated backend aging routes (`/reports/aging/ar`, `/reports/aging/ap`) for every tenant regardless of plan. Shop tenants received 403 responses, which the frontend MFA error handler was misinterpreting as an MFA gate error. Additionally, "Sales Channel Report" in the sidebar was visible to Shop tenants while all other analytics reports in that section already required tier 2.

@@ -8,7 +8,7 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { usePresence } from "../../hooks/usePresence";
-import { UserPlus, Copy, Check, Mail, UserCheck, MapPin, Settings2, UserCog, UserMinus } from "lucide-react";
+import { UserPlus, Copy, Check, Mail, UserCheck, MapPin, Settings2, UserCog, UserMinus, KeyRound } from "lucide-react";
 
 const ROLE_OPTIONS: { value: string; label: string; description: string }[] = [
   { value: "Admin", label: "Admin", description: "Full access — user management, settings, all modules" },
@@ -87,6 +87,7 @@ export function TeamManagement() {
   const [isSavingRole, setIsSavingRole] = useState(false);
 
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null);
 
   const fetchTeamData = useCallback(async () => {
     setIsLoading(true);
@@ -232,6 +233,27 @@ export function TeamManagement() {
     }
   };
 
+  const handleResetPassword = async (member: Member) => {
+    if (!window.confirm(`Reset the password for ${member.name} (${member.email})? A temporary password will be emailed to them.`)) {
+      return;
+    }
+    setResettingPasswordId(member.id);
+    try {
+      const res = await api.post(`/tenants/members/${member.id}/reset-password`);
+      if (res.data.success) {
+        if (res.data.tempPassword) {
+          showToast(`Password reset. No email configured — give ${member.name} this temp password: ${res.data.tempPassword}`, "info");
+        } else {
+          showToast(res.data.message || `Temporary password emailed to ${member.email}.`, "success");
+        }
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to reset password.", "error");
+    } finally {
+      setResettingPasswordId(null);
+    }
+  };
+
   const handleRemoveMember = async (member: Member) => {
     if (!window.confirm(`Remove ${member.name} (${member.email}) from this workspace? This frees up their email for reuse elsewhere and cannot be undone.`)) {
       return;
@@ -367,6 +389,16 @@ export function TeamManagement() {
                             Manage Access
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={resettingPasswordId === member.id}
+                          onClick={() => handleResetPassword(member)}
+                          className="inline-flex items-center text-xs text-amber-600 hover:text-amber-700"
+                        >
+                          <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                          {resettingPasswordId === member.id ? "Resetting..." : "Reset Password"}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

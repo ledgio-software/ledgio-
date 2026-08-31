@@ -14,6 +14,8 @@ import { CLOSED_ROLES, isLocationScopedRole } from '../services/warehouseAccessS
 import { recordAuditLog, recordAuditLogTx, actorFromRequest, diffFields } from '../services/auditLogService';
 import { onboardingRateLimiter } from '../middleware/rateLimiterMiddleware';
 import { encryptCredential } from '../utils/credentialEncryption';
+import { hashPassword } from '../utils/password';
+import { EmailService } from '../services/EmailService';
 
 const router = Router();
 
@@ -753,6 +755,72 @@ router.delete('/members/:id', authenticateJwt, tenantContextMiddleware, requireR
   } catch (error: any) {
     console.error('[TenantMembers] Error removing member:', error);
     return res.status(500).json({ success: false, error: 'Failed to remove team member.' });
+  }
+});
+
+/**
+ * POST /api/v1/tenants/members/:id/reset-password (Admin only)
+ * Generates a secure temporary password for the specified team member,
+ * hashes it, persists it, and emails the plain-text temp password to the
+ * member's registered email address. The member must log in with the temp
+ * password and is advised to change it immediately from Settings.
+ */
+router.post('/members/:id/reset-password', authenticateJwt, tenantContextMiddleware, requireRole('Admin'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId || (req as any).user?.tenantId;
+    const { id } = req.params;
+
+    const member = await prisma.user.findFirst({ where: { id, tenantId } });
+    if (!member) {
+      return res.status(404).json({ success: false, error: 'Team member not found.' });
+    }
+
+    // Generate a 12-character alphanumeric temporary password.
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const tempPassword = Array.from({ length: 12 }, () => chars[crypto.randomInt(chars.length)]).join('');
+
+    const hashed = hashPassword(tempPassword);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id }, data: { password: hashed } });
+
+      await recordAuditLogTx(tx, {
+        action: 'TEAM_MEMBER.PASSWORD_RESET',
+        entity: 'User',
+        entityId: id,
+        tenantId,
+        actor: actorFromRequest(req),
+        details: `Admin-initiated password reset for team member ${member.name} (${member.email}).`,
+      });
+    });
+
+    const emailConfigured = EmailService.isConfigured();
+    if (emailConfigured) {
+      const html = `
+        <div style="font-family:sans-serif;max-width:520px;margin:auto;">
+          <h2 style="color:#1e40af;">Your Ledgio Password Has Been Reset</h2>
+          <p>Hello <strong>${member.name}</strong>,</p>
+          <p>A workspace admin has reset your Ledgio account password.</p>
+          <p>Your temporary password is:</p>
+          <div style="background:#f1f5f9;border-radius:6px;padding:12px 20px;font-size:22px;font-family:monospace;letter-spacing:2px;margin:16px 0;">
+            ${tempPassword}
+          </div>
+          <p>Please log in with this temporary password and change it immediately from your <strong>Account Settings</strong> page.</p>
+          <p style="color:#64748b;font-size:12px;margin-top:24px;">If you did not expect this email, please contact your workspace administrator immediately.</p>
+        </div>`;
+      await EmailService.sendMail(member.email, 'Your Ledgio Password Has Been Reset', html);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: emailConfigured
+        ? `Password reset. A temporary password has been emailed to ${member.email}.`
+        : `Password reset. Email sending is not configured — provide the temporary password to ${member.name} directly.`,
+      ...(emailConfigured ? {} : { tempPassword }),
+    });
+  } catch (error: any) {
+    console.error('[TenantMembers] Error resetting password:', error);
+    return res.status(500).json({ success: false, error: 'Failed to reset team member password.' });
   }
 });
 
