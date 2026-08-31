@@ -2,6 +2,24 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Fix: Shop-tier navigation and page tier-gating (API Keys, Cash Flow Forecast, Branch Comparison, Landed Cost)
+
+**What/Why:** Shop-tier (tier 1) users were shown navigation links to four features whose backend routes require tier 2 (`requireTier(2, ...)`). Clicking those links caused instant 403s with no user-friendly explanation. Two separate issues combined:
+
+1. **`navigation.ts` missing `minTier: 2` on four items.** `getVisibleNavGroups()` hides items only when `minTier` is set; without it the link renders for all tiers. Added `minTier: 2` to:
+   - `API Keys` (`/settings/api-keys`) — backend: `requireTier(2, 'API Key Management')`
+   - `Cash Flow Forecast` (`/reports/cash-flow-forecast`) — backend: `requireTier(2, 'Cash Flow Forecast')`
+   - `Branch Comparison` (`/reports/branch-comparison`) — backend: `requireTier(2, 'Branch Comparison Report')`
+   - `Landed Cost` (`/reports/landed-costs`) — backend: `requireTier(2, 'Landed Cost Report')`
+
+2. **`ApiKeys.tsx` had no tier guard at all.** The component called `GET /api-keys` on mount unconditionally — a Shop-tier user who navigated directly to `/settings/api-keys` via the URL bar would receive a 403 with no friendly message. Fixed: added `useTenantSettings` + loading early-return + `UpgradeRequired` guard (same pattern as the already-fixed `AgingReport.tsx`). The `useEffect` that fetches keys now only fires when `settings.tier >= 2`.
+
+**Files affected:**
+- `frontend/src/lib/navigation.ts` — Added `minTier: 2` to API Keys, Cash Flow Forecast, Branch Comparison, and Landed Cost nav items.
+- `frontend/src/pages/settings/ApiKeys.tsx` — Added `useTenantSettings`/`UpgradeRequired` tier guard; `fetchKeys` now only fires for tier ≥ 2.
+
+---
+
 ## [Date: 2026-08-31] - Fix: Aging report 403 for Shop-tier tenants + add PAYSTACK_SECRET_KEY to render.yaml
 
 **What/Why:** Two follow-on production issues observed after the earlier metrics fixes:
