@@ -59,6 +59,7 @@ describe('Ledger Accounts & Transaction History API Integration Tests (BE-108)',
       adminEmail: adminEmail1,
       adminPassword: 'Password123!',
       adminName: 'Ledger Corp 1 Admin',
+      tier: 2,
     });
     tenant1Id = onboard1.tenant.id;
     adminToken1 = onboard1.token;
@@ -100,6 +101,7 @@ describe('Ledger Accounts & Transaction History API Integration Tests (BE-108)',
       adminEmail: adminEmail2,
       adminPassword: 'Password123!',
       adminName: 'Ledger Corp 2 Admin',
+      tier: 2,
     });
     tenant2Id = onboard2.tenant.id;
     adminToken2 = onboard2.token;

@@ -39,6 +39,7 @@ describe('Petty Cash logs', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'Petty Cash Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
 

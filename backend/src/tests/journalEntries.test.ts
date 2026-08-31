@@ -79,6 +79,7 @@ describe('Journal Entries API Integration Tests (BE-107)', () => {
       adminEmail: adminEmail1,
       adminPassword: 'Password123!',
       adminName: 'JE Corp 1 Admin',
+      tier: 2,
     });
     console.log("-> Onboarded Tenant 1");
     tenant1Id = onboard1.tenant.id;
