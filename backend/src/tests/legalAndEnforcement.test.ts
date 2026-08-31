@@ -157,7 +157,7 @@ describe('Legal Policy & Customization Enforcement API', () => {
 
   describe('3. Customization Tier Enforcement Middleware', () => {
     let tier1Token: string;
-    let tier2Token: string;
+    let tier3Token: string;
 
     beforeAll(async () => {
       // The Tier 1 admin created in the first test block is isActive:false until
@@ -178,17 +178,17 @@ describe('Legal Policy & Customization Enforcement API', () => {
         .send({ email: testEmail, password: testPassword });
       tier1Token = loginRes1.body.data.token;
 
-      // Onboard a Tier 2 Tenant
-      const onboard2 = await onboardTenant(prisma, {
-        companyName: 'Tier 2 Corporation',
-        slug: 'tier2-corp',
-        adminEmail: 'tier2-admin@test.com',
+      // Onboard a Tier 3 (Enterprise) tenant — custom fields require Tier 3
+      const onboard3 = await onboardTenant(prisma, {
+        companyName: 'Tier 3 Corporation',
+        slug: 'tier3-corp',
+        adminEmail: 'tier3-admin@test.com',
         adminPassword: testPassword,
         termsAccepted: true,
         acceptedTermsVersion: 'v1.0.0',
-        tier: 2, // Set tier to 2
+        tier: 3,
       });
-      tier2Token = onboard2.token;
+      tier3Token = onboard3.token;
     });
 
     it('should block Tier 1 tenant from creating custom fields (403 Forbidden)', async () => {
@@ -206,16 +206,16 @@ describe('Legal Policy & Customization Enforcement API', () => {
       expect(res.status).toBe(403);
       expect(res.body.success).toBe(false);
       expect(res.body.upgradeRequired).toBe(true);
-      expect(res.body.error).toContain('Custom Fields requires the Business plan or higher');
+      expect(res.body.error).toContain('Custom Fields requires the Enterprise plan or higher');
       expect(res.body.currentTier).toBe(1);
-      expect(res.body.requiredTier).toBe(2);
+      expect(res.body.requiredTier).toBe(3);
     });
 
-    it('should allow Tier 2 tenant to create custom fields (201 Created)', async () => {
+    it('should allow Tier 3 tenant to create custom fields (201 Created)', async () => {
       const res = await request(app)
         .post('/api/v1/custom-fields')
-        .set('Authorization', `Bearer ${tier2Token}`)
-        .set('X-Tenant-Slug', 'tier2-corp')
+        .set('Authorization', `Bearer ${tier3Token}`)
+        .set('X-Tenant-Slug', 'tier3-corp')
         .send({
           entityType: 'Ledger',
           fieldName: 'CostCenter',
