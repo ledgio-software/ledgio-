@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Fix: Aging report 403 for Shop-tier tenants + add PAYSTACK_SECRET_KEY to render.yaml
+
+**What/Why:** Two follow-on production issues observed after the earlier metrics fixes:
+
+1. **`GET /reports/aging/ap` + `/ar` — 403 for Shop tenants.** Root cause: `AgingReport.tsx` rendered the full component body (including the Refresh button) while `isLoadingTenantSettings` was `true`. The gate `if (!isLoadingTenantSettings && settings.tier < 2) return <UpgradeRequired>` correctly blocks the fetch via `useEffect`, but the Refresh button was still visible and clickable during the loading window. Clicking it — or any race where the component mounted with `isLoadingTenantSettings=true` and the user was tier 1 — called `fetchAging()` with no tier guard, returning 403. Fixed: added an early return for the loading state (`if (isLoadingTenantSettings) return <div>Loading...</div>`) before the `UpgradeRequired` check, so the full component (and the Refresh button) never renders until tenant settings are confirmed loaded. The `UpgradeRequired` check is now a clean unconditional `settings.tier < 2` guard.
+
+2. **`POST /paystack/invoices/:id/initialize` — 503.** Root cause: `PAYSTACK_SECRET_KEY` was not listed in `render.yaml`, so new environment setups had no prompt to configure it. Service returns 503 when the key is absent. Added `PAYSTACK_SECRET_KEY: sync: false` to the blueprint's optional integrations block so the key is documented and Render prompts for it during setup.
+
+**Files affected:**
+- `frontend/src/pages/reports/AgingReport.tsx` — Split combined `!isLoadingTenantSettings && settings.tier < 2` guard into separate early-return for loading state + unconditional tier check.
+- `render.yaml` — Added `PAYSTACK_SECRET_KEY` (sync: false) to optional integrations env vars.
+
+---
+
 ## [Date: 2026-08-31] - Fix: Production metrics — Redis error rate, slow bootstrap, HEAD /health latency, warehouses latency
 
 **What/Why:** Admin metrics dashboard showed four production issues:
