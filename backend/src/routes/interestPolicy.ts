@@ -4,11 +4,13 @@ import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { prisma } from '../config/db';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Interest Charges'));
 
 /**
  * GET /api/v1/interest-policy

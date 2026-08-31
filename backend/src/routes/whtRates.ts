@@ -6,11 +6,13 @@ import { requireTenantContext } from '../context/tenantContext';
 import * as whtRateService from '../services/whtRateService';
 import { WhtRateServiceError } from '../services/whtRateService';
 import { actorFromRequest } from '../services/auditLogService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Withholding Tax'));
 
 function handleError(res: Response, error: any, fallbackMessage: string): void {
   if (error instanceof WhtRateServiceError) {

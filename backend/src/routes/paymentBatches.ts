@@ -9,9 +9,11 @@ import { withCurrentTenantDb } from '../database/tenantClient';
 import { recordInvoicePayment } from '../services/invoicePaymentService';
 import { payVendorBill } from '../services/vendorBillPaymentService';
 import { recordAuditLogTx, AuditActor } from '../services/auditLogService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 router.use(authenticateJwt, tenantContextMiddleware);
+router.use(requireTier(2, 'Payment Matching'));
 
 const allocationSchema = z.object({
   invoiceId: z.string().uuid().optional(),

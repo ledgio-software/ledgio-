@@ -5,9 +5,11 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 router.use(authenticateJwt, tenantContextMiddleware);
+router.use(requireTier(2, 'Cost Categories'));
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
