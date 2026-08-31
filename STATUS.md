@@ -2,6 +2,27 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Fix: POS revenue doubling + MFA banner persisting after setup
+
+**What/Why:** Two production bugs reported from the live dashboard:
+
+### Bug 1 — Revenue doubling (GHS 150 recorded, GHS 300 shown)
+**Root cause:** Race condition in `POST /tills/backfill-revenue`. React Strict Mode double-mounts the Dashboard component, resetting the `useRef(false)` guard and firing two concurrent backfill requests. Both queries find the same unposted sale (`journalId: null`), and both call `postCashSaleRevenue()` before either commits its `journalId` update, producing two journal entries — doubling the revenue credit in the ledger.
+
+**Fix:** Before posting each sale, use an atomic `updateMany` with `where: { id, journalId: null }` to claim it (setting `journalId: 'POSTING'` as a sentinel). If `count === 0`, a concurrent request already claimed it — skip it. On failure, the sentinel is released so a future retry can re-attempt.
+
+### Bug 2 — MFA banner stuck after setup
+**Root cause:** `authMiddleware.ts` reads `isMfaEnabled` from the JWT payload, not the database. When the user completes MFA enrollment via `POST /auth/mfa/verify-setup`, the DB is updated to `isMfaEnabled: true` but no new JWT was issued. The old token remained in localStorage with `isMfaEnabled: false`, so every subsequent API call to a protected route continued to return 403 `MFA_REQUIRED` — the user had to log out and back in.
+
+**Fix:** After updating the DB in `POST /auth/mfa/verify-setup`, generate a fresh JWT with `{ ...req.user!, isMfaEnabled: true }` and return it in `data.token`. The frontend's `handleConfirmMfaSetup` stores this new token in `localStorage` before calling `refreshUser()`, so the MFA gate lifts immediately without a forced logout.
+
+**Files affected:**
+- `backend/src/routes/cashTill.ts` — Atomic claim (sentinel `updateMany`) before `postCashSaleRevenue()` in the backfill loop.
+- `backend/src/routes/auth.ts` — Issue and return fresh JWT after MFA verify-setup succeeds.
+- `frontend/src/pages/settings/Settings.tsx` — Store new token in localStorage on successful MFA confirm.
+
+---
+
 ## [Date: 2026-08-31] - Fix: Shop-tier navigation and page tier-gating (API Keys, Cash Flow Forecast, Branch Comparison, Landed Cost)
 
 **What/Why:** Shop-tier (tier 1) users were shown navigation links to four features whose backend routes require tier 2 (`requireTier(2, ...)`). Clicking those links caused instant 403s with no user-friendly explanation. Two separate issues combined:

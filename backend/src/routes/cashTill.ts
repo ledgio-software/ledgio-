@@ -1079,9 +1079,29 @@ router.post('/backfill-revenue', requireRole('Admin', 'Accountant'), async (req:
     let backfilled = 0;
     let failed = 0;
     for (const sale of unposted) {
+      // Atomic claim: set journalId to a sentinel before posting so a second
+      // concurrent backfill call cannot pick up the same sale and double-post.
+      const claimed = await withCurrentTenantDb(prisma, (client) =>
+        (client as any).cashSale.updateMany({
+          where: { id: sale.id, tenantId, journalId: null },
+          data: { journalId: 'POSTING' },
+        })
+      );
+      if (claimed.count === 0) continue; // already claimed by a concurrent request
+
       const journalId = await postCashSaleRevenue(sale, actor);
-      if (journalId) backfilled++;
-      else failed++;
+      if (journalId) {
+        backfilled++;
+      } else {
+        // Release the sentinel so a future manual retry can re-attempt this sale.
+        await withCurrentTenantDb(prisma, (client) =>
+          (client as any).cashSale.updateMany({
+            where: { id: sale.id, tenantId, journalId: 'POSTING' },
+            data: { journalId: null },
+          })
+        );
+        failed++;
+      }
     }
 
     res.status(200).json({

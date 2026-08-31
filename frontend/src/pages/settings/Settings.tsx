@@ -481,6 +481,11 @@ export function Settings() {
     setMfaError(null);
     try {
       const res = await api.post("/auth/mfa/verify-setup", { code: mfaCode });
+      // Backend now returns a refreshed token with isMfaEnabled: true so the
+      // MFA gate on protected routes lifts immediately without a forced logout.
+      if (res.data.data?.token) {
+        localStorage.setItem('accountgo-token', res.data.data.token);
+      }
       setNewBackupCodes(res.data.data.backupCodes);
       setMfaStep("backup-codes");
       setMfaCode("");
