@@ -337,7 +337,7 @@ function DonutChart({ segments, size = 110 }: {
 
 // ── Dashboard finance widgets (AR/AP aging donuts + KPI cards) ────────────────
 function DashboardFinanceWidgets({ currency }: { currency: string }) {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
 
   type AgingTotals = { current: number; days1to30: number; days31to60: number; days61to90: number; days90plus: number; total: number };
@@ -349,13 +349,14 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
   });
 
   useEffect(() => {
+    if (isLoadingTenantSettings || (settings?.tier ?? 1) < 2) return;
     api.get('/reports/aging/ar')
       .then(r => setArTotals(r.data.data?.totals ?? null))
       .catch((e) => { setAgingError(e?.response?.status ?? 0); });
     api.get('/reports/aging/ap')
       .then(r => setApTotals(r.data.data?.totals ?? null))
       .catch(() => {});
-  }, []);
+  }, [isLoadingTenantSettings, settings?.tier]);
 
   const toggleWidget = (key: string) => {
     setHidden(prev => {

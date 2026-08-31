@@ -2,6 +2,31 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-08-31] - Security: Frontend tier-gate enforcement and customFields backend fix
+
+**What/Why:** Live 403 errors were observed for tier-1 (Shop) tenants on endpoints `/reports/aging/ap`, `/reports/aging/ar`, `/ledgers/summary`, and `/reports/sales-channel`. Root cause: `useEffect` hooks in frontend components fired unconditionally on mount, hitting tier-2+ gated endpoints regardless of tenant tier. Additionally, `customFields.ts` lacked a router-level tier gate on its GET route (any tier could list custom fields) and its POST route had an incorrect tier-2 gate instead of tier-3.
+
+**How:**
+- Frontend: Added `useTenantSettings()` tier check at the top of each `useEffect` (`if (isLoadingTenantSettings || settings.tier < 2) return;`), added `isLoadingTenantSettings` and `settings.tier` to all deps arrays, and added `<UpgradeRequired>` early-return render guards in 12 components.
+- Backend: Added `router.use(authenticateJwt, tenantContextMiddleware, requireTier(3, 'Custom Fields'))` to `customFields.ts` to cover all routes at tier 3; removed redundant per-route middleware from both GET and POST handlers.
+
+**Files affected:**
+- `frontend/src/App.tsx` — `DashboardFinanceWidgets` useEffect gated to tier >= 2
+- `frontend/src/hooks/useAccounts.ts` — `fetchBalances` gated to tier >= 2
+- `frontend/src/pages/reports/SalesChannelReport.tsx` — tier gate + UpgradeRequired
+- `frontend/src/pages/reports/AnalyticsDashboard.tsx` — all 3 useEffects gated + UpgradeRequired
+- `frontend/src/pages/reports/Daybook.tsx` — useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/VatReturn.tsx` — useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/StockAging.tsx` — useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/FinancialRatios.tsx` — added useTenantSettings, useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/BenfordAnalysis.tsx` — added useTenantSettings, useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/FraudAlerts.tsx` — added useTenantSettings, useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/StockMovement.tsx` — added useTenantSettings + UpgradeRequired render guard
+- `frontend/src/pages/reports/Registers.tsx` — added useTenantSettings + UpgradeRequired render guard
+- `backend/src/routes/customFields.ts` — router-level requireTier(3) added; redundant per-route middleware removed
+
+---
+
 ## [Date: 2026-08-31] - Fix: Upgrade test tenants to tier 2 for ledger-endpoint access
 
 **What/Why:** Adding `requireTier(2, 'General Ledger')` to `routes/ledgers.ts` broke 8 test files whose `onboardTenant()` calls defaulted to tier 1. Any test asserting ledger balances received a 403 instead of data, causing `TypeError: Cannot read properties of undefined (reading 'accounts')`. Fixed by adding `tier: 2` to each affected `onboardTenant()` call.

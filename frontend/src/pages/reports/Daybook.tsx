@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../..
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { api } from "../../lib/api";
 import { exportToCsv } from "../../lib/exportCsv";
 
@@ -49,7 +50,7 @@ function monthStart() {
 }
 
 export function Daybook() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const currency = settings?.baseCurrency || "GHS";
 
   const [startDate, setStartDate] = useState(monthStart());
@@ -85,9 +86,9 @@ export function Daybook() {
   }, [startDate, endDate, page]);
 
   useEffect(() => {
-    void load(1);
+    if (!isLoadingTenantSettings && settings?.tier >= 2) void load(1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoadingTenantSettings, settings?.tier]);
 
   function toggleExpand(id: string) {
     setExpandedIds((prev) => {
@@ -115,6 +116,9 @@ export function Daybook() {
     }
     exportToCsv(`daybook_${startDate}_${endDate}.csv`, rows);
   }
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if ((settings?.tier ?? 1) < 2) return <UpgradeRequired featureLabel="Daybook" requiredTier={2} currentTier={settings?.tier ?? 1} />;
 
   return (
     <div className="space-y-6 p-4 md:p-6">

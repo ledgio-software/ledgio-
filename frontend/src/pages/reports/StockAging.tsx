@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { RefreshCw, FileText, AlertCircle } from "lucide-react";
 import { api } from "../../lib/api";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { exportToCsv } from "../../lib/exportCsv";
 
 interface AgingItem {
@@ -37,7 +38,7 @@ function bucketColor(bucket: string) {
 }
 
 export function StockAging() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [report, setReport] = useState<StockAgingReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +61,9 @@ export function StockAging() {
     }
   };
 
-  useEffect(() => { fetchReport(); }, [asOfDate]); // eslint-disable-line
+  useEffect(() => {
+    if (!isLoadingTenantSettings && settings.tier >= 2) fetchReport();
+  }, [asOfDate, isLoadingTenantSettings, settings.tier]); // eslint-disable-line
 
   const visibleItems = report?.items.filter((i) => filterBucket === "ALL" || i.bucket === filterBucket) ?? [];
 
@@ -77,6 +80,9 @@ export function StockAging() {
       Bucket: i.bucket,
     })));
   };
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="Stock Aging Report" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">

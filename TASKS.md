@@ -4,6 +4,10 @@ This file lists the development tasks for the Multi-Tenant Web-Based Accounting 
 
 ## Bug Fixes & Features (2026-08-31)
 
+- [x] **Frontend tier-gate enforcement + customFields backend fix** (2026-08-31) — Fixed live 403 errors for tier-1 tenants. 12 frontend report components now gate `useEffect` API calls with `useTenantSettings()` tier check; `customFields.ts` backend upgraded to router-level `requireTier(3)`. Eliminates 403s on `/reports/aging/ap`, `/reports/aging/ar`, `/ledgers/summary`, `/reports/sales-channel` for Shop-tier tenants.
+
+
+
 - [x] **Fix POS revenue doubling** (2026-08-31) — Atomic claim sentinel in `POST /tills/backfill-revenue` prevents concurrent requests from double-posting the same sale. (`backend/src/routes/cashTill.ts`)
 - [x] **Fix MFA banner persisting after setup** (2026-08-31) — `POST /auth/mfa/verify-setup` now issues a fresh JWT with `isMfaEnabled: true`; frontend stores it in localStorage so the MFA gate lifts immediately. (`backend/src/routes/auth.ts`, `frontend/src/pages/settings/Settings.tsx`)
 - [x] **Admin-initiated password reset for team members** (2026-08-31) — `POST /tenants/members/:id/reset-password` generates a 12-char temp password, hashes it, saves it, emails it to the member; frontend adds Reset Password button in Team Management. (`backend/src/routes/tenants.ts`, `frontend/src/pages/team/TeamManagement.tsx`)

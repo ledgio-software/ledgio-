@@ -6,6 +6,8 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { api } from "../../lib/api";
 import { exportToCsv } from "../../lib/exportCsv";
+import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 
 interface SalesRow {
   invoiceId: string;
@@ -74,6 +76,7 @@ function fmtDate(d: string) {
 }
 
 export function Registers() {
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [tab, setTab] = useState<"sales" | "purchase">("sales");
   const [startDate, setStartDate] = useState(monthStart());
   const [endDate, setEndDate] = useState(today());
@@ -146,6 +149,9 @@ export function Registers() {
   }
 
   const hasResult = tab === "sales" ? salesResult !== null : purchaseResult !== null;
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="Purchase & Sales Registers" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="space-y-6 p-4 md:p-6">

@@ -6,6 +6,8 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { api } from "../../lib/api";
 import { exportToCsv } from "../../lib/exportCsv";
+import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 
 interface MovementRow {
   date: string;
@@ -54,6 +56,7 @@ function monthStart() {
 }
 
 export function StockMovement() {
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [itemId, setItemId] = useState("");
@@ -111,6 +114,9 @@ export function StockMovement() {
   }
 
   const netChange = result ? result.closingBalance - result.openingBalance : 0;
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="Stock Movement Analysis" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="space-y-6 p-4 md:p-6">

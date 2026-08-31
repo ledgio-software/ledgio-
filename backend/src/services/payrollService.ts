@@ -414,7 +414,7 @@ export async function createPayrollRun(data: RunPayrollInput, _actor?: AuditActo
   const dbTotalSsnitEmployer = totalSsnitEmployer.toDecimalPlaces(2).toNumber();
   const dbTotalNetPay = totalNetPay.toDecimalPlaces(2).toNumber();
 
-  const runRows: any[] = await withCurrentTenantDb(prisma, async (client) => {
+  const { runRows, slipMeta } = await withCurrentTenantDb(prisma, async (client) => {
     const runs = await (client as any).$queryRawUnsafe(
       `INSERT INTO payroll_runs (run_number, period_month, period_year, status,
          total_gross, total_paye, total_ssnit_employee, total_ssnit_employer, total_net_pay)
@@ -423,17 +423,22 @@ export async function createPayrollRun(data: RunPayrollInput, _actor?: AuditActo
       dbTotalGross, dbTotalPaye, dbTotalSsnitEmployee, dbTotalSsnitEmployer, dbTotalNetPay
     );
     const runId = runs[0].id;
+    const slipMeta: { employeeId: string; payslipId: string }[] = [];
     for (const s of payslipData) {
       const slipRows: any[] = await (client as any).$queryRawUnsafe(
         `INSERT INTO payslips (payroll_run_id, employee_id, gross_salary, gross_salary_foreign, salary_currency, exchange_rate, unpaid_leave_deduction, paye, ssnit_employee, ssnit_employer, net_pay)
          VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
         runId, s.employeeId, s.gross, s.foreignGross, s.currency, s.rate, s.unpaidDed, s.paye, s.ssnitEmp, s.ssnitEr, s.net
       );
-      // Apply any active loan deductions for this employee
-      await applyLoanDeductions(s.employeeId, slipRows[0].id);
+      slipMeta.push({ employeeId: s.employeeId, payslipId: slipRows[0].id });
     }
-    return runs;
-  }) as any[];
+    return { runRows: runs, slipMeta };
+  }) as any;
+
+  // Apply loan deductions outside the outer transaction to avoid nested Prisma $transaction calls.
+  for (const { employeeId, payslipId } of slipMeta) {
+    await applyLoanDeductions(employeeId, payslipId);
+  }
 
   // Recalculate total net pay after loan deductions have been applied
   const updatedRun = await getPayrollRun(runRows[0].id);
