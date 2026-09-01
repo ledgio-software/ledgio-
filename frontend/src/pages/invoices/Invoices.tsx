@@ -909,11 +909,26 @@ export function Invoices() {
                 </option>
               ))}
             </select>
-            {customers.find((c) => c.id === selectedCustomer)?.customerType === "WHOLESALE" && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                Wholesale customer — line items will default to wholesale prices where available.
-              </p>
-            )}
+            {(() => {
+              const cust = customers.find((c) => c.id === selectedCustomer);
+              if (!cust) return null;
+              return (
+                <div className="mt-2 rounded-md border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/30 px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-primary-500 dark:text-primary-400 mb-0.5">
+                    Bill To
+                  </div>
+                  <div className="text-base font-bold text-secondary-900 dark:text-secondary-50 leading-tight">
+                    {cust.name}
+                  </div>
+                  <div className="text-xs text-secondary-500 dark:text-secondary-400 mt-0.5">{cust.email}</div>
+                  {cust.customerType === "WHOLESALE" && (
+                    <div className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                      Wholesale customer — line items will default to wholesale prices where available.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

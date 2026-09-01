@@ -2,6 +2,16 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-01] - Enhancement: Show customer name prominently in Create Invoice modal
+
+**What/Why:**
+When creating a new invoice, the customer name was only visible inside the dropdown but disappeared once selected, making it easy to issue an invoice to the wrong person at a busy counter. Added a "Bill To" preview card below the customer dropdown that shows the selected customer's name (bold), email, and wholesale badge immediately after selection — so the shop attendant always sees who the invoice is being raised for before finalising the line items.
+
+**Files Affected:**
+- `frontend/src/pages/invoices/Invoices.tsx` — added Bill To card inside Create Invoice modal
+
+---
+
 ## [Date: 2026-09-01] - Feature: Monthly Sales Ledger, Month-End Close, and Performance Ranking
 
 **What/Why:**
