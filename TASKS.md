@@ -2,6 +2,10 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes & Features (2026-09-01)
+
+- [x] **Fix: Payroll run 500 / nested Prisma transaction + duplicate-payments SQL** (2026-09-01) — `POST /payroll/runs` crashed with a Prisma nested-transaction error because `applyLoanDeductions` (which opens its own `withCurrentTenantDb`) was called inside the outer `withCurrentTenantDb` block. Fixed by collecting payslip IDs inside the transaction and applying loan deductions outside. Also fixed `getDuplicatePayments` in `reportingService.ts` which used a non-existent column `i.customer_name`; now joins the `customers` table. Updated `legalAndEnforcement.test.ts` to onboard a Tier 3 tenant for the custom-fields gate tests.
+
 ## Bug Fixes & Features (2026-08-31)
 
 - [x] **Frontend tier-gate enforcement + customFields backend fix** (2026-08-31) — Fixed live 403 errors for tier-1 tenants. 12 frontend report components now gate `useEffect` API calls with `useTenantSettings()` tier check; `customFields.ts` backend upgraded to router-level `requireTier(3)`. Eliminates 403s on `/reports/aging/ap`, `/reports/aging/ar`, `/ledgers/summary`, `/reports/sales-channel` for Shop-tier tenants.

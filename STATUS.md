@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-01] - Fix: Payroll run 500 (nested Prisma transaction), duplicate-payments SQL join, CI test alignment
+
+**What/Why:**
+1. `POST /payroll/runs` returned 500 on every request. Root cause: `applyLoanDeductions()` in `loanService.ts` calls `withCurrentTenantDb()` internally (which opens a `prisma.$transaction`). Calling it inside the outer `withCurrentTenantDb` block in `payrollService.ts` caused a nested Prisma `$transaction` error. Fix: collect `{ employeeId, payslipId }` pairs inside the outer transaction, then call `applyLoanDeductions` for each pair outside it.
+2. `getDuplicatePayments()` in `reportingService.ts` selected `i.customer_name` which does not exist on the `invoices` table. Fixed by joining the `customers` table (`JOIN customers c ON c.id = i.customer_id`) and selecting `c.name` / grouping by `c.name`.
+3. `legalAndEnforcement.test.ts` assumed Tier 2 for the custom fields gate, but the backend now requires Tier 3 (Enterprise). Updated `beforeAll` to onboard a Tier 3 tenant (`tier3-corp`), renamed `tier2Token` → `tier3Token`, and updated assertions (`requiredTier: 3`, error message "Enterprise plan or higher").
+
+**Files affected:**
+- `backend/src/services/payrollService.ts` — `applyLoanDeductions` calls moved outside outer `withCurrentTenantDb`
+- `backend/src/services/reportingService.ts` — `getDuplicatePayments`: `JOIN customers c` + `SELECT c.name` / `GROUP BY c.name`
+- `backend/src/tests/legalAndEnforcement.test.ts` — Tier 3 tenant + updated tier assertions
+
+---
+
 ## [Date: 2026-08-31] - Security: Frontend tier-gate enforcement and customFields backend fix
 
 **What/Why:** Live 403 errors were observed for tier-1 (Shop) tenants on endpoints `/reports/aging/ap`, `/reports/aging/ar`, `/ledgers/summary`, and `/reports/sales-channel`. Root cause: `useEffect` hooks in frontend components fired unconditionally on mount, hitting tier-2+ gated endpoints regardless of tenant tier. Additionally, `customFields.ts` lacked a router-level tier gate on its GET route (any tier could list custom fields) and its POST route had an incorrect tier-2 gate instead of tier-3.
