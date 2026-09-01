@@ -4,6 +4,7 @@ This file lists the development tasks for the Multi-Tenant Web-Based Accounting 
 
 ## Bug Fixes & Features (2026-09-01)
 
+- [x] **Fix: Shop plan 403 on executive summary and WHT rates** (2026-09-01) — Router-level `requireTier(2)` in `analytics.ts` blocked all analytics routes for Tier 1 tenants; moved gate inline to `/stock-intelligence` route only. Router-level `requireTier(2)` in `whtRates.ts` blocked WHT rate lookups for Shop-plan tenants on the Vendor Bills page; removed entirely (route-level `requireRole` guards remain). Also added `detail` field to payroll 500 responses for diagnostics (PR #156). Shop plan now accesses executive summary, export reports, and WHT rates correctly.
 - [x] **Fix: Payroll run 500 / nested Prisma transaction + duplicate-payments SQL** (2026-09-01) — `POST /payroll/runs` crashed with a Prisma nested-transaction error because `applyLoanDeductions` (which opens its own `withCurrentTenantDb`) was called inside the outer `withCurrentTenantDb` block. Fixed by collecting payslip IDs inside the transaction and applying loan deductions outside. Also fixed `getDuplicatePayments` in `reportingService.ts` which used a non-existent column `i.customer_name`; now joins the `customers` table. Updated `legalAndEnforcement.test.ts` to onboard a Tier 3 tenant for the custom-fields gate tests.
 
 ## Bug Fixes & Features (2026-08-31)

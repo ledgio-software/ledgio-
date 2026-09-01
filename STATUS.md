@@ -2,6 +2,19 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-01] - Fix: Shop plan (Tier 1) 403 errors on executive summary and WHT rates
+
+**What/Why:**
+1. `GET /api/v1/analytics/executive-summary` returned 403 for Tier 1 (Shop plan) tenants. Root cause: `analytics.ts` had `router.use(requireTier(2, 'Stock Intelligence'))` at the router level, blocking *all* analytics routes for non-Business tenants. Only the `/stock-intelligence` sub-route actually requires Tier 2. Fix: removed router-level gate; added `requireTier(2, 'Stock Intelligence')` inline on `/stock-intelligence` only. The export routes (CSV/PDF/DOCX) received in-handler Tier 2 checks specifically when `reportType === 'stock-intelligence'`.
+2. `GET /api/v1/wht-rates` returned 403 for Tier 1 tenants. Root cause: `whtRates.ts` had `router.use(requireTier(2, 'Withholding Tax'))` at the router level, blocking Shop-plan users from accessing WHT rate reference data on the Vendor Bills page. WHT rates are basic reference data, not a Business-tier feature. Fix: removed router-level `requireTier` and the now-unused import; per-route `requireRole` guards remain.
+3. Added `detail: error?.message` field to payroll 500 responses to surface DB/runtime errors in the browser Network tab for diagnostics (PR #156, merged).
+
+**Files affected:**
+- `backend/src/routes/analytics.ts` — removed router-level `requireTier(2)`, added inline gate to `/stock-intelligence` route + in-handler checks on stock-intelligence export branches
+- `backend/src/routes/whtRates.ts` — removed router-level `requireTier(2, 'Withholding Tax')` and unused `requireTier` import
+
+---
+
 ## [Date: 2026-09-01] - Fix: Payroll run 500 (nested Prisma transaction), duplicate-payments SQL join, CI test alignment
 
 **What/Why:**
