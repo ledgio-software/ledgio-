@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   CalendarClock, ChevronDown, ChevronRight, Lock, Trophy,
-  ShoppingCart, FileText, Download, RefreshCw
+  ShoppingCart, FileText, RefreshCw
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/Card";
