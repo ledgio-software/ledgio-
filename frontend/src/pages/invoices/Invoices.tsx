@@ -12,7 +12,7 @@ import { syncDb, createInvoiceLocalFirst, payInvoiceLocalFirst, resyncInvoicesFr
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
-import { Plus, CheckCircle, UserPlus, DollarSign, Clock, Undo2, RefreshCw, History, Mail, ChevronDown, ShieldCheck, Download, Trash2 } from "lucide-react";
+import { Plus, CheckCircle, UserPlus, DollarSign, Banknote, Clock, Undo2, RefreshCw, History, Mail, ChevronDown, ShieldCheck, Download, Trash2 } from "lucide-react";
 
 // Mirrors rbacMiddleware.ts's SCOPED_ROLES - these actions all backend-gate
 // to requireRole('Accountant') (Email Invoice, Request GRA Clearance, Pay
@@ -629,7 +629,7 @@ export function Invoices() {
         <Card className="border-emerald-100 dark:border-emerald-950">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-semibold text-secondary-600 dark:text-secondary-400">Total Collected Payments</CardTitle>
-            <DollarSign className="h-5 w-5 text-emerald-500" />
+            <Banknote className="h-5 w-5 text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalPaid)}</div>

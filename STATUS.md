@@ -2,6 +2,19 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-01] - Fix: AR page dollar icon + RecurringInvoices currency defaulting to USD
+
+**What/Why:**
+Two minor polish fixes found while reviewing the Invoicing & AR page:
+1. The "Total Collected Payments" card in `Invoices.tsx` displayed a `DollarSign` (lucide icon) as its header icon — visually misleading for GHS tenants. Replaced with `Banknote` which carries no currency-country association. The amounts themselves were already correct (using `settings.baseCurrency`).
+2. `RecurringInvoices.tsx` initialised its form `currency` field with a hardcoded `"USD"` string and had no `useEffect` to snap it to the tenant's real base currency after settings loaded. Added the same `useEffect` pattern already used in `ExpenseClaims.tsx`: snaps currency to `tenantSettings.baseCurrency` once loaded, but only if the user has not already changed the field.
+
+**Files affected:**
+- `frontend/src/pages/invoices/Invoices.tsx` — `DollarSign` → `Banknote` for "Total Collected Payments" card icon
+- `frontend/src/pages/recurringinvoices/RecurringInvoices.tsx` — add `useEffect` to snap initial currency to `tenantSettings.baseCurrency`
+
+---
+
 ## [Date: 2026-09-01] - Fix: Journal entries showing "$" instead of tenant base currency (GH₵)
 
 **What/Why:**

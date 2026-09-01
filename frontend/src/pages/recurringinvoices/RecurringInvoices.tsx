@@ -85,6 +85,10 @@ export function RecurringInvoices() {
     }
   }, [fetchAll, isLoadingTenantSettings, tenantSettings.tier]);
 
+  useEffect(() => {
+    setForm((f) => (f.currency === "USD" ? { ...f, currency: tenantSettings.baseCurrency } : f));
+  }, [tenantSettings.baseCurrency]);
+
   const updateLine = (index: number, patch: Partial<RecurringInvoiceLine>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   };
