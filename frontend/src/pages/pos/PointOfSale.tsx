@@ -145,6 +145,19 @@ export function PointOfSale() {
     { userId: string; name: string; totalSales: number; voidedSales: number; voidRatio: number; anomaly: boolean }[]
   >([]);
 
+  const openReceipt = useCallback(async (saleId: string) => {
+    try {
+      const res = await api.get(`/tills/sales/${saleId}/receipt.pdf`, { responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(res.data);
+      const win = window.open(blobUrl, '_blank');
+      if (win) {
+        win.addEventListener('load', () => URL.revokeObjectURL(blobUrl), { once: true });
+      }
+    } catch {
+      showToast('Failed to open receipt. Please try again.', 'error');
+    }
+  }, [showToast]);
+
   const fetchWarehouses = useCallback(async () => {
     try {
       const res = await api.get("/inventory/warehouses");
@@ -910,7 +923,7 @@ export function PointOfSale() {
                       <button
                         type="button"
                         className="text-xs text-emerald-700 dark:text-emerald-400 underline hover:text-emerald-900"
-                        onClick={() => window.open(`/api/v1/tills/sales/${lastReceipt.id}/receipt.pdf`, '_blank')}
+                        onClick={() => openReceipt(lastReceipt.id)}
                       >
                         Print Receipt
                       </button>
@@ -992,7 +1005,7 @@ export function PointOfSale() {
                         <div className="mt-1 flex items-center gap-3">
                           <button
                             type="button"
-                            onClick={() => window.open(`/api/v1/tills/sales/${sale.id}/receipt.pdf`, '_blank')}
+                            onClick={() => openReceipt(sale.id)}
                             className="flex items-center text-secondary-400 hover:text-primary-600 font-medium"
                           >
                             <Receipt className="h-3 w-3 mr-1" />

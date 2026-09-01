@@ -2,6 +2,16 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-01] - Bug fix: Print Receipt redirected to landing page instead of opening the PDF
+
+**What/Why:**
+Clicking "Print Receipt" (or "Print" in Today's Receipts) opened `/api/v1/tills/sales/<id>/receipt.pdf` via `window.open` with a relative path. In production the frontend and backend are on different origins — the relative path resolved to the Vercel frontend, which has no such route, so the SPA catch-all rendered the landing page. Additionally, direct browser navigation never sends the JWT `Authorization` header, so even on a same-origin setup the request would be rejected with 401. Fixed by replacing both `window.open` calls with an authenticated `api.get(..., { responseType: 'blob' })` request, creating a temporary blob URL, and opening that — the receipt now displays correctly in a new tab and the blob URL is cleaned up on load.
+
+**Files Affected:**
+- `frontend/src/pages/pos/PointOfSale.tsx` — added `openReceipt` helper; replaced 2 `window.open('/api/v1/...')` calls
+
+---
+
 ## [Date: 2026-09-01] - Enhancement: Show customer name prominently in Create Invoice modal
 
 **What/Why:**
