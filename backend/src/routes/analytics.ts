@@ -13,7 +13,6 @@ const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
-router.use(requireTier(2, 'Stock Intelligence'));
 
 type ExecutiveReportType = 'daily' | 'monthly' | 'yearly' | 'closeouts';
 
@@ -32,7 +31,7 @@ async function resolveTenantName(tenantId: string, tenantName: string | undefine
  * Analyzes inventory sales velocity to identify Fast-Selling items, Slow-Moving (Dead) stock,
  * and generates Smart Stock Balancing Suggestions.
  */
-router.get('/stock-intelligence', async (req: Request, res: Response): Promise<void> => {
+router.get('/stock-intelligence', requireTier(2, 'Stock Intelligence'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
     const intelligence = await analyticsService.getStockIntelligence(tenantId);
@@ -73,6 +72,11 @@ router.get('/export/csv', async (req: Request, res: Response): Promise<void> => 
     res.setHeader('Content-Disposition', `attachment; filename=Ledgio_${reportType || 'report'}_${Date.now()}.csv`);
 
     if (reportType === 'stock-intelligence') {
+      const { tenantTier } = requireTenantContext();
+      if ((tenantTier ?? 1) < 2) {
+        res.status(403).json({ success: false, error: 'Stock Intelligence requires the Business plan or higher.' });
+        return;
+      }
       const intelligence = await analyticsService.getStockIntelligence(tenantId);
       const rows = [
         ...intelligence.fastSellers.map(i => [i.sku, i.name, 'FAST_SELLING', i.totalStock]),
@@ -117,6 +121,11 @@ router.get('/export/pdf', async (req: Request, res: Response): Promise<void> => 
 
     let buffer: Buffer;
     if (reportType === 'stock-intelligence') {
+      const { tenantTier } = requireTenantContext();
+      if ((tenantTier ?? 1) < 2) {
+        res.status(403).json({ success: false, error: 'Stock Intelligence requires the Business plan or higher.' });
+        return;
+      }
       const intelligence = await analyticsService.getStockIntelligence(tenantId);
       buffer = await generateStockIntelligencePdf(name, intelligence);
     } else {
@@ -167,6 +176,11 @@ router.get('/export/docx', async (req: Request, res: Response): Promise<void> =>
 
     let buffer: Buffer;
     if (reportType === 'stock-intelligence') {
+      const { tenantTier } = requireTenantContext();
+      if ((tenantTier ?? 1) < 2) {
+        res.status(403).json({ success: false, error: 'Stock Intelligence requires the Business plan or higher.' });
+        return;
+      }
       const intelligence = await analyticsService.getStockIntelligence(tenantId);
       buffer = await generateStockIntelligenceDocx(name, intelligence);
     } else {
