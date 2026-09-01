@@ -2,6 +2,16 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-01] - Fix: Journal entries showing "$" instead of tenant base currency (GH₵)
+
+**What/Why:**
+`JournalList.tsx` had a hardcoded `currency: "USD"` in its `formatCurrency` helper. Every journal entry amount (POS cash sales, expense reimbursements, reversals) displayed with a "$" prefix regardless of the tenant's base currency. For a GHS tenant this was visually wrong and confused the owner when comparing journals to their manual books (the numbers were correct; only the symbol was wrong). Fix: import `useTenantSettings`, call it inside `JournalList`, and pass `settings.baseCurrency` to the formatter.
+
+**Files affected:**
+- `frontend/src/pages/journals/JournalList.tsx` — import + use `useTenantSettings` in `formatCurrency`
+
+---
+
 ## [Date: 2026-09-01] - Fix: Shop plan (Tier 1) 403 errors on executive summary and WHT rates
 
 **What/Why:**
