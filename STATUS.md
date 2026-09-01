@@ -2,6 +2,30 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-01] - Feature: Monthly Sales Ledger, Month-End Close, and Performance Ranking
+
+**What/Why:**
+Built 4 reconciliation features to solve the problem of staff missing sales in the physical book. The shop owner discovered that "220 mag lubricant and rubber clip 4" were not written in the manual book because there was no easy way to see a complete day-by-day, line-item breakdown.
+
+**Features delivered:**
+1. **Monthly Sales Ledger** (`GET /reports/monthly-sales-ledger?year=&month=`): Returns every POS receipt and AR invoice for the selected month, with full line items (product name, qty, unit price), customer/company name, payment method, and running day totals.
+2. **Customer/company name on transactions**: Both POS receipts (via `customerName` field if present) and Invoices (via the linked `Customer` record including company name) are surfaced prominently in the ledger view.
+3. **Month-End Close** (`POST /reports/month-close`): Admin/Accountant can "Save Records" for any month. Creates a `MonthClose` snapshot (total sales, cash vs credit, top products, comparison to prior month). Idempotent — re-saving updates the snapshot.
+4. **Performance ranking** (`GET /reports/month-closes`): Returns all saved months ranked by total revenue. Shows rank badge (#1 = gold), month-over-month diff, and cash vs credit breakdown.
+
+**Files affected (backend):**
+- `backend/prisma/schema.prisma` — added `MonthClose` model
+- `backend/prisma/migrations/20260901000001_add_month_close/migration.sql` — migration
+- `backend/src/services/monthlySalesLedgerService.ts` — new service (getMonthlySalesLedger, closeMonth, getMonthCloses)
+- `backend/src/routes/reports.ts` — 3 new routes: GET /monthly-sales-ledger, POST /month-close, GET /month-closes
+
+**Files affected (frontend):**
+- `frontend/src/pages/reports/MonthlySalesLedger.tsx` — new page with day-by-day ledger, expandable line items, customer/company display, month-close button, top products table, performance ranking
+- `frontend/src/App.tsx` — registered `/reports/monthly-sales-ledger` route
+- `frontend/src/lib/navigation.ts` — added "Monthly Sales Ledger" nav item (no tier gate — all plans)
+
+---
+
 ## [Date: 2026-09-01] - Fix: AR page dollar icon + RecurringInvoices currency defaulting to USD
 
 **What/Why:**

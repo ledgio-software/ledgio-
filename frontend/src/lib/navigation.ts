@@ -172,6 +172,7 @@ export const navigationGroups: NavGroup[] = [
   {
     sectionTitle: "REPORTS & ANALYTICS",
     items: [
+      { name: "Monthly Sales Ledger", href: "/reports/monthly-sales-ledger", icon: CalendarClock },
       { name: "Executive Reports", href: "/reports/executive", icon: BarChart3 },
       { name: "General Ledger", href: "/reports/ledger", icon: BookOpen, minTier: 2 },
       { name: "Trial Balance", href: "/reports/trial-balance", icon: Scale, minTier: 2 },

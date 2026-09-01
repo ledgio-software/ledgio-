@@ -2381,3 +2381,23 @@ model ApiKey {
   @@index([keyPrefix])
   @@map("api_keys")
 }
+
+model MonthClose {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  year             Int
+  month            Int
+  closedAt         DateTime @default(now()) @map("closed_at")
+  closedByUserId   String?  @map("closed_by_user_id")
+  closedByName     String?  @map("closed_by_name")
+  totalSales       Decimal  @map("total_sales") @db.Decimal(15, 2)
+  totalCashSales   Decimal  @map("total_cash_sales") @db.Decimal(15, 2)
+  totalCreditSales Decimal  @map("total_credit_sales") @db.Decimal(15, 2)
+  transactionCount Int      @map("transaction_count")
+  topProducts      Json     @map("top_products")
+  summary          Json
+
+  @@unique([tenantId, year, month])
+  @@index([tenantId])
+  @@map("month_closes")
+}

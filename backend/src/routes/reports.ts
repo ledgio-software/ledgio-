@@ -14,6 +14,7 @@ import * as cashFlowForecastService from '../services/cashFlowForecastService';
 import { CashFlowForecastServiceError } from '../services/cashFlowForecastService';
 import * as agingReportService from '../services/agingReportService';
 import { getCachedReport, setCachedReport } from '../cache/reportCache';
+import * as monthlySalesLedgerService from '../services/monthlySalesLedgerService';
 
 const router = Router();
 
@@ -1753,6 +1754,62 @@ router.get('/fraud/round-amounts', requireTier(2, 'Fraud Detection'), requireRol
     }
     console.error('[Reports] Round amounts error:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to run round-amount analysis.' });
+  }
+});
+
+// Monthly Sales Ledger — Tier 1+ (all plans), Viewer+
+router.get('/monthly-sales-ledger', requireRole('Viewer'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const year = parseInt(req.query.year as string, 10) || new Date().getFullYear();
+    const month = parseInt(req.query.month as string, 10) || (new Date().getMonth() + 1);
+    if (month < 1 || month > 12) {
+      res.status(400).json({ success: false, error: 'month must be 1-12' });
+      return;
+    }
+    const params = { year: String(year), month: String(month) };
+    const cached = await getCachedReport(tenantId, 'monthly-sales-ledger', params);
+    if (cached) { res.json({ success: true, data: cached }); return; }
+    const ledger = await monthlySalesLedgerService.getMonthlySalesLedger(tenantId, year, month);
+    void setCachedReport(tenantId, 'monthly-sales-ledger', params, ledger);
+    res.json({ success: true, data: ledger });
+  } catch (error: any) {
+    console.error('[Reports] Monthly sales ledger error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to generate monthly sales ledger.' });
+  }
+});
+
+// Close a month — Accountant or Admin only
+router.post('/month-close', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { year, month } = req.body as { year: number; month: number };
+    if (!year || !month || month < 1 || month > 12) {
+      res.status(400).json({ success: false, error: 'year and month (1-12) are required.' });
+      return;
+    }
+    const userId = (req as any).user?.id ?? null;
+    const userName = (req as any).user?.name || (req as any).user?.email || null;
+    const record = await monthlySalesLedgerService.closeMonth(tenantId, year, month, userId, userName);
+    res.json({ success: true, data: record });
+  } catch (error: any) {
+    console.error('[Reports] Close month error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to close month.' });
+  }
+});
+
+// List all month-close records (performance history)
+router.get('/month-closes', requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const cached = await getCachedReport(tenantId, 'month-closes', {});
+    if (cached) { res.json({ success: true, data: cached }); return; }
+    const records = await monthlySalesLedgerService.getMonthCloses(tenantId);
+    void setCachedReport(tenantId, 'month-closes', {}, records);
+    res.json({ success: true, data: records });
+  } catch (error: any) {
+    console.error('[Reports] Month closes error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to get month close history.' });
   }
 });
 

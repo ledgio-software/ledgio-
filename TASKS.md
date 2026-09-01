@@ -2,6 +2,10 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes & Features (2026-09-01) — Monthly Sales Ledger
+
+- [x] **Feature: Monthly Sales Ledger + Month-End Close + Performance Ranking** (2026-09-01) — Built 4 reconciliation features. New Prisma model `MonthClose` + migration. New service `monthlySalesLedgerService.ts` (getMonthlySalesLedger, closeMonth, getMonthCloses). New backend routes: `GET /reports/monthly-sales-ledger`, `POST /reports/month-close`, `GET /reports/month-closes`. New frontend page `MonthlySalesLedger.tsx`: day-by-day expandable ledger showing every POS and AR transaction with full line items (product, qty, price), customer/company name, payment method; "Save Records" button for month-end snapshot; top products table; month performance ranking by revenue with rank badges and month-over-month comparison.
+
 ## Bug Fixes & Features (2026-09-01)
 
 - [x] **Fix: Journal list showing "$" instead of tenant currency** (2026-09-01) — `JournalList.tsx` hardcoded `currency: "USD"` in its `formatCurrency` helper. Added `useTenantSettings()` and passed `settings.baseCurrency` so GHS tenants see "GH₵" (not "$") on every journal entry amount.

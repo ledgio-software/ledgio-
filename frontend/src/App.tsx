@@ -41,6 +41,7 @@ const TaxRates = lazy(() => import("./pages/settings/TaxRates").then(m => ({ def
 const WhtRates = lazy(() => import("./pages/settings/WhtRates").then(m => ({ default: m.WhtRates })));
 const PostDatedCheques = lazy(() => import("./pages/banking/PostDatedCheques").then(m => ({ default: m.PostDatedCheques })));
 const InterestCharges = lazy(() => import("./pages/reports/InterestCharges").then(m => ({ default: m.InterestCharges })));
+const MonthlySalesLedger = lazy(() => import("./pages/reports/MonthlySalesLedger").then(m => ({ default: m.MonthlySalesLedger })));
 const Funds = lazy(() => import("./pages/settings/Funds").then(m => ({ default: m.Funds })));
 const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m => ({ default: m.FiscalPeriods })));
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
@@ -795,6 +796,7 @@ function App() {
               <Route path="/banking" element={<ProtectedRoute><MainLayout><BankReconciliation /></MainLayout></ProtectedRoute>} />
               <Route path="/pdc" element={<ProtectedRoute><MainLayout><PostDatedCheques /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/interest-charges" element={<ProtectedRoute><MainLayout><InterestCharges /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/monthly-sales-ledger" element={<ProtectedRoute><MainLayout><MonthlySalesLedger /></MainLayout></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><MainLayout><Invoices /></MainLayout></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><MainLayout><Customers /></MainLayout></ProtectedRoute>} />
               <Route path="/bills" element={<ProtectedRoute><MainLayout><VendorBills /></MainLayout></ProtectedRoute>} />
