@@ -2,6 +2,16 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-02] - Enhancement: Add price update fields to the Adjust Stock modal
+
+**What/Why:**
+The "Restock / Adjust Stock" modal only allowed changing stock quantity; there was no way to correct a product's selling or cost price from that screen. Added an optional "Update Prices" section at the bottom of the adjust modal. If the user fills in a new selling price and/or cost price, a `PUT /inventory/items/:id` call is fired alongside the stock adjustment. Both calls run in parallel (`Promise.all`) so the save is a single click. Current prices are shown as placeholder text so the user knows what they're replacing. Leaving the price fields blank leaves the current price unchanged.
+
+**Files Affected:**
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — added `adjustNewSellingPrice`/`adjustNewCostPrice` state, reset in `openAdjustModal`, parallel price update in `handleAdjustSubmit`, and price fields in the modal UI
+
+---
+
 ## [Date: 2026-09-01] - Bug fix: Print Receipt redirected to landing page instead of opening the PDF
 
 **What/Why:**
