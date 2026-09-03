@@ -266,7 +266,9 @@ export async function recordInvoicePayment(
   }
 
   let syncSeq: bigint | null = null;
-  const updated = await withCurrentTenantDb(prisma, async (client) => {
+  let updated: any;
+  try {
+  updated = await withCurrentTenantDb(prisma, async (client) => {
     // Acquire a row-level lock on the invoice before reading its balance.
     // Forces concurrent payment transactions on the same invoice to queue
     // behind each other rather than reading a stale amountPaid value.
@@ -284,7 +286,24 @@ export async function recordInvoicePayment(
       where: { id: invoiceId, tenantId },
       select: { amountPaid: true, status: true, total: true },
     });
-    if (!fresh || fresh.status === 'PAID') {
+    if (!fresh) {
+      throw new InvoicePaymentServiceError('Invoice not found.', 404);
+    }
+    if (fresh.status === 'PAID') {
+      // A concurrent request with the same idempotency key may have committed
+      // just before we acquired the row lock. Re-check within the lock so both
+      // requests return the same idempotent 200 instead of a 409.
+      if (options.idempotencyKey) {
+        const racePayment = await (client as any).invoicePayment.findFirst({
+          where: { tenantId, idempotencyKey: options.idempotencyKey },
+        });
+        if (racePayment) {
+          return (client as any).invoice.findFirst({
+            where: { id: invoiceId, tenantId },
+            include: { customer: true },
+          });
+        }
+      }
       throw new InvoicePaymentServiceError('Invoice is already paid.', 409);
     }
     const freshAlreadyPaid = new Decimal(fresh.amountPaid);
@@ -342,6 +361,23 @@ export async function recordInvoicePayment(
 
     return invoiceUpdated;
   });
+  } catch (txErr: any) {
+    // A concurrent request with the same idempotencyKey raced past the
+    // pre-check and committed first — the DB partial unique index fired (P2002).
+    // PostgreSQL aborts the whole transaction on constraint violation, so we
+    // catch it here (outside the transaction) and return the existing invoice.
+    if (txErr?.code === 'P2002' && options.idempotencyKey && txErr?.meta?.target?.includes?.('idempotency_key')) {
+      return withCurrentTenantDb(prisma, async (client) => {
+        const inv = await (client as any).invoice.findFirst({
+          where: { id: invoiceId, tenantId },
+          include: { customer: true },
+        });
+        if (!inv) throw new InvoicePaymentServiceError('Invoice not found.', 404);
+        return inv;
+      });
+    }
+    throw txErr;
+  }
 
   if (syncSeq !== null) {
     notifyChange({

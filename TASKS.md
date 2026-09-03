@@ -2,6 +2,15 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## System Hardening Plan (2026-08-28)
+
+- [x] **Phase 1 — Idempotent Invoice Payments** (2026-08-28) — Added `idempotencyKey` parameter to `POST /invoices/:id/pay`. Route validates the key; service uses existing fast-path `findFirst` pre-check plus a new race-safe P2002 catch **outside** the transaction block so concurrent retries with the same key collapse to a single payment. DB-level enforcement via partial unique index on `(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL` (migration `20260827000001`). New test suite `invoicePaymentIdempotency.test.ts` covers sequential retry, concurrent race, distinct keys, backward-compat (no key), validation, and cross-tenant isolation.
+- [x] **Phase 2 — DB Connection Pooling & Query Hardening** (2026-08-28) — Connection pool already sized (50 connections, statement_timeout=30 s in DATABASE_URL). N+1 audit confirmed all hot list routes are safe. Added 4 missing composite indexes (migration `20260828000001`): `invoice_payments(tenant_id, invoice_id)`, `invoice_payments(invoice_id, created_at DESC)`, `invoices(tenant_id, status, due_date)` for AR aging, `vendor_bills(tenant_id, bill_type, bill_date)` for purchase register. ORM-level query timeout in `db.ts` via `$use` middleware (25 s, configurable via `QUERY_TIMEOUT_MS`) fires before PostgreSQL's hard kill to return a structured error. Critical slow-query logging (>5 s) added. Configurable slow query threshold via `SLOW_QUERY_MS`.
+- [ ] **Phase 3 — Offline Sync Robustness** — Idempotency on all sync endpoints, conflict resolution strategy, sync-failure audit log for all entities (not just CashSale).
+- [ ] **Phase 4 — Report Separation** — Move heavy report queries off the OLTP connection pool; read-replica routing or async queue.
+- [ ] **Phase 5 — Queue Durability** — Replace in-process cron jobs with durable queue (BullMQ/pg-boss) so jobs survive restarts.
+- [ ] **Phase 6 — Observability & Load Testing** — Structured logging, distributed tracing, k6/Artillery load test suite, alerting thresholds.
+
 ## Pharmacy Module (2026-08-24)
 
 - [x] **Pharmacy Module Phase 2 — NHIS Billing, Low-Stock Alerts, Daily Count** (2026-08-24) — NHIS/insurance payment method on POS (CASH/NHIS/MoMo/CARD toggle); NHIS Receivable account (code 1020, auto-created); outstanding-claims tracker page; settle endpoint with journal reversal. Low-stock in-app notifications (broadcast, 24-hour dedup, SMS optional) fired after sales, REMOVE adjustments, and transfer-outs. End-of-day narcotics Daily Count endpoint (Accountant role, absolute balance override) with discrepancy logging; Daily Count modal in NarcoticsRegister UI; PDF export grey row with Δ annotation. Backend and frontend tsc clean.
