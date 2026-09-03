@@ -3,6 +3,7 @@ import { Plus, Search, FileSpreadsheet, Ban, ArrowRightLeft, Send, History } fro
 import { useNavigate } from "react-router-dom";
 import { useJournals } from "../../hooks/useJournals";
 import { useToast } from "../../contexts/ToastContext";
+import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
@@ -17,6 +18,7 @@ import {
 
 export function JournalList() {
   const { journals, voidJournal, postExistingJournal } = useJournals();
+  const { settings } = useTenantSettings();
   const [searchTerm, setSearchTerm] = useState("");
   const [voidingId, setVoidingId] = useState<string | null>(null);
   const [postingId, setPostingId] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function JournalList() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: settings.baseCurrency || "USD",
     }).format(amount);
   };
 

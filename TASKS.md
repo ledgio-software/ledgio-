@@ -2,6 +2,29 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes & Features (2026-09-01) — Monthly Sales Ledger
+
+- [x] **Feature: Monthly Sales Ledger + Month-End Close + Performance Ranking** (2026-09-01) — Built 4 reconciliation features. New Prisma model `MonthClose` + migration. New service `monthlySalesLedgerService.ts` (getMonthlySalesLedger, closeMonth, getMonthCloses). New backend routes: `GET /reports/monthly-sales-ledger`, `POST /reports/month-close`, `GET /reports/month-closes`. New frontend page `MonthlySalesLedger.tsx`: day-by-day expandable ledger showing every POS and AR transaction with full line items (product, qty, price), customer/company name, payment method; "Save Records" button for month-end snapshot; top products table; month performance ranking by revenue with rank badges and month-over-month comparison.
+
+## Bug Fixes & Features (2026-09-01)
+
+- [x] **Fix: Journal list showing "$" instead of tenant currency** (2026-09-01) — `JournalList.tsx` hardcoded `currency: "USD"` in its `formatCurrency` helper. Added `useTenantSettings()` and passed `settings.baseCurrency` so GHS tenants see "GH₵" (not "$") on every journal entry amount.
+- [x] **Fix: Shop plan 403 on executive summary and WHT rates** (2026-09-01) — Router-level `requireTier(2)` in `analytics.ts` blocked all analytics routes for Tier 1 tenants; moved gate inline to `/stock-intelligence` route only. Router-level `requireTier(2)` in `whtRates.ts` blocked WHT rate lookups for Shop-plan tenants on the Vendor Bills page; removed entirely (route-level `requireRole` guards remain). Also added `detail` field to payroll 500 responses for diagnostics (PR #156). Shop plan now accesses executive summary, export reports, and WHT rates correctly.
+- [x] **Fix: Payroll run 500 / nested Prisma transaction + duplicate-payments SQL** (2026-09-01) — `POST /payroll/runs` crashed with a Prisma nested-transaction error because `applyLoanDeductions` (which opens its own `withCurrentTenantDb`) was called inside the outer `withCurrentTenantDb` block. Fixed by collecting payslip IDs inside the transaction and applying loan deductions outside. Also fixed `getDuplicatePayments` in `reportingService.ts` which used a non-existent column `i.customer_name`; now joins the `customers` table. Updated `legalAndEnforcement.test.ts` to onboard a Tier 3 tenant for the custom-fields gate tests.
+
+## Bug Fixes & Features (2026-08-31)
+
+- [x] **Frontend tier-gate enforcement + customFields backend fix** (2026-08-31) — Fixed live 403 errors for tier-1 tenants. 12 frontend report components now gate `useEffect` API calls with `useTenantSettings()` tier check; `customFields.ts` backend upgraded to router-level `requireTier(3)`. Eliminates 403s on `/reports/aging/ap`, `/reports/aging/ar`, `/ledgers/summary`, `/reports/sales-channel` for Shop-tier tenants.
+
+
+
+- [x] **Fix POS revenue doubling** (2026-08-31) — Atomic claim sentinel in `POST /tills/backfill-revenue` prevents concurrent requests from double-posting the same sale. (`backend/src/routes/cashTill.ts`)
+- [x] **Fix MFA banner persisting after setup** (2026-08-31) — `POST /auth/mfa/verify-setup` now issues a fresh JWT with `isMfaEnabled: true`; frontend stores it in localStorage so the MFA gate lifts immediately. (`backend/src/routes/auth.ts`, `frontend/src/pages/settings/Settings.tsx`)
+- [x] **Admin-initiated password reset for team members** (2026-08-31) — `POST /tenants/members/:id/reset-password` generates a 12-char temp password, hashes it, saves it, emails it to the member; frontend adds Reset Password button in Team Management. (`backend/src/routes/tenants.ts`, `frontend/src/pages/team/TeamManagement.tsx`)
+- [x] **Dashboard widget tier-gating + Sales Channel Report nav fix** (2026-08-31) — `DashboardFinanceWidgets` now renders an upgrade placeholder for Shop-tier tenants instead of calling tier-2-gated aging routes; eliminates spurious MFA banner on Shop dashboards. `minTier: 2` added to Sales Channel Report nav entry. (`frontend/src/App.tsx`, `frontend/src/lib/navigation.ts`)
+- [x] **Fix: upgrade test tenants to tier 2 for ledger-endpoint access** (2026-08-31) — Eight test files called `/api/v1/ledgers/*` with tier-1 tenants after `requireTier(2, 'General Ledger')` was added; added `tier: 2` to each `onboardTenant()` call so tests get real ledger data. All 723 tests pass. (`backend/src/tests/accountDefaultRole.test.ts`, `creditDebitNotes.test.ts`, `invoicePartialPayments.test.ts`, `journalEntries.test.ts`, `ledgers.test.ts`, `multiCurrency.test.ts`, `pettyCash.test.ts`, `paystack.test.ts`)
+- [x] **Tenant deletion via Admin Core Engine** (2026-08-31) — `DELETE /api/v1/tenants/:id` drops tenant schema, removes users, deletes tenant row; frontend adds per-row delete button in Tenant Schemas tab with slug-confirmation modal. (`backend/src/routes/tenants.ts`, `frontend/src/pages/admin/AdminCoreEngine.tsx`)
+
 ## System Hardening Plan (2026-08-28)
 
 - [x] **Phase 1 — Idempotent Invoice Payments** (2026-08-28) — Added `idempotencyKey` parameter to `POST /invoices/:id/pay`. Route validates the key; service uses existing fast-path `findFirst` pre-check plus a new race-safe P2002 catch **outside** the transaction block so concurrent retries with the same key collapse to a single payment. DB-level enforcement via partial unique index on `(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL` (migration `20260827000001`). New test suite `invoicePaymentIdempotency.test.ts` covers sequential retry, concurrent race, distinct keys, backward-compat (no key), validation, and cross-tenant isolation.

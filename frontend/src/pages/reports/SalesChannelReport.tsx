@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { api } from "../../lib/api";
 
 interface ChannelSummary {
@@ -27,7 +28,7 @@ interface SaleLine {
 }
 
 export function SalesChannelReport() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [summary, setSummary] = useState<SalesChannelSummary | null>(null);
   const [sales, setSales] = useState<SaleLine[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,8 +58,8 @@ export function SalesChannelReport() {
   }, [startDate, endDate]);
 
   useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    if (!isLoadingTenantSettings && settings.tier >= 2) fetchReport();
+  }, [fetchReport, isLoadingTenantSettings, settings.tier]);
 
   const retailPct =
     summary && summary.TOTAL.totalAmount > 0
@@ -68,6 +69,9 @@ export function SalesChannelReport() {
     summary && summary.TOTAL.totalAmount > 0
       ? ((summary.WHOLESALE.totalAmount / summary.TOTAL.totalAmount) * 100).toFixed(1)
       : "0.0";
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="Sales Channel Report" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">

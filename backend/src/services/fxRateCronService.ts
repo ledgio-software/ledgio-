@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import * as fxRateService from './fxRateService';
 
@@ -18,10 +19,10 @@ export class FxRateCronService {
     }
 
     // Every 6 hours, aligned with the cache TTL.
-    this.task = cron.schedule('0 */6 * * *', async () => {
+    this.task = cron.schedule('0 */6 * * *', wrapCronTick('FX Rate Refresh', async () => {
       console.log('[FxRateCron] Refreshing cached FX rates...');
       await this.refreshRatesJob();
-    });
+    }));
 
     console.log('[FxRateCron] FX Rate Refresh Cron Job Initialized.');
   }

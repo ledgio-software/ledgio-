@@ -64,6 +64,7 @@ describe('Invoices - partial payments (Accounts Receivable)', () => {
       adminEmail,
       adminPassword: 'Password123!',
       adminName: 'AR Partial Admin',
+      tier: 2,
     });
     adminToken = onboard.token;
 

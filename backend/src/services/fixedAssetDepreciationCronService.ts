@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { runWithTenantContext } from '../context/tenantContext';
 import * as fixedAssetService from './fixedAssetService';
@@ -20,10 +21,10 @@ export class FixedAssetDepreciationCronService {
   public static init(): void {
     if (this.task) return;
 
-    this.task = cron.schedule('0 8 * * *', async () => {
+    this.task = cron.schedule('0 8 * * *', wrapCronTick('Fixed Asset Depreciation', async () => {
       console.log('[FixedAssetDepreciationCron] Executing daily depreciation sweep...');
       await this.runDepreciationJob();
-    });
+    }));
 
     console.log('[FixedAssetDepreciationCron] Daily Fixed Asset Depreciation Cron Job Initialized.');
   }

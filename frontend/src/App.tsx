@@ -41,6 +41,7 @@ const TaxRates = lazy(() => import("./pages/settings/TaxRates").then(m => ({ def
 const WhtRates = lazy(() => import("./pages/settings/WhtRates").then(m => ({ default: m.WhtRates })));
 const PostDatedCheques = lazy(() => import("./pages/banking/PostDatedCheques").then(m => ({ default: m.PostDatedCheques })));
 const InterestCharges = lazy(() => import("./pages/reports/InterestCharges").then(m => ({ default: m.InterestCharges })));
+const MonthlySalesLedger = lazy(() => import("./pages/reports/MonthlySalesLedger").then(m => ({ default: m.MonthlySalesLedger })));
 const Funds = lazy(() => import("./pages/settings/Funds").then(m => ({ default: m.Funds })));
 const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m => ({ default: m.FiscalPeriods })));
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
@@ -337,19 +338,26 @@ function DonutChart({ segments, size = 110 }: {
 
 // ── Dashboard finance widgets (AR/AP aging donuts + KPI cards) ────────────────
 function DashboardFinanceWidgets({ currency }: { currency: string }) {
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
 
   type AgingTotals = { current: number; days1to30: number; days31to60: number; days61to90: number; days90plus: number; total: number };
   const [arTotals, setArTotals] = useState<AgingTotals | null>(null);
   const [apTotals, setApTotals] = useState<AgingTotals | null>(null);
+  const [agingError, setAgingError] = useState<number | null>(null);
   const [hidden, setHidden] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem('dash-widgets-hidden') || '{}'); } catch { return {}; }
   });
 
   useEffect(() => {
-    api.get('/reports/aging/ar').then(r => setArTotals(r.data.data?.totals ?? null)).catch(() => {});
-    api.get('/reports/aging/ap').then(r => setApTotals(r.data.data?.totals ?? null)).catch(() => {});
-  }, []);
+    if (isLoadingTenantSettings || (settings?.tier ?? 1) < 2) return;
+    api.get('/reports/aging/ar')
+      .then(r => setArTotals(r.data.data?.totals ?? null))
+      .catch((e) => { setAgingError(e?.response?.status ?? 0); });
+    api.get('/reports/aging/ap')
+      .then(r => setApTotals(r.data.data?.totals ?? null))
+      .catch(() => {});
+  }, [isLoadingTenantSettings, settings?.tier]);
 
   const toggleWidget = (key: string) => {
     setHidden(prev => {
@@ -379,6 +387,15 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
   const arOver30  = arTotals ? arTotals.days31to60 + arTotals.days61to90 + arTotals.days90plus : 0;
   const arOver90  = arTotals ? arTotals.days90plus : 0;
 
+  if ((settings?.tier ?? 1) < 2) {
+    return (
+      <div className="rounded-lg border border-secondary-200 dark:border-secondary-700 bg-secondary-50 dark:bg-secondary-800/40 p-6 text-center text-sm text-secondary-500 dark:text-secondary-400">
+        AR/AP aging reports and KPI widgets are available on the <span className="font-semibold text-secondary-700 dark:text-secondary-300">Business</span> plan and above.
+        Upgrade your plan to unlock these insights.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Customize toggle */}
@@ -391,6 +408,22 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
           </button>
         ))}
       </div>
+
+      {/* MFA / auth error banner */}
+      {agingError === 403 && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>
+            Dashboard widgets are unavailable — your account requires two-factor authentication.
+            {' '}<Link to="/settings?tab=security" className="underline font-medium">Enable MFA in Settings → Security</Link> to restore access.
+          </span>
+        </div>
+      )}
+      {agingError !== null && agingError !== 403 && (
+        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          Could not load dashboard data. Please refresh the page.
+        </div>
+      )}
 
       {/* AR KPI cards */}
       {!hidden['kpi'] && (
@@ -746,6 +779,7 @@ function App() {
               <Route path="/accounts" element={<ProtectedRoute><MainLayout><ChartOfAccounts /></MainLayout></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><OnboardingWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
+              <Route path="/settings/security" element={<Navigate to="/settings?tab=security" replace />} />
               <Route path="/settings/tax-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><TaxRates /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/wht-rates" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><WhtRates /></MainLayout></ProtectedRoute>} />
               <Route path="/settings/funds" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Funds /></MainLayout></ProtectedRoute>} />
@@ -762,6 +796,7 @@ function App() {
               <Route path="/banking" element={<ProtectedRoute><MainLayout><BankReconciliation /></MainLayout></ProtectedRoute>} />
               <Route path="/pdc" element={<ProtectedRoute><MainLayout><PostDatedCheques /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/interest-charges" element={<ProtectedRoute><MainLayout><InterestCharges /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/monthly-sales-ledger" element={<ProtectedRoute><MainLayout><MonthlySalesLedger /></MainLayout></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><MainLayout><Invoices /></MainLayout></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><MainLayout><Customers /></MainLayout></ProtectedRoute>} />
               <Route path="/bills" element={<ProtectedRoute><MainLayout><VendorBills /></MainLayout></ProtectedRoute>} />

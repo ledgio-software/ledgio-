@@ -134,7 +134,7 @@ const PRICING_PLANS = [
     period: "/ mo",
     seats: Infinity,
     tagline: "Dedicated support for large organisations.",
-    cta: "Start Free Trial",
+    cta: "Contact Sales",
     ctaVariant: "outline" as const,
     highlight: false,
     features: [

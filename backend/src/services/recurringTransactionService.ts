@@ -5,6 +5,7 @@ import { RecurringTransactionRecord, RecurrenceFrequency, CreateRecurringTransac
 import { runWithTenantContext } from '../context/tenantContext';
 import * as journalEntryService from './journalEntryService';
 import { recordAuditLogTx, diffFields, AuditActor } from './auditLogService';
+import { wrapCronTick } from './cronJobRegistry';
 
 export class RecurringTransactionServiceError extends Error {
   statusCode: number;
@@ -186,10 +187,10 @@ export class RecurringTransactionCronService {
   public static init(): void {
     if (this.task) return;
 
-    this.task = cron.schedule('0 * * * *', async () => {
+    this.task = cron.schedule('0 * * * *', wrapCronTick('Recurring Transactions', async () => {
       console.log('[RecurringTransactionCron] Executing hourly due-recurring-transactions sweep...');
       await this.runDueTransactionsJob();
-    });
+    }));
 
     console.log('[RecurringTransactionCron] Hourly Recurring Transactions Cron Job Initialized.');
   }

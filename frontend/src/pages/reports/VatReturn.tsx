@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FileText, AlertCircle, RefreshCw } from "lucide-react";
 import { api } from "../../lib/api";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { exportToCsv } from "../../lib/exportCsv";
 
 interface VatLine {
@@ -24,7 +25,7 @@ interface VatReturn {
 }
 
 export function VatReturn() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [report, setReport] = useState<VatReturn | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +50,9 @@ export function VatReturn() {
     }
   };
 
-  useEffect(() => { fetchReport(); }, [startDate, endDate]); // eslint-disable-line
+  useEffect(() => {
+    if (!isLoadingTenantSettings && settings.tier >= 2) fetchReport();
+  }, [startDate, endDate, isLoadingTenantSettings, settings.tier]); // eslint-disable-line
 
   const handleExport = () => {
     if (!report) return;
@@ -63,6 +66,9 @@ export function VatReturn() {
       { "Tax Rate": "TOTAL", "Rate %": "", "Taxable Amount": report.outputVat.totalTaxableAmount, "VAT Amount": report.outputVat.totalTaxAmount },
     ]);
   };
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="VAT Return Report" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

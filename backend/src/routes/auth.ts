@@ -323,7 +323,7 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
   // Org type rides on the token so nav filtering never needs an extra DB
   // round trip on later requests - only fetched here at login time.
   const loginTenant = user.tenantId
-    ? await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { orgType: true } })
+    ? await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { orgType: true, isLive: true } })
     : null;
 
   const tokenPayload = {
@@ -333,6 +333,7 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
     role: user.role,
     tenantId: user.tenantId || undefined,
     orgType: loginTenant?.orgType,
+    isLive: loginTenant?.isLive ?? false,
     isMfaEnabled: user.isMfaEnabled || false,
     ...(mfaVerifiedNow ? { lastMfaAt: Math.floor(Date.now() / 1000) } : {}),
   };
@@ -751,10 +752,15 @@ router.post('/mfa/verify-setup', authenticateJwt, async (req: Request, res: Resp
       actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
     });
 
+    // Issue a refreshed JWT so isMfaEnabled flips to true immediately.
+    // Without this, the old token (isMfaEnabled: false) would keep triggering
+    // the MFA gate on protected routes until the user logs out and back in.
+    const freshToken = generateJwtToken({ ...req.user!, isMfaEnabled: true });
+
     res.status(200).json({
       success: true,
       message: 'MFA enabled successfully. Save these backup codes somewhere safe - each one can be used once if you lose access to your authenticator app, and they will not be shown again.',
-      data: { backupCodes },
+      data: { backupCodes, token: freshToken },
     });
   } catch (error: any) {
     console.error('[Auth Service] MFA setup verification error:', error);

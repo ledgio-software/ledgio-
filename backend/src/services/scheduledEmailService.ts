@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { EmailService } from './EmailService';
 
@@ -109,10 +110,10 @@ export class ScheduledEmailCronService {
   public static init(): void {
     if (this.task) return;
 
-    this.task = cron.schedule('0 * * * *', async () => {
+    this.task = cron.schedule('0 * * * *', wrapCronTick('Scheduled Email Reports', async () => {
       console.log('[ScheduledEmailCron] Executing hourly due-schedules sweep...');
       await this.runDueSchedulesJob();
-    });
+    }));
 
     console.log('[ScheduledEmailCron] Hourly Scheduled Reports Cron Job Initialized.');
   }

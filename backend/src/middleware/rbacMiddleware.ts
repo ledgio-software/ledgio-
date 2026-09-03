@@ -59,9 +59,14 @@ const OPERATIONAL_ROLES = new Set(['admin', 'owner', 'accountant', 'finance cont
 const ROLE_IMPLIES: Record<string, string[]> = {
   'finance controller': ['accountant', 'viewer', 'auditor'],
   'external accountant': ['viewer', 'auditor'],
-  'payroll officer': ['hr'],
-  'payroll approver': ['hr', 'payroll officer'],
+  'auditor': ['viewer'],
+  // Payroll staff get viewer so they can see financial data needed for payroll processing.
+  'payroll officer': ['hr', 'viewer'],
+  'payroll approver': ['hr', 'payroll officer', 'viewer'],
   'warehouse manager': ['shop manager', 'viewer'],
+  // Cashier / Shop Manager / HR are operational roles — they do NOT imply viewer
+  // so they remain blocked from financial reports. Routes they need access to
+  // (e.g. WHT rates) must name them explicitly in requireRole().
   'accounts payable clerk': ['viewer'],
   'accounts receivable clerk': ['viewer'],
 };

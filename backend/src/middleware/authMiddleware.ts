@@ -71,8 +71,12 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions = {}) {
         '/tenants/members',
         '/subscription/status',
       ];
+      // MFA is only enforced once the tenant has completed onboarding (isLive = true).
+      // This lets new admins finish the setup wizard before being gated. Once live,
+      // Admin/Auditor roles must have MFA enabled to access any financial data.
       if (
         process.env.NODE_ENV !== 'test' &&
+        payload.isLive === true &&
         ['Admin', 'Auditor'].includes(payload.role ?? '') &&
         !payload.isMfaEnabled &&
         !MFA_EXEMPT_PATHS.some((p) => req.originalUrl.includes(p))

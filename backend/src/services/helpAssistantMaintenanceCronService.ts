@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { pruneConversationsOlderThan } from '../repository/helpAssistantConversationRepository';
 
@@ -27,10 +28,10 @@ export class HelpAssistantMaintenanceCronService {
 
     // Once daily at 3am UTC - an off-hours slot, matching the "off-peak
     // batch job" timing other daily crons in this codebase use.
-    this.task = cron.schedule('0 3 * * *', async () => {
+    this.task = cron.schedule('0 3 * * *', wrapCronTick('Help Assistant Maintenance', async () => {
       console.log('[HelpAssistantMaintenanceCron] Executing daily conversation-log retention sweep...');
       await this.runRetentionJob();
-    });
+    }));
 
     console.log('[HelpAssistantMaintenanceCron] Daily Help Assistant Maintenance Cron Job Initialized.');
   }

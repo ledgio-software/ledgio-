@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { AlertTriangle, RefreshCw, Download } from "lucide-react";
 import { api } from "../../lib/api";
 import { exportToCsv } from "../../lib/exportCsv";
+import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 
 type Tab = "duplicate-payments" | "round-amounts";
 
@@ -23,6 +25,7 @@ interface RoundAmountTransaction {
 }
 
 export function FraudAlerts() {
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const today = new Date().toISOString().split("T")[0];
   const yearStart = today.slice(0, 4) + "-01-01";
 
@@ -68,9 +71,10 @@ export function FraudAlerts() {
   };
 
   useEffect(() => {
+    if (isLoadingTenantSettings || settings.tier < 2) return;
     if (tab === "duplicate-payments") fetchDuplicates();
     else fetchRoundAmounts();
-  }, [tab, startDate, endDate, minAmount, roundingThreshold]); // eslint-disable-line
+  }, [tab, startDate, endDate, minAmount, roundingThreshold, isLoadingTenantSettings, settings.tier]); // eslint-disable-line
 
   const handleExport = () => {
     if (tab === "duplicate-payments") {
@@ -99,6 +103,9 @@ export function FraudAlerts() {
 
   const noData =
     tab === "duplicate-payments" ? dupPayments.length === 0 : roundAmounts.length === 0;
+
+  if (isLoadingTenantSettings) return <div className="py-8 text-center text-secondary-500">Loading…</div>;
+  if (settings.tier < 2) return <UpgradeRequired featureLabel="Fraud Alerts" requiredTier={2} currentTier={settings.tier} />;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

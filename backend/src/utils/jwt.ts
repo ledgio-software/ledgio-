@@ -15,6 +15,10 @@ export interface JwtPayload {
   // verification but before MFA verification - authMiddleware rejects any
   // request bearing this token outright, see authMiddleware.ts.
   mfaPending?: boolean;
+  // True once the tenant's onboarding wizard is complete (isLive = true on the
+  // Tenant row). MFA enforcement for Admin/Auditor is only active after this
+  // point so that new tenants can finish setup before being gated.
+  isLive?: boolean;
   // Unix timestamp (seconds) of when TOTP MFA was last verified. Used by
   // step-up middleware to enforce re-authentication windows on sensitive routes.
   lastMfaAt?: number;

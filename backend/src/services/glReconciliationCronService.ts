@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { runWithTenantContext, TenantContextData } from '../context/tenantContext';
@@ -19,10 +20,10 @@ export class GlReconciliationCronService {
   public static init(): void {
     if (this.task) return;
 
-    this.task = cron.schedule('30 2 * * *', async () => {
+    this.task = cron.schedule('30 2 * * *', wrapCronTick('GL Reconciliation', async () => {
       console.log('[GlReconCron] Running daily GL vs subledger reconciliation...');
       await this.runJob();
-    });
+    }));
 
     console.log('[GlReconCron] Daily GL Reconciliation Cron Initialized.');
   }

@@ -106,9 +106,15 @@ export function AdminCoreEngine() {
   const fetchMetrics = useCallback(() => {
     setIsLoadingMetrics(true);
     setMetricsError(null);
-    return api
-      .get("/admin/metrics", { headers: { 'x-admin-passcode': passcode } })
-      .then((res) => setMetricsData(res.data.data))
+    const headers = { 'x-admin-passcode': passcode };
+    return Promise.all([
+      api.get("/admin/metrics", { headers }),
+      api.get("/admin/error-logs/grouped", { headers }),
+    ])
+      .then(([metricsRes, errRes]) => {
+        setMetricsData(metricsRes.data.data);
+        setErrorGroups(errRes.data.data?.groups ?? []);
+      })
       .catch(() => setMetricsError("Failed to load performance metrics."))
       .finally(() => setIsLoadingMetrics(false));
   }, [passcode]);
@@ -254,9 +260,17 @@ export function AdminCoreEngine() {
     uptime: number;
     nodeVersion: string;
     buckets: { ts: number; requests: number; errors: number; avgMs: number }[];
+    statusDist?: { ok: number; redirect: number; clientErr: number; serverErr: number };
+    topRoutesByTraffic?: { route: string; requests: number; errors: number; errorRate: number; avgMs: number }[];
+    topRoutesByErrors?: { route: string; requests: number; errors: number; errorRate: number; avgMs: number }[];
   } | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  const [errorGroups, setErrorGroups] = useState<{
+    key: string; status: number; method: string; error: string;
+    source?: string; fn?: string; count: number; firstSeen: string; lastSeen: string;
+    sample?: { path: string; [key: string]: unknown };
+  }[]>([]);
 
   // Cron jobs state
   const [jobsData, setJobsData] = useState<{
@@ -316,6 +330,12 @@ export function AdminCoreEngine() {
   // to the saved tier while a change is pending.
   const [tierDrafts, setTierDrafts] = useState<Record<string, number>>({});
   const [savingTierId, setSavingTierId] = useState<string | null>(null);
+
+  // Tenant deletion state — requires typing the slug to confirm, to prevent
+  // accidental deletion of a live business's entire dataset.
+  const [deletingTenant, setDeletingTenant] = useState<{ id: string; name: string; slug: string } | null>(null);
+  const [deleteConfirmSlug, setDeleteConfirmSlug] = useState("");
+  const [isDeletingTenant, setIsDeletingTenant] = useState(false);
 
   // Platform-wide Audit Logs state
   const [auditLogs, setAuditLogs] = useState<
@@ -479,6 +499,22 @@ export function AdminCoreEngine() {
       showToast(err.response?.data?.error || "Failed to update tenant plan.", "error");
     } finally {
       setSavingTierId(null);
+    }
+  };
+
+  const handleDeleteTenant = async () => {
+    if (!deletingTenant || deleteConfirmSlug !== deletingTenant.slug) return;
+    setIsDeletingTenant(true);
+    try {
+      await api.delete(`/tenants/${deletingTenant.id}`, { headers: { 'x-admin-passcode': passcode } });
+      showToast(`Tenant "${deletingTenant.name}" permanently deleted.`, "success");
+      setDeletingTenant(null);
+      setDeleteConfirmSlug("");
+      fetchTenants();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to delete tenant.", "error");
+    } finally {
+      setIsDeletingTenant(false);
     }
   };
 
@@ -688,6 +724,61 @@ export function AdminCoreEngine() {
 
   return (
     <div className="min-h-screen bg-secondary-950 text-white font-sans selection:bg-amber-500 selection:text-secondary-950">
+      {/* Tenant Deletion Confirmation Modal */}
+      {deletingTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-secondary-900 border border-rose-800 rounded-2xl shadow-2xl p-6 space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-rose-500/10 rounded-lg text-rose-400 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Permanently Delete Tenant</h3>
+                <p className="text-xs text-secondary-400 mt-1">
+                  This will drop the PostgreSQL schema <span className="font-mono text-rose-300">{deletingTenant.slug}</span>, delete all its users, and remove it from the platform roster. <strong className="text-white">This cannot be undone.</strong>
+                </p>
+              </div>
+            </div>
+            <div className="p-3 bg-rose-950/40 border border-rose-900 rounded-lg text-xs text-rose-300 space-y-1">
+              <div><span className="text-secondary-400">Tenant:</span> <span className="font-semibold text-white">{deletingTenant.name}</span></div>
+              <div><span className="text-secondary-400">Slug:</span> <span className="font-mono">{deletingTenant.slug}</span></div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-secondary-300">
+                Type the slug <span className="font-mono text-rose-300">{deletingTenant.slug}</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmSlug}
+                onChange={(e) => setDeleteConfirmSlug(e.target.value)}
+                placeholder={deletingTenant.slug}
+                className="w-full h-9 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs font-mono focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 border-secondary-700 text-secondary-300 hover:bg-secondary-800 text-xs"
+                onClick={() => { setDeletingTenant(null); setDeleteConfirmSlug(""); }}
+                disabled={isDeletingTenant}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1 bg-rose-700 hover:bg-rose-600 text-white text-xs disabled:opacity-40"
+                onClick={handleDeleteTenant}
+                disabled={deleteConfirmSlug !== deletingTenant.slug || isDeletingTenant}
+              >
+                {isDeletingTenant ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                Delete Permanently
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Engine Navigation Header */}
       <header className="border-b border-secondary-800 bg-secondary-900/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -1318,6 +1409,7 @@ export function AdminCoreEngine() {
                             <TableHead className="text-secondary-400">Status</TableHead>
                             <TableHead className="text-secondary-400">Users</TableHead>
                             <TableHead className="text-secondary-400">Onboarded</TableHead>
+                            <TableHead className="text-secondary-400"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1382,10 +1474,19 @@ export function AdminCoreEngine() {
                                   </TableCell>
                                   <TableCell className="text-secondary-300 font-mono text-center">{t.userCount ?? "—"}</TableCell>
                                   <TableCell className="text-secondary-300">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      className="p-1.5 rounded-md text-rose-500 hover:bg-rose-950/50 hover:text-rose-400 transition-colors"
+                                      title="Delete tenant permanently"
+                                      onClick={() => { setDeletingTenant({ id: t.id, name: t.name, slug: t.slug }); setDeleteConfirmSlug(""); }}
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </button>
+                                  </TableCell>
                                 </TableRow>
                                 {isExpanded && (
                                   <TableRow key={`${t.id}-users`} className="border-secondary-800 bg-secondary-950/40">
-                                    <TableCell colSpan={8} className="p-0">
+                                    <TableCell colSpan={9} className="p-0">
                                       <div className="px-6 py-4 space-y-2">
                                         <div className="text-xs font-bold text-secondary-300 mb-2 flex items-center gap-2">
                                           <Users className="h-3.5 w-3.5" /> Users in {t.name}
@@ -2001,9 +2102,9 @@ export function AdminCoreEngine() {
                   <div>
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                       <Activity className="h-5 w-5 text-amber-400" />
-                      API Performance (last hour)
+                      System Performance
                     </h2>
-                    <p className="text-xs text-secondary-400 mt-0.5">5-minute rolling buckets — refreshes every 30 s.</p>
+                    <p className="text-xs text-secondary-400 mt-0.5">5-min rolling buckets (last hour) · route stats since last deploy · refreshes every 30 s.</p>
                   </div>
                   <button
                     onClick={fetchMetrics}
@@ -2025,6 +2126,7 @@ export function AdminCoreEngine() {
                 )}
                 {metricsData && (
                   <>
+                    {/* Summary KPI cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       {[
                         { label: "Requests (1hr)", value: metricsData.requests.toLocaleString(), color: "text-blue-400" },
@@ -2041,55 +2143,223 @@ export function AdminCoreEngine() {
                       ))}
                     </div>
 
-                    {/* Sparkline */}
+                    {/* Status code distribution */}
+                    {metricsData.statusDist && (() => {
+                      const sd = metricsData.statusDist!;
+                      const total = sd.ok + sd.redirect + sd.clientErr + sd.serverErr || 1;
+                      const bars = [
+                        { label: "2xx OK", count: sd.ok, color: "bg-emerald-500", text: "text-emerald-400" },
+                        { label: "3xx Redirect", count: sd.redirect, color: "bg-blue-500", text: "text-blue-400" },
+                        { label: "4xx Client Error", count: sd.clientErr, color: "bg-amber-500", text: "text-amber-400" },
+                        { label: "5xx Server Error", count: sd.serverErr, color: "bg-rose-500", text: "text-rose-400" },
+                      ];
+                      return (
+                        <Card className="bg-secondary-900 border-secondary-800 text-white">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-bold">Response Status Distribution (since last deploy)</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex h-5 w-full rounded overflow-hidden gap-px mb-3">
+                              {bars.map(bar => bar.count > 0 && (
+                                <div key={bar.label} title={`${bar.label}: ${bar.count}`}
+                                  className={`${bar.color} transition-all`}
+                                  style={{ width: `${(bar.count / total * 100).toFixed(1)}%` }} />
+                              ))}
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {bars.map(bar => (
+                                <div key={bar.label} className="flex items-center gap-2">
+                                  <span className={`inline-block w-2.5 h-2.5 rounded-sm ${bar.color}`} />
+                                  <div>
+                                    <div className="text-[10px] text-secondary-400">{bar.label}</div>
+                                    <div className={`font-mono font-bold text-sm ${bar.text}`}>{bar.count.toLocaleString()}</div>
+                                    <div className="text-[10px] text-secondary-500">{(bar.count / total * 100).toFixed(1)}%</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+
+                    {/* Request + Latency sparklines */}
                     {metricsData.buckets.length > 0 && (
                       <Card className="bg-secondary-900 border-secondary-800 text-white">
-                        <CardHeader>
-                          <CardTitle className="text-sm font-bold">Request / Error Rate — last {metricsData.buckets.length} × 5 min</CardTitle>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold">Traffic & Latency — last {metricsData.buckets.length} × 5 min</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="overflow-x-auto">
-                            <svg width={Math.max(metricsData.buckets.length * 48, 400)} height={80} className="w-full h-20">
-                              {(() => {
-                                const maxReq = Math.max(...metricsData.buckets.map((b) => b.requests), 1);
-                                const w = Math.max(metricsData.buckets.length * 48, 400);
-                                const bw = w / metricsData.buckets.length;
-                                return metricsData.buckets.map((b, i) => {
-                                  const reqH = Math.round((b.requests / maxReq) * 64);
-                                  const errH = b.requests > 0 ? Math.round((b.errors / b.requests) * reqH) : 0;
-                                  const x = i * bw;
-                                  return (
-                                    <g key={b.ts}>
-                                      <rect x={x + 2} y={80 - reqH} width={bw - 4} height={reqH} rx={2} fill="#3b82f6" opacity={0.6} />
-                                      {errH > 0 && <rect x={x + 2} y={80 - errH} width={bw - 4} height={errH} rx={2} fill="#ef4444" opacity={0.8} />}
-                                    </g>
-                                  );
-                                });
-                              })()}
-                            </svg>
+                        <CardContent className="space-y-4">
+                          {/* Request/Error bars */}
+                          <div>
+                            <div className="text-[10px] text-secondary-400 mb-1">Requests / Errors</div>
+                            <div className="overflow-x-auto">
+                              <svg width={Math.max(metricsData.buckets.length * 48, 400)} height={72} className="w-full" style={{ height: 72 }}>
+                                {(() => {
+                                  const maxReq = Math.max(...metricsData.buckets.map((b) => b.requests), 1);
+                                  const w = Math.max(metricsData.buckets.length * 48, 400);
+                                  const bw = w / metricsData.buckets.length;
+                                  return metricsData.buckets.map((b, i) => {
+                                    const reqH = Math.round((b.requests / maxReq) * 56);
+                                    const errH = b.requests > 0 ? Math.round((b.errors / b.requests) * reqH) : 0;
+                                    const x = i * bw;
+                                    return (
+                                      <g key={b.ts}>
+                                        <title>{new Date(b.ts).toLocaleTimeString()} · {b.requests} req · {b.errors} err · {b.avgMs}ms avg</title>
+                                        <rect x={x + 2} y={72 - reqH} width={bw - 4} height={reqH} rx={2} fill="#3b82f6" opacity={0.55} />
+                                        {errH > 0 && <rect x={x + 2} y={72 - errH} width={bw - 4} height={errH} rx={2} fill="#ef4444" opacity={0.85} />}
+                                      </g>
+                                    );
+                                  });
+                                })()}
+                              </svg>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4 mt-2 text-[10px] text-secondary-400">
-                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-blue-500/60 rounded-sm" /> Requests</span>
-                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-red-500/80 rounded-sm" /> Errors</span>
+                          {/* Latency line chart */}
+                          <div>
+                            <div className="text-[10px] text-secondary-400 mb-1">Avg Response Time (ms)</div>
+                            <div className="overflow-x-auto">
+                              <svg width={Math.max(metricsData.buckets.length * 48, 400)} height={56} className="w-full" style={{ height: 56 }}>
+                                {(() => {
+                                  const maxMs = Math.max(...metricsData.buckets.map(b => b.avgMs), 1);
+                                  const w = Math.max(metricsData.buckets.length * 48, 400);
+                                  const bw = w / metricsData.buckets.length;
+                                  const pts = metricsData.buckets.map((b, i) => {
+                                    const x = i * bw + bw / 2;
+                                    const y = 48 - Math.round((b.avgMs / maxMs) * 40);
+                                    return `${x},${y}`;
+                                  }).join(' ');
+                                  return (
+                                    <>
+                                      <polyline points={pts} fill="none" stroke="#a78bfa" strokeWidth={2} strokeLinejoin="round" />
+                                      {metricsData.buckets.map((b, i) => (
+                                        <circle key={b.ts} cx={i * bw + bw / 2} cy={48 - Math.round((b.avgMs / maxMs) * 40)} r={3} fill="#a78bfa">
+                                          <title>{new Date(b.ts).toLocaleTimeString()} · {b.avgMs} ms</title>
+                                        </circle>
+                                      ))}
+                                    </>
+                                  );
+                                })()}
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-[10px] text-secondary-400">
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-blue-500/55 rounded-sm" /> Requests</span>
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 bg-red-500/85 rounded-sm" /> Errors</span>
+                            <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-violet-400 rounded" /> Avg Latency</span>
                           </div>
                         </CardContent>
                       </Card>
                     )}
 
+                    {/* Top Routes by Traffic */}
+                    {metricsData.topRoutesByTraffic && metricsData.topRoutesByTraffic.length > 0 && (
+                      <Card className="bg-secondary-900 border-secondary-800 text-white">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold">Top Routes by Traffic (since last deploy)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-secondary-400 border-b border-secondary-800">
+                                  <th className="text-left pb-2 pr-4 font-medium">Route</th>
+                                  <th className="text-right pb-2 pr-4 font-medium">Requests</th>
+                                  <th className="text-right pb-2 pr-4 font-medium">Errors</th>
+                                  <th className="text-right pb-2 pr-4 font-medium">Error Rate</th>
+                                  <th className="text-right pb-2 font-medium">Avg Latency</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {metricsData.topRoutesByTraffic.map((r) => (
+                                  <tr key={r.route} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
+                                    <td className="py-2 pr-4 font-mono text-[11px] text-secondary-300 max-w-[260px] truncate">{r.route}</td>
+                                    <td className="py-2 pr-4 text-right font-mono text-blue-300">{r.requests.toLocaleString()}</td>
+                                    <td className="py-2 pr-4 text-right font-mono">{r.errors > 0 ? <span className="text-rose-400">{r.errors}</span> : <span className="text-secondary-500">0</span>}</td>
+                                    <td className="py-2 pr-4 text-right font-mono">
+                                      <span className={r.errorRate > 10 ? "text-rose-400" : r.errorRate > 1 ? "text-amber-400" : "text-emerald-400"}>
+                                        {r.errorRate.toFixed(1)}%
+                                      </span>
+                                    </td>
+                                    <td className="py-2 text-right font-mono">
+                                      <span className={r.avgMs > 500 ? "text-rose-400" : r.avgMs > 200 ? "text-amber-400" : "text-secondary-300"}>
+                                        {r.avgMs} ms
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Top Error Sources from error log */}
+                    {errorGroups.length > 0 && (
+                      <Card className="bg-secondary-900 border-secondary-800 text-white">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 rounded-full bg-rose-500" />
+                            Top Error Sources
+                            <span className="text-xs font-normal text-secondary-400 ml-1">({errorGroups.length} distinct error{errorGroups.length !== 1 ? "s" : ""})</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-secondary-400 border-b border-secondary-800">
+                                  <th className="text-left pb-2 pr-3 font-medium">Route</th>
+                                  <th className="text-left pb-2 pr-3 font-medium">Error</th>
+                                  <th className="text-left pb-2 pr-3 font-medium">Source</th>
+                                  <th className="text-right pb-2 pr-3 font-medium">Status</th>
+                                  <th className="text-right pb-2 font-medium">Count</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {errorGroups.slice(0, 10).map((g) => (
+                                  <tr key={g.key} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
+                                    <td className="py-2 pr-3 font-mono text-[10px] text-secondary-300 max-w-[180px] truncate">
+                                      <span className="text-secondary-500 mr-1">{g.method}</span>{g.sample?.path ?? '—'}
+                                    </td>
+                                    <td className="py-2 pr-3 text-rose-300 max-w-[200px] truncate" title={g.error}>{g.error}</td>
+                                    <td className="py-2 pr-3 font-mono text-[10px] text-violet-300 max-w-[160px] truncate" title={g.source}>
+                                      {g.fn ? `${g.fn} ` : ''}{g.source ?? '—'}
+                                    </td>
+                                    <td className="py-2 pr-3 text-right">
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${g.status >= 500 ? "bg-rose-900/60 text-rose-300" : "bg-amber-900/60 text-amber-300"}`}>
+                                        {g.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 text-right font-mono font-bold text-rose-400">{g.count}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {errorGroups.length === 0 && metricsData && (
+                      <div className="p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-lg text-emerald-400 text-xs flex items-center gap-2">
+                        <span>✓</span> No errors in the log buffer. All good.
+                      </div>
+                    )}
+
                     {/* System info */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
-                        <div className="text-secondary-400 mb-1">Node.js</div>
-                        <div className="font-mono text-white">{metricsData.nodeVersion}</div>
-                      </div>
-                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
-                        <div className="text-secondary-400 mb-1">Process Uptime</div>
-                        <div className="font-mono text-white">{Math.floor(metricsData.uptime / 3600)}h {Math.floor((metricsData.uptime % 3600) / 60)}m</div>
-                      </div>
-                      <div className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
-                        <div className="text-secondary-400 mb-1">RSS Memory</div>
-                        <div className="font-mono text-white">{metricsData.memory.rssMb.toFixed(1)} MB</div>
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+                      {[
+                        { label: "Node.js", value: metricsData.nodeVersion },
+                        { label: "Process Uptime", value: `${Math.floor(metricsData.uptime / 3600)}h ${Math.floor((metricsData.uptime % 3600) / 60)}m` },
+                        { label: "Heap Used", value: `${metricsData.memory.heapUsedMb.toFixed(1)} MB` },
+                        { label: "RSS Memory", value: `${metricsData.memory.rssMb.toFixed(1)} MB` },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
+                          <div className="text-secondary-400 mb-1">{label}</div>
+                          <div className="font-mono text-white">{value}</div>
+                        </div>
+                      ))}
                     </div>
                   </>
                 )}

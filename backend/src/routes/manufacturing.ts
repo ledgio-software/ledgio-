@@ -7,11 +7,13 @@ import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { recordAuditLogTx, actorFromRequest } from '../services/auditLogService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Manufacturing'));
 
 // ─── BOM Template schemas ──────────────────────────────────────────────────
 
@@ -52,9 +54,9 @@ router.get('/bom-templates', requireRole('Viewer'), async (req: Request, res: Re
     const templates = await (prisma as any).bomTemplate.findMany({
       where: { tenantId },
       include: {
-        finishedItem: { select: { id: true, name: true, sku: true, unit: true } },
+        finishedItem: { select: { id: true, name: true, sku: true, unitOfMeasure: true } },
         lines: {
-          include: { componentItem: { select: { id: true, name: true, sku: true, unit: true } } },
+          include: { componentItem: { select: { id: true, name: true, sku: true, unitOfMeasure: true } } },
         },
       },
       orderBy: { name: 'asc' },
@@ -73,9 +75,9 @@ router.get('/bom-templates/:id', requireRole('Viewer'), async (req: Request, res
     const tpl = await (prisma as any).bomTemplate.findFirst({
       where: { id: req.params.id, tenantId },
       include: {
-        finishedItem: { select: { id: true, name: true, sku: true, unit: true } },
+        finishedItem: { select: { id: true, name: true, sku: true, unitOfMeasure: true } },
         lines: {
-          include: { componentItem: { select: { id: true, name: true, sku: true, unit: true } } },
+          include: { componentItem: { select: { id: true, name: true, sku: true, unitOfMeasure: true } } },
         },
         productionOrders: { orderBy: { createdAt: 'desc' }, take: 10 },
       },

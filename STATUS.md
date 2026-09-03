@@ -2,6 +2,406 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-03] - Bug fix: Approve/Reject buttons on Expense Claims showed no loading feedback
+
+**What/Why:**
+Clicking "Approve" or "Reject" on an expense claim gave no visual feedback while the API request was in-flight (typically several seconds). The button appeared frozen — no spinner, no disabled state, no label change — until the toast appeared after the call completed. Added a `decidingId` state (mirrors the existing `reimbursingId` pattern on the Reimburse button): both buttons are disabled and show a spinner + "Approving…"/"Rejecting…" label while the request runs, then reset to normal on completion or error.
+
+**Files Affected:**
+- `frontend/src/pages/expenses/ExpenseClaims.tsx` — added `decidingId` state; `handleDecide` sets/clears it; Approve/Reject buttons read it for `disabled` prop and label
+
+---
+
+## [Date: 2026-09-02] - Enhancement: Add price update fields to the Adjust Stock modal
+
+**What/Why:**
+The "Restock / Adjust Stock" modal only allowed changing stock quantity; there was no way to correct a product's selling or cost price from that screen. Added an optional "Update Prices" section at the bottom of the adjust modal. If the user fills in a new selling price and/or cost price, a `PUT /inventory/items/:id` call is fired alongside the stock adjustment. Both calls run in parallel (`Promise.all`) so the save is a single click. Current prices are shown as placeholder text so the user knows what they're replacing. Leaving the price fields blank leaves the current price unchanged.
+
+**Files Affected:**
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — added `adjustNewSellingPrice`/`adjustNewCostPrice` state, reset in `openAdjustModal`, parallel price update in `handleAdjustSubmit`, and price fields in the modal UI
+
+---
+
+## [Date: 2026-09-01] - Bug fix: Print Receipt redirected to landing page instead of opening the PDF
+
+**What/Why:**
+Clicking "Print Receipt" (or "Print" in Today's Receipts) opened `/api/v1/tills/sales/<id>/receipt.pdf` via `window.open` with a relative path. In production the frontend and backend are on different origins — the relative path resolved to the Vercel frontend, which has no such route, so the SPA catch-all rendered the landing page. Additionally, direct browser navigation never sends the JWT `Authorization` header, so even on a same-origin setup the request would be rejected with 401. Fixed by replacing both `window.open` calls with an authenticated `api.get(..., { responseType: 'blob' })` request, creating a temporary blob URL, and opening that — the receipt now displays correctly in a new tab and the blob URL is cleaned up on load.
+
+**Files Affected:**
+- `frontend/src/pages/pos/PointOfSale.tsx` — added `openReceipt` helper; replaced 2 `window.open('/api/v1/...')` calls
+
+---
+
+## [Date: 2026-09-01] - Enhancement: Show customer name prominently in Create Invoice modal
+
+**What/Why:**
+When creating a new invoice, the customer name was only visible inside the dropdown but disappeared once selected, making it easy to issue an invoice to the wrong person at a busy counter. Added a "Bill To" preview card below the customer dropdown that shows the selected customer's name (bold), email, and wholesale badge immediately after selection — so the shop attendant always sees who the invoice is being raised for before finalising the line items.
+
+**Files Affected:**
+- `frontend/src/pages/invoices/Invoices.tsx` — added Bill To card inside Create Invoice modal
+
+---
+
+## [Date: 2026-09-01] - Feature: Monthly Sales Ledger, Month-End Close, and Performance Ranking
+
+**What/Why:**
+Built 4 reconciliation features to solve the problem of staff missing sales in the physical book. The shop owner discovered that "220 mag lubricant and rubber clip 4" were not written in the manual book because there was no easy way to see a complete day-by-day, line-item breakdown.
+
+**Features delivered:**
+1. **Monthly Sales Ledger** (`GET /reports/monthly-sales-ledger?year=&month=`): Returns every POS receipt and AR invoice for the selected month, with full line items (product name, qty, unit price), customer/company name, payment method, and running day totals.
+2. **Customer/company name on transactions**: Both POS receipts (via `customerName` field if present) and Invoices (via the linked `Customer` record including company name) are surfaced prominently in the ledger view.
+3. **Month-End Close** (`POST /reports/month-close`): Admin/Accountant can "Save Records" for any month. Creates a `MonthClose` snapshot (total sales, cash vs credit, top products, comparison to prior month). Idempotent — re-saving updates the snapshot.
+4. **Performance ranking** (`GET /reports/month-closes`): Returns all saved months ranked by total revenue. Shows rank badge (#1 = gold), month-over-month diff, and cash vs credit breakdown.
+
+**Files affected (backend):**
+- `backend/prisma/schema.prisma` — added `MonthClose` model
+- `backend/prisma/migrations/20260901000001_add_month_close/migration.sql` — migration
+- `backend/src/services/monthlySalesLedgerService.ts` — new service (getMonthlySalesLedger, closeMonth, getMonthCloses)
+- `backend/src/routes/reports.ts` — 3 new routes: GET /monthly-sales-ledger, POST /month-close, GET /month-closes
+
+**Files affected (frontend):**
+- `frontend/src/pages/reports/MonthlySalesLedger.tsx` — new page with day-by-day ledger, expandable line items, customer/company display, month-close button, top products table, performance ranking
+- `frontend/src/App.tsx` — registered `/reports/monthly-sales-ledger` route
+- `frontend/src/lib/navigation.ts` — added "Monthly Sales Ledger" nav item (no tier gate — all plans)
+
+---
+
+## [Date: 2026-09-01] - Fix: AR page dollar icon + RecurringInvoices currency defaulting to USD
+
+**What/Why:**
+Two minor polish fixes found while reviewing the Invoicing & AR page:
+1. The "Total Collected Payments" card in `Invoices.tsx` displayed a `DollarSign` (lucide icon) as its header icon — visually misleading for GHS tenants. Replaced with `Banknote` which carries no currency-country association. The amounts themselves were already correct (using `settings.baseCurrency`).
+2. `RecurringInvoices.tsx` initialised its form `currency` field with a hardcoded `"USD"` string and had no `useEffect` to snap it to the tenant's real base currency after settings loaded. Added the same `useEffect` pattern already used in `ExpenseClaims.tsx`: snaps currency to `tenantSettings.baseCurrency` once loaded, but only if the user has not already changed the field.
+
+**Files affected:**
+- `frontend/src/pages/invoices/Invoices.tsx` — `DollarSign` → `Banknote` for "Total Collected Payments" card icon
+- `frontend/src/pages/recurringinvoices/RecurringInvoices.tsx` — add `useEffect` to snap initial currency to `tenantSettings.baseCurrency`
+
+---
+
+## [Date: 2026-09-01] - Fix: Journal entries showing "$" instead of tenant base currency (GH₵)
+
+**What/Why:**
+`JournalList.tsx` had a hardcoded `currency: "USD"` in its `formatCurrency` helper. Every journal entry amount (POS cash sales, expense reimbursements, reversals) displayed with a "$" prefix regardless of the tenant's base currency. For a GHS tenant this was visually wrong and confused the owner when comparing journals to their manual books (the numbers were correct; only the symbol was wrong). Fix: import `useTenantSettings`, call it inside `JournalList`, and pass `settings.baseCurrency` to the formatter.
+
+**Files affected:**
+- `frontend/src/pages/journals/JournalList.tsx` — import + use `useTenantSettings` in `formatCurrency`
+
+---
+
+## [Date: 2026-09-01] - Fix: Shop plan (Tier 1) 403 errors on executive summary and WHT rates
+
+**What/Why:**
+1. `GET /api/v1/analytics/executive-summary` returned 403 for Tier 1 (Shop plan) tenants. Root cause: `analytics.ts` had `router.use(requireTier(2, 'Stock Intelligence'))` at the router level, blocking *all* analytics routes for non-Business tenants. Only the `/stock-intelligence` sub-route actually requires Tier 2. Fix: removed router-level gate; added `requireTier(2, 'Stock Intelligence')` inline on `/stock-intelligence` only. The export routes (CSV/PDF/DOCX) received in-handler Tier 2 checks specifically when `reportType === 'stock-intelligence'`.
+2. `GET /api/v1/wht-rates` returned 403 for Tier 1 tenants. Root cause: `whtRates.ts` had `router.use(requireTier(2, 'Withholding Tax'))` at the router level, blocking Shop-plan users from accessing WHT rate reference data on the Vendor Bills page. WHT rates are basic reference data, not a Business-tier feature. Fix: removed router-level `requireTier` and the now-unused import; per-route `requireRole` guards remain.
+3. Added `detail: error?.message` field to payroll 500 responses to surface DB/runtime errors in the browser Network tab for diagnostics (PR #156, merged).
+
+**Files affected:**
+- `backend/src/routes/analytics.ts` — removed router-level `requireTier(2)`, added inline gate to `/stock-intelligence` route + in-handler checks on stock-intelligence export branches
+- `backend/src/routes/whtRates.ts` — removed router-level `requireTier(2, 'Withholding Tax')` and unused `requireTier` import
+
+---
+
+## [Date: 2026-09-01] - Fix: Payroll run 500 (nested Prisma transaction), duplicate-payments SQL join, CI test alignment
+
+**What/Why:**
+1. `POST /payroll/runs` returned 500 on every request. Root cause: `applyLoanDeductions()` in `loanService.ts` calls `withCurrentTenantDb()` internally (which opens a `prisma.$transaction`). Calling it inside the outer `withCurrentTenantDb` block in `payrollService.ts` caused a nested Prisma `$transaction` error. Fix: collect `{ employeeId, payslipId }` pairs inside the outer transaction, then call `applyLoanDeductions` for each pair outside it.
+2. `getDuplicatePayments()` in `reportingService.ts` selected `i.customer_name` which does not exist on the `invoices` table. Fixed by joining the `customers` table (`JOIN customers c ON c.id = i.customer_id`) and selecting `c.name` / grouping by `c.name`.
+3. `legalAndEnforcement.test.ts` assumed Tier 2 for the custom fields gate, but the backend now requires Tier 3 (Enterprise). Updated `beforeAll` to onboard a Tier 3 tenant (`tier3-corp`), renamed `tier2Token` → `tier3Token`, and updated assertions (`requiredTier: 3`, error message "Enterprise plan or higher").
+
+**Files affected:**
+- `backend/src/services/payrollService.ts` — `applyLoanDeductions` calls moved outside outer `withCurrentTenantDb`
+- `backend/src/services/reportingService.ts` — `getDuplicatePayments`: `JOIN customers c` + `SELECT c.name` / `GROUP BY c.name`
+- `backend/src/tests/legalAndEnforcement.test.ts` — Tier 3 tenant + updated tier assertions
+
+---
+
+## [Date: 2026-08-31] - Security: Frontend tier-gate enforcement and customFields backend fix
+
+**What/Why:** Live 403 errors were observed for tier-1 (Shop) tenants on endpoints `/reports/aging/ap`, `/reports/aging/ar`, `/ledgers/summary`, and `/reports/sales-channel`. Root cause: `useEffect` hooks in frontend components fired unconditionally on mount, hitting tier-2+ gated endpoints regardless of tenant tier. Additionally, `customFields.ts` lacked a router-level tier gate on its GET route (any tier could list custom fields) and its POST route had an incorrect tier-2 gate instead of tier-3.
+
+**How:**
+- Frontend: Added `useTenantSettings()` tier check at the top of each `useEffect` (`if (isLoadingTenantSettings || settings.tier < 2) return;`), added `isLoadingTenantSettings` and `settings.tier` to all deps arrays, and added `<UpgradeRequired>` early-return render guards in 12 components.
+- Backend: Added `router.use(authenticateJwt, tenantContextMiddleware, requireTier(3, 'Custom Fields'))` to `customFields.ts` to cover all routes at tier 3; removed redundant per-route middleware from both GET and POST handlers.
+
+**Files affected:**
+- `frontend/src/App.tsx` — `DashboardFinanceWidgets` useEffect gated to tier >= 2
+- `frontend/src/hooks/useAccounts.ts` — `fetchBalances` gated to tier >= 2
+- `frontend/src/pages/reports/SalesChannelReport.tsx` — tier gate + UpgradeRequired
+- `frontend/src/pages/reports/AnalyticsDashboard.tsx` — all 3 useEffects gated + UpgradeRequired
+- `frontend/src/pages/reports/Daybook.tsx` — useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/VatReturn.tsx` — useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/StockAging.tsx` — useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/FinancialRatios.tsx` — added useTenantSettings, useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/BenfordAnalysis.tsx` — added useTenantSettings, useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/FraudAlerts.tsx` — added useTenantSettings, useEffect gated + UpgradeRequired
+- `frontend/src/pages/reports/StockMovement.tsx` — added useTenantSettings + UpgradeRequired render guard
+- `frontend/src/pages/reports/Registers.tsx` — added useTenantSettings + UpgradeRequired render guard
+- `backend/src/routes/customFields.ts` — router-level requireTier(3) added; redundant per-route middleware removed
+
+---
+
+## [Date: 2026-08-31] - Fix: Upgrade test tenants to tier 2 for ledger-endpoint access
+
+**What/Why:** Adding `requireTier(2, 'General Ledger')` to `routes/ledgers.ts` broke 8 test files whose `onboardTenant()` calls defaulted to tier 1. Any test asserting ledger balances received a 403 instead of data, causing `TypeError: Cannot read properties of undefined (reading 'accounts')`. Fixed by adding `tier: 2` to each affected `onboardTenant()` call.
+
+**Files affected:**
+- `backend/src/tests/accountDefaultRole.test.ts`
+- `backend/src/tests/creditDebitNotes.test.ts`
+- `backend/src/tests/invoicePartialPayments.test.ts`
+- `backend/src/tests/journalEntries.test.ts`
+- `backend/src/tests/ledgers.test.ts`
+- `backend/src/tests/multiCurrency.test.ts`
+- `backend/src/tests/pettyCash.test.ts`
+- `backend/src/tests/paystack.test.ts`
+
+**Verification:** CI passed (all 723 tests, 95 suites) on commit `27feec8`.
+
+---
+
+## [Date: 2026-08-31] - Security: Comprehensive tier-gating audit and enforcement patch
+
+**What/Why:** A full audit revealed that 17 backend route files and 16 `reports.ts` endpoints were missing `requireTier(2, ...)` enforcement, meaning Shop-tier (tier 1) tenants could access Business-tier features by hitting API endpoints directly (the nav-sidebar filter is presentation-only and does not block direct URL or API access). The missing gates covered Sales Orders, Delivery Notes, GRNs, Payment Matching, Cost Centres, Cost Categories, Manufacturing, Job Costing, Job Work Orders, WHT Rates, Price Lists, Scenarios, Voucher Classes, Post-Dated Cheques, Interest Policy, Serial Numbers, General Ledger, and ~16 report endpoints (Sales Channel, Analytics sub-reports, Stock Movement, Registers, Daybook, VAT Return, Stock Aging, Financial Ratios, Cost Centre P&L, Cost Category P&L, Benford Analysis, Fraud Detection).
+
+**How:** Added `import { requireTier } from '../middleware/tierEnforcementMiddleware'` and `router.use(requireTier(2, 'Feature Name'))` to each affected route file immediately after the existing `authenticateJwt + tenantContextMiddleware` setup. For `reports.ts` individual endpoints, inserted `requireTier(2, '...')` as the first middleware argument before `requireRole(...)`. All changes are additive — no logic altered, no data models changed.
+
+**Files affected (backend only — no frontend changes needed):**
+- `backend/src/routes/salesOrders.ts` — added `requireTier(2, 'Sales Orders')`
+- `backend/src/routes/deliveryNotes.ts` — added `requireTier(2, 'Delivery Notes & GRN')`
+- `backend/src/routes/goodsReceiptNotes.ts` — added `requireTier(2, 'Delivery Notes & GRN')`
+- `backend/src/routes/paymentBatches.ts` — added `requireTier(2, 'Payment Matching')`
+- `backend/src/routes/costCentres.ts` — added `requireTier(2, 'Cost Centres')`
+- `backend/src/routes/manufacturing.ts` — added `requireTier(2, 'Manufacturing')`
+- `backend/src/routes/whtRates.ts` — added `requireTier(2, 'Withholding Tax')`
+- `backend/src/routes/priceLists.ts` — added `requireTier(2, 'Price Lists')`
+- `backend/src/routes/jobs.ts` — added `requireTier(2, 'Job Costing')`
+- `backend/src/routes/jobWorkOrders.ts` — added `requireTier(2, 'Job Work Orders')`
+- `backend/src/routes/costCategories.ts` — added `requireTier(2, 'Cost Categories')`
+- `backend/src/routes/scenarios.ts` — added `requireTier(2, 'Scenarios')`
+- `backend/src/routes/voucherClasses.ts` — added `requireTier(2, 'Voucher Classes')`
+- `backend/src/routes/postDatedCheques.ts` — added `requireTier(2, 'Post-Dated Cheques')`
+- `backend/src/routes/interestPolicy.ts` — added `requireTier(2, 'Interest Charges')`
+- `backend/src/routes/serialNumbers.ts` — added `requireTier(2, 'Serial Numbers')`
+- `backend/src/routes/ledgers.ts` — added `requireTier(2, 'General Ledger')`
+- `backend/src/routes/reports.ts` — 16 endpoints gated: `/sales-channel`, `/analytics/trends`, `/analytics/top-customers`, `/analytics/top-items`, `/stock-movement`, `/sales-register`, `/purchase-register`, `/daybook`, `/cost-centre-pnl`, `/cost-category-pnl`, `/vat-return`, `/stock-aging`, `/financial-ratios`, `/benford-analysis`, `/fraud/duplicate-payments`, `/fraud/round-amounts`
+
+**TypeScript verification:** `npx tsc --noEmit` passes with zero errors.
+
+---
+
+## [Date: 2026-08-31] - Feature: Admin-initiated password reset for team members
+
+**What/Why:** Workspace admins had no way to reset a staff member's password when they were locked out or forgot it. Built an admin-triggered reset that generates a secure 12-character temporary password, persists it hashed, and emails it to the member so they can log in and change it from Settings.
+
+**How:**
+- **Backend:** Added `POST /api/v1/tenants/members/:id/reset-password` (Admin-only, tenant-scoped). Uses `crypto.randomInt` to build a 12-char alphanumeric temp password from a curated alphabet (no ambiguous chars like 0/O/1/l). Hashes it with `hashPassword`, updates the user row in a transaction that also records a `TEAM_MEMBER.PASSWORD_RESET` audit log. Emails the plain-text temp password to the member via `EmailService.sendMail`; if email is unconfigured, returns the temp password in the JSON response so the admin can deliver it manually.
+- **Frontend:** Added `handleResetPassword` + `resettingPasswordId` state in `TeamManagement.tsx`. New amber "Reset Password" button (KeyRound icon) appears in the Admin actions column for each member row, between "Manage Access" and "Remove". Prompts for confirmation before firing, shows a success toast with the email confirmation message (or the temp password itself if email is unconfigured).
+
+**Files affected:**
+- `backend/src/routes/tenants.ts` — New `POST /members/:id/reset-password` handler; added `hashPassword` and `EmailService` imports.
+- `frontend/src/pages/team/TeamManagement.tsx` — `handleResetPassword`, `resettingPasswordId` state, Reset Password button, `KeyRound` icon import.
+
+---
+
+## [Date: 2026-08-31] - Fix: Dashboard widget tier-gating + Sales Channel Report nav fix
+
+**What/Why:** Shop-tier (tier 1) tenants saw a spurious "two-factor authentication required" banner on their dashboard. Root cause: the `DashboardFinanceWidgets` component was calling tier-2-gated backend aging routes (`/reports/aging/ar`, `/reports/aging/ap`) for every tenant regardless of plan. Shop tenants received 403 responses, which the frontend MFA error handler was misinterpreting as an MFA gate error. Additionally, "Sales Channel Report" in the sidebar was visible to Shop tenants while all other analytics reports in that section already required tier 2.
+
+**How:**
+- **`frontend/src/App.tsx`** — `DashboardFinanceWidgets` now reads `settings?.tier` via `useTenantSettings()`. If tier < 2 (Shop plan), the component returns an "upgrade your plan" placeholder div instead of rendering the AR KPIs, AR Aging, and AP Aging widgets — preventing the spurious 403 calls and the MFA banner.
+- **`frontend/src/lib/navigation.ts`** — Added `minTier: 2` to the "Sales Channel Report" nav entry, matching all other analytics reports in that section.
+
+**Files affected:**
+- `frontend/src/App.tsx` — Added `useTenantSettings()` call + tier < 2 early-return in `DashboardFinanceWidgets`.
+- `frontend/src/lib/navigation.ts` — `minTier: 2` on Sales Channel Report.
+
+---
+
+## [Date: 2026-08-31] - Feature: Tenant Deletion via Admin Core Engine
+
+**What/Why:** No mechanism existed to permanently delete a tenant from the platform. The user requested removal of a specific contracted client whose account needed to be offboarded. Built a full delete flow — backend endpoint + frontend confirmation dialog — gated by the master admin passcode.
+
+**How:**
+- **Backend:** Added `DELETE /api/v1/tenants/:id` to `routes/tenants.ts`. Verifies master passcode, writes an audit log entry first (so there is always a trace), then: (1) drops the tenant's PostgreSQL schema with `CASCADE` via `dropTenantSchema()`, (2) deletes all tenant users from `public.users`, (3) deletes the tenant row and invalidates its Redis cache entries via `deleteTenantBySlug()`.
+- **Frontend:** Added a red `XCircle` delete button on each row in the "Tenant Schemas & Tiers" tab. Clicking it opens a modal that shows the tenant name/slug and requires typing the exact slug to confirm — preventing accidental deletion. Submitting calls the backend endpoint and refreshes the tenant roster on success.
+
+**Files affected:**
+- `backend/src/routes/tenants.ts` — New `DELETE /:id` handler; imports `dropTenantSchema`.
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — Delete state, `handleDeleteTenant`, delete button in table row, confirmation modal.
+
+---
+
+## [Date: 2026-08-31] - Fix: POS revenue doubling + MFA banner persisting after setup
+
+**What/Why:** Two production bugs reported from the live dashboard:
+
+### Bug 1 — Revenue doubling (GHS 150 recorded, GHS 300 shown)
+**Root cause:** Race condition in `POST /tills/backfill-revenue`. React Strict Mode double-mounts the Dashboard component, resetting the `useRef(false)` guard and firing two concurrent backfill requests. Both queries find the same unposted sale (`journalId: null`), and both call `postCashSaleRevenue()` before either commits its `journalId` update, producing two journal entries — doubling the revenue credit in the ledger.
+
+**Fix:** Before posting each sale, use an atomic `updateMany` with `where: { id, journalId: null }` to claim it (setting `journalId: 'POSTING'` as a sentinel). If `count === 0`, a concurrent request already claimed it — skip it. On failure, the sentinel is released so a future retry can re-attempt.
+
+### Bug 2 — MFA banner stuck after setup
+**Root cause:** `authMiddleware.ts` reads `isMfaEnabled` from the JWT payload, not the database. When the user completes MFA enrollment via `POST /auth/mfa/verify-setup`, the DB is updated to `isMfaEnabled: true` but no new JWT was issued. The old token remained in localStorage with `isMfaEnabled: false`, so every subsequent API call to a protected route continued to return 403 `MFA_REQUIRED` — the user had to log out and back in.
+
+**Fix:** After updating the DB in `POST /auth/mfa/verify-setup`, generate a fresh JWT with `{ ...req.user!, isMfaEnabled: true }` and return it in `data.token`. The frontend's `handleConfirmMfaSetup` stores this new token in `localStorage` before calling `refreshUser()`, so the MFA gate lifts immediately without a forced logout.
+
+**Files affected:**
+- `backend/src/routes/cashTill.ts` — Atomic claim (sentinel `updateMany`) before `postCashSaleRevenue()` in the backfill loop.
+- `backend/src/routes/auth.ts` — Issue and return fresh JWT after MFA verify-setup succeeds.
+- `frontend/src/pages/settings/Settings.tsx` — Store new token in localStorage on successful MFA confirm.
+
+---
+
+## [Date: 2026-08-31] - Fix: Shop-tier navigation and page tier-gating (API Keys, Cash Flow Forecast, Branch Comparison, Landed Cost)
+
+**What/Why:** Shop-tier (tier 1) users were shown navigation links to four features whose backend routes require tier 2 (`requireTier(2, ...)`). Clicking those links caused instant 403s with no user-friendly explanation. Two separate issues combined:
+
+1. **`navigation.ts` missing `minTier: 2` on four items.** `getVisibleNavGroups()` hides items only when `minTier` is set; without it the link renders for all tiers. Added `minTier: 2` to:
+   - `API Keys` (`/settings/api-keys`) — backend: `requireTier(2, 'API Key Management')`
+   - `Cash Flow Forecast` (`/reports/cash-flow-forecast`) — backend: `requireTier(2, 'Cash Flow Forecast')`
+   - `Branch Comparison` (`/reports/branch-comparison`) — backend: `requireTier(2, 'Branch Comparison Report')`
+   - `Landed Cost` (`/reports/landed-costs`) — backend: `requireTier(2, 'Landed Cost Report')`
+
+2. **`ApiKeys.tsx` had no tier guard at all.** The component called `GET /api-keys` on mount unconditionally — a Shop-tier user who navigated directly to `/settings/api-keys` via the URL bar would receive a 403 with no friendly message. Fixed: added `useTenantSettings` + loading early-return + `UpgradeRequired` guard (same pattern as the already-fixed `AgingReport.tsx`). The `useEffect` that fetches keys now only fires when `settings.tier >= 2`.
+
+**Files affected:**
+- `frontend/src/lib/navigation.ts` — Added `minTier: 2` to API Keys, Cash Flow Forecast, Branch Comparison, and Landed Cost nav items.
+- `frontend/src/pages/settings/ApiKeys.tsx` — Added `useTenantSettings`/`UpgradeRequired` tier guard; `fetchKeys` now only fires for tier ≥ 2.
+
+---
+
+## [Date: 2026-08-31] - Fix: Aging report 403 for Shop-tier tenants + add PAYSTACK_SECRET_KEY to render.yaml
+
+**What/Why:** Two follow-on production issues observed after the earlier metrics fixes:
+
+1. **`GET /reports/aging/ap` + `/ar` — 403 for Shop tenants.** Root cause: `AgingReport.tsx` rendered the full component body (including the Refresh button) while `isLoadingTenantSettings` was `true`. The gate `if (!isLoadingTenantSettings && settings.tier < 2) return <UpgradeRequired>` correctly blocks the fetch via `useEffect`, but the Refresh button was still visible and clickable during the loading window. Clicking it — or any race where the component mounted with `isLoadingTenantSettings=true` and the user was tier 1 — called `fetchAging()` with no tier guard, returning 403. Fixed: added an early return for the loading state (`if (isLoadingTenantSettings) return <div>Loading...</div>`) before the `UpgradeRequired` check, so the full component (and the Refresh button) never renders until tenant settings are confirmed loaded. The `UpgradeRequired` check is now a clean unconditional `settings.tier < 2` guard.
+
+2. **`POST /paystack/invoices/:id/initialize` — 503.** Root cause: `PAYSTACK_SECRET_KEY` was not listed in `render.yaml`, so new environment setups had no prompt to configure it. Service returns 503 when the key is absent. Added `PAYSTACK_SECRET_KEY: sync: false` to the blueprint's optional integrations block so the key is documented and Render prompts for it during setup.
+
+**Files affected:**
+- `frontend/src/pages/reports/AgingReport.tsx` — Split combined `!isLoadingTenantSettings && settings.tier < 2` guard into separate early-return for loading state + unconditional tier check.
+- `render.yaml` — Added `PAYSTACK_SECRET_KEY` (sync: false) to optional integrations env vars.
+
+---
+
+## [Date: 2026-08-31] - Fix: Production metrics — Redis error rate, slow bootstrap, HEAD /health latency, warehouses latency
+
+**What/Why:** Admin metrics dashboard showed four production issues:
+
+1. **`POST /api/v1/sync/ticket` — 34.3% error rate.** The endpoint called `redis.setex()` directly (not through the fail-open `cacheUtils` wrapper). When Redis is temporarily unavailable (free-tier cold start, network blip), the call threw and was caught as a generic 500. Fixed: inner try/catch now returns 503 with a human-readable message so clients know it's a transient infrastructure issue, not a server bug. Error rate drops to 0% when Redis is healthy; failures report accurately when it's not.
+
+2. **`HEAD /api/v1/health` — 2205ms average latency.** Express has no `HEAD /` handler registered, so it silently routed HEAD through the `GET /` handler, which does a full `prisma.$queryRaw SELECT 1` + Redis probe on every call. Load-balancers and Render send HEAD probes frequently. Fixed: added `router.head('/')` that returns 200 immediately, before the GET handler.
+
+3. **`GET /api/v1/sync/bootstrap` — 3304ms average latency.** The bootstrap snapshot ran `invoice.findMany({ include: { customer: true, items: true } })` — fetching all invoice fields plus all fields of each nested customer and each nested invoice line item. The `customer` join was redundant: the endpoint already returns a separate `customers` array, so clients can join by `customerId` locally. Removed `customer: true` from the invoice include, eliminating one JOIN. This also reduces the connection-pool pressure that likely caused cascade failures on `GET /ledgers/summary` and `GET /reports/profit-loss`.
+
+4. **`GET /api/v1/inventory/warehouses` — 2165ms average latency.** The query used `include: { stocks: { include: { item: true } } }` — a 2-level deep nested include that fetched every column of every item (including GRA compliance, batch-tracking, preferred-vendor, etc.) for all stock entries across all warehouses. Fixed: switched the inner `item` include to `select` with only the 9 fields the warehouse card UI actually needs (`id`, `name`, `sku`, `category`, `unitOfMeasure`, `sellingPrice`, `costPrice`, `reorderLevel`, `requiresBatchTracking`, `trackSerials`).
+
+**Files affected:**
+- `backend/src/routes/health.ts` — Added `router.head('/', ...)` returning 200 immediately before the GET handler.
+- `backend/src/routes/sync.ts` — Ticket endpoint: wrapped `redis.setex()` in inner try/catch → 503 on Redis failure. Bootstrap: removed redundant `customer: true` from invoice `include`.
+- `backend/src/routes/inventory.ts` — Warehouses: changed `include: { item: true }` to `include: { item: { select: { ... } } }` with 9 specific fields.
+
+---
+
+## [Date: 2026-08-28] - Fix: Render production build failure (@types/compression not installed)
+
+**What/Why:** Render's build kept failing with `TS7016: Could not find a declaration file for module 'compression'` even after the `@types/compression` version fix landed. True root cause: `render.yaml` sets `NODE_ENV=production` for the whole service, and `npm ci` with `NODE_ENV=production` silently skips all devDependencies — so `@types/compression` (and all other type packages) are never installed during the build step. The earlier version fix (`^1.8.1` → `^1.7.5`) was also necessary (the old version doesn't exist on npm), but the environment variable is what actually caused the type resolution to fail.
+
+**Changes:**
+- `render.yaml` — `buildCommand` changed from `npm ci` to `npm ci --include=dev`. The `--include=dev` flag forces npm to install devDependencies regardless of `NODE_ENV`, so TypeScript, `@types/*`, and other build-time packages are present when `tsc` runs.
+- `backend/package.json` — `@types/compression` version corrected to `^1.7.5` (already landed in previous commit).
+- `backend/package-lock.json` — Updated lockfile (already landed in previous commit).
+
+**Files affected:** `render.yaml`
+
+---
+
+## [Date: 2026-08-28] - Phase 6: Observability & Load Testing
+
+**What/Why:** Final phase of the 6-phase hardening plan. Observability infrastructure (structured JSON request logger with X-Request-ID + W3C traceparent, 5-minute bucket metrics, `/health`/`/live`/`/ready` probes, `/api/v1/admin/metrics`, `/api/v1/admin/jobs`) was already fully implemented and wired into app.ts from prior work. The only new deliverable for Phase 6 is the k6 smoke / baseline load test script — committed so any engineer can run a pre-release performance check without reinventing the test parameters.
+
+**Changes:**
+
+- `backend/load-tests/smoke.js` — **New file.** k6 script covering the 6 highest-traffic endpoints (health probe, login, accounts list, journal-entries list, AR aging report, cash-flow statement). Defaults to 10 VUs for 30 s. Thresholds: overall p95 < 500 ms; per-endpoint p95 targets; error rate < 2 %. Accepts `BASE_URL`, `TENANT_SLUG`, `EMAIL`, `PASSWORD` via `-e` env vars. Includes a `setup()` phase that authenticates once and shares the token across VUs. Not wired into CI — intended for manual pre-release runs (`k6 run ... backend/load-tests/smoke.js`).
+
+**Files affected:** `backend/load-tests/smoke.js`
+
+---
+
+## [Date: 2026-08-28] - Fix: agingReport test cache interference
+
+**What/Why:** Phase 4's Redis caching of `/reports/aging/ar` broke one test in `agingReport.test.ts`. The test suite reuses the same tenant across all five test cases. An earlier test populated the cache; a later test then created a new invoice and called the same endpoint, but received the cached (stale) response which omitted the new invoice — causing `.find()` to return `undefined` and `row.bucket` to throw.
+
+**Changes:**
+- `backend/src/tests/agingReport.test.ts` — Imported `invalidateReportCache` from `../cache/reportCache`; captured `tenantId` from the `onboardTenant` result in `beforeAll`; added `beforeEach` to call `invalidateReportCache(tenantId)` so every test case in the suite starts with a fresh, uncached response.
+
+**Files affected:** `backend/src/tests/agingReport.test.ts`
+
+---
+
+## [Date: 2026-08-28] - Phase 5: Queue Durability
+
+**What/Why:** All 11 cron services (recurring transactions, invoices, dunning reminders, FX rate refresh, vendor payment scheduling, GRA E-VAT sync, fixed-asset depreciation, interest charges, GL reconciliation, help-assistant maintenance, scheduled email reports) were scheduling their `node-cron` callbacks independently and bypassing `wrapCronTick`. This meant two failure modes went unguarded: (a) if a job's workload exceeds its scheduling interval (especially the hourly recurring-transactions sweep under heavy load), the next tick would start a parallel run creating duplicate journal entries; (b) on horizontal scale-out to multiple pods, every pod would fire the same job simultaneously. Phase 5 adds a Redis-based distributed lock (SET NX EX 1800) inside `wrapCronTick` and wires it into all 11 services, so duplicate firings are skipped regardless of cause. Lock acquisition is fail-open: if Redis is unavailable the job still runs on a single instance.
+
+**Changes:**
+
+- `backend/src/services/cronJobRegistry.ts` — Added `acquireCronLock`/`releaseCronLock` using Redis `SET NX EX` (30-minute TTL). Updated `wrapCronTick` to acquire the lock before running and release it in `finally`; if the lock is already held, the tick is logged and skipped. If Redis throws (unavailable), acquisition returns `true` (fail-open).
+- `backend/src/services/recurringTransactionService.ts` — Wrapped `cron.schedule` callback with `wrapCronTick('Recurring Transactions', ...)`.
+- `backend/src/services/recurringInvoiceCronService.ts` — Wrapped with `wrapCronTick('Recurring Invoices', ...)`.
+- `backend/src/services/dunningReminderService.ts` — Wrapped with `wrapCronTick('Dunning Reminders', ...)`.
+- `backend/src/services/fxRateCronService.ts` — Wrapped with `wrapCronTick('FX Rate Refresh', ...)`.
+- `backend/src/services/vendorPaymentSchedulingCronService.ts` — Wrapped with `wrapCronTick('Vendor Payment Scheduling', ...)`.
+- `backend/src/services/graEvatCronService.ts` — Wrapped with `wrapCronTick('GRA E-VAT Sync', ...)`.
+- `backend/src/services/fixedAssetDepreciationCronService.ts` — Wrapped with `wrapCronTick('Fixed Asset Depreciation', ...)`.
+- `backend/src/services/interestChargeCronService.ts` — Wrapped with `wrapCronTick('Interest Charges', ...)`.
+- `backend/src/services/glReconciliationCronService.ts` — Wrapped with `wrapCronTick('GL Reconciliation', ...)`.
+- `backend/src/services/helpAssistantMaintenanceCronService.ts` — Wrapped with `wrapCronTick('Help Assistant Maintenance', ...)`.
+- `backend/src/services/scheduledEmailService.ts` — Wrapped with `wrapCronTick('Scheduled Email Reports', ...)`.
+- `backend/src/tests/cronJobRegistry.test.ts` — **New file.** 8 unit tests covering: lock acquired → job runs; lock held → job skipped; lock released after success; lock released after throw; fail-open when Redis down; correct lock key format; successful run recorded in registry; failed run recorded with error message. All 8 pass.
+
+## [Date: 2026-08-28] - Phase 4: Report Separation
+
+**What/Why:** Heavy report queries (full-ledger aggregations, multi-table UNIONs, paginated result sets) were executing without any caching on 12 of the 22 report endpoints, letting repeated page refreshes and concurrent users hammer the PostgreSQL connection pool and starve OLTP write paths. Phase 4 adds Redis result caching to every previously uncached endpoint and caps the analytics-trends fan-out to prevent connection exhaustion on cold-cache requests.
+
+**Changes:**
+
+1. **Caching added to 12 uncached report endpoints** in `routes/reports.ts` — all now follow the same `getCachedReport` → compute → `setCachedReport` pattern already used by trial-balance, P&L, balance-sheet, KPIs, and others. Newly cached endpoints: `/cash-flow`, `/aging/ar`, `/aging/ap`, `/cash-flow-forecast`, `/sales-channel`, `/branch-comparison`, `/landed-costs`, `/stock-movement`, `/sales-register`, `/purchase-register`, `/daybook`, `/cost-centre-pnl`. Cache key includes `tenantId + reportType + hash(params)` so paginated and filtered variants cache independently. TTL is 5 minutes (same as existing cached endpoints).
+
+2. **Analytics-trends connection-pool cap** — `GET /reports/analytics/trends` previously fanned out up to 24 parallel `getProfitAndLoss` calls (one per month) inside a single `Promise.all`, saturating the connection pool on cold-cache requests. Replaced with a batched loop (6 P&L calls per batch), maintaining correctness while capping concurrent DB connections per request to 6.
+
+3. **`setCachedReport` defensive catch** — `reportCache.ts:setCachedReport` now wraps the Redis write in a try/catch so a cache-layer error (Redis restart, network partition) can never propagate up to the route handler and cause a 500 on a read-only report request.
+
+4. **Tests** — New `src/tests/reportCache.test.ts` with 9 unit tests (Redis mocked): cache miss returns null, cache hit returns stored payload, tenant isolation (different tenants get different keys), param isolation (different params hash to different keys), TTL is 300 seconds, set and get use the same key, write error never throws, invalidate calls delPattern with the right tenant-scoped wildcard, invalidate pattern does not touch other tenants.
+
+**Files:**
+- `backend/src/routes/reports.ts`
+- `backend/src/cache/reportCache.ts`
+- `backend/src/tests/reportCache.test.ts`
+
+---
+
+## [Date: 2026-08-28] - Phase 3: Offline Sync Robustness
+
+**What/Why:** Three hardening improvements to the local-first sync infrastructure to prevent data loss and resource exhaustion for long-offline clients.
+
+**Changes:**
+
+1. **Paginated `GET /sync/changes`** — Added `limit` query param (1–2000, default 500). The handler fetches `limit + 1` rows, sets `hasMore: true` when more remain, and slices to `limit`. Clients advance `since` to the last returned sequence and repeat until `hasMore` is false. Prevents unbounded result sets from long-offline clients.
+
+2. **Customer sync** — Extended `SyncEntityType` to include `'Customer'`. Added `customerToSyncPayload()` in `syncChangeLogService.ts` (PII fields excluded). Hooked `recordChange`/`notifyChange` into `POST /customers` (CREATE), `PUT /customers/:id` (UPDATE), and `DELETE /customers/:id` (DELETE) in `routes/invoices.ts`. Customers now appear in the change log and are pushed to connected WebSocket clients immediately on write.
+
+3. **Change log prune endpoint** — `DELETE /api/v1/sync/prune?beforeSequence=<n>` (Admin-only). Delegates to new `pruneChangesBefore(client, tenantId, beforeSequence)` in `syncChangeLogService.ts`. Removes entries with `sequence < beforeSequence` for the tenant. Guards: non-numeric param → 400; non-Admin → 403.
+
+4. **Tests** — Extended `syncChangeLog.test.ts` with 6 new cases: pagination (hasMore + multi-page), Customer CREATE/UPDATE/DELETE log entries (PII absence verified), prune count return, prune entry survival, prune input validation.
+
+**Files:**
+- `backend/src/services/syncChangeLogService.ts`
+- `backend/src/routes/sync.ts`
+- `backend/src/routes/invoices.ts`
+- `backend/src/tests/syncChangeLog.test.ts`
+
+---
+
 ## [Date: 2026-08-28] - Fix: Concurrent-race 409 in idempotent invoice payment
 
 **What/Why:** PR #133 CI was still failing after the URL fix: the "concurrent race" test sent two simultaneous `POST /invoices/:id/pay` requests with the same `idempotencyKey` and expected both to return 200. The second request received 409 because: (a) both passed the pre-transaction duplicate check (no payment row yet), (b) the first committed and set the invoice to PAID, (c) the second re-read inside the row lock, saw `status=PAID`, and threw 409 — the existing catch block only handled P2002 constraint violations, not this earlier PAID-status guard.

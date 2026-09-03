@@ -26,7 +26,8 @@ function handleError(res: Response, error: any, fallback: string): void {
     return;
   }
   console.error('[Payroll] Error:', error);
-  res.status(500).json({ success: false, error: fallback });
+  // Include raw error detail in response to surface DB/runtime errors during debugging.
+  res.status(500).json({ success: false, error: fallback, detail: error?.message ?? String(error) });
 }
 
 // ── Employees ─────────────────────────────────────────────────────────────

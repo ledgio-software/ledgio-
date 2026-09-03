@@ -5,6 +5,8 @@ import { Input } from "../../components/ui/Input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/Card";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
+import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { UpgradeRequired } from "../../components/UpgradeRequired";
 
 interface ApiKey {
   id: string;
@@ -17,6 +19,7 @@ interface ApiKey {
 
 export function ApiKeys() {
   const { showToast } = useToast();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -38,7 +41,19 @@ export function ApiKeys() {
     }
   }, []);
 
-  useEffect(() => { fetchKeys(); }, [fetchKeys]);
+  useEffect(() => {
+    if (!isLoadingTenantSettings && settings.tier >= 2) {
+      fetchKeys();
+    }
+  }, [fetchKeys, isLoadingTenantSettings, settings.tier]);
+
+  if (isLoadingTenantSettings) {
+    return <div className="py-8 text-center text-secondary-500">Loading...</div>;
+  }
+
+  if (settings.tier < 2) {
+    return <UpgradeRequired featureLabel="API Key Management" requiredTier={2} currentTier={settings.tier} />;
+  }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

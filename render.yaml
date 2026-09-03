@@ -48,7 +48,7 @@ services:
     # `prisma migrate deploy` to `preDeployCommand` (runs closer to deploy
     # time and won't block a build from completing if a migration fails) -
     # not yet done, buildCommand below still works fine as-is.
-    buildCommand: npm ci && npx prisma generate && npm run build && npx prisma migrate deploy
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build && npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /health/live
     envVars:
@@ -85,6 +85,8 @@ services:
 
       # All optional - each feature cleanly reports "not configured" instead
       # of faking data if left blank. Fill in only the ones you're using.
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
       - key: MONO_SECRET_KEY
         sync: false
       - key: MONO_WEBHOOK_SECRET

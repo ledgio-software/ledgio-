@@ -110,6 +110,7 @@ describe('Multi-currency transaction-time conversion (Invoice/VendorBill -> Ledg
       adminPassword: 'Password123!',
       adminName: 'FX Corp 1 Admin',
       baseCurrency: 'USD',
+      tier: 2,
     });
     token1 = onboard1.token;
     tenant1Id = onboard1.tenant.id;

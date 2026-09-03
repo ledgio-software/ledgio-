@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from 'node-cron';
+import { wrapCronTick } from './cronJobRegistry';
 import { prisma } from '../config/db';
 import { runWithTenantContext } from '../context/tenantContext';
 import { withCurrentTenantDb } from '../database/tenantClient';
@@ -19,10 +20,10 @@ export class InterestChargeCronService {
   public static init(): void {
     if (this.task) return;
 
-    this.task = cron.schedule('0 7 * * *', async () => {
+    this.task = cron.schedule('0 7 * * *', wrapCronTick('Interest Charges', async () => {
       console.log('[InterestChargeCron] Running daily interest accrual sweep...');
       await this.runJob();
-    });
+    }));
 
     console.log('[InterestChargeCron] Daily Interest Charge Cron Job Initialized.');
   }

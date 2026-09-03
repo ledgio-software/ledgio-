@@ -122,6 +122,7 @@ describe('Account default-role resolution (fixes silent revenue/cash misposting)
         adminEmail,
         adminPassword: 'Password123!',
         adminName: 'Default Role Admin',
+        tier: 2,
       });
       adminToken = onboard.token;
 

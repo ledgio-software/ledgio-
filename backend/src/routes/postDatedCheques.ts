@@ -6,11 +6,13 @@ import { requireTenantContext } from '../context/tenantContext';
 import * as pdcService from '../services/pdcService';
 import { PDCServiceError } from '../services/pdcService';
 import { actorFromRequest } from '../services/auditLogService';
+import { requireTier } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+router.use(requireTier(2, 'Post-Dated Cheques'));
 
 function handleError(res: Response, error: any, fallback: string): void {
   if (error instanceof PDCServiceError) {

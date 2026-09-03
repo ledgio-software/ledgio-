@@ -128,6 +128,8 @@ export function WarehouseManagement() {
   const [adjustMode, setAdjustMode] = useState<"add" | "remove" | "set">("add");
   const [adjustQty, setAdjustQty] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
+  const [adjustNewSellingPrice, setAdjustNewSellingPrice] = useState("");
+  const [adjustNewCostPrice, setAdjustNewCostPrice] = useState("");
   const [isAdjusting, setIsAdjusting] = useState(false);
 
   // Adjustment History State
@@ -339,6 +341,8 @@ export function WarehouseManagement() {
     setAdjustMode("add");
     setAdjustQty("");
     setAdjustReason("");
+    setAdjustNewSellingPrice("");
+    setAdjustNewCostPrice("");
     setIsAdjustModalOpen(true);
   };
 
@@ -354,15 +358,23 @@ export function WarehouseManagement() {
     }
     setIsAdjusting(true);
     try {
-      const res = await api.post("/inventory/adjustments", {
-        warehouseId: adjustWarehouseId,
-        itemId: adjustItemId,
-        mode: adjustMode,
-        quantity: Number(adjustQty),
-        reason: adjustReason.trim(),
-      });
+      const [adjRes] = await Promise.all([
+        api.post("/inventory/adjustments", {
+          warehouseId: adjustWarehouseId,
+          itemId: adjustItemId,
+          mode: adjustMode,
+          quantity: Number(adjustQty),
+          reason: adjustReason.trim(),
+        }),
+        (adjustNewSellingPrice || adjustNewCostPrice)
+          ? api.put(`/inventory/items/${adjustItemId}`, {
+              ...(adjustNewSellingPrice ? { sellingPrice: Number(adjustNewSellingPrice) } : {}),
+              ...(adjustNewCostPrice ? { costPrice: Number(adjustNewCostPrice) } : {}),
+            })
+          : Promise.resolve(null),
+      ]);
 
-      if (res.data.success) {
+      if (adjRes.data.success) {
         setIsAdjustModalOpen(false);
         fetchData();
       }
@@ -1323,6 +1335,20 @@ export function WarehouseManagement() {
           <div>
             <label className="block text-sm font-medium mb-1">Reason (required)</label>
             <Input required placeholder="e.g. Received delivery from supplier / Correcting mistaken entry / Physical stock count" value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} />
+          </div>
+          <div className="border-t border-secondary-200 dark:border-secondary-700 pt-4">
+            <p className="text-xs font-semibold text-secondary-500 uppercase tracking-wide mb-3">Update Prices (optional)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">New Selling Price</label>
+                <Input type="number" min="0" step="0.01" placeholder={adjustItemId ? String(items.find(it => it.id === adjustItemId)?.sellingPrice ?? "") : "Leave blank to keep"} value={adjustNewSellingPrice} onChange={(e) => setAdjustNewSellingPrice(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">New Cost Price</label>
+                <Input type="number" min="0" step="0.01" placeholder={adjustItemId ? String(items.find(it => it.id === adjustItemId)?.costPrice ?? "") : "Leave blank to keep"} value={adjustNewCostPrice} onChange={(e) => setAdjustNewCostPrice(e.target.value)} />
+              </div>
+            </div>
+            <p className="text-xs text-secondary-400 mt-1">Leave blank to keep the current price. Fill in only what you want to change.</p>
           </div>
           <div className="flex justify-end space-x-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsAdjustModalOpen(false)}>Cancel</Button>

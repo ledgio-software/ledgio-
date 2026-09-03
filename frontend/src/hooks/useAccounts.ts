@@ -41,13 +41,14 @@ function accountTypeToBackend(type: AccountType): string {
 // yet (journal entries/ledgers are a later phase - see STATUS.md), so
 // they're still fetched live and merged in on top of the local rows.
 export function useAccounts() {
-  const { settings } = useTenantSettings();
+  const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const [balanceByAccountId, setBalanceByAccountId] = useState<Map<string, number>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   const localAccounts = useLiveQuery(() => syncDb.accounts.toArray(), []);
 
   const fetchBalances = useCallback(async () => {
+    if (isLoadingTenantSettings || (settings?.tier ?? 1) < 2) return;
     setIsLoading(true);
     try {
       const summaryResponse = await api.get('/ledgers/summary');
@@ -61,7 +62,7 @@ export function useAccounts() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isLoadingTenantSettings, settings?.tier]);
 
   useEffect(() => {
     fetchBalances();
