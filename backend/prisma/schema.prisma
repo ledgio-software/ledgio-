@@ -614,6 +614,7 @@ model Invoice {
   @@index([fundId])
   @@index([costCentreId])
   @@index([tenantId, status, issueDate])
+  @@index([tenantId, status, dueDate])
   @@map("invoices")
 }
 
@@ -645,6 +646,8 @@ model InvoicePayment {
 
   @@index([tenantId])
   @@index([invoiceId])
+  @@index([tenantId, invoiceId])
+  @@index([invoiceId, createdAt(sort: Desc)])
   @@map("invoice_payments")
 }
 
@@ -830,6 +833,7 @@ model VendorBill {
   @@index([purchaseOrderId])
   @@index([status, scheduledPaymentDate])
   @@index([tenantId, status, dueDate])
+  @@index([tenantId, billType, billDate])
   @@map("vendor_bills")
 }
 

@@ -4,12 +4,45 @@ This file records all significant changes, decisions, and progress made on the M
 
 ## [Date: 2026-08-28] - Fix: Concurrent-race 409 in idempotent invoice payment
 
-**What/Why:** The "concurrent race" idempotency test was failing with resB returning 409. Both concurrent requests with the same `idempotencyKey` passed the pre-transaction duplicate check (no payment row yet). The first to acquire the row lock committed and set the invoice to PAID. The second, inside the lock, saw `status=PAID` and threw 409 — the P2002 catch block didn't cover this earlier guard.
+**What/Why:** PR #133 CI was still failing after the URL fix: the "concurrent race" test sent two simultaneous `POST /invoices/:id/pay` requests with the same `idempotencyKey` and expected both to return 200. The second request received 409 because: (a) both passed the pre-transaction duplicate check (no payment row yet), (b) the first committed and set the invoice to PAID, (c) the second re-read inside the row lock, saw `status=PAID`, and threw 409 — the existing catch block only handled P2002 constraint violations, not this earlier PAID-status guard.
 
-**Fix:** Inside the locked transaction, before throwing "Invoice is already paid", re-query `invoicePayment` for the idempotency key. If found, return the invoice with 200 (idempotent short-circuit).
+**Fix:** Inside the locked transaction, before throwing "Invoice is already paid", if an `idempotencyKey` is present, re-query `invoicePayment` for that key. If found (meaning the race partner already committed), return the invoice with 200 — the same idempotent short-circuit as the pre-transaction check.
 
 **Changes:**
-- **`backend/src/services/invoicePaymentService.ts`** — Added idempotency re-check inside the row-locked transaction when `fresh.status === 'PAID'`.
+- **`backend/src/services/invoicePaymentService.ts`** — Added idempotency re-check inside the row-locked transaction when `fresh.status === 'PAID'`; also split the `!fresh || fresh.status === 'PAID'` guard into two separate conditions so a missing invoice still returns 404.
+
+**Applied to:** `feature/phase1-idempotent-payments` (PR #133) and `feature/phase2-db-hardening` (PR #134) via merge.
+
+---
+
+## [Date: 2026-08-28] - Fix: CI test URL bug in idempotency test suite
+
+**What/Why:** PR #133 CI was failing all 6 tests in `invoicePaymentIdempotency.test.ts` with `TypeError: Cannot read properties of undefined (reading 'customer')` at line 65. Root cause: both `POST /customers` calls in the test used path `/api/v1/customers` which does not exist — the customer routes are registered under the invoices router, making the correct path `/api/v1/invoices/customers`. The 404 response had no `data.customer`, so `customerId` was never set and all downstream tests cascaded to fail.
+
+**Changes:**
+- **`backend/src/tests/invoicePaymentIdempotency.test.ts`** — Fixed two wrong URL references: `beforeAll` customer creation (line 61) and cross-tenant test customer creation (line 172), both changed from `/api/v1/customers` to `/api/v1/invoices/customers`.
+
+**Fix propagated to:** `feature/phase2-db-hardening` via merge from `feature/phase1-idempotent-payments`.
+
+---
+
+## [Date: 2026-08-28] - Phase 2: DB Connection Pooling & Query Hardening
+
+**What/Why:** Phase 2 of the 6-phase system hardening plan. The connection pool was already sized (50 connections, statement_timeout=30 s via DATABASE_URL). This phase closes the remaining gaps: missing composite indexes on hot query paths and an ORM-level query timeout that fires before PostgreSQL's hard kill, providing a cleaner structured error to callers.
+
+**N+1 audit findings:** All hot list routes (invoices, reports, aging, purchase register) already use `Promise.all` or batched `findMany` — no serial N+1 loops found. The audit confirmed that `reports.ts` analytics trends (line 718) uses `Promise.all(ranges.map(...))` correctly.
+
+**Changes:**
+- **`backend/prisma/migrations/20260828000001_phase2_db_hardening_indexes/migration.sql`** — Adds 4 missing composite indexes:
+  - `invoice_payments(tenant_id, invoice_id)` — compound for idempotency pre-check and payment history
+  - `invoice_payments(invoice_id, created_at DESC)` — for invoice detail view payment list (ordered by time)
+  - `invoices(tenant_id, status, due_date)` — for AR aging report (`WHERE status IN (...) ORDER BY due_date`; existing index covered filter but forced a re-sort)
+  - `vendor_bills(tenant_id, bill_type, bill_date)` — for purchase register (`WHERE billType = 'STANDARD' AND billDate BETWEEN ? AND ?`)
+- **`backend/prisma/schema.prisma`** — Added matching `@@index` declarations to `Invoice`, `InvoicePayment`, and `VendorBill` models.
+- **`backend/src/config/db.ts`** — Three improvements:
+  1. ORM-level query timeout via `$use` middleware (`QUERY_TIMEOUT_MS` env var, default 25 s) — fires 5 s before PostgreSQL's own `statement_timeout=30000`, so callers receive a descriptive `Error` instead of raw Prisma P2024
+  2. Critical slow query logging at >5 000 ms (`logger.error`) in addition to the existing >100 ms warning
+  3. Configurable slow query threshold via `SLOW_QUERY_MS` env var (default 100 ms)
 
 ---
 
