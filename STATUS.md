@@ -2,6 +2,16 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-03] - Bug fix: Approve/Reject buttons on Expense Claims showed no loading feedback
+
+**What/Why:**
+Clicking "Approve" or "Reject" on an expense claim gave no visual feedback while the API request was in-flight (typically several seconds). The button appeared frozen — no spinner, no disabled state, no label change — until the toast appeared after the call completed. Added a `decidingId` state (mirrors the existing `reimbursingId` pattern on the Reimburse button): both buttons are disabled and show a spinner + "Approving…"/"Rejecting…" label while the request runs, then reset to normal on completion or error.
+
+**Files Affected:**
+- `frontend/src/pages/expenses/ExpenseClaims.tsx` — added `decidingId` state; `handleDecide` sets/clears it; Approve/Reject buttons read it for `disabled` prop and label
+
+---
+
 ## [Date: 2026-09-02] - Enhancement: Add price update fields to the Adjust Stock modal
 
 **What/Why:**
