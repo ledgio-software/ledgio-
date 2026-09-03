@@ -63,6 +63,7 @@ export function ExpenseClaims() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reimbursingId, setReibursingId] = useState<string | null>(null);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -127,6 +128,8 @@ export function ExpenseClaims() {
   };
 
   const handleDecide = async (id: string, decision: "APPROVE" | "REJECT") => {
+    if (decidingId) return;
+    setDecidingId(id);
     try {
       const res = await api.post(`/expense-claims/${id}/decide`, { decision });
       if (res.data.success) {
@@ -135,6 +138,8 @@ export function ExpenseClaims() {
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to record decision.", "error");
+    } finally {
+      setDecidingId(null);
     }
   };
 
@@ -259,11 +264,13 @@ export function ExpenseClaims() {
                   </div>
                   {canDecide && c.status === "PENDING_APPROVAL" && (
                     <div className="flex justify-end gap-2 pt-1">
-                      <Button variant="outline" size="sm" className="text-xs text-emerald-600" onClick={() => handleDecide(c.id, "APPROVE")}>
-                        <CheckCircle2 className="mr-1 h-3 w-3" /> Approve
+                      <Button variant="outline" size="sm" className="text-xs text-emerald-600" disabled={decidingId === c.id} onClick={() => handleDecide(c.id, "APPROVE")}>
+                        {decidingId === c.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CheckCircle2 className="mr-1 h-3 w-3" />}
+                        {decidingId === c.id ? "Approving…" : "Approve"}
                       </Button>
-                      <Button variant="outline" size="sm" className="text-xs text-red-600" onClick={() => handleDecide(c.id, "REJECT")}>
-                        <XCircle className="mr-1 h-3 w-3" /> Reject
+                      <Button variant="outline" size="sm" className="text-xs text-red-600" disabled={decidingId === c.id} onClick={() => handleDecide(c.id, "REJECT")}>
+                        {decidingId === c.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <XCircle className="mr-1 h-3 w-3" />}
+                        {decidingId === c.id ? "Rejecting…" : "Reject"}
                       </Button>
                     </div>
                   )}
