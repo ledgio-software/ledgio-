@@ -7,8 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --only=production && \
+# Install all dependencies (including devDependencies needed for tsc)
+RUN npm ci && \
     npm cache clean --force
 
 # Copy source code
@@ -19,6 +19,9 @@ RUN npx prisma generate
 
 # Build TypeScript
 RUN npm run build
+
+# Prune to production-only deps after build
+RUN npm ci --only=production && npm cache clean --force
 
 # Production stage
 FROM node:20-alpine
