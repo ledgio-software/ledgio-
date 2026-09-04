@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldAlert,
-  Lock,
   Radio,
   Activity,
   Database,
@@ -822,24 +821,24 @@ export function AdminCoreEngine() {
               <div>
                 <h3 className="text-base font-bold text-white">Permanently Delete Tenant</h3>
                 <p className="text-xs text-secondary-400 mt-1">
-                  This will drop the PostgreSQL schema <span className="font-mono text-rose-300">{deletingTenant.slug}</span>, delete all its users, and remove it from the platform roster. <strong className="text-white">This cannot be undone.</strong>
+                  This will drop the PostgreSQL schema <span className="font-jetbrains text-rose-300">{deletingTenant.slug}</span>, delete all its users, and remove it from the platform roster. <strong className="text-white">This cannot be undone.</strong>
                 </p>
               </div>
             </div>
             <div className="p-3 bg-rose-950/40 border border-rose-900 rounded-lg text-xs text-rose-300 space-y-1">
               <div><span className="text-secondary-400">Tenant:</span> <span className="font-semibold text-white">{deletingTenant.name}</span></div>
-              <div><span className="text-secondary-400">Slug:</span> <span className="font-mono">{deletingTenant.slug}</span></div>
+              <div><span className="text-secondary-400">Slug:</span> <span className="font-jetbrains">{deletingTenant.slug}</span></div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-secondary-300">
-                Type the slug <span className="font-mono text-rose-300">{deletingTenant.slug}</span> to confirm:
+                Type the slug <span className="font-jetbrains text-rose-300">{deletingTenant.slug}</span> to confirm:
               </label>
               <input
                 type="text"
                 value={deleteConfirmSlug}
                 onChange={(e) => setDeleteConfirmSlug(e.target.value)}
                 placeholder={deletingTenant.slug}
-                className="w-full h-9 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs font-mono focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                className="w-full h-9 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs font-jetbrains focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
                 autoFocus
               />
             </div>
@@ -877,13 +876,20 @@ export function AdminCoreEngine() {
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500 border border-amber-500/20">
-                <ShieldAlert className="h-5 w-5" />
+            <div className="flex items-center space-x-2.5">
+              {/* Hexagonal AGOD brand mark */}
+              <div
+                className="flex items-center justify-center w-9 h-9 bg-amber-500 text-secondary-950 font-extrabold text-base shrink-0"
+                style={{ clipPath: 'polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)', fontFamily: "'Syne', sans-serif" }}
+              >
+                A
               </div>
-              <h1 className="text-lg font-extrabold tracking-tight">
-                Ledgio <span className="text-amber-400">Core Control Engine</span>
-              </h1>
+              <div className="flex flex-col leading-none gap-0.5">
+                <h1 className="text-base font-extrabold tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  AGOD <span className="text-amber-400">Control Engine</span>
+                </h1>
+                <span className="text-[10px] text-secondary-500 tracking-widest uppercase" style={{ fontFamily: "'DM Sans', sans-serif" }}>Software Solution · Admin</span>
+              </div>
             </div>
           </div>
 
@@ -914,11 +920,15 @@ export function AdminCoreEngine() {
           <div className="max-w-md mx-auto py-16">
             <Card className="bg-secondary-900 border-secondary-800 text-white shadow-2xl text-center">
               <CardHeader>
-                <div className="inline-flex p-4 bg-amber-500/10 rounded-full border border-amber-500/20 text-amber-400 mb-3 mx-auto">
-                  <Lock className="h-10 w-10" />
+                <div
+                  className="inline-flex items-center justify-center w-16 h-16 bg-amber-500 text-secondary-950 font-extrabold text-2xl mb-4 mx-auto"
+                  style={{ clipPath: 'polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)', fontFamily: "'Syne', sans-serif" }}
+                >
+                  A
                 </div>
-                <CardTitle className="text-2xl font-bold">Ledgio Core Engine Gate</CardTitle>
-                <CardDescription className="text-secondary-400 text-xs mt-1">
+                <CardTitle className="text-2xl font-extrabold" style={{ fontFamily: "'Syne', sans-serif" }}>AGOD Control Engine</CardTitle>
+                <p className="text-secondary-500 text-[10px] tracking-widest uppercase mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>Software Solution · Admin Gate</p>
+                <CardDescription className="text-secondary-400 text-xs mt-2">
                   Enter your master passcode to access platform-wide system upgrade broadcasts, tenant schema inspectors, and engine health controls.
                 </CardDescription>
               </CardHeader>
@@ -932,7 +942,7 @@ export function AdminCoreEngine() {
                       onChange={(e) => setPasscode(e.target.value)}
                       placeholder="Enter Master Security Passcode"
                       required
-                      className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-mono text-base"
+                      className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-jetbrains text-base"
                     />
                   </div>
 
@@ -1155,7 +1165,7 @@ export function AdminCoreEngine() {
             {activeTab === "broadcast" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold flex items-center" style={{ fontFamily: "'Syne', sans-serif" }}>
                     <Radio className="h-5 w-5 mr-2 text-amber-400" />
                     System-Wide Email & SMS Upgrade Broadcast Console
                   </CardTitle>
@@ -1252,7 +1262,7 @@ export function AdminCoreEngine() {
                         <CheckCircle2 className="h-5 w-5 mr-2" />
                         System Broadcast Dispatched Successfully!
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-center font-mono">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-center font-jetbrains">
                         <div className="p-2 bg-emerald-900/40 rounded">Total Targeted: <strong>{broadcastResult.totalTargeted}</strong></div>
                         <div className="p-2 bg-emerald-900/40 rounded">Emails Sent: <strong>{broadcastResult.emailSentCount}</strong></div>
                         <div className="p-2 bg-emerald-900/40 rounded">SMS Sent: <strong>{broadcastResult.smsSentCount}</strong></div>
@@ -1314,7 +1324,7 @@ export function AdminCoreEngine() {
             {activeTab === "health" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold">Platform Diagnostics & Service Uptime</CardTitle>
+                  <CardTitle className="text-xl font-extrabold font-syne">Platform Diagnostics & Service Uptime</CardTitle>
                   <CardDescription className="text-secondary-400 text-xs">
                     Live status from the backend's /health endpoint.
                   </CardDescription>
@@ -1380,7 +1390,7 @@ export function AdminCoreEngine() {
             {activeTab === "integrations" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                     <Plug className="h-5 w-5 mr-2 text-amber-400" />
                     Third-Party Integrations
                   </CardTitle>
@@ -1471,7 +1481,7 @@ export function AdminCoreEngine() {
             {activeTab === "schemas" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold">Tenant Schemas & Tier Management</CardTitle>
+                  <CardTitle className="text-xl font-extrabold font-syne">Tenant Schemas & Tier Management</CardTitle>
                   <CardDescription className="text-secondary-400 text-xs">
                     Inspect schema-isolated business environments and subscription tiers.
                   </CardDescription>
@@ -1531,8 +1541,8 @@ export function AdminCoreEngine() {
                                     {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-secondary-400" /> : <ChevronRight className="h-3.5 w-3.5 text-secondary-400" />}
                                   </TableCell>
                                   <TableCell className="font-semibold text-white">{t.name}</TableCell>
-                                  <TableCell className="font-mono text-secondary-300">{t.slug}</TableCell>
-                                  <TableCell className="font-mono text-secondary-300">{t.schema}</TableCell>
+                                  <TableCell className="font-jetbrains text-secondary-300">{t.slug}</TableCell>
+                                  <TableCell className="font-jetbrains text-secondary-300">{t.schema}</TableCell>
                                   <TableCell className="text-secondary-300" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-2">
                                       <select
@@ -1568,7 +1578,7 @@ export function AdminCoreEngine() {
                                       <div className="text-[10px] text-secondary-500 mt-0.5">until {new Date(t.subscriptionPaidUntil).toLocaleDateString()}</div>
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-secondary-300 font-mono text-center">{t.userCount ?? "—"}</TableCell>
+                                  <TableCell className="text-secondary-300 font-jetbrains text-center">{t.userCount ?? "—"}</TableCell>
                                   <TableCell className="text-secondary-300">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                     <button
@@ -1611,7 +1621,7 @@ export function AdminCoreEngine() {
                                                 {users.map((u) => (
                                                   <tr key={u.id} className="border-b border-secondary-800/50 last:border-0">
                                                     <td className="py-1.5 pr-4 text-secondary-200">{u.name}</td>
-                                                    <td className="py-1.5 pr-4 font-mono text-secondary-300">{u.email}</td>
+                                                    <td className="py-1.5 pr-4 font-jetbrains text-secondary-300">{u.email}</td>
                                                     <td className="py-1.5 pr-4 text-secondary-400">{u.role}</td>
                                                     <td className="py-1.5 pr-4">
                                                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${u.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-700" : "bg-rose-500/10 text-rose-400 border-rose-700"}`}>
@@ -1668,7 +1678,7 @@ export function AdminCoreEngine() {
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold">System Audit Logs</CardTitle>
+                    <CardTitle className="text-xl font-extrabold font-syne">System Audit Logs</CardTitle>
                     <CardDescription className="text-secondary-400 text-xs">
                       Platform-wide activity across every tenant - administrative broadcasts, system configuration events, and tenant-level actions.
                     </CardDescription>
@@ -1823,12 +1833,12 @@ export function AdminCoreEngine() {
                                   {log.action}
                                 </span>
                               </TableCell>
-                              <TableCell className="font-mono text-secondary-400">
+                              <TableCell className="font-jetbrains text-secondary-400">
                                 {log.entity}
                                 {log.entityId && <span className="text-secondary-600">:{log.entityId.slice(0, 8)}</span>}
                               </TableCell>
                               <TableCell className="text-secondary-300">{log.userEmail || log.userId || "System"}</TableCell>
-                              <TableCell className="text-secondary-400 font-mono max-w-xs truncate" title={log.details || ""}>
+                              <TableCell className="text-secondary-400 font-jetbrains max-w-xs truncate" title={log.details || ""}>
                                 {log.details || "-"}
                               </TableCell>
                               <TableCell className="text-secondary-400">
@@ -1867,7 +1877,7 @@ export function AdminCoreEngine() {
             {activeTab === "onboard" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                     <Building2 className="h-5 w-5 mr-2 text-amber-400" />
                     Onboard a Contracted Client
                   </CardTitle>
@@ -2113,7 +2123,7 @@ export function AdminCoreEngine() {
                               <div key={i}>
                                 <div className="flex justify-between items-center text-xs mb-0.5">
                                   <span className="text-secondary-300 truncate max-w-[180px]" title={p.page}>{p.page || '/'}</span>
-                                  <span className="text-secondary-400 font-mono ml-2 flex-shrink-0">{p.views.toLocaleString()}</span>
+                                  <span className="text-secondary-400 font-jetbrains ml-2 flex-shrink-0">{p.views.toLocaleString()}</span>
                                 </div>
                                 <div className="w-full bg-secondary-800 h-1 rounded-full overflow-hidden">
                                   <div className="h-full bg-amber-400" style={{ width: `${(p.views / max) * 100}%` }} />
@@ -2142,7 +2152,7 @@ export function AdminCoreEngine() {
                               <div key={i}>
                                 <div className="flex justify-between items-center text-xs mb-0.5">
                                   <span className="text-secondary-300">{c.country}</span>
-                                  <span className="text-secondary-400 font-mono">{c.users.toLocaleString()}</span>
+                                  <span className="text-secondary-400 font-jetbrains">{c.users.toLocaleString()}</span>
                                 </div>
                                 <div className="w-full bg-secondary-800 h-1 rounded-full overflow-hidden">
                                   <div className="h-full bg-blue-400" style={{ width: `${(c.users / max) * 100}%` }} />
@@ -2175,7 +2185,7 @@ export function AdminCoreEngine() {
                                   <div className="w-20 bg-secondary-800 h-1.5 rounded-full overflow-hidden">
                                     <div className="h-full bg-purple-400" style={{ width: `${pct}%` }} />
                                   </div>
-                                  <span className="text-secondary-400 font-mono w-8 text-right">{pct}%</span>
+                                  <span className="text-secondary-400 font-jetbrains w-8 text-right">{pct}%</span>
                                 </div>
                               </div>
                             );
@@ -2233,7 +2243,7 @@ export function AdminCoreEngine() {
                         <Card key={label} className="bg-secondary-900 border-secondary-800 text-white">
                           <CardContent className="p-4">
                             <div className="text-[11px] text-secondary-400 mb-1">{label}</div>
-                            <div className={`text-2xl font-extrabold font-mono ${color}`}>{value}</div>
+                            <div className={`text-2xl font-extrabold font-jetbrains ${color}`}>{value}</div>
                           </CardContent>
                         </Card>
                       ))}
@@ -2268,7 +2278,7 @@ export function AdminCoreEngine() {
                                   <span className={`inline-block w-2.5 h-2.5 rounded-sm ${bar.color}`} />
                                   <div>
                                     <div className="text-[10px] text-secondary-400">{bar.label}</div>
-                                    <div className={`font-mono font-bold text-sm ${bar.text}`}>{bar.count.toLocaleString()}</div>
+                                    <div className={`font-jetbrains font-bold text-sm ${bar.text}`}>{bar.count.toLocaleString()}</div>
                                     <div className="text-[10px] text-secondary-500">{(bar.count / total * 100).toFixed(1)}%</div>
                                   </div>
                                 </div>
@@ -2369,15 +2379,15 @@ export function AdminCoreEngine() {
                               <tbody>
                                 {metricsData.topRoutesByTraffic.map((r) => (
                                   <tr key={r.route} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
-                                    <td className="py-2 pr-4 font-mono text-[11px] text-secondary-300 max-w-[260px] truncate">{r.route}</td>
-                                    <td className="py-2 pr-4 text-right font-mono text-blue-300">{r.requests.toLocaleString()}</td>
-                                    <td className="py-2 pr-4 text-right font-mono">{r.errors > 0 ? <span className="text-rose-400">{r.errors}</span> : <span className="text-secondary-500">0</span>}</td>
-                                    <td className="py-2 pr-4 text-right font-mono">
+                                    <td className="py-2 pr-4 font-jetbrains text-[11px] text-secondary-300 max-w-[260px] truncate">{r.route}</td>
+                                    <td className="py-2 pr-4 text-right font-jetbrains text-blue-300">{r.requests.toLocaleString()}</td>
+                                    <td className="py-2 pr-4 text-right font-jetbrains">{r.errors > 0 ? <span className="text-rose-400">{r.errors}</span> : <span className="text-secondary-500">0</span>}</td>
+                                    <td className="py-2 pr-4 text-right font-jetbrains">
                                       <span className={r.errorRate > 10 ? "text-rose-400" : r.errorRate > 1 ? "text-amber-400" : "text-emerald-400"}>
                                         {r.errorRate.toFixed(1)}%
                                       </span>
                                     </td>
-                                    <td className="py-2 text-right font-mono">
+                                    <td className="py-2 text-right font-jetbrains">
                                       <span className={r.avgMs > 500 ? "text-rose-400" : r.avgMs > 200 ? "text-amber-400" : "text-secondary-300"}>
                                         {r.avgMs} ms
                                       </span>
@@ -2416,11 +2426,11 @@ export function AdminCoreEngine() {
                               <tbody>
                                 {errorGroups.slice(0, 10).map((g) => (
                                   <tr key={g.key} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
-                                    <td className="py-2 pr-3 font-mono text-[10px] text-secondary-300 max-w-[180px] truncate">
+                                    <td className="py-2 pr-3 font-jetbrains text-[10px] text-secondary-300 max-w-[180px] truncate">
                                       <span className="text-secondary-500 mr-1">{g.method}</span>{g.sample?.path ?? '—'}
                                     </td>
                                     <td className="py-2 pr-3 text-rose-300 max-w-[200px] truncate" title={g.error}>{g.error}</td>
-                                    <td className="py-2 pr-3 font-mono text-[10px] text-violet-300 max-w-[160px] truncate" title={g.source}>
+                                    <td className="py-2 pr-3 font-jetbrains text-[10px] text-violet-300 max-w-[160px] truncate" title={g.source}>
                                       {g.fn ? `${g.fn} ` : ''}{g.source ?? '—'}
                                     </td>
                                     <td className="py-2 pr-3 text-right">
@@ -2428,7 +2438,7 @@ export function AdminCoreEngine() {
                                         {g.status}
                                       </span>
                                     </td>
-                                    <td className="py-2 text-right font-mono font-bold text-rose-400">{g.count}</td>
+                                    <td className="py-2 text-right font-jetbrains font-bold text-rose-400">{g.count}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -2453,7 +2463,7 @@ export function AdminCoreEngine() {
                       ].map(({ label, value }) => (
                         <div key={label} className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
                           <div className="text-secondary-400 mb-1">{label}</div>
-                          <div className="font-mono text-white">{value}</div>
+                          <div className="font-jetbrains text-white">{value}</div>
                         </div>
                       ))}
                     </div>
@@ -2467,7 +2477,7 @@ export function AdminCoreEngine() {
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <CardTitle className="text-xl font-extrabold font-syne flex items-center gap-2">
                       <Clock className="h-5 w-5 text-amber-400" />
                       Cron Job Monitor
                     </CardTitle>
@@ -2520,11 +2530,11 @@ export function AdminCoreEngine() {
                                   <div className="font-semibold text-white text-xs">{job.name}</div>
                                   {job.description && <div className="text-[10px] text-secondary-500 mt-0.5">{job.description}</div>}
                                 </TableCell>
-                                <TableCell className="font-mono text-secondary-400 text-xs">{job.schedule}</TableCell>
+                                <TableCell className="font-jetbrains text-secondary-400 text-xs">{job.schedule}</TableCell>
                                 <TableCell className="text-secondary-400 text-xs whitespace-nowrap">
                                   {lr ? new Date(lr.startedAt).toLocaleString() : "—"}
                                 </TableCell>
-                                <TableCell className="font-mono text-secondary-400 text-xs">
+                                <TableCell className="font-jetbrains text-secondary-400 text-xs">
                                   {lr ? `${(lr.durationMs / 1000).toFixed(1)}s` : "—"}
                                 </TableCell>
                                 <TableCell>
@@ -2568,16 +2578,16 @@ export function AdminCoreEngine() {
                   <div className={`flex items-start justify-between gap-4 p-5 border-b ${selectedTicket.status >= 500 ? 'border-rose-900/60 bg-rose-950/20' : 'border-amber-900/60 bg-amber-950/20'}`}>
                     <div className="flex items-start gap-3 min-w-0">
                       <div className={`shrink-0 mt-0.5 flex flex-col items-center gap-1.5`}>
-                        <span className={`text-xs font-black px-2.5 py-1 rounded-lg font-mono tracking-wider ${selectedTicket.status >= 500 ? 'bg-rose-900 text-rose-200' : 'bg-amber-900 text-amber-200'}`}>
+                        <span className={`text-xs font-black px-2.5 py-1 rounded-lg font-jetbrains tracking-wider ${selectedTicket.status >= 500 ? 'bg-rose-900 text-rose-200' : 'bg-amber-900 text-amber-200'}`}>
                           {selectedTicket.status >= 500 ? 'CRITICAL' : 'ERROR'}
                         </span>
-                        <span className="text-[10px] font-bold font-mono text-secondary-400 px-1.5 py-0.5 rounded bg-secondary-800">{selectedTicket.status}</span>
+                        <span className="text-[10px] font-bold font-jetbrains text-secondary-400 px-1.5 py-0.5 rounded bg-secondary-800">{selectedTicket.status}</span>
                       </div>
                       <div className="min-w-0">
                         <p className={`text-base font-semibold leading-snug ${selectedTicket.status >= 500 ? 'text-rose-200' : 'text-amber-200'}`}>{selectedTicket.error}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${selectedTicket.method === 'GET' ? 'bg-blue-900/60 text-blue-300' : selectedTicket.method === 'POST' ? 'bg-emerald-900/60 text-emerald-300' : selectedTicket.method === 'DELETE' ? 'bg-rose-900/60 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{selectedTicket.method}</span>
-                          <span className="font-mono text-xs text-secondary-300 break-all">{selectedTicket.path}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${selectedTicket.method === 'GET' ? 'bg-blue-900/60 text-blue-300' : selectedTicket.method === 'POST' ? 'bg-emerald-900/60 text-emerald-300' : selectedTicket.method === 'DELETE' ? 'bg-rose-900/60 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{selectedTicket.method}</span>
+                          <span className="font-jetbrains text-xs text-secondary-300 break-all">{selectedTicket.path}</span>
                         </div>
                       </div>
                     </div>
@@ -2591,19 +2601,19 @@ export function AdminCoreEngine() {
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-xs">
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">First Seen</p>
-                        <p className="text-secondary-200 font-mono">{new Date(selectedTicket.ts).toLocaleString()}</p>
+                        <p className="text-secondary-200 font-jetbrains">{new Date(selectedTicket.ts).toLocaleString()}</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Last Seen</p>
-                        <p className="text-secondary-200 font-mono">{new Date(selectedTicket.lastSeen).toLocaleString()}</p>
+                        <p className="text-secondary-200 font-jetbrains">{new Date(selectedTicket.lastSeen).toLocaleString()}</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Occurrences</p>
-                        <p className={`font-mono font-bold ${selectedTicket.count >= 10 ? 'text-rose-400' : selectedTicket.count >= 3 ? 'text-amber-400' : 'text-secondary-200'}`}>{selectedTicket.count}×</p>
+                        <p className={`font-jetbrains font-bold ${selectedTicket.count >= 10 ? 'text-rose-400' : selectedTicket.count >= 3 ? 'text-amber-400' : 'text-secondary-200'}`}>{selectedTicket.count}×</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Ticket ID</p>
-                        <p className="text-secondary-400 font-mono text-[10px] break-all">{selectedTicket.id}</p>
+                        <p className="text-secondary-400 font-jetbrains text-[10px] break-all">{selectedTicket.id}</p>
                       </div>
                     </div>
 
@@ -2612,7 +2622,7 @@ export function AdminCoreEngine() {
                       <div className="rounded-xl bg-rose-950/20 border border-rose-900/40 p-4 space-y-1">
                         <p className="text-rose-400 uppercase tracking-widest text-[9px] font-bold mb-2">📍 Source Location</p>
                         {selectedTicket.fn && <p className="text-white text-sm font-semibold">{selectedTicket.fn}<span className="text-secondary-500">()</span></p>}
-                        {selectedTicket.source && <p className="text-rose-300 font-mono text-xs break-all">{selectedTicket.source}</p>}
+                        {selectedTicket.source && <p className="text-rose-300 font-jetbrains text-xs break-all">{selectedTicket.source}</p>}
                       </div>
                     )}
 
@@ -2621,12 +2631,12 @@ export function AdminCoreEngine() {
                       <div className="rounded-xl bg-secondary-900 border border-secondary-800 p-4 space-y-2">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold mb-3">🔗 Request Context</p>
                         <div className="space-y-1.5 text-xs">
-                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Method</span><span className={`font-mono font-bold ${selectedTicket.method === 'GET' ? 'text-blue-400' : selectedTicket.method === 'POST' ? 'text-emerald-400' : selectedTicket.method === 'DELETE' ? 'text-rose-400' : 'text-secondary-300'}`}>{selectedTicket.method}</span></div>
-                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Path</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.path}</span></div>
-                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Status</span><span className={`font-mono font-bold ${selectedTicket.status >= 500 ? 'text-rose-400' : 'text-amber-400'}`}>{selectedTicket.status}</span></div>
-                          {selectedTicket.ip && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">IP</span><span className="font-mono text-secondary-200">{selectedTicket.ip}</span></div>}
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Method</span><span className={`font-jetbrains font-bold ${selectedTicket.method === 'GET' ? 'text-blue-400' : selectedTicket.method === 'POST' ? 'text-emerald-400' : selectedTicket.method === 'DELETE' ? 'text-rose-400' : 'text-secondary-300'}`}>{selectedTicket.method}</span></div>
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Path</span><span className="font-jetbrains text-secondary-200 break-all">{selectedTicket.path}</span></div>
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Status</span><span className={`font-jetbrains font-bold ${selectedTicket.status >= 500 ? 'text-rose-400' : 'text-amber-400'}`}>{selectedTicket.status}</span></div>
+                          {selectedTicket.ip && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">IP</span><span className="font-jetbrains text-secondary-200">{selectedTicket.ip}</span></div>}
                           {selectedTicket.bodyKeys && selectedTicket.bodyKeys.length > 0 && (
-                            <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Body</span><span className="font-mono text-secondary-300">{selectedTicket.bodyKeys.join(', ')}</span></div>
+                            <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Body</span><span className="font-jetbrains text-secondary-300">{selectedTicket.bodyKeys.join(', ')}</span></div>
                           )}
                         </div>
                       </div>
@@ -2634,10 +2644,10 @@ export function AdminCoreEngine() {
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold mb-3">🏢 Identity</p>
                         <div className="space-y-1.5 text-xs">
                           {selectedTicket.tenantId
-                            ? <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Tenant</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.tenantId}</span></div>
+                            ? <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Tenant</span><span className="font-jetbrains text-secondary-200 break-all">{selectedTicket.tenantId}</span></div>
                             : <p className="text-secondary-600 italic text-xs">No tenant context (platform-level)</p>
                           }
-                          {selectedTicket.userId && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">User</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.userId}</span></div>}
+                          {selectedTicket.userId && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">User</span><span className="font-jetbrains text-secondary-200 break-all">{selectedTicket.userId}</span></div>}
                           {selectedTicket.userAgent && (
                             <div className="flex gap-2">
                               <span className="text-secondary-500 w-14 shrink-0">UA</span>
@@ -2659,7 +2669,7 @@ export function AdminCoreEngine() {
                           >Copy stack</button>
                         </div>
                         <div className="rounded-xl bg-black/60 border border-secondary-800 overflow-x-auto max-h-72 overflow-y-auto">
-                          <pre className="p-4 text-[11px] font-mono leading-relaxed">
+                          <pre className="p-4 text-[11px] font-jetbrains leading-relaxed">
                             {selectedTicket.stack.split('\n').map((line, i) => {
                               const isAppLine = line.includes('/src/') && !line.includes('node_modules');
                               const isAt = line.trim().startsWith('at ');
@@ -2689,11 +2699,11 @@ export function AdminCoreEngine() {
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <CardTitle className="text-xl font-extrabold font-syne flex items-center gap-2">
                       <XCircle className="h-5 w-5 text-rose-400" />
                       Server Error Log
                       {errorsData && errorsData.length > 0 && (
-                        <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-900/50 text-rose-300 text-xs font-mono font-bold">
+                        <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-900/50 text-rose-300 text-xs font-jetbrains font-bold">
                           {errorsData.reduce((s, e) => s + e.count, 0)} total
                         </span>
                       )}
@@ -2778,20 +2788,20 @@ export function AdminCoreEngine() {
                                 >
                                   {/* Count badge */}
                                   <div className="shrink-0 mt-0.5">
-                                    <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-md text-xs font-bold font-mono ${g.count >= 10 ? 'bg-rose-900/60 text-rose-300' : g.count >= 3 ? 'bg-amber-900/50 text-amber-300' : 'bg-secondary-800 text-secondary-300'}`}>
+                                    <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-md text-xs font-bold font-jetbrains ${g.count >= 10 ? 'bg-rose-900/60 text-rose-300' : g.count >= 3 ? 'bg-amber-900/50 text-amber-300' : 'bg-secondary-800 text-secondary-300'}`}>
                                       {g.count}×
                                     </span>
                                   </div>
                                   {/* Status + method */}
                                   <div className="shrink-0 flex flex-col gap-1 mt-0.5">
-                                    <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${g.status >= 500 ? 'bg-rose-900/40 text-rose-400' : g.status >= 400 ? 'bg-amber-900/40 text-amber-400' : 'bg-secondary-800 text-secondary-400'}`}>{g.status}</span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${g.method === 'GET' ? 'bg-blue-900/40 text-blue-400' : g.method === 'POST' ? 'bg-emerald-900/40 text-emerald-400' : g.method === 'DELETE' ? 'bg-rose-900/40 text-rose-400' : 'bg-secondary-800 text-secondary-300'}`}>{g.method}</span>
+                                    <span className={`text-[10px] font-bold font-jetbrains px-1.5 py-0.5 rounded ${g.status >= 500 ? 'bg-rose-900/40 text-rose-400' : g.status >= 400 ? 'bg-amber-900/40 text-amber-400' : 'bg-secondary-800 text-secondary-400'}`}>{g.status}</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${g.method === 'GET' ? 'bg-blue-900/40 text-blue-400' : g.method === 'POST' ? 'bg-emerald-900/40 text-emerald-400' : g.method === 'DELETE' ? 'bg-rose-900/40 text-rose-400' : 'bg-secondary-800 text-secondary-300'}`}>{g.method}</span>
                                   </div>
                                   {/* Error + source */}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm text-white font-medium truncate">{g.error}</p>
                                     {g.source && (
-                                      <p className="text-[11px] text-rose-400/80 font-mono mt-0.5 truncate">
+                                      <p className="text-[11px] text-rose-400/80 font-jetbrains mt-0.5 truncate">
                                         📍 {g.fn ? `${g.fn} @ ` : ''}{g.source}
                                       </p>
                                     )}
@@ -2809,12 +2819,12 @@ export function AdminCoreEngine() {
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                       <div className="space-y-1">
                                         <p className="text-secondary-500 uppercase tracking-wide text-[10px] font-semibold">Sample Request</p>
-                                        <p className="font-mono text-secondary-300 break-all">{g.sample.path}</p>
-                                        {g.sample.ip && <p className="text-secondary-500">IP: <span className="text-secondary-300 font-mono">{g.sample.ip}</span></p>}
-                                        {g.sample.tenantId && <p className="text-secondary-500">Tenant: <span className="text-secondary-300 font-mono">{g.sample.tenantId}</span></p>}
-                                        {g.sample.userId && <p className="text-secondary-500">User: <span className="text-secondary-300 font-mono">{g.sample.userId}</span></p>}
+                                        <p className="font-jetbrains text-secondary-300 break-all">{g.sample.path}</p>
+                                        {g.sample.ip && <p className="text-secondary-500">IP: <span className="text-secondary-300 font-jetbrains">{g.sample.ip}</span></p>}
+                                        {g.sample.tenantId && <p className="text-secondary-500">Tenant: <span className="text-secondary-300 font-jetbrains">{g.sample.tenantId}</span></p>}
+                                        {g.sample.userId && <p className="text-secondary-500">User: <span className="text-secondary-300 font-jetbrains">{g.sample.userId}</span></p>}
                                         {g.sample.bodyKeys && g.sample.bodyKeys.length > 0 && (
-                                          <p className="text-secondary-500">Body keys: <span className="text-secondary-300 font-mono">{g.sample.bodyKeys.join(', ')}</span></p>
+                                          <p className="text-secondary-500">Body keys: <span className="text-secondary-300 font-jetbrains">{g.sample.bodyKeys.join(', ')}</span></p>
                                         )}
                                         {g.sample.userAgent && <p className="text-secondary-500 break-all">UA: <span className="text-secondary-400">{g.sample.userAgent.slice(0, 80)}{g.sample.userAgent.length > 80 ? '…' : ''}</span></p>}
                                       </div>
@@ -2822,8 +2832,8 @@ export function AdminCoreEngine() {
                                         <p className="text-secondary-500 uppercase tracking-wide text-[10px] font-semibold">Source Location</p>
                                         {g.source ? (
                                           <>
-                                            <p className="font-mono text-rose-400 break-all">{g.source}</p>
-                                            {g.fn && <p className="text-secondary-400">Function: <span className="font-mono text-white">{g.fn}</span></p>}
+                                            <p className="font-jetbrains text-rose-400 break-all">{g.source}</p>
+                                            {g.fn && <p className="text-secondary-400">Function: <span className="font-jetbrains text-white">{g.fn}</span></p>}
                                           </>
                                         ) : (
                                           <p className="text-secondary-600 italic">No source frame (external or built-in error)</p>
@@ -2843,7 +2853,7 @@ export function AdminCoreEngine() {
                                           </button>
                                         </div>
                                         <div className="rounded-lg bg-black/40 border border-secondary-800 overflow-x-auto max-h-64 overflow-y-auto">
-                                          <pre className="p-3 text-[10px] font-mono leading-relaxed">
+                                          <pre className="p-3 text-[10px] font-jetbrains leading-relaxed">
                                             {g.sample.stack.split('\n').map((line, i) => {
                                               const isAppLine = line.includes('/src/') && !line.includes('node_modules');
                                               return (
@@ -2897,9 +2907,9 @@ export function AdminCoreEngine() {
                                       <span className={`text-[9px] font-black px-2 py-1 rounded-md tracking-widest ${isCritical ? 'bg-rose-900/70 text-rose-200' : 'bg-amber-900/60 text-amber-200'}`}>
                                         {isCritical ? 'CRITICAL' : 'ERROR'}
                                       </span>
-                                      <span className={`text-[11px] font-bold font-mono px-1.5 py-0.5 rounded ${isCritical ? 'bg-rose-900/40 text-rose-400' : 'bg-amber-900/40 text-amber-400'}`}>{err.status}</span>
+                                      <span className={`text-[11px] font-bold font-jetbrains px-1.5 py-0.5 rounded ${isCritical ? 'bg-rose-900/40 text-rose-400' : 'bg-amber-900/40 text-amber-400'}`}>{err.status}</span>
                                       {err.count > 1 && (
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${err.count >= 10 ? 'bg-rose-900/50 text-rose-300' : 'bg-amber-900/40 text-amber-300'}`}>{err.count}×</span>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${err.count >= 10 ? 'bg-rose-900/50 text-rose-300' : 'bg-amber-900/40 text-amber-300'}`}>{err.count}×</span>
                                       )}
                                     </div>
 
@@ -2910,24 +2920,24 @@ export function AdminCoreEngine() {
 
                                       {/* Method + path */}
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${err.method === 'GET' ? 'bg-blue-900/50 text-blue-300' : err.method === 'POST' ? 'bg-emerald-900/50 text-emerald-300' : err.method === 'DELETE' ? 'bg-rose-900/50 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{err.method}</span>
-                                        <span className="font-mono text-xs text-secondary-300 truncate max-w-xs" title={err.path}>{err.path}</span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${err.method === 'GET' ? 'bg-blue-900/50 text-blue-300' : err.method === 'POST' ? 'bg-emerald-900/50 text-emerald-300' : err.method === 'DELETE' ? 'bg-rose-900/50 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{err.method}</span>
+                                        <span className="font-jetbrains text-xs text-secondary-300 truncate max-w-xs" title={err.path}>{err.path}</span>
                                       </div>
 
                                       {/* Source location — the key detail */}
                                       {err.source && (
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                           <span className="text-[9px] text-secondary-500 uppercase tracking-widest font-bold">📍 Source</span>
-                                          <span className="font-mono text-[11px] text-rose-400">{err.fn ? `${err.fn} @ ` : ''}{err.source}</span>
+                                          <span className="font-jetbrains text-[11px] text-rose-400">{err.fn ? `${err.fn} @ ` : ''}{err.source}</span>
                                         </div>
                                       )}
 
                                       {/* Context chips */}
                                       <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                                        <span className="text-secondary-500 font-mono">{new Date(err.ts).toLocaleString()}</span>
-                                        {err.ip && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono">{err.ip}</span>}
-                                        {err.tenantId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono" title={err.tenantId}>T:{err.tenantId.slice(0, 8)}</span>}
-                                        {err.userId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono" title={err.userId}>U:{err.userId.slice(0, 8)}</span>}
+                                        <span className="text-secondary-500 font-jetbrains">{new Date(err.ts).toLocaleString()}</span>
+                                        {err.ip && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-jetbrains">{err.ip}</span>}
+                                        {err.tenantId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-jetbrains" title={err.tenantId}>T:{err.tenantId.slice(0, 8)}</span>}
+                                        {err.userId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-jetbrains" title={err.userId}>U:{err.userId.slice(0, 8)}</span>}
                                         {err.bodyKeys && err.bodyKeys.length > 0 && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400">body: {err.bodyKeys.join(', ')}</span>}
                                       </div>
                                     </div>
@@ -2963,7 +2973,7 @@ export function AdminCoreEngine() {
                                       >Copy</button>
                                     </div>
                                     <div className="rounded-lg bg-black/50 border border-secondary-800 overflow-x-auto max-h-52 overflow-y-auto">
-                                      <pre className="p-3 text-[10px] font-mono leading-relaxed">
+                                      <pre className="p-3 text-[10px] font-jetbrains leading-relaxed">
                                         {err.stack.split('\n').map((line, i) => {
                                           const isAppLine = line.includes('/src/') && !line.includes('node_modules');
                                           return (
@@ -2991,7 +3001,7 @@ export function AdminCoreEngine() {
             {activeTab === "feedback" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                     <MessageSquare className="h-5 w-5 mr-2 text-amber-400" />
                     Tenant Feedback Inbox
                   </CardTitle>
@@ -3127,7 +3137,7 @@ export function AdminCoreEngine() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-xl font-bold flex items-center">
+                      <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                         <HandCoins className="h-5 w-5 mr-2 text-amber-400" />
                         Referral Partner Management
                       </CardTitle>
@@ -3190,7 +3200,7 @@ export function AdminCoreEngine() {
                             value={newPartnerCode}
                             onChange={(e) => setNewPartnerCode(e.target.value.toUpperCase())}
                             placeholder="ACME2026"
-                            className="h-8 text-xs bg-secondary-900 border-secondary-700 text-white font-mono"
+                            className="h-8 text-xs bg-secondary-900 border-secondary-700 text-white font-jetbrains"
                           />
                         </div>
                         <div>
@@ -3266,7 +3276,7 @@ export function AdminCoreEngine() {
                           <TableBody>
                             {referralPartners.map((p) => (
                               <TableRow key={p.id} className="border-secondary-800 hover:bg-secondary-800/40">
-                                <TableCell className="font-mono text-xs text-amber-400 font-semibold">{p.code}</TableCell>
+                                <TableCell className="font-jetbrains text-xs text-amber-400 font-semibold">{p.code}</TableCell>
                                 <TableCell className="text-xs text-secondary-200">{p.name}</TableCell>
                                 <TableCell className="text-xs text-secondary-300 text-right">{p.commissionRate}%</TableCell>
                                 <TableCell className="text-xs text-secondary-300 text-right">{p.tenantCount}</TableCell>
@@ -3373,7 +3383,7 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
   return (
     <Card className="bg-secondary-900 border-secondary-800 text-white">
       <CardHeader>
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
+        <CardTitle className="text-xl font-extrabold font-syne flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-red-500" />
           Emergency Stop
         </CardTitle>
