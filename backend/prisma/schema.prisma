@@ -85,6 +85,8 @@ model Tenant {
   // When true, stock is allowed to go negative and quantityOnHand may become
   // negative. Useful for businesses that fulfil before receiving stock.
   allowNegativeStock      Boolean   @default(false) @map("allow_negative_stock")
+  // Referral code used when this tenant signed up (links to ReferralPartner.code).
+  referralCode            String?   @map("referral_code")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
@@ -93,6 +95,7 @@ model Tenant {
   apiKeys     ApiKey[]
 
   @@index([acceptedTermsVersion, termsAcceptedAt])
+  @@index([referralCode])
   @@map("tenants")
 }
 
@@ -2405,4 +2408,17 @@ model MonthClose {
   @@unique([tenantId, year, month])
   @@index([tenantId])
   @@map("month_closes")
+}
+
+model ReferralPartner {
+  id             String   @id @default(uuid())
+  name           String
+  code           String   @unique
+  commissionRate Decimal  @default(10) @map("commission_rate") @db.Decimal(5, 2)
+  contacts       String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("referral_partners")
 }
