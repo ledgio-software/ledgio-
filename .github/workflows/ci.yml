@@ -47,6 +47,10 @@ jobs:
       JWT_SECRET: ci-only-jwt-secret-not-for-production
       BROADCAST_MASTER_SECRET: ci-only-broadcast-secret-not-for-production
       CREDENTIAL_ENCRYPTION_KEY: ci-only-credential-encryption-key-not-for-production
+      # Jest runs the entire test suite in a single Node process; the default
+      # heap (~1.5 GB) is not enough. 4 GB keeps the runner well within the
+      # 7 GB available on ubuntu-latest.
+      NODE_OPTIONS: '--max-old-space-size=4096'
 
     defaults:
       run:
