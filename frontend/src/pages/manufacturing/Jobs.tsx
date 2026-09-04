@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Briefcase, Plus, RefreshCw, AlertCircle, CheckCircle, ChevronDown, ChevronUp, DollarSign, Calendar, TrendingUp } from "lucide-react";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface JobCostLine {
   id: string;
@@ -103,7 +104,7 @@ export function Jobs() {
   };
 
   const handleComplete = async (jobId: string) => {
-    if (!confirm("Mark this job as Completed? A COGS journal will be posted.")) return;
+    if (!await confirm({ title: "Mark job as Completed?", description: "A COGS journal will be posted.", confirmLabel: "Complete", variant: "warning" })) return;
     try {
       await api.post(`/jobs/${jobId}/complete`);
       flash("Job completed."); fetchAll();
@@ -111,7 +112,7 @@ export function Jobs() {
   };
 
   const handleCancel = async (jobId: string) => {
-    if (!confirm("Cancel this job?")) return;
+    if (!await confirm({ title: "Cancel this job?", confirmLabel: "Cancel Job" })) return;
     try {
       await api.post(`/jobs/${jobId}/cancel`);
       flash("Job cancelled."); fetchAll();

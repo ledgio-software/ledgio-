@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface InterestPolicy {
   id: string;
@@ -115,7 +116,7 @@ export function InterestCharges() {
   };
 
   const handleVoid = async (id: string) => {
-    if (!confirm("Void this interest charge? This cannot be undone.")) return;
+    if (!await confirm({ title: "Void this interest charge?", description: "This cannot be undone.", confirmLabel: "Void" })) return;
     setVoidingId(id);
     try {
       await api.patch(`/interest-policy/charges/${id}/void`);

@@ -2,6 +2,33 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-04] - UX: Replace all window.confirm() calls with branded AlertDialog
+
+**What/Why:**
+The native browser `window.confirm()` dialog is unstyled, doesn't match the app theme, is blocked in some PWA/iframe contexts, and is inaccessible. Built a reusable `AlertDialog` component and an imperative `confirm()` function that drops in as a direct async replacement. Replaced all 23 native confirm calls across 15+ files.
+
+**Files Affected:**
+- `frontend/src/components/ui/AlertDialog.tsx` — new component using native `<dialog>` element; exports `AlertDialog` (declarative) and `confirm()` (imperative async function); variants: `danger` (red), `warning` (amber), `default`; backdrop click intentionally does not close (proper alert dialog UX); Cancel button gets initial focus; uses `role="alertdialog"` for accessibility
+- `frontend/src/pages/journals/JournalList.tsx` — replaced 2 confirms (post voucher, void entry)
+- `frontend/src/pages/payroll/PayrollRuns.tsx` — replaced 1 confirm (post payroll run)
+- `frontend/src/pages/manufacturing/Manufacturing.tsx` — replaced 1 confirm (cancel production order)
+- `frontend/src/pages/manufacturing/JobWorkOrders.tsx` — replaced 1 confirm (cancel work order)
+- `frontend/src/pages/manufacturing/Jobs.tsx` — replaced 2 confirms (complete job, cancel job)
+- `frontend/src/pages/salesorders/SalesOrders.tsx` — replaced 2 confirms (cancel order, convert to invoice)
+- `frontend/src/pages/costcentres/CostCategories.tsx` — replaced 1 confirm (delete category)
+- `frontend/src/pages/costcentres/CostCentres.tsx` — replaced 1 confirm (delete cost centre)
+- `frontend/src/pages/customers/Customers.tsx` — replaced 1 confirm (delete customer)
+- `frontend/src/pages/reports/InterestCharges.tsx` — replaced 1 confirm (void charge)
+- `frontend/src/pages/purchaseorders/PurchaseOrders.tsx` — replaced 1 confirm (cancel PO)
+- `frontend/src/pages/settings/PriceLists.tsx` — replaced 1 confirm (delete price list)
+- `frontend/src/pages/settings/VoucherClasses.tsx` — replaced 1 confirm (delete voucher class)
+- `frontend/src/pages/settings/ApiKeys.tsx` — replaced 1 confirm (revoke API key)
+- `frontend/src/pages/settings/Scenarios.tsx` — replaced 2 confirms (post all, delete scenario)
+- `frontend/src/pages/reports/MonthlySalesLedger.tsx` — replaced 1 confirm (save month-close snapshot)
+- `frontend/src/pages/team/TeamManagement.tsx` — replaced 2 confirms (reset password, remove member)
+
+---
+
 ## [Date: 2026-09-04] - UX: Auto-reload on reconnect + PWA update prompt
 
 **What/Why:**

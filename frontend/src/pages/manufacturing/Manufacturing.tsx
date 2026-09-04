@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface InventoryItem {
   id: string;
@@ -388,7 +389,7 @@ export function Manufacturing() {
   };
 
   const cancelOrder = async (order: ProductionOrder) => {
-    if (!confirm(`Cancel ${order.orderNumber}?`)) return;
+    if (!await confirm({ title: `Cancel ${order.orderNumber}?`, confirmLabel: "Cancel Order" })) return;
     setActionError(null);
     try {
       await api.put(`/manufacturing/production-orders/${order.id}/cancel`);

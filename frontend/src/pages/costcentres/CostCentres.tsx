@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface CostCentre {
   id: string;
@@ -129,7 +130,7 @@ export function CostCentres() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this cost centre? This cannot be undone.")) return;
+    if (!await confirm({ title: "Delete this cost centre?", description: "This cannot be undone.", confirmLabel: "Delete" })) return;
     try {
       await api.delete(`/cost-centres/${id}`);
       load();

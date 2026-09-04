@@ -7,6 +7,7 @@ import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
+import { confirm } from "../../components/ui/AlertDialog";
 import { usePresence } from "../../hooks/usePresence";
 import { UserPlus, Copy, Check, Mail, UserCheck, MapPin, Settings2, UserCog, UserMinus, KeyRound } from "lucide-react";
 
@@ -234,9 +235,7 @@ export function TeamManagement() {
   };
 
   const handleResetPassword = async (member: Member) => {
-    if (!window.confirm(`Reset the password for ${member.name} (${member.email})? A temporary password will be emailed to them.`)) {
-      return;
-    }
+    if (!await confirm({ title: `Reset password for ${member.name}?`, description: `A temporary password will be emailed to ${member.email}.`, confirmLabel: "Reset Password", variant: "warning" })) return;
     setResettingPasswordId(member.id);
     try {
       const res = await api.post(`/tenants/members/${member.id}/reset-password`);
@@ -255,9 +254,7 @@ export function TeamManagement() {
   };
 
   const handleRemoveMember = async (member: Member) => {
-    if (!window.confirm(`Remove ${member.name} (${member.email}) from this workspace? This frees up their email for reuse elsewhere and cannot be undone.`)) {
-      return;
-    }
+    if (!await confirm({ title: `Remove ${member.name} from workspace?`, description: "This frees up their email for reuse elsewhere and cannot be undone.", confirmLabel: "Remove" })) return;
     setRemovingId(member.id);
     try {
       const res = await api.delete(`/tenants/members/${member.id}`);

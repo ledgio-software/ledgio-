@@ -6,6 +6,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
+import { confirm } from "../../components/ui/AlertDialog";
 import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
 import { Plus, FileSpreadsheet, Trash2, Send, XCircle, ReceiptText, AlertTriangle, RefreshCcw } from "lucide-react";
@@ -178,7 +179,7 @@ export function PurchaseOrders() {
   };
 
   const handleCancel = async (po: PurchaseOrder) => {
-    if (!window.confirm(`Cancel ${po.poNumber}?`)) return;
+    if (!await confirm({ title: `Cancel ${po.poNumber}?`, confirmLabel: "Cancel PO" })) return;
     try {
       await api.put(`/purchase-orders/${po.id}/status`, { status: "CANCELLED" });
       showToast("Purchase Order cancelled.", "success");

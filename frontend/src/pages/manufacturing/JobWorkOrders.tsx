@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface WorkOrder {
   id: string;
@@ -88,7 +89,7 @@ export function JobWorkOrders() {
   }
 
   async function handleCancel(id: string) {
-    if (!confirm("Cancel this work order?")) return;
+    if (!await confirm({ title: "Cancel this work order?", confirmLabel: "Cancel Order" })) return;
     try {
       await api.patch(`/job-work-orders/${id}/cancel`);
       await load();

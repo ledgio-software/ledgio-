@@ -7,6 +7,7 @@ import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
+import { confirm } from "../../components/ui/AlertDialog";
 import {
   Table,
   TableBody,
@@ -32,7 +33,7 @@ export function JournalList() {
   }, [journals]);
 
   const handlePost = async (id: string, entryLabel: string) => {
-    if (!window.confirm(`Post journal voucher ${entryLabel} to the general ledger? Once posted it becomes a Journal Entry and can no longer be edited.`)) return;
+    if (!await confirm({ title: `Post ${entryLabel}?`, description: "Once posted it becomes a Journal Entry and can no longer be edited.", confirmLabel: "Post", variant: "warning" })) return;
     setPostingId(id);
     try {
       await postExistingJournal(id);
@@ -45,10 +46,7 @@ export function JournalList() {
   };
 
   const handleVoid = async (id: string, entryLabel: string, isPosted: boolean) => {
-    const confirmMessage = isPosted
-      ? `Void journal entry ${entryLabel}? It has already posted to the ledger, so a reversing entry will be created and posted to offset it. This cannot be undone.`
-      : `Void journal voucher ${entryLabel}? This cannot be undone.`;
-    if (!window.confirm(confirmMessage)) return;
+    if (!await confirm({ title: isPosted ? `Void posted entry ${entryLabel}?` : `Void voucher ${entryLabel}?`, description: isPosted ? "A reversing entry will be created and posted to offset it. This cannot be undone." : "This cannot be undone.", confirmLabel: "Void" })) return;
     setVoidingId(id);
     try {
       const result = await voidJournal(id);
