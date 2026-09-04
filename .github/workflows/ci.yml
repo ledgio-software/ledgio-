@@ -2,12 +2,15 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches-ignore:
+      - main  # main is covered by the migrate workflow; feature branches run CI on push
   pull_request:
-    branches: ['**']
+    branches:
+      - main
 
 jobs:
   backend:
+    name: Backend — typecheck / migrate / test
     runs-on: ubuntu-latest
 
     services:
@@ -38,8 +41,7 @@ jobs:
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/accounting_db?schema=public&connection_limit=50&pool_timeout=10&connect_timeout=5&statement_timeout=30000
-      # No external pooler in CI, so this just points at the same database as
-      # DATABASE_URL - see backend/prisma/schema.prisma's directUrl comment.
+      # No external pooler in CI — DIRECT_URL == DATABASE_URL (see schema.prisma comment).
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/accounting_db?schema=public&connection_limit=50&pool_timeout=10&connect_timeout=5&statement_timeout=30000
       REDIS_URL: redis://localhost:6379/0
       JWT_SECRET: ci-only-jwt-secret-not-for-production
@@ -62,7 +64,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: TypeScript type check
         run: npx tsc --noEmit -p .
 
       - name: Apply database migrations
@@ -72,6 +77,7 @@ jobs:
         run: npm test
 
   frontend:
+    name: Frontend — typecheck / build
     runs-on: ubuntu-latest
 
     defaults:
@@ -93,5 +99,5 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Type check & build
+      - name: TypeScript type check & Vite build
         run: npm run build
