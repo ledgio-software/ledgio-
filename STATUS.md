@@ -2,6 +2,21 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-04] - UX: Auto-reload on reconnect + PWA update prompt
+
+**What/Why:**
+Two UX improvements reported by users:
+1. After going offline and reconnecting, the app displayed stale data until the user manually refreshed. The `OfflineBanner` now detects reconnection (via `wasOfflineRef`) and auto-reloads after 1.5 s, showing a green "Back online — refreshing data…" banner with a spinner during the delay.
+2. Installed PWA users had to close and reopen the app to receive updates. Changed `registerType` from `'autoUpdate'` to `'prompt'` in vite.config.ts and created an `UpdatePrompt` component that surfaces a persistent banner ("A new version of Ledgio is available — Update now") whenever a new service worker is waiting; users can apply the update immediately or dismiss the banner.
+
+**Files Affected:**
+- `frontend/src/components/layout/OfflineBanner.tsx` — added `wasOfflineRef`, `reconnecting` state, green "Back online" banner, auto-reload on reconnect
+- `frontend/vite.config.ts` — changed `registerType: 'autoUpdate'` → `'prompt'`
+- `frontend/src/components/layout/UpdatePrompt.tsx` — new component; uses `useRegisterSW` from `virtual:pwa-register/react` to show update banner
+- `frontend/src/components/layout/MainLayout.tsx` — added `<UpdatePrompt />` above `<OfflineBanner />`
+
+---
+
 ## [Date: 2026-09-04] - Design: Apply AGOD Software Solution branding to Admin Control Engine
 
 **What/Why:**
