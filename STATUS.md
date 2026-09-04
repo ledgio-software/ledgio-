@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-04] - UI: Rebuild Modal.tsx on Radix UI Dialog primitives
+
+**What/Why:**
+Replaced the native `<dialog>`-based `Modal` component with one backed by `@radix-ui/react-dialog`. All 18 call sites across the app receive the upgrade automatically with no API changes. Benefits: proper portal rendering (avoids CSS stacking context / z-index bugs), automatic scroll-lock and focus-trap without manual `body.overflow` manipulation, keyboard navigation, and ARIA semantics (`aria-modal`, `aria-labelledby`, `aria-describedby`) supplied by the primitive. `preventEasyClose` behaviour is preserved: Escape and overlay-click are blocked via `onEscapeKeyDown`/`onInteractOutside` when set.
+
+**Files Affected:**
+- `frontend/package.json` / `frontend/package-lock.json` — added `@radix-ui/react-dialog@^1.1.23`
+- `frontend/src/components/ui/Modal.tsx` — rebuilt; same props interface (`isOpen`, `onClose`, `title`, `description`, `children`, `className`, `preventEasyClose`)
+
+---
+
 ## [Date: 2026-09-04] - UX: Replace all window.confirm() calls with branded AlertDialog
 
 **What/Why:**
