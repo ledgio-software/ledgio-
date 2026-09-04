@@ -1034,10 +1034,10 @@ export function AdminCoreEngine() {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex border-b border-secondary-800 space-x-6 text-sm font-semibold">
+            <div className="flex border-b border-secondary-800 gap-6 text-sm font-semibold overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-px">
               <button
                 onClick={() => setActiveTab("broadcast")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "broadcast" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1046,7 +1046,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("health")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "health" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1055,7 +1055,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("integrations")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "integrations" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1064,7 +1064,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("schemas")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "schemas" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1073,7 +1073,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("audit")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "audit" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1082,7 +1082,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("onboard")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "onboard" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1091,7 +1091,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("feedback")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "feedback" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1100,7 +1100,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("analytics")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "analytics" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1109,7 +1109,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("performance")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "performance" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1118,7 +1118,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("jobs")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "jobs" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1127,7 +1127,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("errors")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "errors" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1143,7 +1143,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("safety")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "safety" ? "border-red-500 text-red-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1152,7 +1152,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("referral")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "referral" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
