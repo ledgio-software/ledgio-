@@ -59,7 +59,10 @@ export function Register() {
     tenantSlug: "",
     baseCurrency: "GHS",
     orgType: "BUSINESS",
+    referralCode: "",
   });
+  const [referralStatus, setReferralStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle");
+  const [referralPartnerName, setReferralPartnerName] = useState("");
   // Tracks which profile card is highlighted — multiple cards share orgType=BUSINESS
   // so we can't use orgType alone to identify the selected card.
   const [selectedProfile, setSelectedProfile] = useState<string>("Retail Shop / Boutique");
@@ -98,11 +101,37 @@ export function Register() {
     }
   };
 
+  const validateReferralCode = async (code: string) => {
+    if (!code.trim()) {
+      setReferralStatus("idle");
+      setReferralPartnerName("");
+      return;
+    }
+    setReferralStatus("checking");
+    try {
+      const res = await api.post("/admin/referrals/verify", { code: code.trim().toUpperCase() });
+      if (res.data.valid) {
+        setReferralStatus("valid");
+        setReferralPartnerName(res.data.partnerName || "");
+      } else {
+        setReferralStatus("invalid");
+        setReferralPartnerName("");
+      }
+    } catch {
+      setReferralStatus("invalid");
+      setReferralPartnerName("");
+    }
+  };
+
   const handleAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!formData.email || !formData.password || !formData.adminName || !formData.phone || !formData.tenantName) {
       setError("Please fill in all required fields.");
+      return;
+    }
+    if (referralStatus === "invalid") {
+      setError("The referral code you entered is invalid. Please remove it or enter a valid one.");
       return;
     }
     setStep("tenant");
@@ -132,6 +161,7 @@ export function Register() {
         orgType: formData.orgType,
         termsAccepted: true,
         acceptedTermsVersion: "v1.0",
+        ...(formData.referralCode.trim() ? { referralCode: formData.referralCode.trim().toUpperCase() } : {}),
       });
 
       if (response.data.success) {
@@ -264,6 +294,40 @@ export function Register() {
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
+                </div>
+                <div>
+                  <label htmlFor="referralCode" className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">
+                    Referral Code <span className="text-secondary-400 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Input
+                      id="referralCode"
+                      type="text"
+                      placeholder="e.g. PARTNER-ABC123"
+                      value={formData.referralCode}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setFormData({ ...formData, referralCode: val });
+                        if (!val.trim()) { setReferralStatus("idle"); setReferralPartnerName(""); }
+                      }}
+                      onBlur={() => validateReferralCode(formData.referralCode)}
+                      className={
+                        referralStatus === "valid" ? "border-green-500 focus:ring-green-500" :
+                        referralStatus === "invalid" ? "border-red-400 focus:ring-red-400" : ""
+                      }
+                    />
+                  </div>
+                  {referralStatus === "checking" && (
+                    <p className="text-[11px] text-secondary-400 mt-1">Checking code...</p>
+                  )}
+                  {referralStatus === "valid" && (
+                    <p className="text-[11px] text-green-600 dark:text-green-400 mt-1">
+                      ✓ Valid referral from {referralPartnerName}
+                    </p>
+                  )}
+                  {referralStatus === "invalid" && (
+                    <p className="text-[11px] text-red-500 mt-1">Invalid or inactive referral code.</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full">
                   Continue

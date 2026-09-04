@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-04] - Feature: Wire referral code into signup flow
+
+**What/Why:**
+Referral partners now get credit when a new business signs up using their referral code. The optional "Referral Code" field on the Register page validates the code on blur via `POST /api/v1/admin/referrals/verify` (no auth required), shows live feedback (valid/invalid), and blocks Continue if the code is present but invalid. On submit the code is passed to `POST /api/v1/tenants/onboard`, which validates the code server-side against the `referralPartner` table and writes it to the new tenant record.
+
+**Files Affected:**
+- `backend/src/services/tenantService.ts` — added `referralCode?: string` to `OnboardTenantDTO`; validate code against `referralPartner` table before tenant creation; pass it to `createTenant`
+- `backend/src/repository/tenantRepository.ts` — added `referralCode?: string` to `CreateTenantData`; included in `prisma.tenant.create` call
+- `frontend/src/pages/auth/Register.tsx` — added optional referral code input to step "account"; live validation on blur; blocks Continue if code is entered but invalid; included in onboard POST payload
+
+---
+
 ## [Date: 2026-09-03] - Bug fix: Approve/Reject buttons on Expense Claims showed no loading feedback
 
 **What/Why:**
