@@ -7,7 +7,6 @@ import { FeedbackWidget } from "../FeedbackWidget";
 import { SubscriptionBanner } from "../SubscriptionBanner";
 import { SubscriptionWall } from "../SubscriptionWall";
 import { OfflineBanner } from "./OfflineBanner";
-import { UpdatePrompt } from "./UpdatePrompt";
 import { WorkspaceModeProvider } from "../../contexts/WorkspaceModeContext";
 import { api } from "../../lib/api";
 
@@ -32,7 +31,6 @@ export function MainLayout({ children }: { children: ReactNode }) {
         <Sidebar />
         <div className="flex flex-col flex-1 w-0 overflow-hidden">
           <Header />
-          <UpdatePrompt />
           <OfflineBanner />
           <SubscriptionBanner />
           <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
