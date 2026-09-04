@@ -8,6 +8,7 @@ import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/utils";
+import { confirm } from "../../components/ui/AlertDialog";
 import {
   Plus, Edit2, Trash2, X, Users, Phone, Mail, MapPin,
   CreditCard, FileText, ChevronRight, Loader2,
@@ -168,7 +169,7 @@ export function Customers() {
   }
 
   async function handleDelete(c: Customer) {
-    if (!window.confirm(`Delete customer "${c.name}"? This cannot be undone.`)) return;
+    if (!await confirm({ title: `Delete "${c.name}"?`, description: "This cannot be undone.", confirmLabel: "Delete" })) return;
     try {
       await api.delete(`/invoices/customers/${c.id}`);
       showToast("Customer deleted.", "success");

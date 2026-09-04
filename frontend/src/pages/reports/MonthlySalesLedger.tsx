@@ -6,6 +6,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/Card";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -134,7 +135,7 @@ export function MonthlySalesLedger() {
   }, [fetchCloses]);
 
   const handleClose = async () => {
-    if (!window.confirm(`Save records for ${MONTH_NAMES[month - 1]} ${year}? This creates a permanent snapshot.`)) return;
+    if (!await confirm({ title: `Save records for ${MONTH_NAMES[month - 1]} ${year}?`, description: "This creates a permanent snapshot.", confirmLabel: "Save Records", variant: "warning" })) return;
     setIsClosing(true);
     setMessage(null);
     try {

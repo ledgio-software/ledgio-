@@ -5,6 +5,7 @@ import { Input } from "../../components/ui/Input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/Card";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
+import { confirm } from "../../components/ui/AlertDialog";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
 
@@ -75,7 +76,7 @@ export function ApiKeys() {
   };
 
   const handleRevoke = async (id: string, name: string) => {
-    if (!confirm(`Revoke API key "${name}"? Any system using this key will immediately lose access.`)) return;
+    if (!await confirm({ title: `Revoke API key "${name}"?`, description: "Any system using this key will immediately lose access.", confirmLabel: "Revoke" })) return;
     setRevokingId(id);
     try {
       await api.delete(`/api-keys/${id}`);

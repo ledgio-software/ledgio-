@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface VoucherClass {
   id: string;
@@ -94,7 +95,7 @@ export function VoucherClasses() {
   }
 
   async function handleDelete(vc: VoucherClass) {
-    if (!confirm(`Delete voucher class "${vc.name}"?`)) return;
+    if (!await confirm({ title: `Delete voucher class "${vc.name}"?`, confirmLabel: "Delete" })) return;
     try {
       await api.delete(`/voucher-classes/${vc.id}`);
       await load();

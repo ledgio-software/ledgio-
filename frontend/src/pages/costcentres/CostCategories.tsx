@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface CostCategory {
   id: string;
@@ -70,7 +71,7 @@ export function CostCategories() {
   }
 
   async function handleDelete(cat: CostCategory) {
-    if (!confirm(`Delete cost category "${cat.name}"?`)) return;
+    if (!await confirm({ title: `Delete "${cat.name}"?`, description: "This cost category will be permanently deleted.", confirmLabel: "Delete" })) return;
     try {
       await api.delete(`/cost-categories/${cat.id}`);
       await load();

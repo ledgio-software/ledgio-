@@ -5,6 +5,7 @@ import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { BadgeDollarSign, Plus, ChevronDown, ChevronUp, CheckCircle, Download } from "lucide-react";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface Payslip {
   id: string;
@@ -114,7 +115,7 @@ export function PayrollRuns() {
   }
 
   async function handlePost(run: PayrollRun) {
-    if (!window.confirm(`Post payroll run ${run.runNumber}? This will create an irreversible journal entry.`)) return;
+    if (!await confirm({ title: `Post payroll run ${run.runNumber}?`, description: "This will create an irreversible journal entry.", confirmLabel: "Post", variant: "warning" })) return;
     setPostingId(run.id);
     try {
       await api.post(`/payroll/runs/${run.id}/post`);
