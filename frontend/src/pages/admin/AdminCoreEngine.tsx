@@ -32,6 +32,7 @@ import {
   UserCheck,
   ChevronDown,
   ChevronRight,
+  HandCoins,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -62,7 +63,7 @@ export function AdminCoreEngine() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -83,6 +84,35 @@ export function AdminCoreEngine() {
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState("");
   const [feedbackTenantFilter, setFeedbackTenantFilter] = useState("");
   const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
+
+  // Referral Partners state
+  const [referralPartners, setReferralPartners] = useState<{
+    id: string;
+    name: string;
+    code: string;
+    commissionRate: number;
+    contacts: string | null;
+    isActive: boolean;
+    tenantCount: number;
+    totalMrr: number;
+    commissionDue: number;
+  }[] | null>(null);
+  const [referralStats, setReferralStats] = useState<{
+    totalPartners: number;
+    activePartners: number;
+    totalTenants: number;
+    totalMrr: number;
+    totalCommissionDue: number;
+  } | null>(null);
+  const [referralError, setReferralError] = useState<string | null>(null);
+  const [isLoadingReferral, setIsLoadingReferral] = useState(false);
+  const [showNewPartnerForm, setShowNewPartnerForm] = useState(false);
+  const [newPartnerName, setNewPartnerName] = useState("");
+  const [newPartnerCode, setNewPartnerCode] = useState("");
+  const [newPartnerRate, setNewPartnerRate] = useState("");
+  const [newPartnerContacts, setNewPartnerContacts] = useState("");
+  const [isSavingPartner, setIsSavingPartner] = useState(false);
+  const [togglingPartnerId, setTogglingPartnerId] = useState<string | null>(null);
 
   // Google Analytics State
   const [analyticsData, setAnalyticsData] = useState<{
@@ -625,6 +655,63 @@ export function AdminCoreEngine() {
     fetchFeedback();
   }, [isUnlocked, activeTab, feedbackCategoryFilter, feedbackStatusFilter, feedbackTenantFilter]);
 
+  const fetchReferralData = useCallback(() => {
+    setIsLoadingReferral(true);
+    setReferralError(null);
+    const headers = { 'x-admin-passcode': passcode };
+    return Promise.all([
+      api.get("/admin/referrals/partners", { headers }),
+      api.get("/admin/referrals/stats", { headers }),
+    ])
+      .then(([partnersRes, statsRes]) => {
+        setReferralPartners(partnersRes.data.data.partners ?? partnersRes.data.data);
+        setReferralStats(statsRes.data.data);
+      })
+      .catch(() => setReferralError("Failed to load referral data."))
+      .finally(() => setIsLoadingReferral(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "referral") return;
+    fetchReferralData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  const handleCreatePartner = async () => {
+    if (!newPartnerName.trim() || !newPartnerCode.trim() || !newPartnerRate) return;
+    setIsSavingPartner(true);
+    try {
+      await api.post("/admin/referrals/partners", {
+        name: newPartnerName.trim(),
+        code: newPartnerCode.trim().toUpperCase(),
+        commissionRate: parseFloat(newPartnerRate),
+        contacts: newPartnerContacts.trim() || undefined,
+      }, { headers: { 'x-admin-passcode': passcode } });
+      setShowNewPartnerForm(false);
+      setNewPartnerName("");
+      setNewPartnerCode("");
+      setNewPartnerRate("");
+      setNewPartnerContacts("");
+      fetchReferralData();
+    } catch (err: any) {
+      setReferralError(err.response?.data?.error || "Failed to create partner.");
+    } finally {
+      setIsSavingPartner(false);
+    }
+  };
+
+  const handleTogglePartner = async (id: string, isActive: boolean) => {
+    setTogglingPartnerId(id);
+    try {
+      await api.patch(`/admin/referrals/partners/${id}`, { isActive: !isActive }, { headers: { 'x-admin-passcode': passcode } });
+      setReferralPartners((prev) => prev?.map((p) => p.id === id ? { ...p, isActive: !isActive } : p) ?? null);
+    } catch {
+      setReferralError("Failed to update partner.");
+    } finally {
+      setTogglingPartnerId(null);
+    }
+  };
+
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
@@ -1052,6 +1139,15 @@ export function AdminCoreEngine() {
               >
                 <ShieldAlert className="h-4 w-4" />
                 <span>Safety</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("referral")}
+                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                  activeTab === "referral" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <HandCoins className="h-4 w-4" />
+                <span>Referrals</span>
               </button>
             </div>
 
@@ -3023,6 +3119,181 @@ export function AdminCoreEngine() {
             {/* Tab: Safety — Emergency Stop */}
             {activeTab === "safety" && (
               <EmergencyStopPanel passcode={passcode} />
+            )}
+
+            {/* Tab: Referral Partners */}
+            {activeTab === "referral" && (
+              <Card className="bg-secondary-900 border-secondary-800 text-white">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold flex items-center">
+                        <HandCoins className="h-5 w-5 mr-2 text-amber-400" />
+                        Referral Partner Management
+                      </CardTitle>
+                      <CardDescription className="text-secondary-400 text-xs mt-1">
+                        Track referral partners, commission rates, and revenue attributed per code.
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={fetchReferralData}
+                        className="h-8 px-3 rounded-lg bg-secondary-800 hover:bg-secondary-700 text-xs font-medium border border-secondary-700 transition-colors flex items-center gap-1"
+                      >
+                        <RefreshCw className="h-3 w-3" /> Refresh
+                      </button>
+                      <button
+                        onClick={() => setShowNewPartnerForm((v) => !v)}
+                        className="h-8 px-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-xs font-semibold text-white transition-colors"
+                      >
+                        + New Partner
+                      </button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  {/* Summary stats */}
+                  {referralStats && (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {[
+                        { label: "Total Partners", value: referralStats.totalPartners },
+                        { label: "Active", value: referralStats.activePartners },
+                        { label: "Tenants Referred", value: referralStats.totalTenants },
+                        { label: "Total MRR", value: `$${referralStats.totalMrr.toFixed(2)}` },
+                        { label: "Commission Due", value: `$${referralStats.totalCommissionDue.toFixed(2)}` },
+                      ].map((s) => (
+                        <div key={s.label} className="bg-secondary-800 rounded-lg p-3 border border-secondary-700">
+                          <p className="text-[10px] text-secondary-400 uppercase tracking-wide">{s.label}</p>
+                          <p className="text-lg font-bold text-amber-400 mt-0.5">{s.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* New partner form */}
+                  {showNewPartnerForm && (
+                    <div className="bg-secondary-800 border border-secondary-700 rounded-lg p-4 space-y-3">
+                      <p className="text-xs font-semibold text-secondary-300">New Referral Partner</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] text-secondary-400 block mb-1">Partner Name</label>
+                          <Input
+                            value={newPartnerName}
+                            onChange={(e) => setNewPartnerName(e.target.value)}
+                            placeholder="Acme Agency"
+                            className="h-8 text-xs bg-secondary-900 border-secondary-700 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-secondary-400 block mb-1">Referral Code</label>
+                          <Input
+                            value={newPartnerCode}
+                            onChange={(e) => setNewPartnerCode(e.target.value.toUpperCase())}
+                            placeholder="ACME2026"
+                            className="h-8 text-xs bg-secondary-900 border-secondary-700 text-white font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-secondary-400 block mb-1">Commission Rate (%)</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={newPartnerRate}
+                            onChange={(e) => setNewPartnerRate(e.target.value)}
+                            placeholder="10"
+                            className="h-8 text-xs bg-secondary-900 border-secondary-700 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-secondary-400 block mb-1">Contacts (optional)</label>
+                          <textarea
+                            value={newPartnerContacts}
+                            onChange={(e) => setNewPartnerContacts(e.target.value)}
+                            placeholder="email@partner.com, +1-555-0100"
+                            rows={1}
+                            className="w-full bg-secondary-900 border border-secondary-700 rounded px-3 py-1.5 text-xs text-white placeholder-secondary-500 resize-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleCreatePartner}
+                          disabled={isSavingPartner || !newPartnerName.trim() || !newPartnerCode.trim() || !newPartnerRate}
+                          className="px-4 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-xs font-semibold text-white disabled:opacity-50 transition-colors"
+                        >
+                          {isSavingPartner ? "Saving…" : "Create Partner"}
+                        </button>
+                        <button
+                          onClick={() => setShowNewPartnerForm(false)}
+                          className="px-4 py-1.5 rounded bg-secondary-700 hover:bg-secondary-600 text-xs font-medium transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isLoadingReferral && (
+                    <div className="flex items-center gap-2 text-secondary-400 text-sm py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading referral data…
+                    </div>
+                  )}
+                  {referralError && (
+                    <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                      {referralError}
+                    </div>
+                  )}
+
+                  {referralPartners !== null && !isLoadingReferral && (
+                    referralPartners.length === 0 ? (
+                      <p className="text-sm text-secondary-500 py-4">No referral partners yet. Create one above.</p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-secondary-800">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800">
+                              <TableHead className="text-secondary-400 text-xs">Code</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Partner Name</TableHead>
+                              <TableHead className="text-secondary-400 text-xs text-right">Commission %</TableHead>
+                              <TableHead className="text-secondary-400 text-xs text-right">Tenants</TableHead>
+                              <TableHead className="text-secondary-400 text-xs text-right">MRR</TableHead>
+                              <TableHead className="text-secondary-400 text-xs text-right">Due</TableHead>
+                              <TableHead className="text-secondary-400 text-xs text-center">Active</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {referralPartners.map((p) => (
+                              <TableRow key={p.id} className="border-secondary-800 hover:bg-secondary-800/40">
+                                <TableCell className="font-mono text-xs text-amber-400 font-semibold">{p.code}</TableCell>
+                                <TableCell className="text-xs text-secondary-200">{p.name}</TableCell>
+                                <TableCell className="text-xs text-secondary-300 text-right">{p.commissionRate}%</TableCell>
+                                <TableCell className="text-xs text-secondary-300 text-right">{p.tenantCount}</TableCell>
+                                <TableCell className="text-xs text-secondary-300 text-right">${p.totalMrr.toFixed(2)}</TableCell>
+                                <TableCell className="text-xs text-emerald-400 text-right font-semibold">${p.commissionDue.toFixed(2)}</TableCell>
+                                <TableCell className="text-center">
+                                  <button
+                                    onClick={() => handleTogglePartner(p.id, p.isActive)}
+                                    disabled={togglingPartnerId === p.id}
+                                    className={`text-[10px] font-bold rounded px-2 py-0.5 border transition-colors ${
+                                      p.isActive
+                                        ? "bg-emerald-950/60 text-emerald-400 border-emerald-800 hover:bg-emerald-950"
+                                        : "bg-secondary-800 text-secondary-500 border-secondary-700 hover:bg-secondary-700"
+                                    } disabled:opacity-50`}
+                                  >
+                                    {togglingPartnerId === p.id ? "…" : p.isActive ? "Active" : "Inactive"}
+                                  </button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )
+                  )}
+                </CardContent>
+              </Card>
             )}
           </div>
         )}
