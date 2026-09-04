@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-04] - Design: Apply AGOD Software Solution branding to Admin Control Engine
+
+**What/Why:**
+Updated the Admin Control Engine page to reflect the "AGOD Software Solution" brand identity. The redesign applied the AGOD design language — hexagonal brand mark, Syne display typeface, DM Sans body, JetBrains Mono for data/codes, amber-gold accent, deep navy ground — to replace the generic "Ledgio Core Control Engine" identity. All changes are cosmetic/typographic; no logic or API surface was altered.
+
+**Files Affected:**
+- `frontend/index.html` — added Syne (600/700/800), DM Sans (300/400/500/600), and JetBrains Mono (400/500) font faces via Google Fonts link
+- `frontend/src/index.css` — added `--font-syne`, `--font-dm-sans`, and `--font-jetbrains` custom font families to `@theme` block (generates Tailwind utilities `font-syne`, `font-dm-sans`, `font-jetbrains`)
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — replaced header "Ledgio Core Control Engine" + ShieldAlert icon with hexagonal "A" mark + "AGOD Control Engine" / "Software Solution · Admin" wordmark; replaced lock screen "Ledgio Core Engine Gate" with "AGOD Control Engine" title + hex mark; applied `font-syne` to all `CardTitle` section headings; replaced `font-mono` with `font-jetbrains` on all data/code elements
+
+---
+
 ## [Date: 2026-09-04] - Feature: Wire referral code into signup flow
 
 **What/Why:**
