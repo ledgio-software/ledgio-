@@ -5,7 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { api } from "../../lib/api";
-import { confirm } from "../../components/ui/AlertDialog";
+import { confirm as alertConfirm } from "../../components/ui/AlertDialog";
 
 interface SalesOrderLine {
   id: string;
@@ -147,7 +147,7 @@ export function SalesOrders() {
   };
 
   const cancel = async (id: string) => {
-    if (!await confirm({ title: "Cancel this sales order?", confirmLabel: "Cancel Order" })) return;
+    if (!await alertConfirm({ title: "Cancel this sales order?", confirmLabel: "Cancel Order" })) return;
     setActionLoading(id + "-cancel");
     try {
       await api.put(`/sales-orders/${id}/cancel`, {});
@@ -160,7 +160,7 @@ export function SalesOrders() {
   };
 
   const convertToInvoice = async (id: string) => {
-    if (!await confirm({ title: "Convert to invoice?", description: "This sales order will be converted to a customer invoice.", confirmLabel: "Convert", variant: "warning" })) return;
+    if (!await alertConfirm({ title: "Convert to invoice?", description: "This sales order will be converted to a customer invoice.", confirmLabel: "Convert", variant: "warning" })) return;
     setActionLoading(id + "-convert");
     try {
       await api.post(`/sales-orders/${id}/convert-to-invoice`, {});
