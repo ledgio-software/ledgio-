@@ -3169,8 +3169,8 @@ export function AdminCoreEngine() {
                         { label: "Total Partners", value: referralStats.totalPartners },
                         { label: "Active", value: referralStats.activePartners },
                         { label: "Tenants Referred", value: referralStats.totalTenants },
-                        { label: "Total MRR", value: `$${referralStats.totalMrr.toFixed(2)}` },
-                        { label: "Commission Due", value: `$${referralStats.totalCommissionDue.toFixed(2)}` },
+                        { label: "Total MRR", value: `GH₵${referralStats.totalMrr.toFixed(2)}` },
+                        { label: "Commission Due", value: `GH₵${referralStats.totalCommissionDue.toFixed(2)}` },
                       ].map((s) => (
                         <div key={s.label} className="bg-secondary-800 rounded-lg p-3 border border-secondary-700">
                           <p className="text-[10px] text-secondary-400 uppercase tracking-wide">{s.label}</p>
@@ -3280,8 +3280,8 @@ export function AdminCoreEngine() {
                                 <TableCell className="text-xs text-secondary-200">{p.name}</TableCell>
                                 <TableCell className="text-xs text-secondary-300 text-right">{p.commissionRate}%</TableCell>
                                 <TableCell className="text-xs text-secondary-300 text-right">{p.tenantCount}</TableCell>
-                                <TableCell className="text-xs text-secondary-300 text-right">${p.totalMrr.toFixed(2)}</TableCell>
-                                <TableCell className="text-xs text-emerald-400 text-right font-semibold">${p.commissionDue.toFixed(2)}</TableCell>
+                                <TableCell className="text-xs text-secondary-300 text-right">GH₵{p.totalMrr.toFixed(2)}</TableCell>
+                                <TableCell className="text-xs text-emerald-400 text-right font-semibold">GH₵{p.commissionDue.toFixed(2)}</TableCell>
                                 <TableCell className="text-center">
                                   <button
                                     onClick={() => handleTogglePartner(p.id, p.isActive)}
