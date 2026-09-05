@@ -23,6 +23,7 @@ const PLANS = [
 ];
 
 function SubscriptionTab() {
+  const { fetchSettings } = useTenantSettings();
   const [status, setStatus] = useState<{
     state: string; planName: string; tier: number; priceGhs: number;
     trialDaysRemaining: number | null; trialEndsAt: string | null; subscriptionPaidUntil: string | null;
@@ -31,6 +32,10 @@ function SubscriptionTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [pendingRef, setPendingRef] = useState<string | null>(null);
+  // Stored so the UI can render a direct link — window.open() inside async
+  // callbacks is treated as a popup and blocked by browsers, which prevents
+  // the Paystack checkout from loading and means USSD/MoMo is never triggered.
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -47,7 +52,7 @@ function SubscriptionTab() {
     try {
       const { data } = await api.post<any>("/subscription/initialize", { planTier: selectedTier });
       setPendingRef(data.reference);
-      window.open(data.authorizationUrl, "_blank", "noopener,noreferrer");
+      setPaymentUrl(data.authorizationUrl);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to start payment.");
     } finally { setIsLoading(false); }
@@ -60,6 +65,11 @@ function SubscriptionTab() {
       const { data } = await api.post<any>("/subscription/verify", { reference: pendingRef, planTier: selectedTier });
       setSuccessMsg(data.message);
       setPendingRef(null);
+      setPaymentUrl(null);
+      // Refresh the global tenant context so tier-gated pages (Analytics
+      // Dashboard, Purchase Orders, etc.) reflect the new plan immediately
+      // without requiring a full page reload.
+      await fetchSettings();
       api.get<any>("/subscription/status").then((r) => setStatus(r.data)).catch(() => {});
     } catch (err: any) {
       setVerifyError(err.response?.data?.error || "Could not verify. Please wait a moment and try again.");
@@ -161,17 +171,32 @@ function SubscriptionTab() {
 
           {!pendingRef ? (
             <Button onClick={handlePay} disabled={isLoading}>
-              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Opening payment…</> : <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {PLANS.find((p) => p.tier === selectedTier)?.priceGhs}/month</>}
+              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Preparing payment…</> : <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {PLANS.find((p) => p.tier === selectedTier)?.priceGhs}/month</>}
             </Button>
           ) : (
-            <div className="space-y-2">
-              <p className="text-sm text-secondary-600 dark:text-secondary-400">Complete payment in the Paystack tab that opened, then click below.</p>
+            <div className="space-y-3">
+              {paymentUrl && (
+                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-4 py-3">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Your payment session is ready.</p>
+                  <a
+                    href={paymentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4" aria-hidden />
+                    Open Paystack — Pay with Mobile Money or Card
+                  </a>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Supports MTN MoMo, AirtelTigo Cash, Telecel Cash, Visa &amp; Mastercard.</p>
+                </div>
+              )}
+              <p className="text-sm text-secondary-600 dark:text-secondary-400">After completing payment on Paystack, click below to activate your plan.</p>
               {verifyError && <p className="text-red-600 dark:text-red-400 text-sm">{verifyError}</p>}
               <div className="flex gap-2">
                 <Button onClick={handleVerify} disabled={isVerifying}>
                   {isVerifying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Verifying…</> : "I've completed payment"}
                 </Button>
-                <Button variant="outline" onClick={() => setPendingRef(null)}>Start over</Button>
+                <Button variant="outline" onClick={() => { setPendingRef(null); setPaymentUrl(null); }}>Start over</Button>
               </div>
             </div>
           )}
