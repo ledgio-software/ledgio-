@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Fix: Policy documents returning "not found on server" (wrong path)
+
+**What/Why:**
+
+All 4 legal documents (Terms & Conditions, Privacy Policy, SLA, Customization Policy) were returning "The requested policy document could not be found on the server." `legal.ts` resolved the docs folder as `path.resolve(__dirname, '../../../docs')`. From the compiled `dist/routes/` directory, `../../../` goes up 3 levels — past `dist/`, past `backend/`, landing at the project root where no `docs/` folder exists. The actual files are in `backend/docs/`. Fixed to `'../../docs'` which correctly resolves to `backend/docs/` from both `dist/routes/` (production) and `src/routes/` (ts-node development).
+
+**Files Affected:**
+- `backend/src/routes/legal.ts` — path changed from `'../../../docs'` to `'../../docs'`
+
+---
+
 ## [Date: 2026-09-05] - Feature: Keep-alive cron to prevent Render cold starts
 
 **What/Why:**

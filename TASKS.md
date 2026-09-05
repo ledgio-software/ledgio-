@@ -4,6 +4,7 @@ This file lists the development tasks for the Multi-Tenant Web-Based Accounting 
 
 ## Bug Fixes & Features (2026-09-05)
 
+- [x] **Fix: Policy documents returning "not found on server"** (2026-09-05) — `legal.ts` resolved docs path with `'../../../docs'` which overshoots `backend/` and lands at the project root (no `docs/` there). Changed to `'../../docs'` — correctly reaches `backend/docs/` from both compiled `dist/routes/` and ts-node `src/routes/`. All 4 policy documents now load. (`backend/src/routes/legal.ts`)
 - [x] **Feature: Keep-alive cron to prevent Render cold starts** (2026-09-05) — Backend spinning down after inactivity caused Paystack MoMo USSD prompts to arrive too late, resulting in "Connection problem or invalid MMI code". Added `KeepAliveCronService` pinging `/health` every 10 min. (`backend/src/services/keepAliveCronService.ts`, `backend/src/index.ts`)
 - [x] **Fix: Onboard Client missing Plan Tier selector** (2026-09-05) — Every admin-onboarded tenant defaulted to tier 1 (Shop). Added a Plan Tier dropdown (default 3 = Enterprise) to the Onboard Client form; passes `tier` to the backend. Prevents the "fix tier separately after onboarding" workaround. (`frontend/src/pages/admin/AdminCoreEngine.tsx`)
 - [x] **Fix: Employees page hides tier-403 error message** (2026-09-05) — `fetchEmployees` caught all errors with a generic toast, masking the "Payroll requires Business plan or higher" message. Now checks `upgradeRequired` flag and shows the real backend error. (`frontend/src/pages/payroll/Employees.tsx`)
