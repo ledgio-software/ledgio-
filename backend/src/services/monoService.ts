@@ -61,6 +61,7 @@ export async function exchangeCodeForAccountId(code: string): Promise<string> {
           'Content-Type': 'application/json',
           accept: 'application/json',
         },
+        timeout: 15_000,
       }
     );
     return response.data.id;
@@ -80,6 +81,7 @@ export async function getAccountDetails(monoAccountId: string): Promise<MonoAcco
   try {
     const response = await axios.get(`${MONO_API_BASE}/v2/accounts/${monoAccountId}`, {
       headers: { 'mono-sec-key': secretKey() },
+      timeout: 15_000,
     });
     const account = response.data.account || response.data;
     return {
@@ -116,6 +118,7 @@ export async function getTransactions(
     const response = await axios.get(`${MONO_API_BASE}/v2/accounts/${monoAccountId}/transactions`, {
       headers: { 'mono-sec-key': secretKey() },
       params,
+      timeout: 20_000,
     });
 
     const rawTransactions = response.data.data || response.data.transactions || [];
