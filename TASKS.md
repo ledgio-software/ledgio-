@@ -2,6 +2,13 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes & Features (2026-09-05)
+
+- [x] **Fix: Paystack USSD/MoMo never triggered on subscription** (2026-09-05) — `window.open(authorizationUrl)` inside an `async` callback is popup-blocked by all browsers. Fixed by storing the URL in `paymentUrl` state and rendering a direct `<a href>` link. User-initiated link clicks are never blocked. (`frontend/src/pages/settings/Settings.tsx`)
+- [x] **Fix: Business/Enterprise earnings (Analytics) not showing after subscription** (2026-09-05) — `handleVerify` success updated only local state, leaving `TenantSettingsContext.settings.tier` stale. All tier-gated pages (Analytics Dashboard, Purchase Orders, Budgets, etc.) showed `UpgradeRequired` until a hard reload. Fixed by calling `await fetchSettings()` after verify success. (`frontend/src/pages/settings/Settings.tsx`)
+- [x] **Fix: `UpgradeRequired` CTA pointed at support instead of billing** (2026-09-05) — Component still said "Contact support to upgrade your plan." Replaced with an "Upgrade plan" button linking to `/settings?tab=subscription`. (`frontend/src/components/UpgradeRequired.tsx`)
+- [x] **Fix: Paystack checkout missing explicit channels** (2026-09-05) — `initializeTransaction` now passes `channels: ['mobile_money', 'card']` so MTN/AirtelTigo/Telecel Cash and card are the prominent options on the Paystack checkout page. (`backend/src/services/paystackService.ts`)
+
 ## Bug Fixes & Features (2026-09-01) — Monthly Sales Ledger
 
 - [x] **Feature: Monthly Sales Ledger + Month-End Close + Performance Ranking** (2026-09-01) — Built 4 reconciliation features. New Prisma model `MonthClose` + migration. New service `monthlySalesLedgerService.ts` (getMonthlySalesLedger, closeMonth, getMonthCloses). New backend routes: `GET /reports/monthly-sales-ledger`, `POST /reports/month-close`, `GET /reports/month-closes`. New frontend page `MonthlySalesLedger.tsx`: day-by-day expandable ledger showing every POS and AR transaction with full line items (product, qty, price), customer/company name, payment method; "Save Records" button for month-end snapshot; top products table; month performance ranking by revenue with rank badges and month-over-month comparison.

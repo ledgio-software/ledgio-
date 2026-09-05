@@ -2,6 +2,26 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Fix: Paystack USSD popup-blocked + tier not refreshed after upgrade + UpgradeRequired CTA + Paystack channels
+
+**What/Why:**
+Three fixes shipped in one pass:
+
+1. **Paystack USSD/MoMo never triggered (PR #15):** `window.open(authorizationUrl, "_blank")` inside an `async` function (after `await`) is treated as an unauthorized popup by every major browser and silently blocked — the Paystack checkout page never loaded, so USSD/Mobile Money prompts never reached the user. Fixed by storing `authorizationUrl` in `paymentUrl` state and rendering a direct `<a href={paymentUrl}>` link that the user clicks themselves. User-initiated link clicks are never popup-blocked.
+
+2. **Tier not refreshed after subscription (PR #15):** `handleVerify` success only updated local `status` state, not `TenantSettingsContext.settings.tier`. All tier-gated pages (Analytics Dashboard = "earnings", Purchase Orders, Budgets, etc.) still showed `UpgradeRequired` until a hard page reload. Fixed by calling `await fetchSettings()` (from `useTenantSettings()`) in the verify success path so the global tier context updates immediately.
+
+3. **`UpgradeRequired` stale CTA:** Component still said "Contact support to upgrade your plan" — written before self-serve billing existed. Replaced with an "Upgrade plan" button that links to `/settings?tab=subscription` (Settings already reads `?tab` via `useSearchParams`).
+
+4. **Paystack channels:** `initializeTransaction` now explicitly passes `channels: ['mobile_money', 'card']` to Paystack's `/transaction/initialize`. Without this, Paystack defaults to all channels including bank transfer, which is rarely what a Ghanaian SME wants; being explicit makes MoMo (MTN/AirtelTigo/Telecel Cash) and card the prominent options on the Paystack checkout page.
+
+**Files Affected:**
+- `frontend/src/pages/settings/Settings.tsx` (items 1 & 2)
+- `frontend/src/components/UpgradeRequired.tsx` (item 3)
+- `backend/src/services/paystackService.ts` (item 4)
+
+---
+
 ## [Date: 2026-09-04] - UI: Rebuild Modal.tsx on Radix UI Dialog primitives
 
 **What/Why:**

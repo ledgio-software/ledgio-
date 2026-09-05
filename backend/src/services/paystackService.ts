@@ -212,6 +212,7 @@ export async function initializeTransaction(input: PaystackInitializeInput): Pro
         currency: input.currency,
         reference: input.reference,
         callback_url: input.callbackUrl,
+        channels: ['mobile_money', 'card'],
         ...(input.subaccountCode && { subaccount: input.subaccountCode }),
       },
       { headers: { Authorization: authHeader(), 'Content-Type': 'application/json' } }
