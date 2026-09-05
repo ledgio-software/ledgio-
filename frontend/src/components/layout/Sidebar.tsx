@@ -66,6 +66,7 @@ export function Sidebar() {
     user?.orgType,
     isRestricted ? "professional" : effectiveMode,
     tier,
+    settings?.posEnabled !== false,
   );
 
   function handleModeClick(m: WorkspaceMode) {

@@ -2,6 +2,47 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Feature: Per-tenant POS toggle
+
+**What/Why:**
+Businesses that never use a cash till (consultancies, law firms, accounting practices, NGOs billed by invoice) complained about the Point of Sale link cluttering their sidebar. Added a `posEnabled` boolean on the `Tenant` model (default `true`) so an Admin can hide POS in one click from Settings → Regional & Preferences. Hiding it removes the nav link from the sidebar, Cmd+K, and mobile bottom nav — but never deletes any till data.
+
+NONPROFIT tenants already had POS hidden via `orgType` gating; this toggle is for BUSINESS tenants that want the same result without changing their org type.
+
+**Files Affected:**
+- `backend/prisma/schema.prisma` — `posEnabled Boolean @default(true)`
+- `backend/prisma/migrations/20260905000001_add_pos_enabled/migration.sql`
+- `backend/src/routes/tenants.ts` — accept + persist `posEnabled` in `PUT /tenants/current`; returned automatically via `sanitizeTenantForResponse` spread
+- `frontend/src/types/tenant.ts` — `posEnabled: boolean` field
+- `frontend/src/contexts/TenantSettingsContext.tsx` — default + fetch mapping
+- `frontend/src/lib/navigation.ts` — `getVisibleNavGroups` accepts `posEnabled` param, filters `/pos` when false
+- `frontend/src/components/layout/Sidebar.tsx` — passes `settings.posEnabled`
+- `frontend/src/components/layout/MobileBottomNav.tsx` — imports `useTenantSettings`, passes `posEnabled`
+- `frontend/src/components/ui/CommandMenu.tsx` — passes `posEnabled`
+- `frontend/src/pages/settings/Settings.tsx` — "Point of Sale" toggle in Regional & Preferences
+
+---
+
+## [Date: 2026-09-05] - Fix: Paystack USSD popup-blocked + tier not refreshed after upgrade + UpgradeRequired CTA + Paystack channels
+
+**What/Why:**
+Three fixes shipped in one pass:
+
+1. **Paystack USSD/MoMo never triggered (PR #15):** `window.open(authorizationUrl, "_blank")` inside an `async` function (after `await`) is treated as an unauthorized popup by every major browser and silently blocked — the Paystack checkout page never loaded, so USSD/Mobile Money prompts never reached the user. Fixed by storing `authorizationUrl` in `paymentUrl` state and rendering a direct `<a href={paymentUrl}>` link that the user clicks themselves. User-initiated link clicks are never popup-blocked.
+
+2. **Tier not refreshed after subscription (PR #15):** `handleVerify` success only updated local `status` state, not `TenantSettingsContext.settings.tier`. All tier-gated pages (Analytics Dashboard = "earnings", Purchase Orders, Budgets, etc.) still showed `UpgradeRequired` until a hard page reload. Fixed by calling `await fetchSettings()` (from `useTenantSettings()`) in the verify success path so the global tier context updates immediately.
+
+3. **`UpgradeRequired` stale CTA:** Component still said "Contact support to upgrade your plan" — written before self-serve billing existed. Replaced with an "Upgrade plan" button that links to `/settings?tab=subscription` (Settings already reads `?tab` via `useSearchParams`).
+
+4. **Paystack channels:** `initializeTransaction` now explicitly passes `channels: ['mobile_money', 'card']` to Paystack's `/transaction/initialize`. Without this, Paystack defaults to all channels including bank transfer, which is rarely what a Ghanaian SME wants; being explicit makes MoMo (MTN/AirtelTigo/Telecel Cash) and card the prominent options on the Paystack checkout page.
+
+**Files Affected:**
+- `frontend/src/pages/settings/Settings.tsx` (items 1 & 2)
+- `frontend/src/components/UpgradeRequired.tsx` (item 3)
+- `backend/src/services/paystackService.ts` (item 4)
+
+---
+
 ## [Date: 2026-09-04] - UI: Rebuild Modal.tsx on Radix UI Dialog primitives
 
 **What/Why:**

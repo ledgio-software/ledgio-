@@ -1,4 +1,5 @@
 import { Lock } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "./ui/Card";
 import { TIER_NAMES, type TenantTier } from "../types/tenant";
 
@@ -11,9 +12,7 @@ interface UpgradeRequiredProps {
 // Shown instead of a gated page's real content when the tenant's plan
 // doesn't meet the feature's minimum tier - see requireTier() in
 // backend/src/middleware/tierEnforcementMiddleware.ts, the source of truth
-// this mirrors. No self-serve upgrade button yet (no billing integration) -
-// upgrading is a platform-admin action for now, so this points the user at
-// support rather than a payment flow that doesn't exist.
+// this mirrors.
 export function UpgradeRequired({ featureLabel, requiredTier, currentTier }: UpgradeRequiredProps) {
   return (
     <Card className="max-w-lg mx-auto mt-12">
@@ -28,9 +27,14 @@ export function UpgradeRequired({ featureLabel, requiredTier, currentTier }: Upg
           Your business is currently on the {TIER_NAMES[currentTier]} plan. Upgrading unlocks {featureLabel.toLowerCase()}
           {" "}and everything else on the {TIER_NAMES[requiredTier]} plan, with all your existing data carried over exactly as it is.
         </p>
-        <p className="mt-4 text-xs text-secondary-400 dark:text-secondary-500">
-          Contact support to upgrade your plan.
-        </p>
+        <div className="mt-4">
+          <Link
+            to="/settings?tab=subscription"
+            className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 transition-colors"
+          >
+            Upgrade plan
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
