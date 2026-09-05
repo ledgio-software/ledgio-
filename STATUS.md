@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Fix: Payroll run 500 (leave deduction SQL) + Reorder PO toast overflow
+
+**What/Why:**
+
+1. **Payroll run 500 error:** `computeUnpaidLeaveDeduction` in `leaveService.ts` had a SQL parameter binding bug — the function passed `[employeeId, null, periodStart, periodEnd]` as positional parameters but the SQL only referenced `$1`, `$3`, `$4` (skipping `$2`). Depending on the Prisma/pg driver version this causes a driver-level validation error when the parameter count doesn't match usage, surfacing as a generic 500 "Failed to create payroll run." during payroll run creation. Fixed by removing the stray `null` and renumbering: SQL now uses `$1`, `$2`, `$3` with all three referenced, params passed as `[employeeId, periodStart, periodEnd]`.
+
+2. **Reorder PO toast overflow:** The "Generate Reorder POs" handler in `PurchaseOrders.tsx` joined ALL skipped item names into a single toast string via `Array.join(", ")`. With 614 low-stock items having no preferred vendor, this produced a 6 000+ character unreadable message in the toast. Fixed to show the first 3 item names plus "and N more".
+
+**Files Affected:**
+- `backend/src/services/leaveService.ts` — `computeUnpaidLeaveDeduction` SQL renumbered ($3/$4 → $2/$3, `null` param removed)
+- `frontend/src/pages/purchaseorders/PurchaseOrders.tsx` — skipped-items toast truncated to 3 names + "and N more"
+
+---
+
 ## [Date: 2026-09-05] - Feature: Per-tenant POS toggle
 
 **What/Why:**
