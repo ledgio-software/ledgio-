@@ -58,8 +58,13 @@ export function Employees() {
     try {
       const res = await api.get(`/payroll/employees?activeOnly=${!showAll}`);
       setEmployees(res.data.data.employees || []);
-    } catch {
-      showToast("Failed to load employees.", "error");
+    } catch (err: any) {
+      const data = err?.response?.data;
+      if (data?.upgradeRequired) {
+        showToast(data.error || "Payroll requires a higher plan. Please upgrade.", "error");
+      } else {
+        showToast("Failed to load employees.", "error");
+      }
     } finally {
       setIsLoading(false);
     }

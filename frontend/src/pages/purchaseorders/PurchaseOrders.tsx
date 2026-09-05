@@ -237,8 +237,11 @@ export function PurchaseOrders() {
       if (res.data.success) {
         showToast(res.data.message, "success");
         if (res.data.data.skippedNoVendor.length > 0) {
+          const skipped = res.data.data.skippedNoVendor;
+          const preview = skipped.slice(0, 3).map((s: any) => s.itemName).join(", ");
+          const more = skipped.length > 3 ? ` and ${skipped.length - 3} more` : "";
           showToast(
-            `${res.data.data.skippedNoVendor.length} low-stock item(s) skipped - no preferred vendor set (${res.data.data.skippedNoVendor.map((s: any) => s.itemName).join(", ")}).`,
+            `${skipped.length} low-stock item(s) have no preferred vendor set — skipped. (${preview}${more})`,
             "error"
           );
         }
