@@ -48,13 +48,6 @@ describe('Ledgio System-Wide End-to-End API Integration Suite', () => {
       expect(res.body.status).toBe('healthy');
     });
 
-    it('GET /api/v1/legal/terms-and-conditions - should serve legal terms document', async () => {
-      const res = await request(app).get('/api/v1/legal/terms-and-conditions');
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.title).toContain('Terms');
-    });
-
     it('GET /api/v1/currency/rates - should return multi-currency exchange rates', async () => {
       const res = await request(app)
         .get('/api/v1/currency/rates')

@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ArrowLeft, FileText } from "lucide-react";
-import { api } from "../../lib/api";
 import { PublicHeader } from "../../components/layout/PublicHeader";
 import { PublicFooter } from "../../components/layout/PublicFooter";
 import { LEGAL_DOCS } from "../../lib/legalDocs";
@@ -76,20 +75,26 @@ export function LegalDocumentPage() {
     setTitle(null);
     setContent(null);
 
-    api
-      .get(`/legal/${policyName}`)
+    const doc = LEGAL_DOCS.find((d) => d.policyName === policyName);
+    if (!doc) {
+      setError("This legal document could not be found.");
+      setIsLoading(false);
+      return;
+    }
+
+    fetch(`/legal/${policyName}.md`)
       .then((res) => {
-        if (cancelled) return;
-        if (res.data.success) {
-          setTitle(res.data.title);
-          setContent(res.data.content);
-        } else {
-          setError("This legal document could not be loaded.");
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
       })
-      .catch((err) => {
+      .then((text) => {
         if (cancelled) return;
-        setError(err.response?.data?.message || "This legal document could not be found.");
+        setTitle(doc.title);
+        setContent(text);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError("This legal document could not be loaded.");
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
