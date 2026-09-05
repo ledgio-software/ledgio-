@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Fix: Employees page silently swallowing tier-403 error
+
+**What/Why:**
+
+`Employees.tsx` `fetchEmployees` caught all errors with a generic "Failed to load employees." toast, hiding the backend's actionable message when a tenant's tier is too low for Payroll (`requireTier(2, 'Payroll')` returns `{ upgradeRequired: true, error: "Payroll requires the Business plan or higher..." }`). HR users had no way to self-diagnose. Fixed the catch block to surface the real backend message when `upgradeRequired: true`.
+
+**Files Affected:**
+- `frontend/src/pages/payroll/Employees.tsx` — catch block now checks `err.response.data.upgradeRequired` and shows the actual error message
+
+---
+
 ## [Date: 2026-09-05] - Fix: Payroll run 500 (leave deduction SQL) + Reorder PO toast overflow
 
 **What/Why:**
