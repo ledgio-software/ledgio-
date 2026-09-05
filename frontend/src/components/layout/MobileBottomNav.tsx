@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspaceMode } from "../../contexts/WorkspaceModeContext";
+import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { getVisibleNavGroups, getVisibleHrefs } from "../../lib/navigation";
 
 // Preferred hrefs to pin in the bottom bar for users who have many nav items
@@ -30,13 +31,16 @@ export function MobileBottomNav() {
   const location = useLocation();
   const { user } = useAuth();
   const { mode } = useWorkspaceMode();
+  const { settings } = useTenantSettings();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isRestricted = getVisibleHrefs(user?.role) !== null;
   const visibleGroups = getVisibleNavGroups(
     user?.role,
     user?.orgType,
-    isRestricted ? "professional" : mode
+    isRestricted ? "professional" : mode,
+    1,
+    settings?.posEnabled !== false,
   );
   const allItems = visibleGroups.flatMap((g) => g.items);
 

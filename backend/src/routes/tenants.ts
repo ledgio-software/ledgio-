@@ -254,6 +254,7 @@ router.put('/current', authenticateJwt, tenantContextMiddleware, requireRole('Ad
       graSecurityKey,
       stockValuationMethod,
       allowNegativeStock,
+      posEnabled,
     } = req.body;
     const newName = (companyName || name || '').trim();
 
@@ -324,6 +325,7 @@ router.put('/current', authenticateJwt, tenantContextMiddleware, requireRole('Ad
             ? { stockValuationMethod }
             : {}),
           ...(allowNegativeStock !== undefined && { allowNegativeStock: Boolean(allowNegativeStock) }),
+          ...(posEnabled !== undefined && { posEnabled: Boolean(posEnabled) }),
         },
       });
 

@@ -43,6 +43,8 @@ export interface TenantSettings {
   paystackAccountName: string | null;
   paystackConfigured: boolean;
   tier: TenantTier;
+  // When false, the POS nav link and /pos route are hidden for this tenant.
+  posEnabled: boolean;
   updatedAt: string;
 }
 

@@ -357,6 +357,7 @@ export function getVisibleNavGroups(
   orgType?: string,
   mode: WorkspaceMode = 'professional',
   tier: number = 1,
+  posEnabled: boolean = true,
 ): NavGroup[] {
   // Filter groups restricted to a specific org type (e.g. PHARMACY section)
   let groups = navigationGroups.filter(
@@ -376,6 +377,18 @@ export function getVisibleNavGroups(
         return group;
       })
       .filter((group): group is NavGroup => group !== null);
+  }
+
+  // POS toggle: when posEnabled is false, hide /pos from BUSINESS tenants
+  // (NONPROFIT already removes it above via orgType gating).
+  if (!posEnabled && orgType !== "NONPROFIT") {
+    groups = groups
+      .map((group) =>
+        group.sectionTitle === "SALES & PURCHASES"
+          ? { ...group, items: group.items.filter((item) => item.href !== "/pos") }
+          : group
+      )
+      .filter((group) => group.items.length > 0);
   }
 
   // Plan tier gate: hide items that require a higher-tier plan.

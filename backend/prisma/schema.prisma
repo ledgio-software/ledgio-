@@ -85,6 +85,11 @@ model Tenant {
   // When true, stock is allowed to go negative and quantityOnHand may become
   // negative. Useful for businesses that fulfil before receiving stock.
   allowNegativeStock      Boolean   @default(false) @map("allow_negative_stock")
+  // When false, the POS nav item and /pos route are hidden for this tenant.
+  // Defaults to true (POS visible). NONPROFIT tenants already hide POS via
+  // orgType gating; this toggle lets a BUSINESS tenant (e.g. a law firm, a
+  // consulting practice) also turn it off without changing their orgType.
+  posEnabled              Boolean   @default(true) @map("pos_enabled")
   // Referral code used when this tenant signed up (links to ReferralPartner.code).
   referralCode            String?   @map("referral_code")
   createdAt               DateTime  @default(now()) @map("created_at")

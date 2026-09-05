@@ -2,6 +2,27 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Feature: Per-tenant POS toggle
+
+**What/Why:**
+Businesses that never use a cash till (consultancies, law firms, accounting practices, NGOs billed by invoice) complained about the Point of Sale link cluttering their sidebar. Added a `posEnabled` boolean on the `Tenant` model (default `true`) so an Admin can hide POS in one click from Settings → Regional & Preferences. Hiding it removes the nav link from the sidebar, Cmd+K, and mobile bottom nav — but never deletes any till data.
+
+NONPROFIT tenants already had POS hidden via `orgType` gating; this toggle is for BUSINESS tenants that want the same result without changing their org type.
+
+**Files Affected:**
+- `backend/prisma/schema.prisma` — `posEnabled Boolean @default(true)`
+- `backend/prisma/migrations/20260905000001_add_pos_enabled/migration.sql`
+- `backend/src/routes/tenants.ts` — accept + persist `posEnabled` in `PUT /tenants/current`; returned automatically via `sanitizeTenantForResponse` spread
+- `frontend/src/types/tenant.ts` — `posEnabled: boolean` field
+- `frontend/src/contexts/TenantSettingsContext.tsx` — default + fetch mapping
+- `frontend/src/lib/navigation.ts` — `getVisibleNavGroups` accepts `posEnabled` param, filters `/pos` when false
+- `frontend/src/components/layout/Sidebar.tsx` — passes `settings.posEnabled`
+- `frontend/src/components/layout/MobileBottomNav.tsx` — imports `useTenantSettings`, passes `posEnabled`
+- `frontend/src/components/ui/CommandMenu.tsx` — passes `posEnabled`
+- `frontend/src/pages/settings/Settings.tsx` — "Point of Sale" toggle in Regional & Preferences
+
+---
+
 ## [Date: 2026-09-05] - Fix: Paystack USSD popup-blocked + tier not refreshed after upgrade + UpgradeRequired CTA + Paystack channels
 
 **What/Why:**

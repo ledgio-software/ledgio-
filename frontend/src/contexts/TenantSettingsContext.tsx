@@ -21,6 +21,7 @@ const DEFAULT_TENANT: TenantSettings = {
   paystackAccountName: null,
   paystackConfigured: false,
   tier: 1,
+  posEnabled: true,
   updatedAt: new Date().toISOString()
 };
 
@@ -70,6 +71,7 @@ export function TenantSettingsProvider({ children }: { children: React.ReactNode
           paystackAccountName: t.paystackAccountName ?? null,
           paystackConfigured: Boolean(t.paystackConfigured),
           tier: t.tier ?? 1,
+          posEnabled: t.posEnabled !== false,
           updatedAt: t.updatedAt || new Date().toISOString(),
         });
       }

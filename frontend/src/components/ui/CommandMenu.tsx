@@ -76,7 +76,7 @@ export function CommandMenu() {
 
   // Same source of truth (role + workspace mode + tier filtering) as the sidebar, so
   // Cmd+K never offers a page the sidebar currently hides from this user.
-  const navGroups = getVisibleNavGroups(user?.role, user?.orgType, mode, settings.tier);
+  const navGroups = getVisibleNavGroups(user?.role, user?.orgType, mode, settings.tier, settings.posEnabled !== false);
   const canAccessSettings = getVisibleHrefs(user?.role) === null;
 
   const debouncedQuery = useDebounce(query, 280);

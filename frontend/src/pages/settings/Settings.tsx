@@ -222,6 +222,7 @@ export function Settings() {
     timezone: settings.timezone,
     stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
     allowNegativeStock: (settings as any).allowNegativeStock ?? false,
+    posEnabled: settings.posEnabled !== false,
   });
 
   const [smsData, setSmsData] = useState({
@@ -296,6 +297,7 @@ export function Settings() {
         timezone: settings.timezone,
         stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
         allowNegativeStock: (settings as any).allowNegativeStock ?? false,
+        posEnabled: settings.posEnabled !== false,
       });
       setSmsData((prev) => ({ ...prev, bossPhone: settings.bossPhone || "" }));
       setGraData((prev) => ({
@@ -784,6 +786,24 @@ export function Settings() {
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">
                   When enabled, invoices and POS sales can fulfil orders even when on-hand quantity is insufficient.
                   Useful for businesses that ship before receiving stock. Disable to enforce strict stock availability.
+                </p>
+              </div>
+
+              {/* Point of Sale */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-secondary-700 dark:text-secondary-300">Point of Sale</label>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={(regionalData as any).posEnabled !== false}
+                    onChange={(e) => setRegionalData({ ...regionalData, posEnabled: e.target.checked } as any)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Show Point of Sale in navigation</span>
+                </label>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Disable for businesses that do not use a cash till (e.g. consultancies, law firms, NGOs billed by invoice).
+                  Hides the POS link from the sidebar and Cmd+K. Your till data is not deleted.
                 </p>
               </div>
             </CardContent>
