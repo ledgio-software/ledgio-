@@ -110,9 +110,10 @@ export function Register() {
     setReferralStatus("checking");
     try {
       const res = await api.post("/admin/referrals/verify", { code: code.trim().toUpperCase() });
-      if (res.data.valid) {
+      const payload = res.data?.data ?? res.data;
+      if (payload?.valid) {
         setReferralStatus("valid");
-        setReferralPartnerName(res.data.partnerName || "");
+        setReferralPartnerName(payload.partnerName || "");
       } else {
         setReferralStatus("invalid");
         setReferralPartnerName("");

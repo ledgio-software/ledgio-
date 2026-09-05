@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Fix: Referral code always rejected as "invalid" during registration
+
+**What/Why:**
+
+`validateReferralCode` in `Register.tsx` read `res.data.valid` but the `/verify` endpoint wraps its response as `{ success, data: { valid, partnerName } }`. So `res.data.valid` was always `undefined` (falsy), sending every code to the `else` branch → `setReferralStatus("invalid")`. Fixed by normalising the response: `const payload = res.data?.data ?? res.data` before checking `payload.valid`. Valid codes (e.g. OK2026) now correctly show the green "✓ Valid referral from <partner>" message.
+
+**Files Affected:**
+- `frontend/src/pages/auth/Register.tsx` — unwrap nested `data` envelope before checking `valid`
+
+---
+
 ## [Date: 2026-09-05] - Fix: HTTP timeouts on all external API calls (Paystack, Mono, SMS, FX)
 
 **What/Why:**
