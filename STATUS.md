@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Feature: Keep-alive cron to prevent Render cold starts
+
+**What/Why:**
+
+Render's free/starter tier spins down the backend after ~15 minutes of inactivity. Cold starts take 30–60 seconds, which is long enough for Paystack USSD sessions (Mobile Money PIN prompts) to expire before the prompt arrives on the user's phone — causing "Connection problem or invalid MMI code" errors. Added a `KeepAliveCronService` that pings the server's own `/health` endpoint every 10 minutes to keep it warm. Uses the existing `BASE_URL` env var; falls back to localhost (no-op in test environments).
+
+**Files Affected:**
+- `backend/src/services/keepAliveCronService.ts` — new service, pings `/health` every 10 min via `node-cron`
+- `backend/src/index.ts` — registers and starts the keep-alive cron on server startup
+
+---
+
 ## [Date: 2026-09-05] - Fix: Onboard Client form missing Plan Tier selector
 
 **What/Why:**
