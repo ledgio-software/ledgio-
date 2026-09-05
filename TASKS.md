@@ -4,6 +4,7 @@ This file lists the development tasks for the Multi-Tenant Web-Based Accounting 
 
 ## Bug Fixes & Features (2026-09-05)
 
+- [x] **Fix: Onboard Client missing Plan Tier selector** (2026-09-05) — Every admin-onboarded tenant defaulted to tier 1 (Shop). Added a Plan Tier dropdown (default 3 = Enterprise) to the Onboard Client form; passes `tier` to the backend. Prevents the "fix tier separately after onboarding" workaround. (`frontend/src/pages/admin/AdminCoreEngine.tsx`)
 - [x] **Fix: Employees page hides tier-403 error message** (2026-09-05) — `fetchEmployees` caught all errors with a generic toast, masking the "Payroll requires Business plan or higher" message. Now checks `upgradeRequired` flag and shows the real backend error. (`frontend/src/pages/payroll/Employees.tsx`)
 - [x] **Fix: Payroll run 500 — leave deduction SQL parameter binding** (2026-09-05) — `computeUnpaidLeaveDeduction` passed `[employeeId, null, periodStart, periodEnd]` but SQL only referenced `$1, $3, $4`; the extra `null` caused a driver-level error during `createPayrollRun`. Fixed: removed stray `null`, renumbered SQL to `$1, $2, $3`. (`backend/src/services/leaveService.ts`)
 - [x] **Fix: Reorder PO toast showing 614 item names** (2026-09-05) — "Generate Reorder POs" toast joined all skipped item names into a single string; with 614 items this was unreadable. Now shows first 3 names + "and N more". (`frontend/src/pages/purchaseorders/PurchaseOrders.tsx`)

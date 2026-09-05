@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Fix: Onboard Client form missing Plan Tier selector
+
+**What/Why:**
+
+The Admin Core Engine's "Onboard Client" form had no way to set the plan tier when creating a contracted tenant — every onboarded tenant defaulted to tier 1 (Shop), requiring a second trip to "Tenant Schemas & Tiers" to set the real plan. `onboardTenant` already accepted a `tier` field; the fix simply exposes it in the UI. Default is 3 (Enterprise) since contracted clients are typically on the full plan.
+
+**Files Affected:**
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added `onboardTier` state (default 3), Plan Tier dropdown in the onboard form, passes `tier` in the API body, resets on success
+
+---
+
 ## [Date: 2026-09-05] - Fix: Employees page silently swallowing tier-403 error
 
 **What/Why:**
