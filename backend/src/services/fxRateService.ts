@@ -42,7 +42,7 @@ export async function getLatestRates(baseCurrency: string): Promise<Record<strin
   }
 
   try {
-    const response = await axios.get(`${FX_API_BASE}/${apiKey()}/latest/${baseCurrency}`);
+    const response = await axios.get(`${FX_API_BASE}/${apiKey()}/latest/${baseCurrency}`, { timeout: 10_000 });
     const rates = response.data?.conversion_rates;
     if (!rates || typeof rates !== 'object') {
       throw new FxRateServiceError('Unexpected response shape from FX rate provider.', 502);

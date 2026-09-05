@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const DEFAULT_BASE_URL = 'https://api.paystack.co';
+const PAYSTACK_TIMEOUT_MS = 15_000;
 
 export interface PaystackInitializeInput {
   email: string;
@@ -132,6 +133,7 @@ export async function listBanks(channel: PaystackSettlementChannel = 'ghipss'): 
     const response = await axios.get(`${baseUrl()}/bank`, {
       headers: { Authorization: authHeader() },
       params: { country: 'ghana', currency: 'GHS', type: channel, perPage: 100 },
+      timeout: PAYSTACK_TIMEOUT_MS,
     });
     const banks = response.data?.data || [];
     return banks.map((b: any) => ({ name: b.name, code: b.code }));
@@ -151,6 +153,7 @@ export async function resolveAccountNumber(accountNumber: string, bankCode: stri
     const response = await axios.get(`${baseUrl()}/bank/resolve`, {
       headers: { Authorization: authHeader() },
       params: { account_number: accountNumber, bank_code: bankCode },
+      timeout: PAYSTACK_TIMEOUT_MS,
     });
     const data = response.data?.data;
     return { accountNumber: data?.account_number || accountNumber, accountName: data?.account_name || '' };
@@ -179,7 +182,7 @@ export async function createSubaccount(input: PaystackSubaccountInput): Promise<
         account_number: input.accountNumber,
         percentage_charge: input.percentageCharge,
       },
-      { headers: { Authorization: authHeader(), 'Content-Type': 'application/json' } }
+      { headers: { Authorization: authHeader(), 'Content-Type': 'application/json' }, timeout: PAYSTACK_TIMEOUT_MS }
     );
     const data = response.data?.data;
     if (!data?.subaccount_code) {
@@ -215,7 +218,7 @@ export async function initializeTransaction(input: PaystackInitializeInput): Pro
         channels: ['mobile_money', 'card'],
         ...(input.subaccountCode && { subaccount: input.subaccountCode }),
       },
-      { headers: { Authorization: authHeader(), 'Content-Type': 'application/json' } }
+      { headers: { Authorization: authHeader(), 'Content-Type': 'application/json' }, timeout: PAYSTACK_TIMEOUT_MS }
     );
     const data = response.data?.data;
     if (!data?.authorization_url) {
@@ -241,6 +244,7 @@ export async function verifyTransaction(reference: string): Promise<PaystackVeri
   try {
     const response = await axios.get(`${baseUrl()}/transaction/verify/${encodeURIComponent(reference)}`, {
       headers: { Authorization: authHeader() },
+      timeout: PAYSTACK_TIMEOUT_MS,
     });
     const data = response.data?.data;
     const rawStatus = String(data?.status || '').toLowerCase();

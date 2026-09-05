@@ -2,6 +2,40 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Fix: HTTP timeouts on all external API calls (Paystack, Mono, SMS, FX)
+
+**What/Why:**
+
+System failure audit revealed that every `axios` call to external providers — Paystack (5 calls), Mono banking API (3 calls), Arkesel/mNotify SMS (2 calls), and ExchangeRate-API (1 call) — had no `timeout` configured. A hung external API would hold the worker indefinitely, eventually exhausting the server's connection pool and causing a full outage. Added explicit timeouts: 15 s for Paystack, 15–20 s for Mono (transactions need more), 10 s for SMS and FX rate fetches.
+
+**Files Affected:**
+- `backend/src/services/paystackService.ts` — `PAYSTACK_TIMEOUT_MS = 15_000` constant, applied to all 5 axios calls
+- `backend/src/services/monoService.ts` — 15 s on auth/account detail, 20 s on transactions
+- `backend/src/services/smsService.ts` — 10 s on Arkesel and mNotify posts
+- `backend/src/services/fxRateService.ts` — 10 s on ExchangeRate-API fetch
+
+---
+
+## [Date: 2026-09-05] - Move: Trust Center legal docs from backend API to frontend static files
+
+**What/Why:**
+
+The 4 policy documents (Terms & Conditions, Privacy Policy, SLA, Customization Policy) were served via a backend Express route (`GET /api/v1/legal/:policyName`) that read markdown files from `backend/docs/`. Moving them to `frontend/public/legal/` as static assets eliminates a backend round-trip for purely public, static content, simplifies the architecture (no API key or auth needed for legal docs), and makes the files instantly servable by the CDN/Vercel edge without touching the Node.js process.
+
+**Files Affected:**
+- `frontend/public/legal/terms-and-conditions.md` — moved from `backend/docs/`
+- `frontend/public/legal/privacy-policy.md` — moved from `backend/docs/`
+- `frontend/public/legal/sla.md` — moved from `backend/docs/`
+- `frontend/public/legal/customization-policy.md` — moved from `backend/docs/`
+- `frontend/src/pages/legal/LegalDocumentPage.tsx` — replaced `api.get()` with native `fetch('/legal/*.md')`
+- `frontend/src/lib/legalDocs.ts` — added `title` field to `LegalDocLink` interface
+- `backend/src/routes/legal.ts` — deleted
+- `backend/src/app.ts` — removed both `legalRouter` import and `app.use()` registrations
+- `backend/src/tests/allEndpoints.test.ts` — removed legal endpoint test case
+- `backend/src/tests/legalAndEnforcement.test.ts` — removed 5 legal API test cases
+
+---
+
 ## [Date: 2026-09-05] - Fix: Policy documents returning "not found on server" (wrong path)
 
 **What/Why:**

@@ -64,6 +64,7 @@ export class SmsService {
             headers: {
               'api-key': process.env.ARKESEL_API_KEY,
             },
+            timeout: 10_000,
           }
         );
         if (response.status >= 200 && response.status < 300) {
@@ -85,7 +86,8 @@ export class SmsService {
             sender: this.senderId,
             message: formattedMessage,
             is_schedule: false,
-          }
+          },
+          { timeout: 10_000 }
         );
         if (response.status >= 200 && response.status < 300) {
           console.log(`[SmsService] ✅ SMS sent with Sender ID "${this.senderId}" to ${cleanPhone} via mNotify.`);
