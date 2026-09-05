@@ -23,7 +23,6 @@ import reportsRouter from './routes/reports';
 import { requestLoggerMiddleware } from './middleware/requestLoggerMiddleware';
 import { metricsMiddleware } from './middleware/metricsMiddleware';
 import { apiRateLimiter } from './middleware/rateLimiterMiddleware';
-import legalRouter from './routes/legal';
 import customFieldsRouter from './routes/customFields';
 import auditLogsRouter from './routes/auditLogs';
 import importRouter from './routes/import';
@@ -292,10 +291,6 @@ app.use('/api/external/v1', externalApiRouter);
 
 // Migration admin endpoints
 app.use('/api/v1/admin/migrations', migrationsRouter);
-
-// Legal documents endpoints
-app.use('/api/legal', legalRouter);
-app.use('/api/v1/legal', legalRouter);
 
 // Custom fields endpoints (Tier 2 Customization Enforcement Showcase)
 app.use('/api/v1/custom-fields', customFieldsRouter);
