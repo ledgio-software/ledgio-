@@ -43,7 +43,7 @@ router.get('/:policyName', async (req: Request, res: Response): Promise<void> =>
   }
 
   // Resolve filepath to docs/ folder at the project root
-  const docsPath = path.resolve(__dirname, '../../../docs');
+  const docsPath = path.resolve(__dirname, '../../docs');
   const filePath = path.join(docsPath, policy.file);
 
   try {

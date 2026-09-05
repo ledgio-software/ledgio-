@@ -82,6 +82,11 @@ const startServer = async () => {
     GlReconciliationCronService.init();
     registerJob('GL Reconciliation', '30 2 * * *', 'Daily AR/AP subledger vs GL control account balance check', () => GlReconciliationCronService.runJob());
 
+    // Keep Render from spinning down: ping /health every 10 minutes
+    const { KeepAliveCronService } = require('./services/keepAliveCronService');
+    KeepAliveCronService.init();
+    registerJob('Keep-Alive Ping', '*/10 * * * *', 'Self-ping every 10 min to prevent Render cold starts');
+
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
     migrateCustomerPii().catch((err: unknown) => console.error('[CustomerPiiMigration] Backfill failed:', err));
