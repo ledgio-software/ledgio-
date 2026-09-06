@@ -2,6 +2,32 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Feature: Pharmacy pitch pack — patient registry, NHIS claims, drug interactions, SMS refill reminders
+
+**What/Why:**
+
+Built four pharmacy-specific features (PHARMACY org type only) to pitch the platform to pharmacy shops:
+
+1. **Drug interaction + allergy flags at point of fill** — `PrescriptionRegister.tsx` rewritten with client-side drug interaction checking (17 high-severity drug pairs relevant to Ghana pharmacies: warfarin combos, chloroquine/artemether, metronidazole/alcohol, etc.). When a patient is linked, known allergies are cross-checked against selected drugs and shown as a red `ShieldAlert` banner. Drug interactions show as amber/red `AlertTriangle` banners with HIGH/MODERATE severity. Both warnings appear in the form and in the detail modal.
+
+2. **NHIS claims processing** — New `GET /pharmacy/nhis-claims?from=&to=` endpoint returns all NHIS-billed prescriptions in a date range with patient NHIS card numbers and line items. New `NhisClaims.tsx` page shows summary cards (total Rxs, dispensed count, total claim value), a collapsible claims table, and one-click CSV export for submission to Ghana's NHIA.
+
+3. **SMS refill reminders** — New `POST /pharmacy/prescriptions/:id/send-refill-reminder` endpoint; uses existing `SmsService`. Bell icon button appears on dispensed prescriptions that have a patient phone number. Sends a formatted SMS listing prescribed drugs and the Rx number.
+
+4. **Patient registry with allergy profiles** — New `PharmacyPatient` Prisma model (phone, DOB, NHIS card number, allergies string[], chronic conditions). New `GET/POST /pharmacy/patients` and `PUT /pharmacy/patients/:id` endpoints. New `PharmacyPatients.tsx` page: live search by name/phone/NHIS, expandable allergy/condition view, modal form with common-allergy quick-toggles + custom entry. Prescriptions now link to patients (`patientId FK`), and `billingType` (CASH/NHIS/INSURANCE) is stored on each prescription.
+
+**Files Affected:**
+- `frontend/src/pages/pharmacy/PrescriptionRegister.tsx` — complete rewrite with DRUG_INTERACTIONS array, allergy/interaction banners, patient selector, billing type, SMS refill button
+- `frontend/src/pages/pharmacy/PharmacyPatients.tsx` — new patient registry page (created)
+- `frontend/src/pages/pharmacy/NhisClaims.tsx` — new NHIS claims report page (created)
+- `frontend/src/lib/navigation.ts` — added "Patient Registry" (`/pharmacy/patients`) and "NHIS Claims" (`/pharmacy/nhis-claims`) to PHARMACY nav section
+- `frontend/src/App.tsx` — added lazy imports + routes for `PharmacyPatients` and `NhisClaims`
+- `backend/src/routes/pharmacy.ts` — new patient CRUD, refill-reminder SMS, NHIS claims endpoints; updated prescription creation to accept billingType + patientId
+- `backend/prisma/schema.prisma` — new `PharmacyPatient` model; `billingType` + `patientId` FK added to `Prescription`
+- `backend/prisma/migrations/20260906000001_pharmacy_patient_registry/migration.sql` — creates `pharmacy_patients` table, adds columns to `prescriptions`
+
+---
+
 ## [Date: 2026-09-06] - Fix: Pharmacy bulk import missing Batch # and Expiry Date columns
 
 **What/Why:**
