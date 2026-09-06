@@ -2,6 +2,12 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Merged: PR #20 — Per-org-type nav filtering
+
+PR `ledgio-software/ledgio-#20` merged to `main`. Feature is live.
+
+---
+
 ## [Date: 2026-09-05] - Feature: Per-org-type nav filtering (RETAIL / WHOLESALE / SERVICE / CONSTRUCTION)
 
 **What/Why:**
