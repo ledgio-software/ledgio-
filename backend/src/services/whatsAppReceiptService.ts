@@ -38,20 +38,30 @@ function formatReceiptMessage(receipt: PosSaleReceipt): string {
   ].join('\n');
 }
 
+function normalizePhone(phone: string): string {
+  let p = phone.trim();
+  // Ghana: 10-digit number starting with 0 → +233XXXXXXXXX
+  if (/^0\d{9}$/.test(p)) {
+    p = '+233' + p.slice(1);
+  }
+  return p;
+}
+
 export async function sendWhatsAppReceipt(
   customerPhone: string,
   receipt: PosSaleReceipt
-): Promise<void> {
+): Promise<boolean> {
   if (!isConfigured()) {
     console.warn('[WhatsApp] Twilio not configured — skipping WhatsApp receipt.');
-    return;
+    return false;
   }
 
   const sid = process.env.TWILIO_ACCOUNT_SID!;
   const token = process.env.TWILIO_AUTH_TOKEN!;
   const from = process.env.TWILIO_WHATSAPP_FROM!; // e.g. whatsapp:+14155238886
 
-  const to = customerPhone.startsWith('whatsapp:') ? customerPhone : `whatsapp:${customerPhone}`;
+  const normalized = normalizePhone(customerPhone);
+  const to = normalized.startsWith('whatsapp:') ? normalized : `whatsapp:${normalized}`;
 
   try {
     await axios.post(
@@ -64,10 +74,13 @@ export async function sendWhatsAppReceipt(
       {
         auth: { username: sid, password: token },
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 8000,
       }
     );
     console.log(`[WhatsApp] Receipt sent to ${to} for ${receipt.receiptNo}`);
+    return true;
   } catch (err: any) {
     console.error(`[WhatsApp] Failed to send receipt to ${to}:`, err?.response?.data || err.message);
+    return false;
   }
 }

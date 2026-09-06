@@ -567,29 +567,35 @@ router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async 
       if (journalId) result.sale.journalId = journalId;
     }
 
-    // Fire-and-forget WhatsApp receipt if customer phone was provided
+    // Send WhatsApp receipt if customer phone was provided; await with a
+    // hard 10s ceiling so the response is never held indefinitely.
     const phone = result.sale.customerPhone || customerPhone;
+    let whatsappSent = false;
     if (phone && !result.replayed) {
       const { tenantName } = requireTenantContext();
-      sendWhatsAppReceipt(String(phone), {
-        receiptNo: result.sale.receiptNo,
-        businessName: tenantName || 'Store',
-        items: result.lines.map((l: any) => ({
-          name: l.itemName,
-          quantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice),
-          lineTotal: Number(l.lineTotal),
-        })),
-        totalAmount: result.totalAmount,
-        cashGiven: Number(cashGiven),
-        changeGiven: result.changeGiven,
-        dateTime: new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra' }),
-      });
+      const waTimeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000));
+      whatsappSent = await Promise.race([
+        sendWhatsAppReceipt(String(phone), {
+          receiptNo: result.sale.receiptNo,
+          businessName: tenantName || 'Store',
+          items: result.lines.map((l: any) => ({
+            name: l.itemName,
+            quantity: Number(l.quantity),
+            unitPrice: Number(l.unitPrice),
+            lineTotal: Number(l.lineTotal),
+          })),
+          totalAmount: result.totalAmount,
+          cashGiven: Number(cashGiven),
+          changeGiven: result.changeGiven,
+          dateTime: new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra' }),
+        }),
+        waTimeout,
+      ]);
     }
 
     const { tenantId: saleTenantId } = requireTenantContext();
     invalidateCachedList(saleTenantId, 'inventory-items').catch(() => {});
-    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: { ...result, warnings: (result as any).warnings || [] } });
+    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: { ...result, warnings: (result as any).warnings || [], whatsappSent } });
   } catch (error: any) {
     console.error('[CashTill] Error recording cash sale:', error);
     if (error instanceof WarehouseAccessError) {
@@ -919,23 +925,37 @@ router.get('/sales/:id/receipt.pdf', async (req: Request, res: Response): Promis
     // Divider
     doc.moveDown(0.3).moveTo(MARGIN, doc.y).lineTo(W - MARGIN, doc.y).lineWidth(0.5).stroke().moveDown(0.3);
 
-    // Line items
+    // Line items — use explicit X coordinates so long item names don't
+    // displace the Qty/Price/Total columns via PDFKit's continued chain.
     doc.fontSize(7).font('Helvetica-Bold');
     const QW = 22, PW = 38, TW = 38;
-    const DW = COL - QW - PW - TW;
+    const DW = COL - QW - PW - TW;   // ~104pt for item name
     const x0 = MARGIN;
-    doc.text('Item', x0, doc.y, { width: DW, continued: true });
-    doc.text('Qty', { width: QW, align: 'right', continued: true });
-    doc.text('Price', { width: PW, align: 'right', continued: true });
-    doc.text('Total', { width: TW, align: 'right' });
+    const x1 = x0 + DW;              // Qty column
+    const x2 = x1 + QW;              // Price column
+    const x3 = x2 + PW;              // Total column
 
+    const printRow = (name: string, qty: string, price: string, total: string) => {
+      const y = doc.y;
+      // Truncate name to fit the column width (avoid wrapping)
+      const maxChars = 20;
+      const label = name.length > maxChars ? name.substring(0, maxChars - 1) + '…' : name;
+      doc.text(label, x0, y, { width: DW, lineBreak: false });
+      doc.text(qty,   x1, y, { width: QW, align: 'right', lineBreak: false });
+      doc.text(price, x2, y, { width: PW, align: 'right', lineBreak: false });
+      doc.text(total, x3, y, { width: TW, align: 'right', lineBreak: false });
+      doc.moveDown(0.9);
+    };
+
+    printRow('Item', 'Qty', 'Price', 'Total');
     doc.font('Helvetica');
     for (const l of lines) {
-      const y = doc.y;
-      doc.text(l.itemName, x0, y, { width: DW, continued: true });
-      doc.text(String(l.quantity), { width: QW, align: 'right', continued: true });
-      doc.text(fmt(Number(l.unitPrice)), { width: PW, align: 'right', continued: true });
-      doc.text(fmt(Number(l.lineTotal)), { width: TW, align: 'right' });
+      printRow(
+        l.itemName,
+        String(l.quantity),
+        fmt(Number(l.unitPrice)),
+        fmt(Number(l.lineTotal)),
+      );
     }
 
     // Divider

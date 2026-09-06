@@ -481,6 +481,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), checkEmergencyStop, 
     let replayed = false;
     let syncSeq: bigint | null = null;
     let created: any;
+    let negativeStockWarnings: string[] = [];
     try {
       created = await withCurrentTenantDb(prisma, async (client) => {
         // Idempotency fast path - a retried offline-queued create (same
@@ -555,7 +556,12 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), checkEmergencyStop, 
             for (const line of stockLines) {
               const stock = stockByItemId.get(line.inventoryItemId) as any;
               if (allowNegStock) {
-                // When negative stock is allowed, deduct unconditionally
+                // When negative stock is allowed, deduct unconditionally but warn if it goes below zero
+                if (!stock || stock.quantityOnHand < line.quantity) {
+                  const item = itemsById.get(line.inventoryItemId) as any;
+                  const available = stock?.quantityOnHand ?? 0;
+                  negativeStockWarnings.push(`${item?.name || line.inventoryItemId}: selling ${line.quantity} but only ${available} on hand — stock will go negative.`);
+                }
                 await (client as any).warehouseStock.updateMany({
                   where: { id: stock?.id, ...(stock ? {} : { itemId: line.inventoryItemId, warehouseId }) },
                   data: { quantityOnHand: { decrement: line.quantity } },
@@ -752,7 +758,7 @@ router.post('/', requireRole('Accountant', 'Shop Manager'), checkEmergencyStop, 
       })();
     }
 
-    res.status(replayed ? 200 : 201).json({ success: true, message: 'Invoice created successfully', data: { invoice: created } });
+    res.status(replayed ? 200 : 201).json({ success: true, message: 'Invoice created successfully', data: { invoice: created }, ...(negativeStockWarnings.length > 0 ? { stockWarnings: negativeStockWarnings } : {}) });
   } catch (error: any) {
     console.error('[Invoices] Error creating invoice:', error);
     if (error instanceof InvoiceStockError) {

@@ -9,7 +9,8 @@ import { api } from "../../lib/api";
 import { formatMoney } from "../../lib/utils";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { Warehouse, Plus, ArrowRightLeft, AlertTriangle, Building, MapPin, Search, CheckCircle2, XCircle, Layers, Trash2, Download, SlidersHorizontal, History, Printer, ClipboardCheck } from "lucide-react";
+import { Warehouse, Plus, ArrowRightLeft, AlertTriangle, Building, MapPin, Search, CheckCircle2, XCircle, Layers, Trash2, Download, SlidersHorizontal, History, Printer, ClipboardCheck, Activity } from "lucide-react";
+import { StockMovement } from "../reports/StockMovement";
 
 interface StockAdjustment {
   id: string;
@@ -108,6 +109,7 @@ export function WarehouseManagement() {
   const { showToast } = useToast();
   const { user } = useAuth();
   const canCreateWarehouse = !WAREHOUSE_CREATE_RESTRICTED_ROLES.has((user?.role || "").toLowerCase().trim());
+  const [mainTab, setMainTab] = useState<'inventory' | 'movement'>('inventory');
   const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -679,14 +681,14 @@ export function WarehouseManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-secondary-900 dark:text-secondary-50">
-            Multi-Warehouse & Shop Inventory Logistics ("Godowns")
+            Inventory & Stock Management
           </h2>
           <p className="text-secondary-500 dark:text-secondary-400 mt-1">
-            Search stock across all shops, track low-stock items, and request instant inter-shop stock transfers.
+            Search stock across all shops, track low-stock items, and view all stock movements in and out.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {mainTab === 'inventory' && <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => openAdjustModal()} className="flex items-center">
             <SlidersHorizontal className="mr-2 h-4 w-4 text-primary-600" />
             Restock / Adjust Stock
@@ -713,9 +715,38 @@ export function WarehouseManagement() {
             <Layers className="mr-2 h-4 w-4" />
             Bulk Add Products
           </Button>
-        </div>
+        </div>}
       </div>
 
+      {/* Tab bar */}
+      <div className="flex border-b border-secondary-200 dark:border-secondary-700">
+        <button
+          onClick={() => setMainTab('inventory')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            mainTab === 'inventory'
+              ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+              : 'border-transparent text-secondary-500 hover:text-secondary-700 dark:hover:text-secondary-300'
+          }`}
+        >
+          <Warehouse className="h-4 w-4" />
+          Inventory & Warehouses
+        </button>
+        <button
+          onClick={() => setMainTab('movement')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            mainTab === 'movement'
+              ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+              : 'border-transparent text-secondary-500 hover:text-secondary-700 dark:hover:text-secondary-300'
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          Stock Movement (In / Out)
+        </button>
+      </div>
+
+      {mainTab === 'movement' && <StockMovement />}
+
+      {mainTab === 'inventory' && <>
       {/* Inter-Shop Stock Visibility & Communication Banner */}
       <div className="p-4 rounded-xl bg-gradient-to-r from-primary-900 to-secondary-900 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -945,6 +976,7 @@ export function WarehouseManagement() {
           )}
         </CardContent>
       </Card>
+      </>}
 
       {/* Add Warehouse / Shop Modal */}
       <Modal isOpen={isWarehouseModalOpen} onClose={() => setIsWarehouseModalOpen(false)} title="Add Warehouse / Shop Location">

@@ -51,6 +51,8 @@ export function Jobs() {
   const [form, setForm] = useState({ name: "", customerId: "", startDate: "", endDate: "", description: "", budget: "" });
   const [newLine, setNewLine] = useState({ type: "MATERIAL", description: "", quantity: "1", unitCost: "", accountId: "" });
   const [lineJobId, setLineJobId] = useState<string | null>(null);
+  const [addingLineForJob, setAddingLineForJob] = useState<string | null>(null);
+  const [completingJobId, setCompletingJobId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
@@ -89,26 +91,39 @@ export function Jobs() {
   };
 
   const handleAddLine = async (jobId: string) => {
+    if (addingLineForJob === jobId) return;
     const qty = parseFloat(newLine.quantity);
     const cost = parseFloat(newLine.unitCost);
     if (!newLine.description.trim() || isNaN(qty) || isNaN(cost)) { setError("Fill in description, quantity, and unit cost."); return; }
     setError(null);
+    setAddingLineForJob(jobId);
     try {
-      await api.post(`/jobs/${jobId}/cost-lines`, {
+      const res = await api.post(`/jobs/${jobId}/cost-lines`, {
         type: newLine.type, description: newLine.description, quantity: qty, unitCost: cost,
         ...(newLine.accountId ? { accountId: newLine.accountId } : {}),
       });
       setNewLine({ type: "MATERIAL", description: "", quantity: "1", unitCost: "", accountId: "" });
-      setLineJobId(null); flash("Cost line added."); fetchAll();
+      setLineJobId(null);
+      const warn = res.data?.journalWarning;
+      if (warn) setError(`Cost line added — GL warning: ${warn}`);
+      else flash("Cost line added.");
+      fetchAll();
     } catch (e: any) { setError(e?.response?.data?.error || "Failed to add cost line."); }
+    finally { setAddingLineForJob(null); }
   };
 
   const handleComplete = async (jobId: string) => {
+    if (completingJobId === jobId) return;
     if (!await confirm({ title: "Mark job as Completed?", description: "A COGS journal will be posted.", confirmLabel: "Complete", variant: "warning" })) return;
+    setCompletingJobId(jobId);
     try {
-      await api.post(`/jobs/${jobId}/complete`);
-      flash("Job completed."); fetchAll();
+      const res = await api.post(`/jobs/${jobId}/complete`);
+      const warn = res.data?.journalWarning;
+      if (warn) setError(`Job completed — GL warning: ${warn}`);
+      else flash("Job completed.");
+      fetchAll();
     } catch (e: any) { setError(e?.response?.data?.error || "Failed to complete job."); }
+    finally { setCompletingJobId(null); }
   };
 
   const handleCancel = async (jobId: string) => {
@@ -232,7 +247,7 @@ function BudgetProgress({ job }: { job: Job }) {
               {(job.status === "OPEN" || job.status === "IN_PROGRESS") && (
                 <>
                   <button onClick={() => { setLineJobId(lineJobId === job.id ? null : job.id); setExpandedId(job.id); }} className="text-xs px-2 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700">+ Cost Line</button>
-                  <button onClick={() => handleComplete(job.id)} className="text-xs px-2 py-1 border border-green-300 text-green-700 rounded hover:bg-green-50 dark:hover:bg-green-900/20">Complete</button>
+                  <button onClick={() => handleComplete(job.id)} disabled={completingJobId === job.id} className="text-xs px-2 py-1 border border-green-300 text-green-700 rounded hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-50 disabled:cursor-not-allowed">{completingJobId === job.id ? "Completing…" : "Complete"}</button>
                   <button onClick={() => handleCancel(job.id)} className="text-xs px-2 py-1 border border-red-200 text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-900/20">Cancel</button>
                 </>
               )}
@@ -307,7 +322,7 @@ function BudgetProgress({ job }: { job: Job }) {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleAddLine(job.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">Add Line</button>
+                    <button onClick={() => handleAddLine(job.id)} disabled={addingLineForJob === job.id} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{addingLineForJob === job.id ? "Adding…" : "Add Line"}</button>
                     <button onClick={() => setLineJobId(null)} className="px-3 py-1.5 border rounded text-xs hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
                   </div>
                 </div>

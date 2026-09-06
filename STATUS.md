@@ -2,6 +2,77 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: Dashboard KPI number overflow + Stock Movement tab in Inventory
+
+**What/Why:**
+
+1. **Dashboard KPI tiles clipping large numbers** — Total Revenue (GHS 3,121,917,765), Expenses, and Net Profit numbers were cut off because `text-2xl` at `lg:grid-cols-4` card width cannot fit 18-character currency strings. Added `fmtKpi()` compact formatter: numbers ≥1B show as "GHS 3.12B", ≥1M as "GHS 3.12M", ≥1K as "GHS 3.1K"; smaller numbers use the existing full formatter. Each tile shows the compact figure in bold and the full exact amount in a small grey line below, with `title` attribute for tooltip. Applied `truncate` to prevent any overflow.
+
+2. **Stock Movement tab in Inventory** — Added a two-tab bar at the top of the WarehouseManagement page: "Inventory & Warehouses" (existing view) and "Stock Movement (In / Out)" which embeds the existing `StockMovement` report component inline. Users can now see all stock-in and stock-out movements directly from the Inventory page without navigating away to Reports.
+
+**Files Affected:**
+- `frontend/src/App.tsx` — `fmtKpi()` helper, KPI tiles updated with compact format + full value subtitle
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `mainTab` state, tab bar, `StockMovement` import and conditional render
+
+---
+
+## [Date: 2026-09-06] - Fix: Invoice sync failure reason visible + Retry button
+
+**What/Why:**
+
+The "Needs attention" badge on failed invoices only showed its error reason as a tooltip (hover-only). Users had no idea *why* an invoice failed or what to do. Fixed by:
+
+1. **Visible error text** — When an invoice has `_failed=true`, a red info box appears below the invoice number showing the exact server rejection message (e.g. "Insufficient stock for item X").
+2. **Retry button** — A "Retry →" link inside the error box resets the outbox entry from `failed` → `pending` and triggers `flushOutbox` immediately, so the sync re-attempts without a page reload.
+3. **`retryFailedInvoice(invoiceId)`** exported from `syncEngine.ts` — handles both `CREATE_INVOICE` and `PAY_INVOICE` outbox entry kinds, clears `_failed`/`_failureReason` on the local record, and kicks off the outbox flush.
+
+**Files Affected:**
+- `frontend/src/lib/syncEngine.ts` — new `retryFailedInvoice` export
+- `frontend/src/pages/invoices/Invoices.tsx` — visible error reason box + Retry button
+
+---
+
+## [Date: 2026-09-06] - Fix: POS receipt PDF column alignment + WhatsApp delivery feedback
+
+**What/Why:**
+
+Two POS receipt bugs fixed:
+
+1. **PDF receipt column misalignment** — PDFKit's `continued: true` chain breaks whenever an item name wraps to a second line (e.g. "Alvaro Drink (24)"), pushing the Qty/Price/Total values down a line and making the receipt unreadable. Replaced the chain with explicit X-coordinate positioning (`x0`/`x1`/`x2`/`x3`) for every column, with a `lineBreak: false` constraint and a 20-char truncation on item names so nothing can overflow the thermal roll width.
+
+2. **WhatsApp receipt delivery — no feedback to cashier** — `sendWhatsAppReceipt` was fire-and-forget (`void`), with no axios timeout, and Ghana phone numbers starting with `0` weren't normalized to `+233`. Changed the service to return `Promise<boolean>`, added a `normalizePhone` helper (Ghana 0XXXXXXXXX → +233XXXXXXXXX), added an 8 s axios timeout, and awaited it in `cashTill.ts` behind a 10 s `Promise.race` ceiling. The response now includes `whatsappSent: boolean`. The POS frontend shows a success toast ("WhatsApp receipt sent ✓") or an error toast if delivery failed.
+
+**Files Affected:**
+- `backend/src/routes/cashTill.ts` — PDF column layout rewritten with explicit X coords; WhatsApp call awaited and `whatsappSent` included in response
+- `backend/src/services/whatsAppReceiptService.ts` — `normalizePhone`, 8 s axios timeout, returns `Promise<boolean>`
+- `frontend/src/pages/pos/PointOfSale.tsx` — shows WhatsApp success/failure toast after sale
+
+---
+
+## [Date: 2026-09-06] - Fix: Double-submit guards, job costing GL warnings, negative-stock warnings, negative-stock endpoint
+
+**What/Why:**
+
+Four data-integrity fixes across Job Costing, Invoices, and Inventory:
+
+1. **Job Costing frontend double-submit guard** — "Add Line" and "Complete" buttons could be clicked multiple times during a slow response, creating duplicate cost lines or double-posting COGS journals. Added `addingLineForJob` and `completingJobId` state; buttons are disabled and show "Adding…"/"Completing…" while the API call is in-flight.
+
+2. **Job Costing GL journal warnings visible** — When the WIP/COGS/JOB_EXPENSE accounts are not yet configured, the journal post silently did nothing; the cost line or completion appeared to succeed but no GL entry was made. Now returns `journalWarning` in the API response body. Frontend shows it as an error banner ("Cost line added — GL warning: …").
+
+3. **Invoice negative-stock warning** — When `allowNegativeStock=true`, invoices silently deducted below zero with no user feedback. Backend now collects per-line warnings (`stockWarnings[]`) and includes them in the 201 response. Sync engine attaches them to the local `LocalInvoice` record as `_stockWarnings`; `Invoices.tsx` watches via `useLiveQuery` and fires a toast for each, then clears the field.
+
+4. **`GET /inventory/negative-stock` endpoint** — New endpoint returning all `warehouseStock` rows where `quantityOnHand < 0`, joined with item name/SKU and warehouse name, so managers can audit negative-stock items at any time.
+
+**Files Affected:**
+- `frontend/src/pages/manufacturing/Jobs.tsx` — `addingLineForJob`, `completingJobId` state, button guards, GL warning banner
+- `backend/src/routes/jobs.ts` — `journalWarning` field in cost-line and complete responses
+- `backend/src/routes/invoices.ts` — `negativeStockWarnings[]` collected and returned in response
+- `frontend/src/lib/syncEngine.ts` — `_stockWarnings` on `LocalInvoice`, stored after server responds
+- `frontend/src/pages/invoices/Invoices.tsx` — `useEffect` watches for `_stockWarnings`, shows toast
+- `backend/src/routes/inventory.ts` — New `GET /inventory/negative-stock` endpoint
+
+---
+
 ## [Date: 2026-09-06] - Fix: Quick-Add Table missing Batch # and Expiry Date columns for PHARMACY org type
 
 **What/Why:**

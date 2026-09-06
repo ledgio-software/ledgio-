@@ -232,6 +232,17 @@ const Dashboard = () => {
     }).format(amount);
   };
 
+  // Compact formatter for KPI tiles so large numbers (e.g. GHS 3.12B) don't overflow cards.
+  const fmtKpi = (amount: number) => {
+    const abs = Math.abs(amount);
+    const sign = amount < 0 ? '-' : '';
+    const sym = settings.baseCurrency === 'GHS' ? 'GHS ' : (settings.baseCurrency + ' ');
+    if (abs >= 1_000_000_000) return `${sign}${sym}${(abs / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000)     return `${sign}${sym}${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000)         return `${sign}${sym}${(abs / 1_000).toFixed(1)}K`;
+    return formatCurrency(amount);
+  };
+
   const headerSubtitle =
     mode === "operations"
       ? "Here's your business at a glance. Tap a quick action below to get started."
@@ -268,7 +279,15 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalRevenue)}</div>
+              <div
+                className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 truncate"
+                title={formatCurrency(totalRevenue)}
+              >
+                {fmtKpi(totalRevenue)}
+              </div>
+              <p className="text-xs text-secondary-400 mt-0.5 truncate" title={formatCurrency(totalRevenue)}>
+                {formatCurrency(totalRevenue)}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -276,7 +295,15 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium">Expenses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(totalExpense)}</div>
+              <div
+                className="text-2xl font-bold text-amber-600 dark:text-amber-400 truncate"
+                title={formatCurrency(totalExpense)}
+              >
+                {fmtKpi(totalExpense)}
+              </div>
+              <p className="text-xs text-secondary-400 mt-0.5 truncate" title={formatCurrency(totalExpense)}>
+                {formatCurrency(totalExpense)}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -284,9 +311,15 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${netIncome >= 0 ? 'text-primary-600 dark:text-primary-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatCurrency(netIncome)}
+              <div
+                className={`text-2xl font-bold truncate ${netIncome >= 0 ? 'text-primary-600 dark:text-primary-400' : 'text-red-600 dark:text-red-400'}`}
+                title={formatCurrency(netIncome)}
+              >
+                {fmtKpi(netIncome)}
               </div>
+              <p className="text-xs text-secondary-400 mt-0.5 truncate" title={formatCurrency(netIncome)}>
+                {formatCurrency(netIncome)}
+              </p>
             </CardContent>
           </Card>
           <Card>

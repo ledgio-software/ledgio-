@@ -84,6 +84,7 @@ export interface LocalInvoice {
   _pending?: boolean;
   _failed?: boolean;
   _failureReason?: string;
+  _stockWarnings?: string[];
 }
 
 type OutboxEntry =
@@ -587,9 +588,10 @@ async function processOutboxEntry(entry: OutboxEntry): Promise<void> {
   } else if (entry.kind === 'CREATE_INVOICE') {
     const res = await api.post('/invoices', entry.body);
     const real: LocalInvoice = res.data.data.invoice;
+    const warnings: string[] | undefined = res.data.stockWarnings?.length > 0 ? res.data.stockWarnings : undefined;
     await syncDb.transaction('rw', syncDb.invoices, async () => {
       await syncDb.invoices.delete(entry.tempId);
-      await syncDb.invoices.put(real);
+      await syncDb.invoices.put(warnings ? { ...real, _stockWarnings: warnings } : real);
     });
   } else if (entry.kind === 'PAY_INVOICE') {
     const res = await api.post(`/invoices/${entry.invoiceId}/pay`, entry.amount !== undefined ? { amount: entry.amount } : {});
@@ -612,6 +614,32 @@ async function markEntityFailed(entry: OutboxEntry, reason?: string): Promise<vo
     const row = await syncDb.invoices.get(entry.invoiceId);
     if (row) await syncDb.invoices.put({ ...row, _pending: false, _failed: true, _failureReason: reason });
   }
+}
+
+/**
+ * Reset a failed outbox entry back to 'pending' and clear the _failed flag on
+ * the local invoice so flushOutbox will attempt it again. Works for both
+ * CREATE_INVOICE and PAY_INVOICE failures.
+ */
+export async function retryFailedInvoice(invoiceId: string): Promise<void> {
+  // Find any failed outbox entries linked to this invoice (by tempId or invoiceId).
+  const all = await syncDb.outbox.toArray();
+  const linked = all.filter(
+    (e) =>
+      e.status === 'failed' &&
+      ((e.kind === 'CREATE_INVOICE' && (e as any).tempId === invoiceId) ||
+        (e.kind === 'PAY_INVOICE' && (e as any).invoiceId === invoiceId)),
+  );
+  for (const e of linked) {
+    await syncDb.outbox.update(e.localId!, { status: 'pending', failureReason: undefined });
+  }
+  // Clear the visual failure state on the invoice.
+  const row = await syncDb.invoices.get(invoiceId);
+  if (row) {
+    await syncDb.invoices.put({ ...row, _pending: true, _failed: false, _failureReason: undefined });
+  }
+  // Kick off the outbox immediately.
+  flushOutbox().catch(() => {});
 }
 
 let retryInterval: ReturnType<typeof setInterval> | null = null;
