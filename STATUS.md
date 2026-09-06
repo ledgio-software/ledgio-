@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: Dashboard KPI number overflow + Stock Movement tab in Inventory
+
+**What/Why:**
+
+1. **Dashboard KPI tiles clipping large numbers** — Total Revenue (GHS 3,121,917,765), Expenses, and Net Profit numbers were cut off because `text-2xl` at `lg:grid-cols-4` card width cannot fit 18-character currency strings. Added `fmtKpi()` compact formatter: numbers ≥1B show as "GHS 3.12B", ≥1M as "GHS 3.12M", ≥1K as "GHS 3.1K"; smaller numbers use the existing full formatter. Each tile shows the compact figure in bold and the full exact amount in a small grey line below, with `title` attribute for tooltip. Applied `truncate` to prevent any overflow.
+
+2. **Stock Movement tab in Inventory** — Added a two-tab bar at the top of the WarehouseManagement page: "Inventory & Warehouses" (existing view) and "Stock Movement (In / Out)" which embeds the existing `StockMovement` report component inline. Users can now see all stock-in and stock-out movements directly from the Inventory page without navigating away to Reports.
+
+**Files Affected:**
+- `frontend/src/App.tsx` — `fmtKpi()` helper, KPI tiles updated with compact format + full value subtitle
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `mainTab` state, tab bar, `StockMovement` import and conditional render
+
+---
+
 ## [Date: 2026-09-06] - Fix: Invoice sync failure reason visible + Retry button
 
 **What/Why:**
