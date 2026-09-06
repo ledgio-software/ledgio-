@@ -5,7 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
-import { useTenantSettings } from "../../contexts/TenantSettingsContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 
 type ImportType = "accounts" | "customers" | "inventory-items" | "invoices" | "payments";
@@ -176,8 +176,8 @@ const PHARMACY_INVENTORY_CONFIG: typeof IMPORT_CONFIGS["inventory-items"] = {
 export function BulkImportWizard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { settings } = useTenantSettings();
-  const isPharmacy = settings?.orgType === "PHARMACY";
+  const { user } = useAuth();
+  const isPharmacy = user?.orgType === "PHARMACY";
 
   const configs: typeof IMPORT_CONFIGS = isPharmacy
     ? { ...IMPORT_CONFIGS, "inventory-items": PHARMACY_INVENTORY_CONFIG }
