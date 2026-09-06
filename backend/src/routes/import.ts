@@ -219,6 +219,8 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
       reorderLevel: number | null;
       warehouseName: string;
       initialQty: number;
+      batchNumber: string;
+      expiryDate: string;
     };
 
     const validRows: ValidRow[] = [];
@@ -237,6 +239,8 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
         const unitOfMeasure = (row.unit ?? row.unitofmeasure ?? row['unitOfMeasure'] ?? 'pcs') as string;
         const warehouseName: string = (row.warehousename ?? row['warehouseName'] ?? '').trim();
         const initialQty = row.initialqty ?? row['initialQty'];
+        const batchNumber: string = (row.batchnumber ?? row['batchNumber'] ?? '').trim();
+        const expiryDate: string = (row.expirydate ?? row['expiryDate'] ?? '').trim();
 
         if (costPrice === undefined || costPrice === null || costPrice === '') throw new Error('Cost price is required.');
         if (sellingPrice === undefined || sellingPrice === null || sellingPrice === '') throw new Error('Selling price is required.');
@@ -260,6 +264,8 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
           reorderLevel: reorderLevel ? Number(reorderLevel) : null,
           warehouseName,
           initialQty: initialQty && Number(initialQty) > 0 ? Number(initialQty) : 0,
+          batchNumber,
+          expiryDate,
         });
       } catch (err: any) {
         errors.push({ row: i + 1, name: row.name, error: err.message });
@@ -308,6 +314,7 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
           sellingPrice: r.sellingPrice,
           wholesalePrice: r.wholesalePrice,
           reorderLevel: r.reorderLevel,
+          requiresBatchTracking: !!r.batchNumber,
         })),
         skipDuplicates: true,
       });
@@ -328,6 +335,23 @@ router.post('/inventory-items', requireRole('Accountant'), async (req: Request, 
 
       if (stockData.length > 0) {
         await (client as any).warehouseStock.createMany({ data: stockData, skipDuplicates: true });
+      }
+
+      // Create InventoryBatch records for pharmacy rows that supplied a batch number
+      const batchData = okRows
+        .filter(r => r.batchNumber && r.warehouseName && r.initialQty > 0 && skuToCreated.has(r.sku))
+        .map(r => ({
+          tenantId,
+          itemId: skuToCreated.get(r.sku)!.id,
+          warehouseId: warehouseMap.get(r.warehouseName)!,
+          batchNumber: r.batchNumber,
+          expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
+          quantityOnHand: r.initialQty,
+          costPrice: r.costPrice,
+        }));
+
+      if (batchData.length > 0) {
+        await (client as any).inventoryBatch.createMany({ data: batchData, skipDuplicates: true });
       }
     });
 

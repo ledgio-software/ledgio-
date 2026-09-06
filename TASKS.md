@@ -2,6 +2,10 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes & Features (2026-09-06)
+
+- [x] **Fix: Pharmacy bulk import missing Batch # and Expiry Date columns** (2026-09-06) — When `orgType === "PHARMACY"`, the Bulk Import Wizard now uses a pharmacy-specific inventory-items template: adds `batchNumber` and `expiryDate` CSV columns, shows a pharmaceutical sample (Amoxicillin / Paracetamol / Metronidazole), defaults unit to "tablet". Backend creates `InventoryBatch` records for rows with a batch number and marks items `requiresBatchTracking = true`. (`frontend/src/pages/import/BulkImportWizard.tsx`, `backend/src/routes/import.ts`)
+
 ## Bug Fixes & Features (2026-09-05)
 
 - [x] **Feature: Per-org-type nav filtering** (2026-09-05) — Added `RETAIL`, `WHOLESALE`, `SERVICE`, `CONSTRUCTION` org types. Each gets a tailored nav: SERVICE hides Inventory section + stock reports; WHOLESALE hides POS; CONSTRUCTION hides POS + manufacturing but keeps Job Costing; RETAIL/PHARMACY keep POS + Inventory but drop industrial routes. Registration profile cards now each map to a distinct org type. (`backend/src/services/tenantService.ts`, `frontend/src/lib/navigation.ts`, `frontend/src/pages/auth/Register.tsx`)

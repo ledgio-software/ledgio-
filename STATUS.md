@@ -2,6 +2,20 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: Pharmacy bulk import missing Batch # and Expiry Date columns
+
+**What/Why:**
+
+Pharmacy tenants importing opening stock via the Bulk Import Wizard saw no way to supply batch numbers or expiry dates — both mandatory for FEFO dispensing and Ghana FDA compliance. The `inventory-items` import config was generic (name, SKU, cost price, sell price, warehouse, qty only).
+
+Added pharmacy-aware config: when `orgType === "PHARMACY"`, the wizard switches to a pharmacy-specific inventory-items template that includes `batchNumber` and `expiryDate` columns, shows a pharmaceutical sample CSV (Amoxicillin, Paracetamol, Metronidazole), and sets the default unit to "tablet". The backend now accepts both fields, creates `InventoryBatch` records for rows that supply a batch number, and marks those items `requiresBatchTracking = true` so FEFO dispensing is enforced going forward.
+
+**Files Affected:**
+- `frontend/src/pages/import/BulkImportWizard.tsx` — `PHARMACY_INVENTORY_CONFIG` constant; `useTenantSettings` to detect org type; `configs` override when pharmacy; `handleTypeChange` uses `configs`
+- `backend/src/routes/import.ts` — `batchNumber` + `expiryDate` added to `ValidRow`; parsed from row; `requiresBatchTracking` set on item insert; `inventoryBatch.createMany` after warehouse stock
+
+---
+
 ## [Date: 2026-09-06] - Merged: PR #20 — Per-org-type nav filtering
 
 PR `ledgio-software/ledgio-#20` merged to `main`. Feature is live.
