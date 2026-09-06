@@ -2,6 +2,23 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: POS receipt PDF column alignment + WhatsApp delivery feedback
+
+**What/Why:**
+
+Two POS receipt bugs fixed:
+
+1. **PDF receipt column misalignment** — PDFKit's `continued: true` chain breaks whenever an item name wraps to a second line (e.g. "Alvaro Drink (24)"), pushing the Qty/Price/Total values down a line and making the receipt unreadable. Replaced the chain with explicit X-coordinate positioning (`x0`/`x1`/`x2`/`x3`) for every column, with a `lineBreak: false` constraint and a 20-char truncation on item names so nothing can overflow the thermal roll width.
+
+2. **WhatsApp receipt delivery — no feedback to cashier** — `sendWhatsAppReceipt` was fire-and-forget (`void`), with no axios timeout, and Ghana phone numbers starting with `0` weren't normalized to `+233`. Changed the service to return `Promise<boolean>`, added a `normalizePhone` helper (Ghana 0XXXXXXXXX → +233XXXXXXXXX), added an 8 s axios timeout, and awaited it in `cashTill.ts` behind a 10 s `Promise.race` ceiling. The response now includes `whatsappSent: boolean`. The POS frontend shows a success toast ("WhatsApp receipt sent ✓") or an error toast if delivery failed.
+
+**Files Affected:**
+- `backend/src/routes/cashTill.ts` — PDF column layout rewritten with explicit X coords; WhatsApp call awaited and `whatsappSent` included in response
+- `backend/src/services/whatsAppReceiptService.ts` — `normalizePhone`, 8 s axios timeout, returns `Promise<boolean>`
+- `frontend/src/pages/pos/PointOfSale.tsx` — shows WhatsApp success/failure toast after sale
+
+---
+
 ## [Date: 2026-09-06] - Fix: Double-submit guards, job costing GL warnings, negative-stock warnings, negative-stock endpoint
 
 **What/Why:**

@@ -436,6 +436,14 @@ export function PointOfSale() {
         if (warnings.length > 0) {
           showToast(`Warning: ${warnings.join(" ")}`, "warning" as any);
         }
+        const { whatsappSent } = res.data.data;
+        if (customerPhone.trim()) {
+          if (whatsappSent) {
+            showToast(`WhatsApp receipt sent to ${customerPhone.trim()} ✓`, "success" as any);
+          } else {
+            showToast(`WhatsApp receipt could not be sent to ${customerPhone.trim()}`, "error");
+          }
+        }
         setLastReceipt({
           id: res.data.data.sale.id,
           receiptNo: res.data.data.sale.receiptNo,
