@@ -5,7 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import type { WorkspaceMode } from "../../contexts/WorkspaceModeContext";
 import { getVisibleNavGroups, getVisibleHrefs } from "../../lib/navigation";
-import { Settings, Lock, X, Mail, CreditCard, RefreshCw } from "lucide-react";
+import { Settings, Lock, X, CreditCard, RefreshCw } from "lucide-react";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { TIER_NAMES } from "../../types/tenant";
 import type { TenantTier } from "../../types/tenant";
@@ -195,19 +195,6 @@ export function Sidebar() {
                   <CreditCard className="h-3 w-3" aria-hidden />
                   Upgrade now
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const subject = upgradePanelFor === "business"
-                      ? "Upgrade%20to%20Business%20Plan"
-                      : "Upgrade%20to%20Enterprise%20Plan";
-                    window.location.href = `mailto:ledgioapp@gmail.com?subject=${subject}`;
-                  }}
-                  className="flex items-center gap-1.5 w-full justify-center rounded-md border border-secondary-300 dark:border-secondary-600 text-secondary-600 dark:text-secondary-300 hover:bg-secondary-100 dark:hover:bg-secondary-700 font-medium py-1.5 transition-colors"
-                >
-                  <Mail className="h-3 w-3" aria-hidden />
-                  Email us instead
-                </button>
               </div>
             )}
           </div>

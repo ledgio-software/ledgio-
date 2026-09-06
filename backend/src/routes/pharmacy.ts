@@ -87,9 +87,10 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { tenantId } = requireTenantContext();
-      const { patientName, patientAge, patientPhone, prescribingDoctor, prescriptionDate, notes, lines } = req.body;
+      const { patientName, patientAge, patientPhone, prescribingDoctor, prescriptionDate, notes, lines, billingType, patientId } = req.body;
 
       const rxNumber = `RX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const resolvedBillingType = ['CASH', 'NHIS', 'INSURANCE'].includes(billingType) ? billingType : 'CASH';
 
       const prescription = await (prisma as any).prescription.create({
         data: {
@@ -101,6 +102,8 @@ router.post(
           prescribingDoctor,
           prescriptionDate: new Date(prescriptionDate),
           notes: notes ?? null,
+          billingType: resolvedBillingType,
+          patientId: patientId || null,
           lines: {
             create: lines.map((l: any) => ({
               itemId: l.itemId,
@@ -109,7 +112,10 @@ router.post(
             })),
           },
         },
-        include: { lines: { include: { item: { select: { id: true, name: true, sku: true } } } } },
+        include: {
+          lines: { include: { item: { select: { id: true, name: true, sku: true } } } },
+          patient: { select: { id: true, name: true, nhisCardNumber: true, allergies: true } },
+        },
       });
 
       res.status(201).json({ success: true, data: { prescription } });
@@ -119,6 +125,177 @@ router.post(
     }
   }
 );
+
+/**
+ * POST /api/v1/pharmacy/prescriptions/:id/send-refill-reminder
+ * Sends an SMS refill reminder to the patient's phone.
+ */
+router.post('/prescriptions/:id/send-refill-reminder', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const prescription = await (prisma as any).prescription.findFirst({
+      where: { id: req.params.id, tenantId },
+      include: { lines: { include: { item: { select: { name: true } } } } },
+    });
+    if (!prescription) {
+      res.status(404).json({ success: false, error: 'Prescription not found.' });
+      return;
+    }
+    if (!prescription.patientPhone) {
+      res.status(400).json({ success: false, error: 'Prescription has no patient phone number.' });
+      return;
+    }
+
+    const drugList = prescription.lines.map((l: any) => l.item.name).join(', ');
+    const message = `Hi ${prescription.patientName}, your medication refill reminder from your pharmacy. Drugs: ${drugList}. Please visit us to renew your prescription (Rx: ${prescription.rxNumber}).`;
+
+    const { SmsService } = require('../services/smsService');
+    await SmsService.send(prescription.patientPhone, message);
+
+    res.status(200).json({ success: true, data: { sent: true, phone: prescription.patientPhone } });
+  } catch (error: any) {
+    console.error('[Pharmacy] Error sending refill reminder:', error);
+    res.status(500).json({ success: false, error: 'Failed to send refill reminder.' });
+  }
+});
+
+// ─── Patient Registry ─────────────────────────────────────────────────────────
+
+const createPatientSchema = z.object({
+  name: z.string().min(1).max(200),
+  phone: z.string().max(30).optional().nullable(),
+  dateOfBirth: z.string().datetime({ offset: true }).optional().nullable(),
+  nhisCardNumber: z.string().max(50).optional().nullable(),
+  allergies: z.array(z.string().max(100)).max(50).optional().default([]),
+  chronicConditions: z.string().max(1000).optional().nullable(),
+});
+
+/**
+ * GET /api/v1/pharmacy/patients
+ * Lists patients. Optional ?q= search on name/phone.
+ */
+router.get('/patients', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : undefined;
+
+    const patients = await (prisma as any).pharmacyPatient.findMany({
+      where: {
+        tenantId,
+        ...(q ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { phone: { contains: q } },
+            { nhisCardNumber: { contains: q, mode: 'insensitive' } },
+          ],
+        } : {}),
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    res.status(200).json({ success: true, data: { patients } });
+  } catch (error: any) {
+    console.error('[Pharmacy] Error fetching patients:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve patients.' });
+  }
+});
+
+/**
+ * POST /api/v1/pharmacy/patients
+ * Creates a new patient record.
+ */
+router.post('/patients', requireRole('Accountant', 'Shop Manager', 'Cashier'), validateBody(createPatientSchema), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { name, phone, dateOfBirth, nhisCardNumber, allergies, chronicConditions } = req.body;
+
+    const patient = await (prisma as any).pharmacyPatient.create({
+      data: {
+        tenantId,
+        name,
+        phone: phone ?? null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        nhisCardNumber: nhisCardNumber ?? null,
+        allergies: allergies ?? [],
+        chronicConditions: chronicConditions ?? null,
+      },
+    });
+
+    res.status(201).json({ success: true, data: { patient } });
+  } catch (error: any) {
+    console.error('[Pharmacy] Error creating patient:', error);
+    res.status(500).json({ success: false, error: 'Failed to create patient.' });
+  }
+});
+
+/**
+ * PUT /api/v1/pharmacy/patients/:id
+ * Updates a patient's details (allergies, NHIS card, etc).
+ */
+router.put('/patients/:id', requireRole('Accountant', 'Shop Manager', 'Cashier'), validateBody(createPatientSchema.partial()), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const existing = await (prisma as any).pharmacyPatient.findFirst({ where: { id: req.params.id, tenantId } });
+    if (!existing) {
+      res.status(404).json({ success: false, error: 'Patient not found.' });
+      return;
+    }
+
+    const { name, phone, dateOfBirth, nhisCardNumber, allergies, chronicConditions } = req.body;
+    const patient = await (prisma as any).pharmacyPatient.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(phone !== undefined ? { phone: phone ?? null } : {}),
+        ...(dateOfBirth !== undefined ? { dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null } : {}),
+        ...(nhisCardNumber !== undefined ? { nhisCardNumber: nhisCardNumber ?? null } : {}),
+        ...(allergies !== undefined ? { allergies } : {}),
+        ...(chronicConditions !== undefined ? { chronicConditions: chronicConditions ?? null } : {}),
+      },
+    });
+
+    res.status(200).json({ success: true, data: { patient } });
+  } catch (error: any) {
+    console.error('[Pharmacy] Error updating patient:', error);
+    res.status(500).json({ success: false, error: 'Failed to update patient.' });
+  }
+});
+
+// ─── NHIS Claims ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/pharmacy/nhis-claims?from=&to=
+ * Returns all NHIS-billed prescriptions in the date range for claim submission.
+ */
+router.get('/nhis-claims', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const from = req.query.from ? new Date(String(req.query.from)) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const to = req.query.to ? new Date(String(req.query.to)) : new Date();
+    to.setHours(23, 59, 59, 999);
+
+    const prescriptions = await (prisma as any).prescription.findMany({
+      where: {
+        tenantId,
+        billingType: 'NHIS',
+        prescriptionDate: { gte: from, lte: to },
+      },
+      include: {
+        lines: { include: { item: { select: { name: true, sku: true } } } },
+        patient: { select: { name: true, nhisCardNumber: true, dateOfBirth: true } },
+      },
+      orderBy: { prescriptionDate: 'asc' },
+    });
+
+    const totalClaims = prescriptions.length;
+    const dispensedClaims = prescriptions.filter((p: any) => p.dispensedAt).length;
+
+    res.status(200).json({ success: true, data: { prescriptions, totalClaims, dispensedClaims, from, to } });
+  } catch (error: any) {
+    console.error('[Pharmacy] Error fetching NHIS claims:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve NHIS claims.' });
+  }
+});
 
 /**
  * GET /api/v1/pharmacy/prescriptions/:id

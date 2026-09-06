@@ -1131,6 +1131,25 @@ model ProductionOrder {
 }
 
 // Pharmacy prescription register - required by Ghana FDA for licensed pharmacies.
+model PharmacyPatient {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  name              String
+  phone             String?
+  dateOfBirth       DateTime? @map("date_of_birth")
+  nhisCardNumber    String?   @map("nhis_card_number")
+  allergies         String[]  @default([])
+  chronicConditions String?   @map("chronic_conditions")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  prescriptions Prescription[]
+
+  @@index([tenantId])
+  @@index([tenantId, phone])
+  @@map("pharmacy_patients")
+}
+
 model Prescription {
   id                String    @id @default(uuid())
   tenantId          String    @map("tenant_id")
@@ -1144,12 +1163,16 @@ model Prescription {
   dispensedByName   String?   @map("dispensed_by_name")
   cashSaleId        String?   @map("cash_sale_id")
   notes             String?
+  billingType       String    @default("CASH") @map("billing_type")
+  patientId         String?   @map("patient_id")
   createdAt         DateTime  @default(now()) @map("created_at")
 
-  lines PrescriptionLine[]
+  lines   PrescriptionLine[]
+  patient PharmacyPatient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, rxNumber])
   @@index([tenantId])
+  @@index([tenantId, billingType])
   @@map("prescriptions")
 }
 
