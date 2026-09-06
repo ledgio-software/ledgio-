@@ -147,6 +147,19 @@ export function Invoices() {
   const invoices: Invoice[] = ((localInvoices ?? []) as unknown as Invoice[])
     .slice()
     .sort((a, b) => new Date(b.issueDate ?? 0).getTime() - new Date(a.issueDate ?? 0).getTime());
+
+  // Surface negative-stock warnings from invoice creation (set by sync engine after server responds)
+  useEffect(() => {
+    if (!localInvoices) return;
+    const withWarnings = localInvoices.filter((inv) => (inv as any)._stockWarnings?.length > 0);
+    if (withWarnings.length === 0) return;
+    for (const inv of withWarnings) {
+      for (const w of (inv as any)._stockWarnings as string[]) {
+        showToast(`Stock warning on ${inv.invoiceNumber}: ${w}`, "error");
+      }
+      syncDb.invoices.update(inv.id, { _stockWarnings: undefined } as any).catch(() => {});
+    }
+  }, [localInvoices, showToast]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [funds, setFunds] = useState<Fund[]>([]);

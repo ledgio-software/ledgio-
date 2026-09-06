@@ -84,6 +84,7 @@ export interface LocalInvoice {
   _pending?: boolean;
   _failed?: boolean;
   _failureReason?: string;
+  _stockWarnings?: string[];
 }
 
 type OutboxEntry =
@@ -587,9 +588,10 @@ async function processOutboxEntry(entry: OutboxEntry): Promise<void> {
   } else if (entry.kind === 'CREATE_INVOICE') {
     const res = await api.post('/invoices', entry.body);
     const real: LocalInvoice = res.data.data.invoice;
+    const warnings: string[] | undefined = res.data.stockWarnings?.length > 0 ? res.data.stockWarnings : undefined;
     await syncDb.transaction('rw', syncDb.invoices, async () => {
       await syncDb.invoices.delete(entry.tempId);
-      await syncDb.invoices.put(real);
+      await syncDb.invoices.put(warnings ? { ...real, _stockWarnings: warnings } : real);
     });
   } else if (entry.kind === 'PAY_INVOICE') {
     const res = await api.post(`/invoices/${entry.invoiceId}/pay`, entry.amount !== undefined ? { amount: entry.amount } : {});

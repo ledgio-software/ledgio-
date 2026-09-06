@@ -2,6 +2,30 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: Double-submit guards, job costing GL warnings, negative-stock warnings, negative-stock endpoint
+
+**What/Why:**
+
+Four data-integrity fixes across Job Costing, Invoices, and Inventory:
+
+1. **Job Costing frontend double-submit guard** — "Add Line" and "Complete" buttons could be clicked multiple times during a slow response, creating duplicate cost lines or double-posting COGS journals. Added `addingLineForJob` and `completingJobId` state; buttons are disabled and show "Adding…"/"Completing…" while the API call is in-flight.
+
+2. **Job Costing GL journal warnings visible** — When the WIP/COGS/JOB_EXPENSE accounts are not yet configured, the journal post silently did nothing; the cost line or completion appeared to succeed but no GL entry was made. Now returns `journalWarning` in the API response body. Frontend shows it as an error banner ("Cost line added — GL warning: …").
+
+3. **Invoice negative-stock warning** — When `allowNegativeStock=true`, invoices silently deducted below zero with no user feedback. Backend now collects per-line warnings (`stockWarnings[]`) and includes them in the 201 response. Sync engine attaches them to the local `LocalInvoice` record as `_stockWarnings`; `Invoices.tsx` watches via `useLiveQuery` and fires a toast for each, then clears the field.
+
+4. **`GET /inventory/negative-stock` endpoint** — New endpoint returning all `warehouseStock` rows where `quantityOnHand < 0`, joined with item name/SKU and warehouse name, so managers can audit negative-stock items at any time.
+
+**Files Affected:**
+- `frontend/src/pages/manufacturing/Jobs.tsx` — `addingLineForJob`, `completingJobId` state, button guards, GL warning banner
+- `backend/src/routes/jobs.ts` — `journalWarning` field in cost-line and complete responses
+- `backend/src/routes/invoices.ts` — `negativeStockWarnings[]` collected and returned in response
+- `frontend/src/lib/syncEngine.ts` — `_stockWarnings` on `LocalInvoice`, stored after server responds
+- `frontend/src/pages/invoices/Invoices.tsx` — `useEffect` watches for `_stockWarnings`, shows toast
+- `backend/src/routes/inventory.ts` — New `GET /inventory/negative-stock` endpoint
+
+---
+
 ## [Date: 2026-09-06] - Fix: Quick-Add Table missing Batch # and Expiry Date columns for PHARMACY org type
 
 **What/Why:**

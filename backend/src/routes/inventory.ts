@@ -188,6 +188,41 @@ router.get('/warehouses/:id/stock-sheet.pdf', async (req: Request, res: Response
  * GET /api/v1/inventory/items
  * Lists all inventory items across warehouses.
  */
+
+/**
+ * GET /api/v1/inventory/negative-stock
+ * Returns all warehouse stock rows where quantityOnHand < 0.
+ */
+router.get('/negative-stock', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const rows = await withCurrentTenantDb(prisma, async (client) => {
+      return (client as any).warehouseStock.findMany({
+        where: { tenantId, quantityOnHand: { lt: 0 } },
+        include: {
+          item: { select: { id: true, name: true, sku: true, unitOfMeasure: true } },
+          warehouse: { select: { id: true, name: true } },
+        },
+        orderBy: { quantityOnHand: 'asc' },
+      });
+    });
+    res.json({
+      success: true,
+      data: rows.map((r: any) => ({
+        itemId: r.itemId,
+        itemName: r.item?.name,
+        sku: r.item?.sku,
+        unitOfMeasure: r.item?.unitOfMeasure,
+        warehouseId: r.warehouseId,
+        warehouseName: r.warehouse?.name,
+        quantityOnHand: Number(r.quantityOnHand),
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/items', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
