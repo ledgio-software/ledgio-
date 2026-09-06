@@ -2,6 +2,55 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: Quick-Add Table missing Batch # and Expiry Date columns for PHARMACY org type
+
+**What/Why:**
+
+The "Bulk Add Products" Quick-Add Table in Warehouse Management was missing Batch # and Expiry Date columns when accessed by a PHARMACY account. These are mandatory fields for tracking drug batches and expiry in a pharmacy context.
+
+**Changes:**
+
+- Extended `BulkRow` interface and `EMPTY_BULK_ROW` constant with `batchNumber` and `expiryDate` fields
+- Added conditional `<th>` headers (Batch # / Expiry Date) and `<td>` input cells shown only when `user?.orgType === "PHARMACY"`
+- CSV parser now maps `batchNumber` and `expiryDate` from CSV files (allows pharmacy CSV imports to include these fields too)
+- `handleBulkSubmit` now includes `batchNumber` and `expiryDate` in the per-item payload
+- Backend `/inventory/items/bulk` endpoint now:
+  - Accepts `batchNumber` and `expiryDate` on each item row
+  - After inserting stock, creates `InventoryBatch` records for rows with a batch number
+  - Sets `requiresBatchTracking: true` on items that had a batch number
+
+**Files Affected:**
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `BulkRow`, `EMPTY_BULK_ROW`, table UI, CSV parser, `handleBulkSubmit`
+- `backend/src/routes/inventory.ts` — `ValidRow` type, row extraction, batch record creation after stock inserts
+
+---
+
+## [Date: 2026-09-06] - Feature: Pharmacy ERP gaps — GRA E-VAT, NEPP, barcode enforcement, ABC-FSN inventory matrix
+
+**What/Why:**
+
+Implemented four advanced pharmacy ERP features mandated by Ghana's regulatory environment and identified through market research:
+
+1. **GRA E-VAT receipt generation** — `EvatService` issues a GRA-compliant electronic invoice reference and QR data string on every prescription dispense. When `GRA_EVAT_ENDPOINT` + `GRA_EVAT_CLIENT_ID` env vars are set, sends a real-time submission to the Ghana Revenue Authority API; otherwise generates a deterministic SHA-256-derived stub receipt (suitable for dev/demo, clearly marked). `evatInvoiceRef` stored on the Prescription record and displayed as a green `QrCode` badge in the prescriptions list and detail modal.
+
+2. **NEPP prescription code verification** — `POST /pharmacy/verify-nepp` validates National Electronic Pharmacy Platform codes against the NEPP API (`NEPP_API_ENDPOINT` + `NEPP_API_KEY`) or falls back to a deterministic stub. When verified, auto-fills patient name and phone in the new prescription form. `neppCode` stored on the Prescription model.
+
+3. **Barcode scan enforcement** — Clicking "Dispense" on any prescription now opens a verification modal requiring the pharmacist to scan or type each line item's SKU before the "Confirm Dispense" button becomes enabled. This is a hard stop — the standard dispense call only fires after all barcodes are verified.
+
+4. **ABC-FSN dual-matrix inventory engine** — `GET /pharmacy/inventory-matrix` classifies all inventory items by cumulative stock value (A=top 70%, B=70–90%, C=bottom 10%) and by last-movement days (F=≤30d, S=31–90d, N=90d+). New `PharmacyInventoryMatrix` page with filter chips by ABC/FSN class, a full data table, and reorder guidance notes. Added to PHARMACY nav section.
+
+**Files Affected:**
+- `backend/src/services/evatService.ts` — new GRA E-VAT service (created)
+- `backend/src/routes/pharmacy.ts` — updated `PATCH /prescriptions/:id/dispense` to call EvatService; added `POST /pharmacy/verify-nepp` and `GET /pharmacy/inventory-matrix`; `neppCode` accepted on prescription creation
+- `backend/prisma/schema.prisma` — added `evatInvoiceRef` and `neppCode` to `Prescription` model
+- `backend/prisma/migrations/20260906000002_prescription_evat_nepp/migration.sql` — adds the two new columns
+- `frontend/src/pages/pharmacy/PrescriptionRegister.tsx` — NEPP code input + verify button, barcode verification modal, E-VAT ref display
+- `frontend/src/pages/pharmacy/PharmacyInventoryMatrix.tsx` — new ABC-FSN matrix page (created)
+- `frontend/src/lib/navigation.ts` — added "Inventory Matrix" to PHARMACY section
+- `frontend/src/App.tsx` — lazy import + route for `PharmacyInventoryMatrix`
+
+---
+
 ## [Date: 2026-09-06] - Feature: Pharmacy pitch pack — patient registry, NHIS claims, drug interactions, SMS refill reminders
 
 **What/Why:**

@@ -260,6 +260,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Prescription Register", href: "/pharmacy/prescriptions", icon: ClipboardList },
       { name: "Patient Registry", href: "/pharmacy/patients", icon: Users },
       { name: "NHIS Claims", href: "/pharmacy/nhis-claims", icon: CreditCard },
+      { name: "Inventory Matrix", href: "/pharmacy/inventory-matrix", icon: BarChart3 },
       { name: "Narcotics Register", href: "/pharmacy/narcotics", icon: ShieldAlert },
       { name: "Expiry Alerts", href: "/pharmacy/expiry", icon: AlertTriangle },
     ],

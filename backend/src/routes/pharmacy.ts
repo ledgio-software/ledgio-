@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { validateBody } from '../middleware/validateBody';
 import { actorFromRequest } from '../services/auditLogService';
 import PDFDocument from 'pdfkit';
+import { EvatService } from '../services/evatService';
 
 const router = Router();
 
@@ -43,6 +44,9 @@ const createPrescriptionSchema = z.object({
   prescribingDoctor: z.string().min(1).max(200),
   prescriptionDate: z.string().datetime({ offset: true }),
   notes: z.string().max(1000).optional().nullable(),
+  billingType: z.enum(['CASH', 'NHIS', 'INSURANCE']).optional(),
+  patientId: z.string().uuid().optional().nullable(),
+  neppCode: z.string().max(100).optional().nullable(),
   lines: z.array(prescriptionLineSchema).min(1).max(100),
 });
 
@@ -87,7 +91,7 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { tenantId } = requireTenantContext();
-      const { patientName, patientAge, patientPhone, prescribingDoctor, prescriptionDate, notes, lines, billingType, patientId } = req.body;
+      const { patientName, patientAge, patientPhone, prescribingDoctor, prescriptionDate, notes, lines, billingType, patientId, neppCode } = req.body;
 
       const rxNumber = `RX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const resolvedBillingType = ['CASH', 'NHIS', 'INSURANCE'].includes(billingType) ? billingType : 'CASH';
@@ -104,6 +108,7 @@ router.post(
           notes: notes ?? null,
           billingType: resolvedBillingType,
           patientId: patientId || null,
+          neppCode: neppCode || null,
           lines: {
             create: lines.map((l: any) => ({
               itemId: l.itemId,
@@ -297,6 +302,117 @@ router.get('/nhis-claims', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
+// ─── NEPP Verification ───────────────────────────────────────────────────────
+
+/**
+ * POST /api/v1/pharmacy/verify-nepp
+ * Validates a National Electronic Pharmacy Platform prescription code.
+ * Uses real NEPP_API_ENDPOINT when set; returns a deterministic stub otherwise.
+ */
+router.post('/verify-nepp', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { neppCode } = req.body;
+    if (!neppCode || typeof neppCode !== 'string' || neppCode.trim().length < 4) {
+      res.status(400).json({ success: false, error: 'A valid NEPP prescription code is required.' });
+      return;
+    }
+    const code = neppCode.trim().toUpperCase();
+
+    const endpoint = process.env.NEPP_API_ENDPOINT;
+    const apiKey = process.env.NEPP_API_KEY;
+
+    if (endpoint && apiKey) {
+      try {
+        const { default: axios } = await import('axios');
+        const resp = await axios.post(
+          `${endpoint}/verify`,
+          { prescriptionCode: code },
+          { headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' }, timeout: 8_000 }
+        );
+        res.status(200).json({ success: true, data: resp.data });
+        return;
+      } catch (err: any) {
+        console.warn('[NEPP] API unreachable, falling back to stub:', err.message);
+      }
+    }
+
+    // Stub: derive plausible data from the code so each code gives a consistent result
+    const hash = code.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+    const drugs = [
+      { name: 'Amoxicillin 500mg', qty: 21 },
+      { name: 'Paracetamol 500mg', qty: 30 },
+      { name: 'Metronidazole 400mg', qty: 14 },
+      { name: 'Azithromycin 250mg', qty: 6 },
+      { name: 'Ibuprofen 400mg', qty: 20 },
+    ];
+    res.status(200).json({
+      success: true,
+      data: {
+        prescriptionCode: code,
+        patientName: `Patient ${code.slice(-4)}`,
+        patientPhone: `+233${String(hash).slice(0, 9).padStart(9, '0')}`,
+        patientNhisCard: `NHIS-${code.slice(0, 6)}`,
+        prescribingDoctor: `Dr. Demo (STUB)`,
+        drugs: [drugs[hash % drugs.length]],
+        isStub: true,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Pharmacy] NEPP verify error:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify NEPP code.' });
+  }
+});
+
+// ─── Inventory Matrix (ABC-FSN) ──────────────────────────────────────────────
+
+/**
+ * GET /api/v1/pharmacy/inventory-matrix
+ * Returns ABC-FSN dual classification for all inventory items.
+ * ABC by total stock value, FSN by days since last movement.
+ */
+router.get('/inventory-matrix', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+
+    const items = await prisma.inventoryItem.findMany({
+      where: { tenantId },
+      include: {
+        warehouseStocks: { select: { quantityOnHand: true } },
+      },
+    });
+
+    // Compute per-item: totalStock and estimated stock value
+    const now = Date.now();
+    const itemData = items.map((item) => {
+      const totalStock = item.warehouseStocks.reduce((s, w) => s + w.quantityOnHand, 0);
+      const unitPrice = Number(item.sellingPrice ?? 0);
+      const stockValue = totalStock * unitPrice;
+
+      // FSN: days since item was created (proxy for last movement)
+      const daysSinceMove = Math.floor((now - new Date(item.createdAt).getTime()) / 86_400_000);
+      const fsn = daysSinceMove <= 30 ? 'F' : daysSinceMove <= 90 ? 'S' : 'N';
+
+      return { id: item.id, name: item.name, sku: item.sku, totalStock, unitPrice: Number(unitPrice), stockValue, daysSinceMove, fsn };
+    });
+
+    // ABC: sort by stock value desc, assign A=top 20% by cumulative value, B=next 30%, C=rest
+    const sorted = [...itemData].sort((a, b) => b.stockValue - a.stockValue);
+    const totalValue = sorted.reduce((s, i) => s + i.stockValue, 0);
+    let cumulative = 0;
+    const classified = sorted.map((item) => {
+      cumulative += item.stockValue;
+      const pct = totalValue > 0 ? cumulative / totalValue : 1;
+      const abc = pct <= 0.7 ? 'A' : pct <= 0.9 ? 'B' : 'C';
+      return { ...item, abc, classification: `${abc}${item.fsn}` };
+    });
+
+    res.status(200).json({ success: true, data: { items: classified, totalValue } });
+  } catch (error: any) {
+    console.error('[Pharmacy] Inventory matrix error:', error);
+    res.status(500).json({ success: false, error: 'Failed to compute inventory matrix.' });
+  }
+});
+
 /**
  * GET /api/v1/pharmacy/prescriptions/:id
  */
@@ -332,7 +448,7 @@ router.patch(
 
       const existing = await (prisma as any).prescription.findFirst({
         where: { id: req.params.id, tenantId },
-        include: { lines: true },
+        include: { lines: { include: { item: { select: { id: true, name: true, sku: true, sellingPrice: true } } } } },
       });
       if (!existing) {
         res.status(404).json({ success: false, error: 'Prescription not found.' });
@@ -343,23 +459,35 @@ router.patch(
         return;
       }
 
+      // Issue GRA E-VAT receipt (falls back to deterministic stub if env vars not set)
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { graTin: true } });
+      const dispenseTime = new Date();
+      const totalAmount = existing.lines.reduce((sum: number, l: any) => sum + (l.prescribedQty * Number(l.item?.sellingPrice ?? 0)), 0);
+      const evatReceipt = await EvatService.submitInvoice({
+        tenantId,
+        tenantTin: tenant?.graTin ?? null,
+        transactionRef: existing.rxNumber,
+        totalAmount,
+        lineItems: existing.lines.map((l: any) => ({
+          description: l.item?.name ?? 'Drug',
+          qty: l.prescribedQty,
+          unitPrice: Number(l.item?.sellingPrice ?? 0),
+        })),
+        timestamp: dispenseTime,
+      });
+
       const updated = await (prisma as any).prescription.update({
         where: { id: req.params.id },
         data: {
-          dispensedAt: new Date(),
+          dispensedAt: dispenseTime,
           dispensedByName: dispensedByName || req.user?.name || req.user?.email || null,
           cashSaleId: cashSaleId || null,
-          lines: {
-            updateMany: {
-              where: { prescriptionId: req.params.id },
-              data: { dispensedQty: { increment: 0 } }, // lines updated individually if needed
-            },
-          },
+          evatInvoiceRef: evatReceipt.invoiceRef,
         },
         include: { lines: { include: { item: { select: { id: true, name: true, sku: true } } } } },
       });
 
-      res.status(200).json({ success: true, data: { prescription: updated } });
+      res.status(200).json({ success: true, data: { prescription: updated, evatReceipt } });
     } catch (error: any) {
       console.error('[Pharmacy] Error dispensing prescription:', error);
       res.status(500).json({ success: false, error: 'Failed to dispense prescription.' });

@@ -402,6 +402,8 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
       sellingPrice: number;
       initialWarehouseId: string | null;
       initialQty: number;
+      batchNumber?: string;
+      expiryDate?: string;
     };
 
     const validRows: ValidRow[] = [];
@@ -411,7 +413,7 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
     for (let i = 0; i < items.length; i++) {
       const row = items[i] || {};
       try {
-        const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, initialWarehouseId, initialQty = 0 } = row;
+        const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, initialWarehouseId, initialQty = 0, batchNumber, expiryDate } = row;
 
         if (!name || !String(name).trim()) throw new Error('Item name is required.');
         if (costPrice === undefined || costPrice === null || costPrice === '') throw new Error('Cost price is required.');
@@ -436,6 +438,8 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
           sellingPrice: Number(sellingPrice),
           initialWarehouseId: initialWarehouseId || null,
           initialQty: Number(initialQty) > 0 ? Number(initialQty) : 0,
+          batchNumber: batchNumber ? String(batchNumber).trim() : undefined,
+          expiryDate: expiryDate ? String(expiryDate) : undefined,
         });
       } catch (rowError: any) {
         failed.push({ index: i, name: row?.name, error: rowError.message || 'Failed to create this item.' });
@@ -511,6 +515,32 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
 
         if (stockData.length > 0) {
           await (client as any).warehouseStock.createMany({ data: stockData, skipDuplicates: true });
+        }
+
+        // InventoryBatch records for pharmacy rows that supplied batch/expiry data.
+        // warehouseId and costPrice are required by the model; skip rows that
+        // lack a warehouse (no batch can be location-tracked without one).
+        const batchData = okRows
+          .filter(r => r.batchNumber && r.initialWarehouseId && skuToItem.has(r.sku))
+          .map(r => ({
+            tenantId,
+            itemId: skuToItem.get(r.sku)!.id,
+            warehouseId: r.initialWarehouseId!,
+            batchNumber: r.batchNumber!,
+            expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
+            quantityOnHand: r.initialQty,
+            costPrice: r.costPrice,
+          }));
+
+        if (batchData.length > 0) {
+          await (client as any).inventoryBatch.createMany({ data: batchData, skipDuplicates: true });
+
+          // Mark these items as requiring batch tracking
+          const batchItemIds = batchData.map(b => b.itemId);
+          await (client as any).inventoryItem.updateMany({
+            where: { id: { in: batchItemIds }, tenantId },
+            data: { requiresBatchTracking: true },
+          });
         }
       });
     }

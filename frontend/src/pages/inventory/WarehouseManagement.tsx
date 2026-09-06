@@ -42,6 +42,8 @@ interface BulkRow {
   sellingPrice: string;
   warehouseName: string;
   initialQty: string;
+  batchNumber: string;
+  expiryDate: string;
 }
 
 const EMPTY_BULK_ROW: BulkRow = {
@@ -53,6 +55,8 @@ const EMPTY_BULK_ROW: BulkRow = {
   sellingPrice: "",
   warehouseName: "",
   initialQty: "",
+  batchNumber: "",
+  expiryDate: "",
 };
 
 const CSV_TEMPLATE_HEADERS = ["name", "sku", "category", "unitOfMeasure", "costPrice", "sellingPrice", "warehouseName", "initialQty"];
@@ -581,6 +585,8 @@ export function WarehouseManagement() {
             sellingPrice: row.sellingPrice?.trim() || "",
             warehouseName: row.warehouseName?.trim() || "",
             initialQty: row.initialQty?.trim() || "",
+            batchNumber: row.batchNumber?.trim() || "",
+            expiryDate: row.expiryDate?.trim() || "",
           }));
 
         if (parsedRows.length === 0) {
@@ -626,6 +632,8 @@ export function WarehouseManagement() {
           sellingPrice: row.sellingPrice ? Number(row.sellingPrice) : 0,
           initialWarehouseId: resolveWarehouseIdByName(row.warehouseName),
           initialQty: row.initialQty ? Number(row.initialQty) : 0,
+          batchNumber: row.batchNumber.trim() || undefined,
+          expiryDate: row.expiryDate || undefined,
         })),
       };
 
@@ -1200,6 +1208,12 @@ export function WarehouseManagement() {
                   <th className="text-left p-2 font-medium">Sell</th>
                   <th className="text-left p-2 font-medium">Warehouse</th>
                   <th className="text-left p-2 font-medium">Qty</th>
+                  {user?.orgType === "PHARMACY" && (
+                    <>
+                      <th className="text-left p-2 font-medium text-amber-700 dark:text-amber-400">Batch #</th>
+                      <th className="text-left p-2 font-medium text-amber-700 dark:text-amber-400">Expiry Date</th>
+                    </>
+                  )}
                   <th className="p-2"></th>
                 </tr>
               </thead>
@@ -1225,6 +1239,12 @@ export function WarehouseManagement() {
                       </select>
                     </td>
                     <td className="p-1"><Input type="number" className="h-8 text-xs w-16" value={row.initialQty} onChange={(e) => updateBulkRow(i, "initialQty", e.target.value)} /></td>
+                    {user?.orgType === "PHARMACY" && (
+                      <>
+                        <td className="p-1"><Input className="h-8 text-xs w-28 font-mono" placeholder="e.g. BN-001" value={row.batchNumber} onChange={(e) => updateBulkRow(i, "batchNumber", e.target.value)} /></td>
+                        <td className="p-1"><Input type="date" className="h-8 text-xs w-32" value={row.expiryDate} onChange={(e) => updateBulkRow(i, "expiryDate", e.target.value)} /></td>
+                      </>
+                    )}
                     <td className="p-1">
                       <button type="button" onClick={() => removeBulkRow(i)} className="text-secondary-400 hover:text-red-500 p-1" title="Remove row">
                         <Trash2 className="h-3.5 w-3.5" />

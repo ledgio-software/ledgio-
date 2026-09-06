@@ -4,7 +4,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
-import { ClipboardList, Plus, Search, CheckCircle2, Clock, AlertTriangle, Bell, ShieldAlert } from "lucide-react";
+import { ClipboardList, Plus, Search, CheckCircle2, Clock, AlertTriangle, Bell, ShieldAlert, Scan, QrCode, Loader2 } from "lucide-react";
 
 interface PrescriptionLine {
   id: string;
@@ -37,6 +37,8 @@ interface Prescription {
   cashSaleId?: string;
   notes?: string;
   billingType: string;
+  evatInvoiceRef?: string;
+  neppCode?: string;
   patient?: PharmacyPatient;
   lines: PrescriptionLine[];
   createdAt: string;
@@ -86,6 +88,15 @@ export function PrescriptionRegister() {
   const [patients, setPatients] = useState<PharmacyPatient[]>([]);
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
+  // NEPP verification state
+  const [neppLoading, setNeppLoading] = useState(false);
+  const [neppVerified, setNeppVerified] = useState(false);
+
+  // Barcode verification modal
+  const [barcodeTarget, setBarcodeTarget] = useState<Prescription | null>(null);
+  const [barcodeInputs, setBarcodeInputs] = useState<Record<string, string>>({});
+  const [dispensing, setDispensing] = useState(false);
+
   const emptyForm = {
     patientName: "",
     patientAge: "",
@@ -95,6 +106,7 @@ export function PrescriptionRegister() {
     prescriptionDate: new Date().toISOString().slice(0, 10),
     billingType: "CASH" as "CASH" | "NHIS" | "INSURANCE",
     notes: "",
+    neppCode: "",
     lines: [{ itemId: "", prescribedQty: 1 }],
   };
 
@@ -159,26 +171,67 @@ export function PrescriptionRegister() {
         prescriptionDate: new Date(form.prescriptionDate).toISOString(),
         billingType: form.billingType,
         notes: form.notes || null,
+        neppCode: form.neppCode || null,
         lines: form.lines.map((l) => ({ itemId: l.itemId, prescribedQty: Number(l.prescribedQty) })),
       });
       showToast("Prescription created.", "success");
       setShowNew(false);
       setForm(emptyForm);
+      setNeppVerified(false);
       load();
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to create prescription.", "error");
     }
   }
 
-  async function handleDispense(id: string) {
+  async function handleVerifyNepp() {
+    const code = form.neppCode.trim();
+    if (!code) return;
+    setNeppLoading(true);
     try {
-      await api.patch(`/pharmacy/prescriptions/${id}/dispense`, {});
-      showToast("Prescription marked as dispensed.", "success");
+      const res = await api.post("/pharmacy/verify-nepp", { neppCode: code });
+      const d = res.data.data;
+      setForm((f) => ({
+        ...f,
+        patientName: d.patientName || f.patientName,
+        patientPhone: d.patientPhone || f.patientPhone,
+      }));
+      setNeppVerified(true);
+      if (d.isStub) showToast("NEPP stub mode — using demo data.", "info");
+      else showToast("NEPP prescription verified.", "success");
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "NEPP verification failed.", "error");
+    } finally {
+      setNeppLoading(false);
+    }
+  }
+
+  function openBarcodeModal(prescription: Prescription) {
+    setBarcodeTarget(prescription);
+    setBarcodeInputs({});
+  }
+
+  async function handleConfirmDispense() {
+    if (!barcodeTarget) return;
+    setDispensing(true);
+    try {
+      await api.patch(`/pharmacy/prescriptions/${barcodeTarget.id}/dispense`, {});
+      showToast("Prescription dispensed. GRA E-VAT receipt issued.", "success");
       load();
+      setBarcodeTarget(null);
       setSelected(null);
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to dispense.", "error");
+    } finally {
+      setDispensing(false);
     }
+  }
+
+  function allBarcodesVerified() {
+    if (!barcodeTarget) return false;
+    return barcodeTarget.lines.every((l) =>
+      (barcodeInputs[l.id] ?? "").trim().toLowerCase() === l.item.sku.toLowerCase()
+    );
   }
 
   async function handleSendRefillReminder(id: string) {
@@ -263,7 +316,14 @@ export function PrescriptionRegister() {
                   </td>
                   <td className="px-4 py-3 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     {!p.dispensedAt && (
-                      <Button variant="outline" size="sm" onClick={() => handleDispense(p.id)}>Dispense</Button>
+                      <Button variant="outline" size="sm" onClick={() => openBarcodeModal(p)}>
+                        <Scan className="w-3 h-3 mr-1" />Dispense
+                      </Button>
+                    )}
+                    {p.evatInvoiceRef && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" title={`E-VAT: ${p.evatInvoiceRef}`}>
+                        <QrCode className="w-2.5 h-2.5" />E-VAT
+                      </span>
                     )}
                     {p.dispensedAt && p.patientPhone && (
                       <Button
@@ -284,9 +344,77 @@ export function PrescriptionRegister() {
         </div>
       )}
 
+      {/* Barcode Verification Modal */}
+      {barcodeTarget && (
+        <Modal isOpen={!!barcodeTarget} onClose={() => setBarcodeTarget(null)} title="Verify Barcodes Before Dispensing">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Scan or type each drug's barcode/SKU to confirm the correct product before dispensing.
+            </p>
+            <div className="space-y-3">
+              {barcodeTarget.lines.map((line) => {
+                const entered = (barcodeInputs[line.id] ?? "").trim();
+                const verified = entered.toLowerCase() === line.item.sku.toLowerCase();
+                return (
+                  <div key={line.id} className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{line.item.name}</div>
+                      <div className="text-xs text-gray-500">Expected SKU: <span className="font-mono">{line.item.sku}</span> · Qty: {line.prescribedQty}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Scan SKU…"
+                        value={barcodeInputs[line.id] ?? ""}
+                        onChange={(e) => setBarcodeInputs((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                        className={`w-36 border rounded-lg px-2 py-1.5 text-sm font-mono ${verified ? "border-green-500 bg-green-50 dark:bg-green-900/20" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"} dark:text-white`}
+                      />
+                      {verified && <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setBarcodeTarget(null)}>Cancel</Button>
+              <Button
+                type="button"
+                disabled={!allBarcodesVerified() || dispensing}
+                onClick={handleConfirmDispense}
+              >
+                {dispensing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
+                Confirm Dispense
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* New Prescription Modal */}
-      <Modal isOpen={showNew} onClose={() => { setShowNew(false); setForm(emptyForm); }} title="New Prescription">
+      <Modal isOpen={showNew} onClose={() => { setShowNew(false); setForm(emptyForm); setNeppVerified(false); }} title="New Prescription">
         <form onSubmit={handleCreate} className="space-y-4">
+
+          {/* NEPP code verification */}
+          <div>
+            <label className="block text-sm font-medium mb-1">NEPP Prescription Code (optional)</label>
+            <div className="flex gap-2">
+              <Input
+                value={form.neppCode}
+                onChange={(e) => { setForm({ ...form, neppCode: e.target.value }); setNeppVerified(false); }}
+                placeholder="e.g. NEPP-2026-XXXXX"
+                className="flex-1 font-mono"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!form.neppCode.trim() || neppLoading}
+                onClick={handleVerifyNepp}
+              >
+                {neppLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Verify"}
+              </Button>
+            </div>
+            {neppVerified && <p className="mt-1 text-xs text-green-600">✓ NEPP verified — patient fields pre-filled</p>}
+          </div>
 
           {/* Patient selector */}
           {patients.length > 0 && (
@@ -449,6 +577,16 @@ export function PrescriptionRegister() {
                 <div className="col-span-2"><span className="text-gray-500">NHIS Card:</span> <span className="font-mono font-medium">{selected.patient.nhisCardNumber}</span></div>
               )}
               <div className="col-span-2"><span className="text-gray-500">Status:</span> {selected.dispensedAt ? <span className="text-green-600 font-medium">Dispensed {new Date(selected.dispensedAt).toLocaleDateString()}</span> : <span className="text-amber-600 font-medium">Pending</span>}</div>
+              {selected.evatInvoiceRef && (
+                <div className="col-span-2 flex items-center gap-1">
+                  <QrCode className="w-3 h-3 text-green-600" />
+                  <span className="text-gray-500">E-VAT Ref:</span>
+                  <span className="font-mono text-xs text-green-700 dark:text-green-400">{selected.evatInvoiceRef}</span>
+                </div>
+              )}
+              {selected.neppCode && (
+                <div className="col-span-2"><span className="text-gray-500">NEPP Code:</span> <span className="font-mono text-xs">{selected.neppCode}</span></div>
+              )}
             </div>
             {selected.notes && <p className="text-gray-600 italic">"{selected.notes}"</p>}
             <table className="w-full mt-2 border-t dark:border-gray-700 pt-2">
@@ -470,7 +608,9 @@ export function PrescriptionRegister() {
                 </Button>
               )}
               {!selected.dispensedAt && (
-                <Button onClick={() => handleDispense(selected.id)}>Mark as Dispensed</Button>
+                <Button onClick={() => { openBarcodeModal(selected); }}>
+                  <Scan className="w-3 h-3 mr-1" />Dispense
+                </Button>
               )}
             </div>
           </div>
