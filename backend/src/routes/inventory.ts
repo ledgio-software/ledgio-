@@ -517,15 +517,19 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
           await (client as any).warehouseStock.createMany({ data: stockData, skipDuplicates: true });
         }
 
-        // InventoryBatch records for pharmacy rows that supplied batch/expiry data
+        // InventoryBatch records for pharmacy rows that supplied batch/expiry data.
+        // warehouseId and costPrice are required by the model; skip rows that
+        // lack a warehouse (no batch can be location-tracked without one).
         const batchData = okRows
-          .filter(r => r.batchNumber && skuToItem.has(r.sku))
+          .filter(r => r.batchNumber && r.initialWarehouseId && skuToItem.has(r.sku))
           .map(r => ({
             tenantId,
             itemId: skuToItem.get(r.sku)!.id,
+            warehouseId: r.initialWarehouseId!,
             batchNumber: r.batchNumber!,
             expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
-            quantity: r.initialQty,
+            quantityOnHand: r.initialQty,
+            costPrice: r.costPrice,
           }));
 
         if (batchData.length > 0) {
