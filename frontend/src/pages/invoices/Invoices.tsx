@@ -8,7 +8,7 @@ import { Input } from "../../components/ui/Input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
-import { syncDb, createInvoiceLocalFirst, payInvoiceLocalFirst, resyncInvoicesFromServer } from "../../lib/syncEngine";
+import { syncDb, createInvoiceLocalFirst, payInvoiceLocalFirst, resyncInvoicesFromServer, retryFailedInvoice } from "../../lib/syncEngine";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
@@ -698,14 +698,24 @@ export function Invoices() {
                           </span>
                         )}
                         {inv._failed && (
-                          <span
-                            className="font-sans text-[10px] font-normal text-red-600 dark:text-red-400"
-                            title={inv._failureReason || 'This change was rejected and needs your attention.'}
-                          >
+                          <span className="font-sans text-[10px] font-normal text-red-600 dark:text-red-400">
                             Needs attention
                           </span>
                         )}
                       </div>
+                      {inv._failed && (
+                        <div className="mt-1 max-w-[220px] rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-2 py-1 font-sans font-normal leading-snug">
+                          <p className="text-[11px] text-red-700 dark:text-red-300">
+                            {inv._failureReason || 'This change was rejected by the server.'}
+                          </p>
+                          <button
+                            className="mt-1 text-[11px] font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                            onClick={() => retryFailedInvoice(inv.id).catch(() => {})}
+                          >
+                            Retry →
+                          </button>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-secondary-900 dark:text-secondary-50">{inv.customer?.name}</div>

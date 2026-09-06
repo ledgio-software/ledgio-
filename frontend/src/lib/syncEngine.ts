@@ -616,6 +616,32 @@ async function markEntityFailed(entry: OutboxEntry, reason?: string): Promise<vo
   }
 }
 
+/**
+ * Reset a failed outbox entry back to 'pending' and clear the _failed flag on
+ * the local invoice so flushOutbox will attempt it again. Works for both
+ * CREATE_INVOICE and PAY_INVOICE failures.
+ */
+export async function retryFailedInvoice(invoiceId: string): Promise<void> {
+  // Find any failed outbox entries linked to this invoice (by tempId or invoiceId).
+  const all = await syncDb.outbox.toArray();
+  const linked = all.filter(
+    (e) =>
+      e.status === 'failed' &&
+      ((e.kind === 'CREATE_INVOICE' && (e as any).tempId === invoiceId) ||
+        (e.kind === 'PAY_INVOICE' && (e as any).invoiceId === invoiceId)),
+  );
+  for (const e of linked) {
+    await syncDb.outbox.update(e.localId!, { status: 'pending', failureReason: undefined });
+  }
+  // Clear the visual failure state on the invoice.
+  const row = await syncDb.invoices.get(invoiceId);
+  if (row) {
+    await syncDb.invoices.put({ ...row, _pending: true, _failed: false, _failureReason: undefined });
+  }
+  // Kick off the outbox immediately.
+  flushOutbox().catch(() => {});
+}
+
 let retryInterval: ReturnType<typeof setInterval> | null = null;
 
 /** Starts the background retry triggers (online event + fallback interval) - call once on login; stopSyncBackground() tears it down on logout. */

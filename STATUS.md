@@ -2,6 +2,22 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: Invoice sync failure reason visible + Retry button
+
+**What/Why:**
+
+The "Needs attention" badge on failed invoices only showed its error reason as a tooltip (hover-only). Users had no idea *why* an invoice failed or what to do. Fixed by:
+
+1. **Visible error text** — When an invoice has `_failed=true`, a red info box appears below the invoice number showing the exact server rejection message (e.g. "Insufficient stock for item X").
+2. **Retry button** — A "Retry →" link inside the error box resets the outbox entry from `failed` → `pending` and triggers `flushOutbox` immediately, so the sync re-attempts without a page reload.
+3. **`retryFailedInvoice(invoiceId)`** exported from `syncEngine.ts` — handles both `CREATE_INVOICE` and `PAY_INVOICE` outbox entry kinds, clears `_failed`/`_failureReason` on the local record, and kicks off the outbox flush.
+
+**Files Affected:**
+- `frontend/src/lib/syncEngine.ts` — new `retryFailedInvoice` export
+- `frontend/src/pages/invoices/Invoices.tsx` — visible error reason box + Retry button
+
+---
+
 ## [Date: 2026-09-06] - Fix: POS receipt PDF column alignment + WhatsApp delivery feedback
 
 **What/Why:**
