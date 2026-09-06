@@ -2,6 +2,29 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-06] - Fix: Quick-Add Table missing Batch # and Expiry Date columns for PHARMACY org type
+
+**What/Why:**
+
+The "Bulk Add Products" Quick-Add Table in Warehouse Management was missing Batch # and Expiry Date columns when accessed by a PHARMACY account. These are mandatory fields for tracking drug batches and expiry in a pharmacy context.
+
+**Changes:**
+
+- Extended `BulkRow` interface and `EMPTY_BULK_ROW` constant with `batchNumber` and `expiryDate` fields
+- Added conditional `<th>` headers (Batch # / Expiry Date) and `<td>` input cells shown only when `user?.orgType === "PHARMACY"`
+- CSV parser now maps `batchNumber` and `expiryDate` from CSV files (allows pharmacy CSV imports to include these fields too)
+- `handleBulkSubmit` now includes `batchNumber` and `expiryDate` in the per-item payload
+- Backend `/inventory/items/bulk` endpoint now:
+  - Accepts `batchNumber` and `expiryDate` on each item row
+  - After inserting stock, creates `InventoryBatch` records for rows with a batch number
+  - Sets `requiresBatchTracking: true` on items that had a batch number
+
+**Files Affected:**
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `BulkRow`, `EMPTY_BULK_ROW`, table UI, CSV parser, `handleBulkSubmit`
+- `backend/src/routes/inventory.ts` — `ValidRow` type, row extraction, batch record creation after stock inserts
+
+---
+
 ## [Date: 2026-09-06] - Feature: Pharmacy ERP gaps — GRA E-VAT, NEPP, barcode enforcement, ABC-FSN inventory matrix
 
 **What/Why:**
