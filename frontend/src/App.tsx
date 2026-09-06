@@ -95,6 +95,7 @@ const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister"
 const ExpiryAlerts = lazy(() => import("./pages/pharmacy/ExpiryAlerts").then(m => ({ default: m.ExpiryAlerts })));
 const PharmacyPatients = lazy(() => import("./pages/pharmacy/PharmacyPatients").then(m => ({ default: m.PharmacyPatients })));
 const NhisClaims = lazy(() => import("./pages/pharmacy/NhisClaims").then(m => ({ default: m.NhisClaims })));
+const PharmacyInventoryMatrix = lazy(() => import("./pages/pharmacy/PharmacyInventoryMatrix").then(m => ({ default: m.PharmacyInventoryMatrix })));
 const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m => ({ default: m.CostCentres })));
 const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
 const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ default: m.VatReturn })));
@@ -845,6 +846,7 @@ function App() {
               <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/patients" element={<ProtectedRoute><MainLayout><PharmacyPatients /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/nhis-claims" element={<ProtectedRoute><MainLayout><NhisClaims /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/inventory-matrix" element={<ProtectedRoute><MainLayout><PharmacyInventoryMatrix /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
               <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />

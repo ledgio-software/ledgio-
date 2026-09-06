@@ -1165,6 +1165,8 @@ model Prescription {
   notes             String?
   billingType       String    @default("CASH") @map("billing_type")
   patientId         String?   @map("patient_id")
+  evatInvoiceRef    String?   @map("evat_invoice_ref")
+  neppCode          String?   @map("nepp_code")
   createdAt         DateTime  @default(now()) @map("created_at")
 
   lines   PrescriptionLine[]
