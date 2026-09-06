@@ -6,24 +6,24 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../lib/api";
-import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill } from "lucide-react";
+import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill, HardHat } from "lucide-react";
 import { AuthSplitLayout } from "../../components/layout/AuthSplitLayout";
 
 const BUSINESS_PROFILES = [
   {
-    value: "BUSINESS" as const,
+    value: "RETAIL" as const,
     label: "Retail Shop / Boutique",
     sub: "Physical store, kiosk, market stall",
     icon: ShoppingBag,
   },
   {
-    value: "BUSINESS" as const,
+    value: "WHOLESALE" as const,
     label: "Wholesale / Distributor",
     sub: "Bulk sales, invoices, credit terms",
     icon: Package,
   },
   {
-    value: "BUSINESS" as const,
+    value: "SERVICE" as const,
     label: "Service Business",
     sub: "Agency, freelancer, professional firm",
     icon: Briefcase,
@@ -33,6 +33,12 @@ const BUSINESS_PROFILES = [
     label: "NGO / School / Church",
     sub: "Fund accounting, donor tracking",
     icon: Heart,
+  },
+  {
+    value: "CONSTRUCTION" as const,
+    label: "Construction / Contractor",
+    sub: "Job costing, materials, site payroll",
+    icon: HardHat,
   },
   {
     value: "BUSINESS" as const,
@@ -58,14 +64,11 @@ export function Register() {
     tenantName: "",
     tenantSlug: "",
     baseCurrency: "GHS",
-    orgType: "BUSINESS",
+    orgType: "RETAIL",
     referralCode: "",
   });
   const [referralStatus, setReferralStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle");
   const [referralPartnerName, setReferralPartnerName] = useState("");
-  // Tracks which profile card is highlighted — multiple cards share orgType=BUSINESS
-  // so we can't use orgType alone to identify the selected card.
-  const [selectedProfile, setSelectedProfile] = useState<string>("Retail Shop / Boutique");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [activeLegalDoc, setActiveLegalDoc] = useState<"terms-and-conditions" | "privacy-policy">("terms-and-conditions");
@@ -360,12 +363,12 @@ export function Register() {
                   <div className="grid grid-cols-1 gap-2">
                     {BUSINESS_PROFILES.map((opt) => {
                       const Icon = opt.icon;
-                      const isSelected = selectedProfile === opt.label;
+                      const isSelected = formData.orgType === opt.value;
                       return (
                         <button
                           key={opt.label}
                           type="button"
-                          onClick={() => { setSelectedProfile(opt.label); setFormData({ ...formData, orgType: opt.value }); }}
+                          onClick={() => setFormData({ ...formData, orgType: opt.value })}
                           className={`flex items-center gap-3 text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
                             isSelected
                               ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"

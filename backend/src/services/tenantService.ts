@@ -161,7 +161,8 @@ export async function onboardTenant(
   }
 
   const tier = dto.tier !== undefined ? Number(dto.tier) : 1;
-  const orgType = dto.orgType === 'NONPROFIT' ? 'NONPROFIT' : dto.orgType === 'PHARMACY' ? 'PHARMACY' : 'BUSINESS';
+  const VALID_ORG_TYPES = new Set(['BUSINESS', 'NONPROFIT', 'PHARMACY', 'RETAIL', 'WHOLESALE', 'SERVICE', 'CONSTRUCTION']);
+  const orgType = dto.orgType && VALID_ORG_TYPES.has(dto.orgType) ? dto.orgType : 'BUSINESS';
   const trialEndsAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
   // Validate referral code if provided

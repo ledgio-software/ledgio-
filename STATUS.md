@@ -2,6 +2,19 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-05] - Feature: Per-org-type nav filtering (RETAIL / WHOLESALE / SERVICE / CONSTRUCTION)
+
+**What/Why:**
+
+Every business used to register as generic `BUSINESS` and see the full nav — a construction firm saw POS, a service agency saw stock reports. Added five distinct org types (`RETAIL`, `WHOLESALE`, `SERVICE`, `CONSTRUCTION`, plus existing `NONPROFIT` / `PHARMACY` / `BUSINESS`). Each type gets its own nav profile: SERVICE hides the entire Inventory section and stock reports; WHOLESALE hides POS; CONSTRUCTION hides POS and manufacturing but keeps Job Costing; RETAIL and PHARMACY keep POS + Inventory but strip industrial manufacturing routes. The registration profile cards now map 1-to-1 to org types so selection is unambiguous.
+
+**Files Affected:**
+- `backend/src/services/tenantService.ts` — `VALID_ORG_TYPES` set accepts the four new types
+- `frontend/src/lib/navigation.ts` — `ORG_TYPE_HIDDEN` map + SERVICE section-level drop in `getVisibleNavGroups`
+- `frontend/src/pages/auth/Register.tsx` — profile cards now have unique org-type values; added Construction / Contractor card; removed `selectedProfile` state hack
+
+---
+
 ## [Date: 2026-09-05] - Fix: Referral code always rejected as "invalid" during registration
 
 **What/Why:**

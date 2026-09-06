@@ -77,6 +77,42 @@ const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/approvals', '/audit-logs', '/help-assistant/activity', '/import',
 ]);
 
+// Items hidden per org type at signup — applied before tier/role/mode filtering.
+// RETAIL keeps POS + Inventory; removes heavy industrial features.
+// WHOLESALE removes POS; keeps Inventory + bulk-sales tooling.
+// SERVICE removes POS + entire Inventory section + stock-specific reports.
+// CONSTRUCTION removes POS + manufacturing; keeps Job Costing, Purchase Orders, Payroll.
+// PHARMACY removes manufacturing; keeps POS + Inventory + Pharmacy section.
+const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
+  RETAIL: new Set([
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+  ]),
+  WHOLESALE: new Set([
+    '/pos',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+  ]),
+  SERVICE: new Set([
+    '/pos',
+    '/analytics/inventory', '/inventory/serial-numbers',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders', '/cost-categories',
+    '/pdc', '/reports/interest-charges',
+    '/reports/stock-movement', '/reports/stock-aging', '/reports/landed-costs',
+    '/reports/sales-channel', '/reports/monthly-sales-ledger',
+  ]),
+  CONSTRUCTION: new Set([
+    '/pos',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+    '/reports/stock-aging', '/reports/sales-channel', '/reports/monthly-sales-ledger',
+  ]),
+  PHARMACY: new Set([
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+  ]),
+};
+
 const BUSINESS_HIDDEN: ReadonlySet<string> = new Set([
   '/settings/fiscal-periods', '/settings/recurring-transactions',
   '/reports/ledger', '/fixed-assets',
@@ -379,8 +415,21 @@ export function getVisibleNavGroups(
       .filter((group): group is NavGroup => group !== null);
   }
 
-  // POS toggle: when posEnabled is false, hide /pos from BUSINESS tenants
-  // (NONPROFIT already removes it above via orgType gating).
+  // SERVICE orgs carry no physical stock — remove the entire inventory section.
+  if (orgType === "SERVICE") {
+    groups = groups.filter((group) => group.sectionTitle !== "INVENTORY & GODOWNS");
+  }
+
+  // Apply per-org-type item hiding (RETAIL / WHOLESALE / SERVICE / CONSTRUCTION / PHARMACY).
+  const orgHidden = orgType ? ORG_TYPE_HIDDEN[orgType] : undefined;
+  if (orgHidden) {
+    groups = groups
+      .map((group) => ({ ...group, items: group.items.filter((item) => !orgHidden.has(item.href)) }))
+      .filter((group) => group.items.length > 0);
+  }
+
+  // POS toggle: when posEnabled is false, hide /pos from BUSINESS tenants.
+  // Types that already hide POS via ORG_TYPE_HIDDEN or NONPROFIT block are unaffected.
   if (!posEnabled && orgType !== "NONPROFIT") {
     groups = groups
       .map((group) =>
