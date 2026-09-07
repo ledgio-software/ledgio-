@@ -996,6 +996,10 @@ model InventoryItem {
   // WHOLESALE customer is selected on an invoice or POS sale the unit price
   // auto-fills from this field; the user can still override per-line.
   wholesalePrice    Decimal? @map("wholesale_price") @db.Decimal(15, 2)
+  // Minimum price floor: attendants can negotiate above this but the POS
+  // blocks any sale recorded below it. Null = no floor enforced (fixed-price
+  // shops set floor = sellingPrice implicitly via UI convention).
+  floorPrice        Decimal? @map("floor_price") @db.Decimal(15, 2)
   reorderLevel      Int      @default(10) @map("reorder_level")
   // Guards against repeat low-stock notifications within 24 hours for the same
   // item (see lowStockAlertService.ts). Null = never alerted.

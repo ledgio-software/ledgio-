@@ -376,16 +376,37 @@ router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async 
           }
         }
 
-        const effectivePriceFor = (item: any): number => {
+        const effectivePriceFor = (item: any, line: any): number => {
+          // If a custom price was negotiated and sent from the POS, use it
+          // (already validated against floorPrice below).
+          if (line.customPrice !== undefined && line.customPrice !== null) {
+            return Number(line.customPrice);
+          }
           if (resolvedSaleType === 'WHOLESALE' && item.wholesalePrice !== null && item.wholesalePrice !== undefined) {
             return Number(item.wholesalePrice);
           }
           return Number(item.sellingPrice);
         };
 
+        // Floor price validation: reject any line whose negotiated price
+        // is below the item's configured floor, protecting the boss from
+        // attendants under-recording a sale price.
+        for (const line of items) {
+          if (line.customPrice === undefined || line.customPrice === null) continue;
+          const item = itemsById.get(line.itemId) as any;
+          if (item.floorPrice !== null && item.floorPrice !== undefined) {
+            const floor = Number(item.floorPrice);
+            if (Number(line.customPrice) < floor) {
+              throw new Error(
+                `Sale price for ${item.name} (GH₵ ${Number(line.customPrice).toFixed(2)}) is below the floor price of GH₵ ${floor.toFixed(2)}.`
+              );
+            }
+          }
+        }
+
         const totalAmount = items.reduce((sum: number, line: any) => {
           const item = itemsById.get(line.itemId) as any;
-          return sum + effectivePriceFor(item) * line.quantity;
+          return sum + effectivePriceFor(item, line) * line.quantity;
         }, 0);
 
         // For non-CASH payments, cashGiven = amount (exact, no change)
@@ -489,7 +510,7 @@ router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async 
 
         const lines = items.map((line: any) => {
           const item = itemsById.get(line.itemId) as any;
-          const price = effectivePriceFor(item);
+          const price = effectivePriceFor(item, line);
           return {
             itemId: line.itemId,
             itemName: item.name as string,

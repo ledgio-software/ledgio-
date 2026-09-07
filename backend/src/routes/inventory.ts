@@ -24,6 +24,7 @@ const createItemSchema = z.object({
   costPrice: z.union([z.number().nonnegative('Cost price must be ≥ 0'), z.string().transform(Number)]),
   sellingPrice: z.union([z.number().nonnegative('Selling price must be ≥ 0'), z.string().transform(Number)]),
   wholesalePrice: z.union([z.number().nonnegative(), z.string().transform(Number)]).optional().nullable(),
+  floorPrice: z.union([z.number().nonnegative(), z.string().transform(Number)]).optional().nullable(),
   initialWarehouseId: z.string().uuid().optional().nullable(),
   initialQty: z.union([z.number().nonnegative(), z.string().transform(Number)]).default(0),
   reorderLevel: z.union([z.number().int().nonnegative(), z.string().transform(Number)]).default(10),
@@ -266,7 +267,7 @@ router.get('/items', async (req: Request, res: Response): Promise<void> => {
 router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), validateBody(createItemSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { name, sku, category = 'General', unitOfMeasure = 'pcs', secondaryUnitOfMeasure, conversionFactor, costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
+    const { name, sku, category = 'General', unitOfMeasure = 'pcs', secondaryUnitOfMeasure, conversionFactor, costPrice, sellingPrice, wholesalePrice, floorPrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
 
     if (!name || !costPrice || !sellingPrice) {
       res.status(400).json({ success: false, error: 'Item name, cost price, and selling price are required.' });
@@ -302,6 +303,7 @@ router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Ware
           costPrice: Number(costPrice),
           sellingPrice: Number(sellingPrice),
           wholesalePrice: wholesalePrice !== undefined && wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null,
+          floorPrice: floorPrice !== undefined && floorPrice !== null && floorPrice !== '' ? Number(floorPrice) : null,
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           preferredVendorId: preferredVendorId || null,
           ...(regulatoryCategory !== undefined && { regulatoryCategory: String(regulatoryCategory) }),
@@ -356,7 +358,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
-    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId, requiresBatchTracking, secondaryUnitOfMeasure, conversionFactor } = req.body;
+    const { name, costPrice, sellingPrice, wholesalePrice, floorPrice, reorderLevel, preferredVendorId, requiresBatchTracking, secondaryUnitOfMeasure, conversionFactor } = req.body;
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).inventoryItem.findFirst({ where: { id, tenantId } });
@@ -376,6 +378,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
           ...(costPrice !== undefined && { costPrice: Number(costPrice) }),
           ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
           ...(wholesalePrice !== undefined && { wholesalePrice: wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null }),
+          ...(floorPrice !== undefined && { floorPrice: floorPrice !== null && floorPrice !== '' ? Number(floorPrice) : null }),
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           ...(preferredVendorId !== undefined && { preferredVendorId: preferredVendorId || null }),
           ...(requiresBatchTracking !== undefined && { requiresBatchTracking: Boolean(requiresBatchTracking) }),
