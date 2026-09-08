@@ -14,6 +14,7 @@ export interface OfflineCatalogItem {
   name: string;
   sellingPrice: number;
   wholesalePrice: number | null;
+  floorPrice: number | null;
   unitOfMeasure: string;
   stockQty: number;
 }

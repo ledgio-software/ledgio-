@@ -34,6 +34,7 @@ interface InventoryItemOption {
   name: string;
   sellingPrice: number;
   wholesalePrice: number | null;
+  floorPrice: number | null;
   unitOfMeasure: string;
   stockQty: number;
   regulatoryCategory?: string;
@@ -46,8 +47,10 @@ interface CartLine {
   unitOfMeasure: string;
   sellingPrice: number;
   wholesalePrice: number | null;
+  floorPrice: number | null;
   stockQty: number;
   quantity: number;
+  customPrice: number | null;
   regulatoryCategory?: string;
 }
 
@@ -219,6 +222,7 @@ export function PointOfSale() {
               name: it.name,
               sellingPrice: Number(it.sellingPrice),
               wholesalePrice: it.wholesalePrice != null ? Number(it.wholesalePrice) : null,
+              floorPrice: it.floorPrice != null ? Number(it.floorPrice) : null,
               unitOfMeasure: it.unitOfMeasure,
               stockQty: stock ? stock.quantityOnHand : 0,
               regulatoryCategory: it.regulatoryCategory,
@@ -371,17 +375,31 @@ export function PointOfSale() {
           unitOfMeasure: item.unitOfMeasure,
           sellingPrice: item.sellingPrice,
           wholesalePrice: item.wholesalePrice,
+          floorPrice: item.floorPrice,
           stockQty: item.stockQty,
           quantity: 1,
+          customPrice: null,
           regulatoryCategory: item.regulatoryCategory,
         },
       ];
     });
   };
 
-  // Effective price for a cart line based on current saleType
-  const effectivePriceFor = (l: CartLine) =>
-    saleType === "WHOLESALE" && l.wholesalePrice != null ? l.wholesalePrice : l.sellingPrice;
+  // Effective price for a cart line: custom negotiated price > wholesale > retail
+  const effectivePriceFor = (l: CartLine) => {
+    if (l.customPrice !== null) return l.customPrice;
+    if (saleType === "WHOLESALE" && l.wholesalePrice != null) return l.wholesalePrice;
+    return l.sellingPrice;
+  };
+
+  const updateCartPrice = (itemId: string, rawValue: string) => {
+    const val = rawValue === "" ? null : Number(rawValue);
+    setCart((prev) => prev.map((l) => l.itemId === itemId ? { ...l, customPrice: val } : l));
+  };
+
+  const floorViolations = cart.filter(
+    (l) => l.floorPrice !== null && effectivePriceFor(l) < l.floorPrice
+  );
 
   const adjustCartQty = (itemId: string, delta: number) => {
     setCart((prev) =>
@@ -418,9 +436,14 @@ export function PointOfSale() {
     const clientTxnId = crypto.randomUUID();
     const clientOccurredAt = new Date().toISOString();
     try {
+      if (floorViolations.length > 0) {
+        setSaleError(`Price below floor for: ${floorViolations.map(l => l.name).join(", ")}. Adjust prices before recording.`);
+        setIsRecordingSale(false);
+        return;
+      }
       const res = await api.post("/tills/sales", {
         tillId: till.id,
-        items: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity })),
+        items: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity, ...(l.customPrice !== null ? { customPrice: l.customPrice } : {}) })),
         cashGiven: paymentMethod === "CASH" ? Number(cashGiven) : cartTotal,
         saleType,
         clientTxnId,
@@ -802,16 +825,33 @@ export function PointOfSale() {
                   ) : (
                     <table className="w-full text-sm">
                       <tbody>
-                        {cart.map((l) => (
-                          <tr key={l.itemId} className="border-t border-secondary-100 dark:border-secondary-800 first:border-t-0">
+                        {cart.map((l) => {
+                          const price = effectivePriceFor(l);
+                          const belowFloor = l.floorPrice !== null && price < l.floorPrice;
+                          return (
+                          <tr key={l.itemId} className={`border-t border-secondary-100 dark:border-secondary-800 first:border-t-0 ${belowFloor ? "bg-red-50 dark:bg-red-900/20" : ""}`}>
                             <td className="p-2">
                               <div className="font-medium text-secondary-900 dark:text-secondary-50">{l.name}</div>
-                              <div className="text-xs text-secondary-500">
-                                {formatMoney(effectivePriceFor(l))} / {l.unitOfMeasure}
-                                {saleType === "WHOLESALE" && l.wholesalePrice != null && (
-                                  <span className="text-blue-600 dark:text-blue-400 ml-1">(wholesale)</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <input
+                                  type="number"
+                                  min={l.floorPrice ?? 0}
+                                  step="0.01"
+                                  placeholder={String(saleType === "WHOLESALE" && l.wholesalePrice != null ? l.wholesalePrice : l.sellingPrice)}
+                                  value={l.customPrice !== null ? l.customPrice : ""}
+                                  onChange={(e) => updateCartPrice(l.itemId, e.target.value)}
+                                  className={`w-24 text-xs rounded border px-2 py-0.5 focus:outline-none focus:ring-1 ${belowFloor ? "border-red-400 bg-red-50 dark:bg-red-900/20 focus:ring-red-400" : "border-secondary-300 dark:border-secondary-600 bg-background focus:ring-primary"}`}
+                                />
+                                <span className="text-xs text-secondary-400">/ {l.unitOfMeasure}</span>
+                                {l.floorPrice !== null && (
+                                  <span className={`text-xs ${belowFloor ? "text-red-600 dark:text-red-400 font-medium" : "text-secondary-400"}`}>
+                                    min {formatMoney(l.floorPrice)}
+                                  </span>
                                 )}
                               </div>
+                              {belowFloor && (
+                                <div className="text-xs text-red-600 dark:text-red-400 mt-0.5">Below floor price</div>
+                              )}
                             </td>
                             <td className="p-2">
                               <div className="flex items-center gap-1.5">
@@ -829,14 +869,15 @@ export function PointOfSale() {
                                 </button>
                               </div>
                             </td>
-                            <td className="p-2 text-right font-semibold whitespace-nowrap">{formatMoney(effectivePriceFor(l) * l.quantity)}</td>
+                            <td className="p-2 text-right font-semibold whitespace-nowrap">{formatMoney(price * l.quantity)}</td>
                             <td className="p-2">
                               <button type="button" onClick={() => removeFromCart(l.itemId)} className="text-secondary-400 hover:text-red-500 p-1">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}
@@ -916,7 +957,7 @@ export function PointOfSale() {
                     </div>
                   )}
 
-                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven)}>
+                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven) || floorViolations.length > 0}>
                     {isRecordingSale ? "Recording..." : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}
                   </Button>
                 </form>

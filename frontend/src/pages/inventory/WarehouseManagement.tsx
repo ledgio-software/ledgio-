@@ -82,6 +82,7 @@ interface InventoryItem {
   costPrice: number;
   sellingPrice: number;
   wholesalePrice?: number | null;
+  floorPrice?: number | null;
   reorderLevel: number;
   warehouseStocks: WarehouseStock[];
   regulatoryCategory?: string;
@@ -174,6 +175,7 @@ export function WarehouseManagement() {
   const [costPrice, setCostPrice] = useState("150");
   const [sellingPrice, setSellingPrice] = useState("250");
   const [wholesalePrice, setWholesalePrice] = useState("");
+  const [floorPrice, setFloorPrice] = useState("");
   const [initialWarehouseId, setInitialWarehouseId] = useState("");
   const [initialQty, setInitialQty] = useState("50");
   const [preferredVendorId, setPreferredVendorId] = useState("");
@@ -259,6 +261,7 @@ export function WarehouseManagement() {
         costPrice: Number(costPrice),
         sellingPrice: Number(sellingPrice),
         wholesalePrice: wholesalePrice !== "" ? Number(wholesalePrice) : undefined,
+        floorPrice: floorPrice !== "" ? Number(floorPrice) : undefined,
         initialWarehouseId,
         initialQty: Number(initialQty),
         preferredVendorId: preferredVendorId || undefined,
@@ -902,6 +905,9 @@ export function WarehouseManagement() {
                         {it.wholesalePrice != null && (
                           <div className="text-xs text-primary-600 dark:text-primary-400">{formatMoney(Number(it.wholesalePrice))} (Wholesale)</div>
                         )}
+                        {(it as any).floorPrice != null && (
+                          <div className="text-xs text-amber-600 dark:text-amber-400">Floor: {formatMoney(Number((it as any).floorPrice))}</div>
+                        )}
                       </TableCell>
 
                       {/* Shop Availability Badges */}
@@ -1059,6 +1065,10 @@ export function WarehouseManagement() {
             <div>
               <label className="block text-sm font-medium mb-1">Wholesale Price (GH₵) <span className="text-secondary-400 font-normal">optional</span></label>
               <Input type="number" placeholder="Leave blank if same as retail" value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Floor Price (GH₵) <span className="text-secondary-400 font-normal">optional — min sale price</span></label>
+              <Input type="number" placeholder="Attendants cannot sell below this" value={floorPrice} onChange={(e) => setFloorPrice(e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

@@ -2,6 +2,27 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-07] - Feature: Floor Price enforcement on POS
+
+**What/Why:**
+For flexible-price markets (e.g. phone accessories shops) where attendants negotiate with customers, a fixed selling price is not practical. However, without a minimum, attendants can record a sale at GHS 35, charge the customer GHS 80, and pocket the difference. The floor price feature solves this:
+
+- **Boss sets a floor price per item** — the absolute minimum that must be recorded in the system
+- **POS allows price negotiation above the floor** — attendant can type any price into the per-line input
+- **POS blocks any price below the floor** — red highlight, "Below floor price" label, and the Record Sale button is disabled
+- **Backend validates too** — if a tampered request arrives below the floor, the server rejects it with a clear error
+- **Fixed-price shops unaffected** — if no floor is set (null), the POS behaves exactly as before
+
+**Files Affected:**
+- `backend/prisma/schema.prisma` — added `floorPrice Decimal? @map("floor_price")` to `InventoryItem`
+- `backend/prisma/migrations/20260907000001_add_floor_price_to_inventory_item/migration.sql` — ALTER TABLE migration
+- `backend/src/routes/inventory.ts` — `floorPrice` in create/update Zod schema and handlers
+- `backend/src/routes/cashTill.ts` — `effectivePriceFor` now accepts optional `customPrice` per line; server-side floor price validation before recording sale
+- `frontend/src/pages/pos/PointOfSale.tsx` — `floorPrice` and `customPrice` added to interfaces; per-line editable price input with floor indicator; `floorViolations` blocks submit
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `floorPrice` state and form field; floor price shown in item table (amber label)
+
+---
+
 ## [Date: 2026-09-06] - Fix: Dashboard KPI number overflow + Stock Movement tab in Inventory
 
 **What/Why:**
