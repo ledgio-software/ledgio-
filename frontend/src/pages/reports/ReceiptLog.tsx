@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Fragment } from "react";
 import { Receipt, RefreshCw, Download } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
@@ -162,9 +162,8 @@ export function ReceiptLog() {
                   </TableRow>
                 )}
                 {receipts.map((r) => (
-                  <>
+                  <Fragment key={r.id}>
                     <TableRow
-                      key={r.id}
                       className="cursor-pointer hover:bg-secondary-50 dark:hover:bg-secondary-900/40"
                       onClick={() => setExpanded(expanded === r.id ? null : r.id)}
                     >
@@ -197,7 +196,7 @@ export function ReceiptLog() {
                       </TableCell>
                     </TableRow>
                     {expanded === r.id && (
-                      <TableRow key={`${r.id}-detail`} className="bg-secondary-50 dark:bg-secondary-900/30">
+                      <TableRow className="bg-secondary-50 dark:bg-secondary-900/30">
                         <TableCell colSpan={9} className="py-2 px-4">
                           <div className="text-xs space-y-1">
                             {r.voidedAt && (
@@ -234,7 +233,7 @@ export function ReceiptLog() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
