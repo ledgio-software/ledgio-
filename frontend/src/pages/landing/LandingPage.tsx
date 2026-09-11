@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -153,19 +153,31 @@ export function LandingPage() {
   const { isInstallable, isInstalled, promptInstall } = useInstallPrompt();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
+  // Load landing-page-only fonts (Syne + DM Sans) lazily so the app shell
+  // doesn't download them for authenticated users who never visit this page.
+  useEffect(() => {
+    const id = 'landing-fonts';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap';
+    document.head.appendChild(link);
+  }, []);
+
   return (
     <div className="min-h-screen bg-secondary-950 text-secondary-100 font-sans selection:bg-emerald-500 selection:text-white">
       <PublicHeader />
 
       {/* Hero */}
       <section className="relative pt-24 pb-32 overflow-hidden bg-secondary-950">
-        {/* Subtle radial glow */}
+        {/* Subtle radial glow — CSS gradient, no GPU blur filter */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 flex items-start justify-center"
-        >
-          <div className="w-[800px] h-[500px] bg-emerald-600/10 rounded-full blur-3xl -translate-y-1/3" />
-        </div>
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(ellipse 800px 500px at 50% -10%, rgba(5,150,105,0.10) 0%, transparent 70%)' }}
+        />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-8">
@@ -208,7 +220,7 @@ export function LandingPage() {
           </p>
 
           {/* Stat strip */}
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 divide-x divide-secondary-800 border border-secondary-800 rounded-2xl overflow-hidden bg-secondary-900/50 backdrop-blur-sm">
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 divide-x divide-secondary-800 border border-secondary-800 rounded-2xl overflow-hidden bg-secondary-900">
             {[
               { value: "Instant SMS", label: "Till shortage alerts" },
               { value: "Mon 8 AM", label: "Weekly P&L email delivery" },

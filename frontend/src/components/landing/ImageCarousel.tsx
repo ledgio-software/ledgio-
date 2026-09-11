@@ -66,6 +66,7 @@ export function ImageCarousel() {
                 alt={slide.alt}
                 className="w-full h-full object-cover"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-950/90 via-secondary-950/10 to-transparent" />
               <p className="absolute bottom-5 left-6 right-6 text-white text-base sm:text-lg font-bold drop-shadow-md">

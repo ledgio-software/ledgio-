@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import Papa from "papaparse";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -679,6 +680,14 @@ export function WarehouseManagement() {
     return matchesSearch && matchesLowStock;
   });
 
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredItems.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 80,
+    overscan: 10,
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -869,116 +878,135 @@ export function WarehouseManagement() {
               No matching inventory items found. Try clearing your search filter or click "Add Product / Item".
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-secondary-50/50 dark:bg-secondary-900/50">
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Cost / Selling</TableHead>
-                  <TableHead className="min-w-[320px]">Live Shop-by-Shop Stock Breakdown</TableHead>
-                  <TableHead className="text-right">Total System Stock</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredItems.map((it) => {
-                  const totalQty = calculateTotalStock(it);
-                  const isLowStock = totalQty <= it.reorderLevel;
+            <div ref={tableContainerRef} style={{ height: '520px', overflowY: 'auto' }}>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-secondary-50/50 dark:bg-secondary-900/50">
+                    <TableHead className="w-[100px]">SKU</TableHead>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Cost / Selling</TableHead>
+                    <TableHead className="min-w-[320px]">Live Shop-by-Shop Stock Breakdown</TableHead>
+                    <TableHead className="text-right">Total System Stock</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rowVirtualizer.getVirtualItems().length > 0 && rowVirtualizer.getVirtualItems()[0].start > 0 && (
+                    <TableRow style={{ height: `${rowVirtualizer.getVirtualItems()[0].start}px` }} aria-hidden />
+                  )}
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const it = filteredItems[virtualRow.index];
+                    const totalQty = calculateTotalStock(it);
+                    const isLowStock = totalQty <= it.reorderLevel;
 
-                  return (
-                    <TableRow key={it.id} className="hover:bg-secondary-50/60 dark:hover:bg-secondary-900/40">
-                      <TableCell className="font-mono text-xs font-semibold text-primary-600 dark:text-primary-400">
-                        {it.sku}
-                      </TableCell>
-                      <TableCell className="font-medium text-secondary-900 dark:text-secondary-50">
-                        {it.name}
-                        {it.regulatoryCategory && it.regulatoryCategory !== "GENERAL" && (
-                          <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${it.regulatoryCategory === "CONTROLLED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"}`}>
-                            {it.regulatoryCategory === "CONTROLLED" ? "CTRL" : "RX"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs">{it.category}</TableCell>
-                      <TableCell className="text-xs">
-                        <div className="font-medium text-secondary-500">{formatMoney(Number(it.costPrice))} (Cost)</div>
-                        <div className="font-bold text-secondary-900 dark:text-secondary-100">{formatMoney(Number(it.sellingPrice))} (Retail)</div>
-                        {it.wholesalePrice != null && (
-                          <div className="text-xs text-primary-600 dark:text-primary-400">{formatMoney(Number(it.wholesalePrice))} (Wholesale)</div>
-                        )}
-                        {(it as any).floorPrice != null && (
-                          <div className="text-xs text-amber-600 dark:text-amber-400">Floor: {formatMoney(Number((it as any).floorPrice))}</div>
-                        )}
-                      </TableCell>
+                    return (
+                      <TableRow
+                        key={it.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        className="hover:bg-secondary-50/60 dark:hover:bg-secondary-900/40"
+                      >
+                        <TableCell className="font-mono text-xs font-semibold text-primary-600 dark:text-primary-400">
+                          {it.sku}
+                        </TableCell>
+                        <TableCell className="font-medium text-secondary-900 dark:text-secondary-50">
+                          {it.name}
+                          {it.regulatoryCategory && it.regulatoryCategory !== "GENERAL" && (
+                            <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${it.regulatoryCategory === "CONTROLLED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"}`}>
+                              {it.regulatoryCategory === "CONTROLLED" ? "CTRL" : "RX"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{it.category}</TableCell>
+                        <TableCell className="text-xs">
+                          <div className="font-medium text-secondary-500">{formatMoney(Number(it.costPrice))} (Cost)</div>
+                          <div className="font-bold text-secondary-900 dark:text-secondary-100">{formatMoney(Number(it.sellingPrice))} (Retail)</div>
+                          {it.wholesalePrice != null && (
+                            <div className="text-xs text-primary-600 dark:text-primary-400">{formatMoney(Number(it.wholesalePrice))} (Wholesale)</div>
+                          )}
+                          {(it as any).floorPrice != null && (
+                            <div className="text-xs text-amber-600 dark:text-amber-400">Floor: {formatMoney(Number((it as any).floorPrice))}</div>
+                          )}
+                        </TableCell>
 
-                      {/* Shop Availability Badges */}
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2 py-1">
-                          {warehouses.map((wh) => {
-                            const stockObj = it.warehouseStocks?.find(s => s.warehouseId === wh.id);
-                            const qty = stockObj ? stockObj.quantityOnHand : 0;
-                            const hasStock = qty > 0;
+                        {/* Shop Availability Badges */}
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2 py-1">
+                            {warehouses.map((wh) => {
+                              const stockObj = it.warehouseStocks?.find(s => s.warehouseId === wh.id);
+                              const qty = stockObj ? stockObj.quantityOnHand : 0;
+                              const hasStock = qty > 0;
 
-                            return (
-                              <div
-                                key={wh.id}
-                                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${
-                                  hasStock
-                                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-                                    : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 opacity-80"
-                                }`}
-                              >
-                                {hasStock ? (
-                                  <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                                ) : (
-                                  <XCircle className="mr-1 h-3.5 w-3.5 text-red-500" />
-                                )}
-                                <span>
-                                  <strong>{wh.name}</strong>: {qty} {it.unitOfMeasure}
-                                </span>
-                                {hasStock && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openQuickTransferModal(it.id, wh.id)}
-                                    title={`Request transfer from ${wh.name}`}
-                                    className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
-                                  >
-                                    Transfer
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => openAdjustModal(it.id, wh.id)}
-                                  title={`Restock or correct ${it.name} at ${wh.name}`}
-                                  className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-xs"
+                              return (
+                                <div
+                                  key={wh.id}
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${
+                                    hasStock
+                                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                                      : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 opacity-80"
+                                  }`}
                                 >
-                                  Adjust
-                                </button>
-                                {user?.orgType === "PHARMACY" && it.requiresBatchTracking && (
+                                  {hasStock ? (
+                                    <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                  ) : (
+                                    <XCircle className="mr-1 h-3.5 w-3.5 text-red-500" />
+                                  )}
+                                  <span>
+                                    <strong>{wh.name}</strong>: {qty} {it.unitOfMeasure}
+                                  </span>
+                                  {hasStock && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openQuickTransferModal(it.id, wh.id)}
+                                      title={`Request transfer from ${wh.name}`}
+                                      className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
+                                    >
+                                      Transfer
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
-                                    onClick={() => { setBatchItemId(it.id); setBatchWarehouseId(wh.id); setBatchCostPrice(String(it.costPrice)); setIsBatchModalOpen(true); }}
-                                    className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-xs"
+                                    onClick={() => openAdjustModal(it.id, wh.id)}
+                                    title={`Restock or correct ${it.name} at ${wh.name}`}
+                                    className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-xs"
                                   >
-                                    + Batch
+                                    Adjust
                                   </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
+                                  {user?.orgType === "PHARMACY" && it.requiresBatchTracking && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setBatchItemId(it.id); setBatchWarehouseId(wh.id); setBatchCostPrice(String(it.costPrice)); setIsBatchModalOpen(true); }}
+                                      className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-xs"
+                                    >
+                                      + Batch
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </TableCell>
 
-                      <TableCell className="text-right">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${isLowStock ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400 border border-rose-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
-                          {isLowStock && <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
-                          {totalQty} {it.unitOfMeasure}{it.secondaryUnitOfMeasure && it.conversionFactor ? ` (${it.secondaryUnitOfMeasure} = ${it.conversionFactor} ${it.unitOfMeasure})` : ''}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        <TableCell className="text-right">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${isLowStock ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400 border border-rose-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                            {isLowStock && <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
+                            {totalQty} {it.unitOfMeasure}{it.secondaryUnitOfMeasure && it.conversionFactor ? ` (${it.secondaryUnitOfMeasure} = ${it.conversionFactor} ${it.unitOfMeasure})` : ''}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {rowVirtualizer.getVirtualItems().length > 0 && (() => {
+                    const items = rowVirtualizer.getVirtualItems();
+                    const lastItem = items[items.length - 1];
+                    const paddingBottom = rowVirtualizer.getTotalSize() - lastItem.end;
+                    return paddingBottom > 0 ? (
+                      <TableRow style={{ height: `${paddingBottom}px` }} aria-hidden />
+                    ) : null;
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
