@@ -64,7 +64,7 @@ export function AdminCoreEngine() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -765,6 +765,57 @@ export function AdminCoreEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUnlocked, activeTab]);
 
+  // Churn Risk Tracker state
+  const [churnData, setChurnData] = useState<{
+    summary: {
+      total: number;
+      expired: number;
+      trialCritical: number;
+      trialSoon: number;
+      trialWatch: number;
+      renewalSoon: number;
+      dormant: number;
+      notEmbedded: number;
+    };
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      trialEndsAt: string | null;
+      subscriptionPaidUntil: string | null;
+      createdAt: string;
+      isLive: boolean;
+      userCount: number;
+      lastActivityAt: string | null;
+      daysSinceActivity: number | null;
+      trialDaysLeft: number | null;
+      paidDaysLeft: number | null;
+      adoptionScore: number;
+      adoptionDetail: { invoicing: boolean; bookkeeping: boolean; inventory: boolean; sales: boolean; banking: boolean };
+      bucket: 'expired' | 'trial_critical' | 'trial_soon' | 'trial_watch' | 'renewal_soon' | 'dormant';
+    }[];
+  } | null>(null);
+  const [churnError, setChurnError] = useState<string | null>(null);
+  const [isLoadingChurn, setIsLoadingChurn] = useState(false);
+
+  const fetchChurnRisk = useCallback(() => {
+    setIsLoadingChurn(true);
+    setChurnError(null);
+    return api
+      .get("/admin/churn-risk", { headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setChurnData(res.data.data))
+      .catch(() => setChurnError("Failed to load churn risk data."))
+      .finally(() => setIsLoadingChurn(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "churnrisk") return;
+    fetchChurnRisk();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
@@ -1227,6 +1278,22 @@ export function AdminCoreEngine() {
                   {clientHealthData && clientHealthData.summary.highRiskTenants > 0 && (
                     <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
                       {clientHealthData.summary.highRiskTenants}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("churnrisk")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "churnrisk" ? "border-rose-400 text-rose-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <TrendingDown className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Churn Risk
+                  {churnData && (churnData.summary.trialCritical + churnData.summary.expired) > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {churnData.summary.trialCritical + churnData.summary.expired}
                     </span>
                   )}
                 </span>
@@ -3391,6 +3458,180 @@ export function AdminCoreEngine() {
             )}
           </div>
         )}
+            {/* Tab: Churn Risk Tracker */}
+            {activeTab === "churnrisk" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <TrendingDown className="h-5 w-5 text-rose-400" />
+                      Churn Risk Tracker
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      At-risk tenants sorted by urgency + feature adoption — who to call and what to say.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchChurnRisk}
+                    disabled={isLoadingChurn}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingChurn ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {churnError && (
+                  <div className="rounded-lg border border-rose-800 bg-rose-950/30 p-4 text-rose-400 text-sm">{churnError}</div>
+                )}
+
+                {isLoadingChurn && !churnData && (
+                  <div className="flex items-center gap-3 text-secondary-400 text-sm py-8">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Analysing churn risk signals…
+                  </div>
+                )}
+
+                {churnData && (
+                  <>
+                    {/* Summary strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: "Total at risk", value: churnData.summary.total, color: "text-white" },
+                        { label: "Trial ≤3 days", value: churnData.summary.trialCritical, color: "text-rose-400" },
+                        { label: "Expired", value: churnData.summary.expired, color: "text-rose-400" },
+                        { label: "Not yet embedded", value: churnData.summary.notEmbedded, color: "text-amber-400", note: "score 0–1 features" },
+                      ].map((s) => (
+                        <Card key={s.label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-xs">{s.label}</p>
+                            <p className={`text-3xl font-black mt-1 ${s.color}`}>{s.value}</p>
+                            {s.note && <p className="text-secondary-600 text-[10px] mt-0.5">{s.note}</p>}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {churnData.tenants.length === 0 ? (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <CardContent className="py-12 text-center text-secondary-500 text-sm">
+                          No at-risk tenants right now.
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      (() => {
+                        const BUCKETS: { key: typeof churnData.tenants[0]['bucket']; label: string; urgency: string; color: string }[] = [
+                          { key: 'expired',        label: 'Expired — already churned',         urgency: 'Re-engage now',         color: 'border-rose-800 bg-rose-950/20' },
+                          { key: 'trial_critical', label: 'Trial ends in ≤3 days',             urgency: 'Call today',            color: 'border-rose-800 bg-rose-950/20' },
+                          { key: 'trial_soon',     label: 'Trial ends in 4–7 days',            urgency: 'Reach out this week',   color: 'border-amber-800 bg-amber-950/20' },
+                          { key: 'renewal_soon',   label: 'Renewal due in ≤14 days',           urgency: 'Confirm renewal',       color: 'border-amber-800 bg-amber-950/20' },
+                          { key: 'dormant',        label: 'Dormant 14+ days',                  urgency: 'Check-in needed',       color: 'border-secondary-700 bg-secondary-900' },
+                          { key: 'trial_watch',    label: 'Trial ends in 8–30 days',           urgency: 'Monitor closely',       color: 'border-secondary-700 bg-secondary-900' },
+                        ];
+
+                        const FEATURES: { key: keyof typeof churnData.tenants[0]['adoptionDetail']; label: string }[] = [
+                          { key: 'invoicing',    label: 'Invoicing' },
+                          { key: 'bookkeeping',  label: 'Books' },
+                          { key: 'inventory',    label: 'Inventory' },
+                          { key: 'sales',        label: 'Sales' },
+                          { key: 'banking',      label: 'Banking' },
+                        ];
+
+                        return (
+                          <div className="space-y-5">
+                            {BUCKETS.map(({ key, label, urgency, color }) => {
+                              const rows = churnData.tenants.filter((t) => t.bucket === key);
+                              if (rows.length === 0) return null;
+                              return (
+                                <div key={key} className={`rounded-xl border ${color} overflow-hidden`}>
+                                  <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-white text-sm font-bold">{label}</span>
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-300">{rows.length}</span>
+                                    </div>
+                                    <span className="text-xs text-secondary-400 italic">{urgency}</span>
+                                  </div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="border-white/5 hover:bg-transparent">
+                                        <TableHead className="text-secondary-400 text-xs pl-5">Client</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Tier</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Deadline</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Last active</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Score</TableHead>
+                                        {FEATURES.map((f) => (
+                                          <TableHead key={f.key} className="text-secondary-400 text-xs text-center">{f.label}</TableHead>
+                                        ))}
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {rows.map((t) => {
+                                        const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `T${t.tier}`;
+                                        const deadlineLabel = (() => {
+                                          if (t.bucket === 'expired') return <span className="text-rose-400 text-xs font-bold">EXPIRED</span>;
+                                          if (t.bucket === 'trial_critical' || t.bucket === 'trial_soon' || t.bucket === 'trial_watch') {
+                                            if (t.trialDaysLeft !== null && t.trialDaysLeft <= 0) return <span className="text-rose-400 text-xs font-bold">TODAY</span>;
+                                            return <span className={`text-xs ${(t.trialDaysLeft ?? 99) <= 3 ? 'text-rose-300 font-semibold' : (t.trialDaysLeft ?? 99) <= 7 ? 'text-amber-300' : 'text-secondary-300'}`}>Trial ends in {t.trialDaysLeft}d</span>;
+                                          }
+                                          if (t.bucket === 'renewal_soon') return <span className={`text-xs ${(t.paidDaysLeft ?? 99) <= 7 ? 'text-amber-300 font-semibold' : 'text-secondary-300'}`}>Renewal in {t.paidDaysLeft}d</span>;
+                                          return <span className="text-secondary-500 text-xs">—</span>;
+                                        })();
+                                        const activityLabel = t.daysSinceActivity === null
+                                          ? <span className="text-secondary-600 text-xs italic">never</span>
+                                          : t.daysSinceActivity === 0
+                                          ? <span className="text-emerald-400 text-xs">today</span>
+                                          : <span className={`text-xs ${t.daysSinceActivity >= 14 ? 'text-rose-400 font-semibold' : t.daysSinceActivity >= 7 ? 'text-amber-300' : 'text-secondary-300'}`}>{t.daysSinceActivity}d ago</span>;
+                                        const scoreColor = t.adoptionScore === 0 ? 'text-rose-400' : t.adoptionScore <= 2 ? 'text-amber-400' : t.adoptionScore <= 3 ? 'text-secondary-200' : 'text-emerald-400';
+
+                                        return (
+                                          <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
+                                            <TableCell className="pl-5">
+                                              <div>
+                                                <p className="text-white text-sm font-semibold">{t.name}</p>
+                                                <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="text-secondary-400 text-xs">{tierLabel}</TableCell>
+                                            <TableCell>{deadlineLabel}</TableCell>
+                                            <TableCell>{activityLabel}</TableCell>
+                                            <TableCell>
+                                              <span className={`text-sm font-bold ${scoreColor}`}>{t.adoptionScore}<span className="text-secondary-600 text-xs">/5</span></span>
+                                            </TableCell>
+                                            {FEATURES.map((f) => (
+                                              <TableCell key={f.key} className="text-center">
+                                                {t.adoptionDetail[f.key]
+                                                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mx-auto" />
+                                                  : <XCircle className="h-3.5 w-3.5 text-secondary-700 mx-auto" />}
+                                              </TableCell>
+                                            ))}
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()
+                    )}
+
+                    {/* Adoption legend */}
+                    <div className="flex flex-wrap gap-4 text-xs text-secondary-500 pt-2 border-t border-secondary-800">
+                      <span className="font-semibold text-secondary-300">Feature adoption legend:</span>
+                      <span><span className="text-emerald-400">●</span> Used at least once in audit log</span>
+                      <span><span className="text-secondary-600">●</span> No audit record (never used or pre-audit)</span>
+                      <span>Score 0-1 = not yet embedded, at very high churn risk regardless of trial status</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Tab: Client Health Dashboard */}
             {activeTab === "clienthealth" && (
               <div className="space-y-6">

@@ -2,6 +2,24 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-11] - Feature: Churn Risk Tracker tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: the Client Health tab shows *who is dormant*; the Churn Risk Tracker shows *who needs a call right now and what to say*. Added a 15th tab that groups at-risk tenants by urgency bucket and overlays feature adoption signals so AGOD knows whether a tenant hasn't converted yet because they've never found the product's value (score 0-1) vs. are an active user who may just need a renewal nudge.
+
+**How it works:**
+- Backend derives at-risk tenants from subscription status + trial/renewal expiry dates
+- Feature adoption is detected from distinct `(tenantId, action)` pairs in AuditLog for 5 key feature areas: Invoicing, Bookkeeping, Inventory, Sales, Banking
+- Adoption score 0-5: score 0-1 = "not yet embedded" (very high churn risk regardless of trial status)
+- Urgency buckets (sorted most-urgent first): Expired, Trial ≤3d (critical), Trial 4-7d (soon), Renewal ≤14d, Dormant 14d+, Trial 8-30d (watch)
+- Tab badge shows critical count (expired + trial ≤3d) so it is visible without opening the tab
+- Feature columns (✓/✗ per area) give AGOD talking points for the outreach call
+
+**Files Affected:**
+- `backend/src/routes/adminChurnRisk.ts` — NEW: GET /api/v1/admin/churn-risk endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "churnrisk" tab type, state, fetch, nav button, and full tab panel JSX
+
 ## [Date: 2026-09-11] - Feature: Client Health Dashboard tab in AGOD Control Engine
 
 **What/Why:**
