@@ -2,6 +2,23 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-11] - Docs: Ledgio Founding Partner Programme — proposal and referral letters
+
+**What/Why:**
+Created two formal business development documents for the Ledgio Founding Partner Programme, based entirely on the official Ledgio brochure and the signed HAPA referral pilot agreement (LDG-PA-001). These replace any placeholder/template letters and contain only verified, real details.
+
+1. **Partnership Proposal (LDG-PA-002)** — formal proposal addressed to business networks, consulting firms, and professional advisors. Covers Ledgio's full feature set, the Founding Partner opportunity (10% monthly commission for life), commission tables, roles/responsibilities, what Ledgio provides, pilot agreement structure, and next steps.
+
+2. **Referral Partner Invitation (LDG-FP-2026)** — accessible invitation letter for individuals or smaller networks. Explains the Founding Partner Programme in three key points, earnings table (per referral, over 2 years), 7-step process, commission rules, and contact details.
+
+**Source documents used:** Official Ledgio 4-panel brochure, HAPA Referral Partner Pilot Agreement signed 9 September 2026 (LDG-PA-001).
+
+**Files Affected:**
+- `docs/proposals/partnership-proposal.md` — new: full partnership proposal letter (LDG-PA-002)
+- `docs/proposals/referral-partner-invitation.md` — new: referral partner invitation letter (LDG-FP-2026)
+
+---
+
 ## [Date: 2026-09-11] - Feature: Receipt enforcement (force print) + admin Receipt Audit Log
 
 **What/Why:**
