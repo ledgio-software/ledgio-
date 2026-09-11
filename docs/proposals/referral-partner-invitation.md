@@ -2,7 +2,7 @@
 ref: LDG-FP-2026
 date: 2026-09-11
 type: Referral Partner Invitation
-status: Template
+status: Template — General (No Addressee)
 programme: Founding Partner Programme
 ---
 
@@ -18,94 +18,140 @@ programme: Founding Partner Programme
 **Date:** 11 September 2026  
 **REF:** LDG-FP-2026
 
-**To:**  
-[Name]  
-[Organisation / Network]  
-[City, Ghana]
+---
+
+**Subject: An Invitation to the Ledgio Founding Partner Programme — Everything You Need to Know Before We Meet**
 
 ---
 
-**Subject: Invitation to Become a Ledgio Founding Partner — Earn 10% Commission for Life on Every Business You Refer**
+This letter sets out, in full, the terms and opportunity of the Ledgio Founding Partner Programme. It is written so that you have a complete and accurate picture of what the arrangement involves before we sit down together. Please read it at your own pace. By the time we meet, there will be no need for a sales pitch — only a conversation.
 
-Dear [Name],
+## About Ledgio
 
-I am reaching out personally to invite you to join the **Ledgio Founding Partner Programme**. This is a simple, transparent arrangement: if you know business owners or managers who need proper accounting software, you introduce them to Ledgio, and we pay you **10% of their monthly subscription — every month, for as long as they remain a subscriber. No cap. No expiry date.**
+Ledgio is a cloud-based accounting and business management platform built specifically for Ghanaian businesses. It was designed from the ground up for the Ghanaian operating environment: GRA E-VAT invoicing cleared in one click, Paystack payment links on every invoice, PAYE and SSNIT payroll computed to exact GRA bands, multi-warehouse inventory management, a point-of-sale cash till with daily closeout, purchase orders, expense tracking, bank reconciliation, and complete financial reports — Profit & Loss, Balance Sheet, and Cash Flow Statement — that an accountant or the tax authority can rely on.
 
-You do not need a technical background. You do not need to be an accountant or a software reseller. All you need is a network of businesses and a willingness to make an introduction. We handle the platform, the demonstrations, the onboarding, and all customer support. You make the connection and earn the commission.
+The platform also includes AI-assisted tools: an AI Help Assistant that answers accounting questions in plain English, OCR receipt scanning that reads vendor invoices from a photograph, and AI categorisation for imported bank transactions.
 
-## What Is Ledgio?
+Every business that signs up receives a **90-day free trial, no credit card required**, up and running in under five minutes at [ledgio-fawn.vercel.app](https://ledgio-fawn.vercel.app).
 
-Ledgio is Ghana's most complete cloud accounting and business management platform — built specifically for how Ghanaian businesses operate. A business that signs up gets: a full double-entry general ledger, GRA E-VAT invoicing cleared in one click, Paystack payment links on every invoice, PAYE and SSNIT payroll computed to exact GRA bands, multi-warehouse inventory management, a POS cash till with daily closeout, purchase orders, expense tracking, bank reconciliation, and financial reports (P&L, Balance Sheet, Cash Flow) ready for their accountant or the tax authority.
+Ledgio currently offers three subscription plans:
 
-It also includes AI tools — an AI Help Assistant that answers accounting questions in plain English, OCR receipt scanning that reads vendor invoices from a photograph, and AI categorisation for imported bank transactions.
+| Plan | Monthly Subscription | Who It Is For |
+|------|----------------------|---------------|
+| Shop | GH₵ 150 | Solo traders and micro-businesses — general ledger, invoicing, Paystack integration, POS, GRA E-VAT, 1 user |
+| **Business** | **GH₵ 350** | Retailers, contractors, service firms — everything in Shop plus inventory, payroll, purchase orders, bank reconciliation, up to 10 users |
+| Enterprise | GH₵ 1,000 | Large operations, pharmacies, manufacturers — everything in Business plus pharmacy billing, manufacturing, cost centres, unlimited users |
 
-Every new business gets a **90-day free trial, no credit card required**, set up in under 5 minutes at [ledgio-fawn.vercel.app](https://ledgio-fawn.vercel.app).
+---
 
-## The Founding Partner Programme — Three Things to Know
+## The Founding Partner Programme
 
-> ★ **Founding Partner Programme**
+The arrangement is straightforward.
+
+> **★ Founding Partner Programme**
 >
-> 1. **10% monthly commission, for life** — every month the business you referred pays their Ledgio subscription, you earn 10% of that payment. The commission does not stop after a year or a trial period. It runs for as long as the customer is active.
+> Introduce a business to Ledgio. When that business becomes a paying subscriber, earn **10% of their monthly subscription — every month, for as long as they remain a subscriber.** There is no cap on the amount. There is no expiry date. The commission runs for the life of the customer.
 >
-> 2. **Permanent Founding Partner title** — as one of the first referral partners building Ledgio's network in Ghana, you carry this title permanently.
->
-> 3. **Register the referral before the trial starts** — email ledgioapp@gmail.com with the business name and contact before they sign up. That email is your attribution record.
+> As one of the first people building Ledgio's referral network in Ghana, you also carry the permanent title of **Founding Partner**.
 
-## What You Earn
+Commission is calculated on the net monthly subscription amount actually received by Ledgio:
 
-Commission is 10% of the net monthly subscription amount Ledgio actually receives from each business you refer:
+| Plan | Net Monthly Subscription | Your Monthly Commission | After 12 Months | After 24 Months |
+|------|--------------------------|------------------------|-----------------|-----------------|
+| Shop | GH₵ 105 | GH₵ 10.50 | GH₵ 126 | GH₵ 252 |
+| **Business** | **GH₵ 305** | **GH₵ 30.50** | **GH₵ 366** | **GH₵ 732** |
+| Enterprise | GH₵ 510 | GH₵ 51.00 | GH₵ 612 | GH₵ 1,224 |
 
-| Plan | Monthly Sub (GH₵) | Your Commission / Month | Year 1 Earnings | Year 2 Earnings |
-|------|-------------------|------------------------|-----------------|-----------------|
-| Shop | 105 | GH₵ 10.50 | GH₵ 126 | GH₵ 252 |
-| **Business** | **305** | **GH₵ 30.50** | **GH₵ 366** | **GH₵ 732** |
-| Enterprise | 510 | GH₵ 51.00 | GH₵ 612 | GH₵ 1,224 |
+**These figures are per referred client.** If five businesses on the Business plan remain subscribers over two years, the total commission earned is GH₵ 3,660 — from five introductions. The programme compounds with every referral made.
 
-**These figures are per referred client.** If you refer five businesses on the Business plan, you earn GH₵ 152.50 every month for as long as those five businesses remain subscribers — GH₵ 1,830 in year one. The programme compounds with every introduction you make.
+---
 
-## How It Works — Step by Step
+## What a Referral Involves
 
-1. **You identify a business** in your network that needs proper accounting and business management tools — any business that does not already have a Ledgio account.
+There is no technical requirement. There is no sales training required. The role is to **identify, introduce, and register** — and Ledgio handles everything from that point forward.
 
-2. **You register the referral** by emailing ledgioapp@gmail.com with the business name and a contact person, before they sign up for the trial. Attribution is confirmed within one business day. Your personal referral link (issued when we formalise the partnership) also auto-attributes sign-ups.
+**What you do:**
+- Identify businesses in your network that would benefit from proper accounting and business management software
+- Register the referral by emailing ledgioapp@gmail.com with the business name and a contact person — before they sign up for the trial
+- Make a warm introduction: share the trial link, copy Ledgio on an email, or arrange a brief introduction call
+- Refer any technical, pricing, or product questions directly to ledgioapp@gmail.com
 
-3. **The business signs up** for the 90-day free trial at ledgio-fawn.vercel.app. You can share the link directly or make a warm introduction by email.
+**What Ledgio does from there:**
+- Conducts the product demonstration
+- Sets up and onboards the business
+- Provides all ongoing technical support and customer service
+- Handles all commercial conversations including enterprise pricing
+- Issues your commission statement by the 5th of each month
+- Pays your commission within 14 days of the statement, by Mobile Money or Bank Transfer
 
-4. **Ledgio handles everything from here** — product demonstration, account setup, onboarding, technical support, and customer service. Refer technical and billing questions back to ledgioapp@gmail.com rather than answering them yourself.
+**What you do not need to do:**
+- Make any commitments about custom features, integration, or enterprise pricing
+- Represent yourself as a Ledgio employee or agent
+- Collect any payments on Ledgio's behalf
 
-5. **The business subscribes** — after the 90-day trial, when they begin their first paid subscription month, your commission begins.
+---
 
-6. **You receive your commission statement** — by the 5th of each month, listing all your active referred clients, their plan, the amount paid, and commission owed for that month.
+## How the Process Works — Step by Step
 
-7. **You receive your commission payment** — within fourteen (14) days of the statement, by Mobile Money or Bank Transfer to details you provide.
+1. You identify a business in your network that does not already have a Ledgio account and would benefit from proper accounting software.
 
-## Commission Rules — The Key Points
+2. You email ledgioapp@gmail.com with the business name and contact person before they register. This is your attribution record. A personal referral link — issued when we formalise the partnership — also auto-attributes sign-ups through it.
 
-- **No commission on free trials** — commission begins only when the first subscription payment is made.
-- **Commission survives the end of any formal agreement** — commissions on customers referred before a pilot agreement concludes continue for as long as those customers remain active subscribers.
-- **Enterprise clients** — where a referred client requires custom pricing, Ledgio leads the commercial conversation, but you remain the referred partner and earn 10% of the recurring revenue received.
-- **Non-exclusive** — you are free to promote other products and services. No exclusivity required.
-- **No commitments on Ledgio's behalf** — do not make commitments about custom features, enterprise pricing, or technical integrations to prospects. Refer those conversations to ledgioapp@gmail.com.
+3. The business signs up for the 90-day free trial at ledgio-fawn.vercel.app. Attribution is confirmed within one business day.
 
-## What You Receive from Ledgio
+4. Ledgio handles the demonstration, onboarding, and all ongoing support from here.
 
-- **Personal referral link and/or code** — for automatic attribution
-- **Approved marketing materials** — Ledgio 4-panel brochure, product overview, pricing information
-- **Demo access** — a Ledgio account to show prospects the platform in practice
-- **Monthly commission statements** — itemised, issued by the 5th of each month
-- **Commission payments** — within 14 days of each statement, by Mobile Money or Bank Transfer
-- **Direct access to Kingsley** — ledgioapp@gmail.com or +233 559 428 462 (WhatsApp accepted)
-- **Founding Partner status** — permanent recognition as one of the people who built Ledgio's early network
+5. After the 90-day trial, the business moves to a paid subscription. Your commission begins from their first payment.
 
-## How to Get Started
+6. By the 5th of each month you receive a commission statement listing every active referred client, their plan, the amount received, and the commission owed.
 
-Getting started requires only two things: a brief conversation (in person, by call, or WhatsApp), and a simple written agreement based on the same terms as Agreement LDG-PA-001 signed with our first partner in September 2026.
+7. Commission is paid within 14 days of the statement, to Mobile Money or Bank Transfer details you provide.
 
-After that, you receive your referral link and materials and can submit your first referral immediately. There is no joining fee, no sales target, and no exclusivity requirement.
+---
 
-Reach me at **ledgioapp@gmail.com** or on **+233 559 428 462** (call or WhatsApp). If it is easier, simply reply to this letter and we will arrange a time.
+## Key Commission Terms
 
-Thank you for taking the time to read this. I look forward to welcoming you as a Founding Partner.
+- **Commission begins on the first paid subscription month** — not during the free trial.
+- **Commission is permanent** — it continues for as long as the referred business remains an active paying subscriber. It does not end after a pilot period or a fixed term.
+- **Enterprise clients** — where a referred client requires custom pricing, Ledgio leads the commercial negotiation. You remain the referring partner and earn 10% of the recurring revenue actually received.
+- **Non-exclusive** — you are free to promote other products and services. There is no exclusivity requirement.
+- **Attribution is protected** — once a referral is registered, Ledgio will not accept the same business through another channel without honouring your attribution.
+
+---
+
+## What Ledgio Provides to You
+
+- A unique personal referral link and/or code for automatic attribution
+- Approved marketing materials — product overview, 4-panel brochure, pricing information
+- Demo access — a Ledgio account to show prospects the platform directly
+- Monthly commission statements, itemised and issued by the 5th of each month
+- Commission payments within 14 days of each statement, by Mobile Money or Bank Transfer
+- Direct contact with the founder: ledgioapp@gmail.com or +233 559 428 462 (WhatsApp accepted)
+- Permanent recognition as a Founding Partner
+
+---
+
+## About the Agreement
+
+The relationship is formalised through a short, plain-language Referral Partner Agreement. It is non-exclusive, there is no joining fee, and there are no sales targets. It is governed by the laws of the Republic of Ghana. The format follows the agreement already signed with our first active referral partner in September 2026.
+
+The agreement can be reviewed, discussed, and signed at the same meeting at which we finalise the arrangement.
+
+---
+
+## Before We Meet
+
+If there is anything in this letter that you would like clarified, corrected, or discussed before we sit down, please raise it directly:
+
+**Kingsley Okyere**  
+Founder & Software Engineer · ALPHADEPS (Ledgio)  
+**Email:** ledgioapp@gmail.com  
+**Phone / WhatsApp:** +233 559 428 462  
+**Platform:** ledgio-fawn.vercel.app
+
+There are no obligations attached to reading this letter or attending the meeting. The purpose of the meeting is a conversation — not a close.
+
+I look forward to speaking with you.
 
 Yours sincerely,
 
