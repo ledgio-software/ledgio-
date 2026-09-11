@@ -2,6 +2,36 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-11] - Perf: Cross-device PWA compatibility and performance overhaul
+
+**What/Why:**
+To ensure the PWA runs acceptably on 2018-era budget Android phones, older iOS devices, and low-RAM computers, a full performance audit was performed and the following fixes were applied:
+
+1. **Vite build target** (`frontend/vite.config.ts`): Changed from default `es2020` to `['chrome72','firefox68','safari12.1','edge79']`. This ensures the bundled JS is syntactically compatible with 2018–2019 devices without modern JS syntax that those runtimes reject.
+
+2. **Workbox PWA caching** (`frontend/vite.config.ts`): Added `maximumFileSizeToCacheInBytes: 500*1024` to prevent SW from downloading the entire split-bundle set on a slow connection. Added `navigateFallbackDenylist` for `/api/` and `/partner/`. Added `runtimeCaching` for Google Fonts stylesheets (StaleWhileRevalidate, 1yr) and woff2 font files (CacheFirst, 1yr), so fonts load from cache after first visit.
+
+3. **Font payload reduction** (`frontend/index.html`): Removed 7 landing-page-only font variants (Syne, DM Sans) from the global font link. These were being downloaded by every authenticated user even though they only appear on the public landing page — wasted bandwidth on every login.
+
+4. **Lazy font injection** (`frontend/src/pages/landing/LandingPage.tsx`): Syne and DM Sans are now injected via `document.createElement('link')` inside a `useEffect` that runs only when the landing page mounts. Authenticated users who never visit the landing page never download these fonts.
+
+5. **GPU layer elimination** (`frontend/src/pages/landing/LandingPage.tsx`): Replaced `blur-3xl` decorative div (forces GPU compositing layer, expensive on Mali-G52 / Adreno 505 class GPUs) with a CSS `radial-gradient` that achieves the same visual with zero GPU overhead. Also removed `backdrop-blur-sm` from the stats strip.
+
+6. **List virtualisation** (`frontend/src/pages/inventory/WarehouseManagement.tsx`): The Global Product Search matrix previously rendered all matching items into the DOM simultaneously — on a 500-item inventory that meant 500+ complex `<tr>` nodes with nested warehouse badge maps each. Replaced with `@tanstack/react-virtual`'s `useVirtualizer` so only ~10 rows are in the DOM at any time. Scroll container is 520px tall; rows are measured dynamically; top/bottom padding rows maintain the scrollable height.
+
+7. **Image decoding** (`frontend/src/components/landing/ImageCarousel.tsx`, `frontend/src/components/layout/AuthSplitLayout.tsx`): Added `decoding="async"` to carousel and auth panel images so the browser's image decode does not block the main thread.
+
+**Files Affected:**
+- `frontend/vite.config.ts` — build target, Workbox caching
+- `frontend/index.html` — font payload reduction
+- `frontend/package.json` + `package-lock.json` — added `@tanstack/react-virtual`
+- `frontend/src/pages/landing/LandingPage.tsx` — lazy fonts, GPU blur elimination
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — list virtualisation
+- `frontend/src/components/landing/ImageCarousel.tsx` — decoding=async
+- `frontend/src/components/layout/AuthSplitLayout.tsx` — decoding=async
+
+---
+
 ## [Date: 2026-09-11] - Docs: Ledgio Founding Partner Programme — proposal and referral letters
 
 **What/Why:**

@@ -13,7 +13,7 @@ export function AuthSplitLayout({ imageSrc, imageAlt, tagline, children }: AuthS
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
       <div className="hidden lg:flex relative flex-col justify-between p-12 overflow-hidden bg-secondary-950">
-        <img src={imageSrc} alt={imageAlt} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={imageSrc} alt={imageAlt} className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
         <div className="absolute inset-0 bg-gradient-to-t from-secondary-950 via-secondary-950/70 to-secondary-950/30" />
 
         <Link to="/" className="relative z-10 flex items-center space-x-3">
