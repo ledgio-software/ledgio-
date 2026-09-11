@@ -2,6 +2,26 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-11] - Feature: Revenue & MRR Dashboard tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: after knowing who is at risk (Client Health), who to call (Churn Risk), and who is stuck (Onboarding), AGOD needs to see the financial picture — what revenue is currently locked in, what is in the pipeline from trials, and what is at risk from lapsing renewals. Added a 17th tab showing MRR, ARR, tier breakdown, trial pipeline value, revenue at risk, and upcoming renewals.
+
+**How it works:**
+- MRR = sum of tier prices for all ACTIVE paid tenants (tier 1 = GHS 105, tier 2 = GHS 305, tier 3 = GHS 510 per month)
+- Tier prices come from the existing `SUBSCRIPTION_PLANS` constant in `subscription.ts` — no duplication
+- Revenue at risk = EXPIRED tenants + ACTIVE tenants with renewal due in ≤30 days
+- Trial pipeline value = sum of tier prices for all TRIAL tenants (potential MRR if all convert)
+- Monthly activations chart: new ACTIVE paid tenants bucketed by `createdAt` month for last 12 months
+- Renewals Due sub-view: sorted by urgency (days left), with color coding (≤7d rose, ≤14d orange, ≤30d amber)
+- All Tenants sub-view: full revenue table with at-risk row highlighting
+- Cyan tab nav badge shows `!` when any revenue is at risk
+
+**Files Affected:**
+- `backend/src/routes/adminRevenue.ts` — NEW: GET /api/v1/admin/revenue endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "revenue" tab type, state, fetch, nav button (TrendingUp icon, cyan theme), and full tab panel JSX with KPI tiles, tier cards, activations bar chart, and Renewals Due/All Tenants sub-views
+
 ## [Date: 2026-09-11] - Feature: Onboarding Completion Tracker tab in AGOD Control Engine
 
 **What/Why:**

@@ -35,6 +35,8 @@ import {
   HeartPulse,
   TrendingDown,
   ClipboardList,
+  TrendingUp,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -65,7 +67,7 @@ export function AdminCoreEngine() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -872,6 +874,54 @@ export function AdminCoreEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUnlocked, activeTab]);
 
+  // Revenue & MRR Dashboard state
+  const [revenueData, setRevenueData] = useState<{
+    summary: {
+      totalTenants: number;
+      activePaid: number;
+      trial: number;
+      expired: number;
+      mrr: number;
+      arr: number;
+      trialPipelineValue: number;
+      revenueAtRisk: number;
+      renewalsDueIn30Days: number;
+      avgRevenuePerTenant: number;
+      trialConversionRate: number;
+    };
+    tierBreakdown: { tier: number; name: string; priceGhs: number; activeCount: number; tierMrr: number }[];
+    renewalsDue: {
+      id: string; name: string; slug: string; tier: number; tierName: string; priceGhs: number;
+      subscriptionStatus: string; subscriptionPaidUntil: string | null; renewalDaysLeft: number | null;
+    }[];
+    monthlyActivations: { month: string; count: number; mrr: number }[];
+    allTenants: {
+      id: string; name: string; slug: string; tier: number; tierName: string; priceGhs: number;
+      subscriptionStatus: string; trialEndsAt: string | null; subscriptionPaidUntil: string | null;
+      createdAt: string; isLive: boolean; trialDaysLeft: number | null;
+      renewalDaysLeft: number | null; isRevenueAtRisk: boolean;
+    }[];
+  } | null>(null);
+  const [revenueError, setRevenueError] = useState<string | null>(null);
+  const [isLoadingRevenue, setIsLoadingRevenue] = useState(false);
+  const [revenueView, setRevenueView] = useState<'overview' | 'renewals' | 'all'>('overview');
+
+  const fetchRevenue = useCallback(() => {
+    setIsLoadingRevenue(true);
+    setRevenueError(null);
+    return api
+      .get("/admin/revenue", { headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setRevenueData(res.data.data))
+      .catch(() => setRevenueError("Failed to load revenue data."))
+      .finally(() => setIsLoadingRevenue(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "revenue") return;
+    fetchRevenue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
@@ -1366,6 +1416,22 @@ export function AdminCoreEngine() {
                   {onboardingData && onboardingData.summary.stuck > 0 && (
                     <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-violet-600 text-white text-[10px] font-bold leading-none">
                       {onboardingData.summary.stuck}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("revenue")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "revenue" ? "border-cyan-400 text-cyan-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Revenue
+                  {revenueData && revenueData.summary.revenueAtRisk > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-amber-600 text-white text-[10px] font-bold leading-none">
+                      !
                     </span>
                   )}
                 </span>
@@ -4115,6 +4181,230 @@ export function AdminCoreEngine() {
                       <span><span className="text-secondary-600">✗</span> = not yet completed</span>
                       <span><span className="text-rose-400">STUCK</span> = signed up {">"}7 days ago, {"<"} 4 of 8 steps done — call them</span>
                     </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Revenue & MRR Dashboard */}
+            {activeTab === "revenue" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <TrendingUp className="h-5 w-5 text-cyan-400" />
+                      Revenue & MRR Dashboard
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Monthly recurring revenue, tier breakdown, trial pipeline, and upcoming renewals.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchRevenue}
+                    disabled={isLoadingRevenue}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingRevenue ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {revenueError && (
+                  <div className="rounded-lg bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 text-sm">
+                    {revenueError}
+                  </div>
+                )}
+
+                {isLoadingRevenue && !revenueData && (
+                  <div className="flex items-center gap-2 text-secondary-400 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading revenue data…
+                  </div>
+                )}
+
+                {revenueData && (
+                  <>
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {[
+                        { label: "MRR", value: `GHS ${revenueData.summary.mrr.toLocaleString()}`, sub: "active paid tenants", color: "text-cyan-400" },
+                        { label: "ARR (Projected)", value: `GHS ${revenueData.summary.arr.toLocaleString()}`, sub: "MRR × 12", color: "text-emerald-400" },
+                        { label: "Trial Pipeline", value: `GHS ${revenueData.summary.trialPipelineValue.toLocaleString()}`, sub: `${revenueData.summary.trial} active trials`, color: "text-amber-400" },
+                        { label: "Revenue at Risk", value: `GHS ${revenueData.summary.revenueAtRisk.toLocaleString()}`, sub: `${revenueData.summary.renewalsDueIn30Days} renewals + expired`, color: revenueData.summary.revenueAtRisk > 0 ? "text-rose-400" : "text-secondary-400" },
+                        { label: "Active Paid", value: String(revenueData.summary.activePaid), sub: "of " + revenueData.summary.totalTenants + " total", color: "text-white" },
+                        { label: "Trial Conversion", value: `${revenueData.summary.trialConversionRate}%`, sub: "paid / total tenants", color: "text-violet-400" },
+                        { label: "Avg Rev / Tenant", value: `GHS ${revenueData.summary.avgRevenuePerTenant}`, sub: "active paid only", color: "text-secondary-300" },
+                        { label: "Renewals in 30d", value: String(revenueData.summary.renewalsDueIn30Days), sub: "need retention action", color: revenueData.summary.renewalsDueIn30Days > 0 ? "text-orange-400" : "text-secondary-400" },
+                      ].map(({ label, value, sub, color }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-[10px] uppercase tracking-wide mb-1">{label}</p>
+                            <p className={`text-xl font-extrabold ${color}`} style={{ fontFamily: "'Syne', sans-serif" }}>{value}</p>
+                            <p className="text-secondary-600 text-[10px] mt-0.5">{sub}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Tier Breakdown */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {revenueData.tierBreakdown.map((t) => (
+                        <Card key={t.tier} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="text-white font-bold text-sm">{t.name} Plan</p>
+                                <p className="text-secondary-400 text-xs">GHS {t.priceGhs}/mo per tenant</p>
+                              </div>
+                              <DollarSign className="h-5 w-5 text-cyan-600" />
+                            </div>
+                            <p className="text-2xl font-extrabold text-cyan-400" style={{ fontFamily: "'Syne', sans-serif" }}>
+                              GHS {t.tierMrr.toLocaleString()}
+                            </p>
+                            <p className="text-secondary-500 text-xs mt-1">{t.activeCount} active tenant{t.activeCount !== 1 ? 's' : ''}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Monthly Activations Sparkline */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-secondary-300">New Paid Activations — Last 12 Months</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-end gap-1 h-20">
+                          {(() => {
+                            const maxCount = Math.max(...revenueData.monthlyActivations.map((m) => m.count), 1);
+                            return revenueData.monthlyActivations.map((m) => (
+                              <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                                <div
+                                  className="w-full bg-cyan-500/70 rounded-t"
+                                  style={{ height: `${Math.max(4, Math.round((m.count / maxCount) * 64))}px` }}
+                                  title={`${m.month}: ${m.count} new paid, GHS ${m.mrr}`}
+                                />
+                                <span className="text-[8px] text-secondary-600 leading-none">{m.month}</span>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                        <p className="text-secondary-600 text-[10px] mt-2">Bucketed by sign-up month for active paid tenants.</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Sub-views */}
+                    <div className="flex gap-2 text-xs">
+                      {(['overview', 'renewals', 'all'] as const).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setRevenueView(v)}
+                          className={`px-3 py-1 rounded-full border transition-colors ${
+                            revenueView === v
+                              ? "border-cyan-500 bg-cyan-900/30 text-cyan-300"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {v === 'overview' ? 'Overview' : v === 'renewals' ? `Renewals Due (${revenueData.summary.renewalsDueIn30Days})` : 'All Tenants'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Renewals Due Table */}
+                    {revenueView === 'renewals' && (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-secondary-800 hover:bg-transparent">
+                                <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Plan</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Monthly Value</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Renews In</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Renewal Date</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {revenueData.renewalsDue.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="text-center text-secondary-500 text-sm py-8">
+                                    No renewals due in the next 30 days.
+                                  </TableCell>
+                                </TableRow>
+                              ) : revenueData.renewalsDue.map((t) => {
+                                const urgencyColor = (t.renewalDaysLeft ?? 99) <= 7 ? "text-rose-400" : (t.renewalDaysLeft ?? 99) <= 14 ? "text-orange-400" : "text-amber-400";
+                                return (
+                                  <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-800/50">
+                                    <TableCell>
+                                      <p className="text-white text-sm font-semibold">{t.name}</p>
+                                      <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.tierName}</TableCell>
+                                    <TableCell className="text-cyan-400 text-sm font-bold">GHS {t.priceGhs}</TableCell>
+                                    <TableCell className={`font-bold text-sm ${urgencyColor}`}>
+                                      {t.renewalDaysLeft}d
+                                    </TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">
+                                      {t.subscriptionPaidUntil ? new Date(t.subscriptionPaidUntil).toLocaleDateString('en-GB') : '—'}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* All Tenants Revenue Table */}
+                    {revenueView === 'all' && (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-secondary-800 hover:bg-transparent">
+                                <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Plan</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Monthly Value</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Paid Until / Trial Ends</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {revenueData.allTenants.map((t) => {
+                                const statusColor = t.subscriptionStatus === 'ACTIVE' ? 'text-emerald-400' : t.subscriptionStatus === 'TRIAL' ? 'text-amber-400' : 'text-rose-400';
+                                const dateLabel = t.subscriptionStatus === 'ACTIVE' && t.subscriptionPaidUntil
+                                  ? new Date(t.subscriptionPaidUntil).toLocaleDateString('en-GB')
+                                  : t.subscriptionStatus === 'TRIAL' && t.trialEndsAt
+                                  ? `Trial ends ${new Date(t.trialEndsAt).toLocaleDateString('en-GB')}`
+                                  : '—';
+                                return (
+                                  <TableRow key={t.id} className={`border-secondary-800 hover:bg-secondary-800/50 ${t.isRevenueAtRisk ? 'bg-rose-900/10' : ''}`}>
+                                    <TableCell>
+                                      <p className="text-white text-sm font-semibold">{t.name}</p>
+                                      <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.tierName}</TableCell>
+                                    <TableCell className={`text-xs font-semibold ${statusColor}`}>{t.subscriptionStatus}</TableCell>
+                                    <TableCell className={`font-bold text-sm ${t.subscriptionStatus === 'ACTIVE' ? 'text-cyan-400' : t.subscriptionStatus === 'TRIAL' ? 'text-amber-300/60' : 'text-rose-400/60'}`}>
+                                      GHS {t.priceGhs}
+                                    </TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">{dateLabel}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </Card>
+                    )}
+
+                    {revenueView === 'overview' && (
+                      <div className="text-secondary-500 text-xs pt-2 border-t border-secondary-800">
+                        MRR counts only ACTIVE paid tenants at their tier price. Trial pipeline value shows potential MRR if all active trials convert. Revenue at risk = expired tenants + renewals due in ≤30 days.
+                      </div>
+                    )}
                   </>
                 )}
               </div>
