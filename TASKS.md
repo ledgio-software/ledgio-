@@ -2,6 +2,10 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes & Features (2026-09-11)
+
+- [x] **Feature: Force-print receipt gate on POS + Receipt Audit Log for Admin/Accountant** (2026-09-11) — Two anti-fraud controls to prevent attendants from pocketing the gap between what they charge customers and what they record. (1) **Force-print gate**: `receiptPrinted` state in `PointOfSale.tsx` is cleared to `false` after each completed sale; the "Record Sale" button shows "Print previous receipt first" and stays disabled until the cashier opens the PDF via `openReceipt(id, markPrinted=true)`. Receipt banner turns amber (required) and green once printed. (2) **Receipt Audit Log**: new admin/accountant-only page at `/reports/receipt-log` listing every completed POS sale with date, shop, cashier, payment method, total, and expandable line-item detail; per-row PDF download; date-range filter; pagination. Backend: new `GET /api/v1/tills/receipts` endpoint with `requireRole('Admin','Accountant')`, paginated, supports `from`/`to`/`warehouseId`/`cashierId` filters. (`frontend/src/pages/pos/PointOfSale.tsx`, `frontend/src/pages/reports/ReceiptLog.tsx`, `frontend/src/App.tsx`, `frontend/src/lib/navigation.ts`, `backend/src/routes/cashTill.ts`)
+
 ## Bug Fixes & Features (2026-09-06)
 
 - [x] **Fix: Double-submit guards in Job Costing + GL journal warnings** (2026-09-06) — "Add Line" and "Complete" buttons disabled while API call is in-flight (`addingLineForJob`/`completingJobId` state). Backend returns `journalWarning` in response when WIP/COGS accounts are not configured; frontend shows it as an error banner. (`frontend/src/pages/manufacturing/Jobs.tsx`, `backend/src/routes/jobs.ts`)

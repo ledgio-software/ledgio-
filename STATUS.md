@@ -2,6 +2,24 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-11] - Feature: Receipt enforcement (force print) + admin Receipt Audit Log
+
+**What/Why:**
+To prevent attendants from pocketing the gap between what they charge customers verbally and what they record in the system, two controls were added:
+
+1. **Force-print on POS**: After recording a sale, the cashier must click "Print Receipt" before the system allows a new sale to be started. The "Record Sale" button shows "Print previous receipt first" and stays disabled until the receipt PDF is opened. This closes the loophole where an attendant could skip printing and deny the customer proof of the actual price.
+
+2. **Receipt Audit Log** (Admin/Accountant-only): A new report page at `/reports/receipt-log` lists every completed POS sale with date, shop, cashier, payment method, and total. Clicking a row expands line-item detail. Any receipt PDF can be downloaded directly. Admins and accountants can filter by date range.
+
+**Files Affected:**
+- `backend/src/routes/cashTill.ts` — new `GET /api/v1/tills/receipts` endpoint (`requireRole('Admin','Accountant')`) returning paginated sales with lines, till, and warehouse
+- `frontend/src/pages/pos/PointOfSale.tsx` — `receiptPrinted` state; `openReceipt` accepts `markPrinted` flag; Record Sale button disabled when previous receipt unprinted; receipt banner turns amber until printed
+- `frontend/src/pages/reports/ReceiptLog.tsx` — new admin/accountant-only receipt log page with date filters, expandable line detail, and PDF download
+- `frontend/src/App.tsx` — lazy import and route for `/reports/receipt-log`
+- `frontend/src/lib/navigation.ts` — "Receipt Audit Log" nav item under REPORTS & ANALYTICS
+
+---
+
 ## [Date: 2026-09-07] - Feature: Floor Price enforcement on POS
 
 **What/Why:**

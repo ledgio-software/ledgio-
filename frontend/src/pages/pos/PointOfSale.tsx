@@ -126,6 +126,9 @@ export function PointOfSale() {
   const [isRecordingSale, setIsRecordingSale] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastReceipt | null>(null);
+  // Receipt must be printed before the cashier can start the next sale.
+  // Cleared to false on each new completed sale; set to true when Print Receipt is clicked.
+  const [receiptPrinted, setReceiptPrinted] = useState(true);
 
   // Close Till Modal
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
@@ -148,7 +151,7 @@ export function PointOfSale() {
     { userId: string; name: string; totalSales: number; voidedSales: number; voidRatio: number; anomaly: boolean }[]
   >([]);
 
-  const openReceipt = useCallback(async (saleId: string) => {
+  const openReceipt = useCallback(async (saleId: string, markPrinted = false) => {
     try {
       const res = await api.get(`/tills/sales/${saleId}/receipt.pdf`, { responseType: 'blob' });
       const blobUrl = URL.createObjectURL(res.data);
@@ -156,6 +159,7 @@ export function PointOfSale() {
       if (win) {
         win.addEventListener('load', () => URL.revokeObjectURL(blobUrl), { once: true });
       }
+      if (markPrinted) setReceiptPrinted(true);
     } catch {
       showToast('Failed to open receipt. Please try again.', 'error');
     }
@@ -474,6 +478,7 @@ export function PointOfSale() {
           changeGiven: res.data.data.changeGiven,
           lines: res.data.data.lines.map((l: any) => ({ itemName: l.itemName, quantity: l.quantity })),
         });
+        setReceiptPrinted(false);
         setCart([]);
         setItemSearch("");
         setCashGiven("");
@@ -957,27 +962,32 @@ export function PointOfSale() {
                     </div>
                   )}
 
-                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven) || floorViolations.length > 0}>
-                    {isRecordingSale ? "Recording..." : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}
+                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven) || floorViolations.length > 0 || !receiptPrinted}>
+                    {isRecordingSale ? "Recording..." : !receiptPrinted ? "Print previous receipt first" : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}
                   </Button>
                 </form>
 
                 {lastReceipt && (
-                  <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                  <div className={`mt-4 p-4 border rounded-lg ${receiptPrinted ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800" : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700"}`}>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-1">
+                      <div className={`flex items-center font-bold text-sm mb-1 ${receiptPrinted ? "text-emerald-800 dark:text-emerald-300" : "text-amber-800 dark:text-amber-300"}`}>
                         <Receipt className="mr-1.5 h-4 w-4" />
-                        Sale recorded — Receipt {lastReceipt.receiptNo}
+                        {receiptPrinted ? `Printed — Receipt ${lastReceipt.receiptNo}` : `Print required — Receipt ${lastReceipt.receiptNo}`}
                       </div>
                       <button
                         type="button"
-                        className="text-xs text-emerald-700 dark:text-emerald-400 underline hover:text-emerald-900"
-                        onClick={() => openReceipt(lastReceipt.id)}
+                        className={`text-xs font-semibold underline ${receiptPrinted ? "text-emerald-700 dark:text-emerald-400 hover:text-emerald-900" : "text-amber-700 dark:text-amber-400 hover:text-amber-900"}`}
+                        onClick={() => openReceipt(lastReceipt.id, true)}
                       >
-                        Print Receipt
+                        {receiptPrinted ? "Reprint" : "Print Receipt"}
                       </button>
                     </div>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                    {!receiptPrinted && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">
+                        Give the customer their receipt before starting a new sale.
+                      </p>
+                    )}
+                    <p className={`text-xs ${receiptPrinted ? "text-emerald-700 dark:text-emerald-400" : "text-amber-600 dark:text-amber-500"}`}>
                       {lastReceipt.lines.map((l) => `${l.quantity} × ${l.itemName}`).join(", ")} — Total {formatMoney(lastReceipt.amount)} — Change given {formatMoney(lastReceipt.changeGiven)}
                     </p>
                   </div>
