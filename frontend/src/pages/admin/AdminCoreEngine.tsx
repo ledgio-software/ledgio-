@@ -34,6 +34,7 @@ import {
   HandCoins,
   HeartPulse,
   TrendingDown,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -64,7 +65,7 @@ export function AdminCoreEngine() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -816,6 +817,61 @@ export function AdminCoreEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUnlocked, activeTab]);
 
+  // Onboarding Completion Tracker state
+  const [onboardingData, setOnboardingData] = useState<{
+    summary: {
+      total: number;
+      fullyOnboarded: number;
+      halfOrMore: number;
+      barelyStarted: number;
+      stuck: number;
+      avgCompletionPct: number;
+    };
+    totalSteps: number;
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      isLive: boolean;
+      createdAt: string;
+      userCount: number;
+      daysSinceSignup: number;
+      completionScore: number;
+      completionPct: number;
+      isStuck: boolean;
+      milestoneDetail: {
+        teamMemberAdded: boolean;
+        firstJournalPosted: boolean;
+        firstInvoiceSent: boolean;
+        firstSaleRecorded: boolean;
+        firstInventoryItem: boolean;
+        bankConnected: boolean;
+        firstReconciliation: boolean;
+      };
+    }[];
+  } | null>(null);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [isLoadingOnboarding, setIsLoadingOnboarding] = useState(false);
+  const [onboardingFilter, setOnboardingFilter] = useState<'all' | 'stuck' | 'complete' | 'started' | 'bare'>('all');
+
+  const fetchOnboarding = useCallback(() => {
+    setIsLoadingOnboarding(true);
+    setOnboardingError(null);
+    return api
+      .get("/admin/onboarding", { headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setOnboardingData(res.data.data))
+      .catch(() => setOnboardingError("Failed to load onboarding data."))
+      .finally(() => setIsLoadingOnboarding(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "onboarding") return;
+    fetchOnboarding();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
@@ -1294,6 +1350,22 @@ export function AdminCoreEngine() {
                   {churnData && (churnData.summary.trialCritical + churnData.summary.expired) > 0 && (
                     <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
                       {churnData.summary.trialCritical + churnData.summary.expired}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("onboarding")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "onboarding" ? "border-violet-400 text-violet-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Onboarding
+                  {onboardingData && onboardingData.summary.stuck > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-violet-600 text-white text-[10px] font-bold leading-none">
+                      {onboardingData.summary.stuck}
                     </span>
                   )}
                 </span>
@@ -3857,6 +3929,192 @@ export function AdminCoreEngine() {
                         </Table>
                       </div>
                     </Card>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Onboarding Completion Tracker */}
+            {activeTab === "onboarding" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <ClipboardList className="h-5 w-5 text-violet-400" />
+                      Onboarding Completion Tracker
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Per-tenant setup progress across 8 milestones. Stuck clients ({">"} 7 days, {"<"} 4 steps) need outreach.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchOnboarding}
+                    disabled={isLoadingOnboarding}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingOnboarding ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {onboardingError && (
+                  <div className="rounded-lg bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 text-sm">
+                    {onboardingError}
+                  </div>
+                )}
+
+                {isLoadingOnboarding && !onboardingData && (
+                  <div className="flex items-center gap-2 text-secondary-400 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading onboarding data…
+                  </div>
+                )}
+
+                {onboardingData && (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {[
+                        { label: "Total Tenants", value: onboardingData.summary.total, color: "text-white" },
+                        { label: "Fully Onboarded", value: onboardingData.summary.fullyOnboarded, color: "text-emerald-400" },
+                        { label: "Half or More", value: onboardingData.summary.halfOrMore, color: "text-amber-400" },
+                        { label: "Barely Started", value: onboardingData.summary.barelyStarted, color: "text-orange-400" },
+                        { label: "Stuck (need call)", value: onboardingData.summary.stuck, color: "text-rose-400" },
+                        { label: "Avg Completion", value: `${onboardingData.summary.avgCompletionPct}%`, color: "text-violet-400" },
+                      ].map(({ label, value, color }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-[10px] uppercase tracking-wide mb-1">{label}</p>
+                            <p className={`text-2xl font-extrabold ${color}`} style={{ fontFamily: "'Syne', sans-serif" }}>{value}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Filter Row */}
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {(['all', 'stuck', 'complete', 'started', 'bare'] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setOnboardingFilter(f)}
+                          className={`px-3 py-1 rounded-full border transition-colors ${
+                            onboardingFilter === f
+                              ? "border-violet-500 bg-violet-900/30 text-violet-300"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {f === 'all' ? 'All Tenants' : f === 'stuck' ? 'Stuck Only' : f === 'complete' ? 'Fully Onboarded' : f === 'started' ? 'In Progress' : 'Barely Started'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tenant Milestone Table */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800 hover:bg-transparent">
+                              <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Score</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Wizard</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Team</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Journal</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Invoice</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Sale</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Inventory</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Bank</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Reconcile</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Days</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              let rows = [...onboardingData.tenants];
+                              if (onboardingFilter === 'stuck') rows = rows.filter((r) => r.isStuck);
+                              else if (onboardingFilter === 'complete') rows = rows.filter((r) => r.completionScore === onboardingData.totalSteps);
+                              else if (onboardingFilter === 'started') rows = rows.filter((r) => r.completionScore >= 2 && r.completionScore < onboardingData.totalSteps);
+                              else if (onboardingFilter === 'bare') rows = rows.filter((r) => r.completionScore < 2);
+                              rows.sort((a, b) => {
+                                if (a.isStuck !== b.isStuck) return a.isStuck ? -1 : 1;
+                                return a.completionScore - b.completionScore;
+                              });
+                              if (rows.length === 0) {
+                                return (
+                                  <TableRow>
+                                    <TableCell colSpan={12} className="text-center text-secondary-500 text-sm py-8">
+                                      No clients match this filter.
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+                              return rows.map((t) => {
+                                const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `T${t.tier}`;
+                                const pctColor = t.completionPct >= 75 ? "text-emerald-400" : t.completionPct >= 50 ? "text-amber-400" : t.completionPct >= 25 ? "text-orange-400" : "text-rose-400";
+                                const check = (val: boolean) => val
+                                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mx-auto" />
+                                  : <XCircle className="h-3.5 w-3.5 text-secondary-700 mx-auto" />;
+                                return (
+                                  <TableRow key={t.id} className={`border-secondary-800 hover:bg-secondary-800/50 ${t.isStuck ? 'bg-rose-900/10' : ''}`}>
+                                    <TableCell>
+                                      <div>
+                                        <p className="text-white text-sm font-semibold">{t.name}</p>
+                                        <p className="text-secondary-500 text-[10px]">{t.slug} · {tierLabel} · {t.subscriptionStatus}</p>
+                                        <p className="text-secondary-600 text-[10px]">{t.userCount} user{t.userCount !== 1 ? 's' : ''}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <span className={`font-bold text-sm ${pctColor}`}>{t.completionScore}/{onboardingData.totalSteps}</span>
+                                      <div className="w-16 h-1 bg-secondary-700 rounded-full mt-1">
+                                        <div className={`h-1 rounded-full ${t.completionPct >= 75 ? 'bg-emerald-400' : t.completionPct >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${t.completionPct}%` }} />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">{check(t.isLive)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.teamMemberAdded)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstJournalPosted)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstInvoiceSent)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstSaleRecorded)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstInventoryItem)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.bankConnected)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstReconciliation)}</TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">{t.daysSinceSignup}d</TableCell>
+                                    <TableCell>
+                                      {t.isStuck ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-900/40 text-rose-300 text-[10px] font-bold border border-rose-700">
+                                          STUCK
+                                        </span>
+                                      ) : t.completionScore === onboardingData.totalSteps ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 text-[10px] font-bold border border-emerald-700">
+                                          COMPLETE
+                                        </span>
+                                      ) : t.completionScore >= Math.ceil(onboardingData.totalSteps / 2) ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 text-[10px] font-bold border border-amber-700">
+                                          IN PROGRESS
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-400 text-[10px] font-bold border border-secondary-700">
+                                          STARTED
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+
+                    {/* Legend */}
+                    <div className="flex flex-wrap gap-4 text-xs text-secondary-500 pt-2 border-t border-secondary-800">
+                      <span className="font-semibold text-secondary-300">Step guide:</span>
+                      <span><span className="text-emerald-400">✓</span> = done (detected in audit log or isLive flag)</span>
+                      <span><span className="text-secondary-600">✗</span> = not yet completed</span>
+                      <span><span className="text-rose-400">STUCK</span> = signed up {">"}7 days ago, {"<"} 4 of 8 steps done — call them</span>
+                    </div>
                   </>
                 )}
               </div>

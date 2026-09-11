@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-11] - Feature: Onboarding Completion Tracker tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: AGOD needs to see which tenants are progressing through setup milestones so they can identify "stuck" clients (signed up >7 days ago, completed <50% of steps) and initiate proactive outreach. Added a 16th tab to the admin console showing per-tenant completion of 8 onboarding milestones plus a stuck-client call list.
+
+**How it works:**
+- Step 0 = `Tenant.isLive` (onboarding wizard complete — opening balances validated)
+- Steps 1–7 = presence of specific audit log actions per tenant (team member added, first journal, first invoice, first sale, first inventory item, bank connected, first reconciliation)
+- `completionScore` (0–8), `completionPct`, and `isStuck` (>7 days old, score < 4) computed server-side
+- Summary cards: total tenants, fully onboarded, half-or-more, barely started, stuck count, avg completion %
+- Milestone table shows ✓/✗ per step per tenant with a mini progress bar; row highlighted red when stuck
+- Tab nav badge shows stuck-client count so AGOD sees the alert without opening the tab
+- Filters: All / Stuck Only / Fully Onboarded / In Progress / Barely Started
+
+**Files Affected:**
+- `backend/src/routes/adminOnboarding.ts` — NEW: GET /api/v1/admin/onboarding endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "onboarding" tab type, state, fetch, nav button (ClipboardList icon, violet theme), and full tab panel JSX
+
 ## [Date: 2026-09-11] - Feature: Churn Risk Tracker tab in AGOD Control Engine
 
 **What/Why:**
