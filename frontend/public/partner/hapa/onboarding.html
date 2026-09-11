@@ -1,0 +1,694 @@
+<title>Ledgio Onboarding Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ink:      #0d1b2a;
+    --ink-mid:  #334155;
+    --muted:    #64748b;
+    --ground:   #ffffff;
+    --surface:  #f8fafc;
+    --mint:     #f0fdf8;
+    --border:   #e2e8f0;
+    --emerald:  #059669;
+    --blue:     #2563eb;
+    --rule:     #e2e8f0;
+    --amber:    #d97706;
+    --violet:   #7c3aed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:     #f1f5f9;
+      --ink-mid: #cbd5e1;
+      --muted:   #94a3b8;
+      --ground:  #0f172a;
+      --surface: #1e293b;
+      --mint:    #0d2b22;
+      --border:  #334155;
+      --rule:    #1e293b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:     #f1f5f9;
+    --ink-mid: #cbd5e1;
+    --muted:   #94a3b8;
+    --ground:  #0f172a;
+    --surface: #1e293b;
+    --mint:    #0d2b22;
+    --border:  #334155;
+    --rule:    #1e293b;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    line-height: 1.6;
+    padding-inline: 24px;
+    padding-block: 0;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #059669 0%, #2563eb 100%);
+    margin-inline: -24px;
+    padding: 28px 32px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,0.18); border-radius: 9px;
+    display: flex; align-items: flex-end; gap: 3px; padding: 7px 8px;
+  }
+  .bar { background: #fff; border-radius: 2px; width: 5px; }
+  .b1{height:9px;} .b2{height:14px;} .b3{height:20px;opacity:.92;}
+  .brand-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; font-weight: 700; color: #fff;
+  }
+  .header-right { text-align: right; }
+  .header-right strong {
+    display: block; color: #fff; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .header-right span { color: rgba(255,255,255,0.6); font-size: 12px; }
+
+  /* ── Intro ── */
+  .intro-band {
+    background: var(--mint);
+    margin-inline: -24px;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .intro-band p { font-size: 14px; color: var(--ink-mid); max-width: 580px; }
+  .intro-band strong { color: var(--emerald); font-weight: 600; }
+  .timeline-badge {
+    background: rgba(5,150,105,0.12);
+    border: 1px solid rgba(5,150,105,0.3);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px; font-weight: 600; color: var(--emerald);
+    white-space: nowrap;
+  }
+
+  /* ── Main layout ── */
+  .content {
+    max-width: 860px;
+    margin: 0 auto;
+    padding-block: 40px;
+  }
+
+  /* ── Progress overview ── */
+  .phase-overview {
+    display: flex;
+    gap: 0;
+    margin-bottom: 44px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .phase-pip {
+    flex: 1;
+    padding: 14px 12px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .phase-pip:last-child { border-right: none; }
+  .pip-num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .pip-label {
+    font-size: 11px; color: var(--muted); font-weight: 500;
+    line-height: 1.3;
+  }
+
+  /* ── Phase sections ── */
+  .phase {
+    margin-bottom: 40px;
+  }
+  .phase-header {
+    display: flex; align-items: flex-start; gap: 16px;
+    margin-bottom: 20px;
+  }
+  .phase-num {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 20px; font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .phase-meta { flex: 1; }
+  .phase-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 24px; font-weight: 700;
+    line-height: 1.1; text-wrap: balance;
+    margin-bottom: 3px;
+  }
+  .phase-sub { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .phase-who {
+    display: inline-block;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 2px 9px; border-radius: 20px;
+    margin-top: 6px;
+  }
+
+  /* ── Step list ── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .step {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--ground);
+    transition: background 0.12s;
+  }
+  .step:last-child { border-bottom: none; }
+  .step:hover { background: var(--surface); }
+  .step-n {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .step-body { flex: 1; }
+  .step-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+  .step-desc { font-size: 13px; color: var(--ink-mid); line-height: 1.55; }
+  .step-tip {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 7px;
+    font-size: 12px; font-weight: 500;
+    background: var(--mint);
+    color: var(--emerald);
+    padding: 3px 10px; border-radius: 5px;
+    border: 1px solid rgba(5,150,105,0.2);
+  }
+
+  /* ── Roles section ── */
+  .roles-section {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 2px solid var(--rule);
+  }
+  .roles-header {
+    margin-bottom: 20px;
+  }
+  .roles-header h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 24px; font-weight: 700; margin-bottom: 4px;
+  }
+  .roles-header p { font-size: 14px; color: var(--muted); }
+
+  .role-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+  .role-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .role-top {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .role-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
+    margin-bottom: 6px; display: inline-block;
+  }
+  .role-card h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 18px; font-weight: 700;
+  }
+  .role-routine {
+    list-style: none;
+    padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .role-routine li {
+    font-size: 12.5px; color: var(--ink-mid);
+    padding-left: 16px; position: relative; line-height: 1.4;
+  }
+  .role-routine li::before {
+    content: '·';
+    position: absolute; left: 0;
+    font-size: 16px; font-weight: 700; line-height: 1;
+    top: 1px;
+  }
+  .routine-period {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 4px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    color: var(--muted);
+  }
+
+  /* ── Support strip ── */
+  .support-strip {
+    margin-top: 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px;
+  }
+  .support-strip h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 18px; font-weight: 700; margin-bottom: 3px;
+  }
+  .support-strip p { font-size: 13px; color: var(--muted); }
+  .contact-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip {
+    display: flex; flex-direction: column;
+    background: var(--ground); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px;
+  }
+  .chip span:first-child {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 1px;
+  }
+  .chip span:last-child { font-size: 13px; font-weight: 600; color: var(--emerald); }
+
+  /* ── Footer ── */
+  .footer {
+    background: var(--ink);
+    margin-inline: -24px;
+    padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .footer span { font-size: 12px; color: rgba(255,255,255,0.45); }
+  .footer a { color: #6ee7b7; text-decoration: none; font-size: 12px; font-weight: 500; }
+
+  @media (max-width: 640px) {
+    .phase-overview { flex-wrap: wrap; }
+    .phase-pip { flex: none; width: 50%; border-bottom: 1px solid var(--border); }
+    .role-grid { grid-template-columns: 1fr; }
+    .intro-band { flex-direction: column; align-items: flex-start; }
+    .header { padding: 20px 20px 18px; }
+    .header-right { display: none; }
+    .intro-band { padding: 14px 20px; }
+    .footer { padding: 14px 20px; }
+    .support-strip { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+
+<!-- Header -->
+<div class="header">
+  <div class="brand">
+    <div class="brand-icon">
+      <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div>
+    </div>
+    <span class="brand-name">Ledgio</span>
+  </div>
+  <div class="header-right">
+    <strong>Onboarding Guide</strong>
+    <span>New Customer Setup · 2026</span>
+  </div>
+</div>
+
+<!-- Intro -->
+<div class="intro-band">
+  <p>Follow these five phases to get your business fully set up on Ledgio. Your <strong>Hapa Solutions</strong> representative will guide you through each step — this document is your reference throughout the process.</p>
+  <span class="timeline-badge">Typical setup: 1–2 days</span>
+</div>
+
+<div class="content">
+
+  <!-- Phase overview strip -->
+  <div class="phase-overview">
+    <div class="phase-pip">
+      <div class="pip-num" style="color:#059669;">1</div>
+      <div class="pip-label">Account<br>Setup</div>
+    </div>
+    <div class="phase-pip">
+      <div class="pip-num" style="color:#2563eb;">2</div>
+      <div class="pip-label">Add Your<br>Team</div>
+    </div>
+    <div class="phase-pip">
+      <div class="pip-num" style="color:#7c3aed;">3</div>
+      <div class="pip-label">Load<br>Products</div>
+    </div>
+    <div class="phase-pip">
+      <div class="pip-num" style="color:#d97706;">4</div>
+      <div class="pip-label">Configure<br>POS</div>
+    </div>
+    <div class="phase-pip">
+      <div class="pip-num" style="color:#059669;">5</div>
+      <div class="pip-label">Go<br>Live</div>
+    </div>
+  </div>
+
+  <!-- Phase 1 -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:#059669;">1</div>
+      <div class="phase-meta">
+        <div class="phase-title">Account Setup</div>
+        <div class="phase-sub">Configure your business workspace before anything else</div>
+        <span class="phase-who" style="background:rgba(5,150,105,0.1);color:#059669;">Admin only</span>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <div class="step-title">Receive and test your login credentials</div>
+          <div class="step-desc">Hapa Solutions will send your admin email and temporary password. Log in, change your password immediately, and confirm you can access the dashboard.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <div class="step-title">Set your business details</div>
+          <div class="step-desc">Go to Settings → Business Profile. Enter your business name, address, phone number, and upload your logo. These appear on invoices and receipts.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <div class="step-title">Configure currency and tax</div>
+          <div class="step-desc">Set your base currency (e.g. GHS, NGN, KES) and your VAT / tax rate. You can set different tax rates for different product categories later.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-body">
+          <div class="step-title">Add your branches / shops</div>
+          <div class="step-desc">Go to Settings → Branches. Add each physical location where you sell or store goods. Each branch gets its own tills and stock levels.
+            <span class="step-tip">💡 You can add more branches at any time after going live</span>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">5</div>
+        <div class="step-body">
+          <div class="step-title">Set up your Chart of Accounts</div>
+          <div class="step-desc">Ledgio provides a default chart of accounts ready to use. If your accountant has a preferred structure, set it up now. Enter opening balances if you are migrating from an existing system.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:#2563eb;">2</div>
+      <div class="phase-meta">
+        <div class="phase-title">Add Your Team</div>
+        <div class="phase-sub">Invite staff and get Ledgio installed on every device</div>
+        <span class="phase-who" style="background:rgba(37,99,235,0.1);color:#2563eb;">Admin</span>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <div class="step-title">Invite team members by email</div>
+          <div class="step-desc">Go to Settings → Users → Invite. Enter each person's email address. They will receive a link to create their password and join your workspace.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <div class="step-title">Assign roles</div>
+          <div class="step-desc">Choose the correct role for each person: <strong>Admin</strong> (owner / manager), <strong>Accountant</strong> (finance team), <strong>Cashier</strong> (till staff), or <strong>Viewer</strong> (read-only). A person can only see what their role permits.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <div class="step-title">Install Ledgio on every device</div>
+          <div class="step-desc">On each PC, phone, or tablet, open the browser, go to your Ledgio link, and tap <strong>Install</strong> or <strong>Add to Home Screen</strong>. Ledgio installs as software on the device — its own icon, its own window.
+            <span class="step-tip">💡 Works on Windows, Mac, Android, and iPhone — no app store required</span>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-body">
+          <div class="step-title">Confirm each person can log in</div>
+          <div class="step-desc">Ask each team member to log in and verify they see the correct screens for their role before moving on to loading products.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:#7c3aed;">3</div>
+      <div class="phase-meta">
+        <div class="phase-title">Load Your Products</div>
+        <div class="phase-sub">Build your product catalogue and set opening stock</div>
+        <span class="phase-who" style="background:rgba(124,58,237,0.1);color:#7c3aed;">Admin or Accountant</span>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <div class="step-title">Create product categories</div>
+          <div class="step-desc">Group your items into categories (e.g. "Phones", "Accessories", "Stationery"). Categories make searching faster at the POS and help with sales reports.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <div class="step-title">Add your items</div>
+          <div class="step-desc">For each product enter: name, SKU / barcode, selling price, cost price, tax rate, and category. Items can be added one by one or imported from a spreadsheet (CSV).
+            <span class="step-tip">💡 Ask your Hapa representative for the CSV import template</span>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <div class="step-title">Set opening stock levels</div>
+          <div class="step-desc">For each item, enter how many units you currently have at each branch. This gives Ledgio an accurate starting point for stock tracking.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-body">
+          <div class="step-title">Set low-stock alert thresholds</div>
+          <div class="step-desc">For items you reorder regularly, set a minimum stock level. Ledgio will alert you when any item falls below its threshold at any branch.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 4 -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:#d97706;">4</div>
+      <div class="phase-meta">
+        <div class="phase-title">Configure Your POS</div>
+        <div class="phase-sub">Set up tills, assign cashiers, and run a test sale</div>
+        <span class="phase-who" style="background:rgba(217,119,6,0.1);color:#d97706;">Admin</span>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <div class="step-title">Create a till for each checkout point</div>
+          <div class="step-desc">Go to POS → Tills → New Till. Give each till a name (e.g. "Main Counter", "Branch 2 Till 1") and assign it to the correct branch.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <div class="step-title">Assign cashiers to tills</div>
+          <div class="step-desc">Each cashier user is linked to a till when they open their shift. Confirm each cashier knows which till they will use.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <div class="step-title">Run a test sale end-to-end</div>
+          <div class="step-desc">Log in as a cashier, search for a product, add it to the cart, select a payment method, and complete the sale. Confirm the receipt PDF opens and the stock count decreases by one.
+            <span class="step-tip">💡 The cashier must open the receipt PDF before recording the next sale — this is a security control</span>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-body">
+          <div class="step-title">Run a test cash-up</div>
+          <div class="step-desc">At end of the test shift, go to POS → Cash Up. Enter the cash counted in the till and confirm the system's expected amount matches. Review the daily summary report.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 5 -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:#059669;">5</div>
+      <div class="phase-meta">
+        <div class="phase-title">Go Live</div>
+        <div class="phase-sub">Train your team and start trading on Ledgio</div>
+        <span class="phase-who" style="background:rgba(5,150,105,0.1);color:#059669;">All staff</span>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <div class="step-title">Train your cashiers</div>
+          <div class="step-desc">Walk each cashier through: searching for items, processing a sale, handling cash and mobile money payments, opening the receipt PDF, and doing end-of-shift cash-up. Hapa Solutions can run this training session for you.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <div class="step-title">Train your manager / accountant</div>
+          <div class="step-desc">Walk through the daily reports, receipt audit log, stock levels view, and how to add new products or users. For accountants, cover the accounting modules and bank reconciliation.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <div class="step-title">First day of live trading</div>
+          <div class="step-desc">Start your first real day with Hapa support on standby. Record all sales through Ledgio from day one — do not run parallel paper systems alongside.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-n">4</div>
+        <div class="step-body">
+          <div class="step-title">Review end-of-day reports</div>
+          <div class="step-desc">At close of business, the admin or accountant reviews: daily sales summary, cash-up report, stock movements, and the receipt audit log. Flag anything unexpected to your Hapa representative.
+            <span class="step-tip">✅ Congratulations — you are now running fully on Ledgio</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Role routines -->
+  <div class="roles-section">
+    <div class="roles-header">
+      <h2>Daily &amp; Monthly Routines by Role</h2>
+      <p>Quick reference for what each role does in Ledgio on a regular basis.</p>
+    </div>
+    <div class="role-grid">
+
+      <div class="role-card">
+        <div class="role-top">
+          <span class="role-badge" style="background:rgba(217,119,6,0.12);color:#d97706;">Cashier</span>
+          <h3>Each Shift</h3>
+        </div>
+        <div class="routine-period">Start of shift</div>
+        <ul class="role-routine">
+          <li>Open Ledgio, log in, select your till</li>
+          <li>Count opening float and record it</li>
+        </ul>
+        <div class="routine-period">During trading</div>
+        <ul class="role-routine">
+          <li>Search product by name or SKU</li>
+          <li>Add items, select payment method, complete sale</li>
+          <li>Open receipt PDF before next customer</li>
+          <li>Void a sale only with a valid reason</li>
+        </ul>
+        <div class="routine-period">End of shift</div>
+        <ul class="role-routine">
+          <li>Count cash in till</li>
+          <li>Submit cash-up report in Ledgio</li>
+          <li>Log out</li>
+        </ul>
+      </div>
+
+      <div class="role-card">
+        <div class="role-top">
+          <span class="role-badge" style="background:rgba(5,150,105,0.12);color:#059669;">Admin / Manager</span>
+          <h3>Daily &amp; Weekly</h3>
+        </div>
+        <div class="routine-period">Each day</div>
+        <ul class="role-routine">
+          <li>Review daily sales summary</li>
+          <li>Check cash-up reports from all tills</li>
+          <li>Check stock levels — reorder if below threshold</li>
+          <li>Review receipt audit log for anomalies</li>
+        </ul>
+        <div class="routine-period">Each week</div>
+        <ul class="role-routine">
+          <li>Review weekly sales by product / branch</li>
+          <li>Check for any voided transactions</li>
+          <li>Add new products or update prices as needed</li>
+          <li>Review any low-stock alerts</li>
+        </ul>
+      </div>
+
+      <div class="role-card">
+        <div class="role-top">
+          <span class="role-badge" style="background:rgba(37,99,235,0.12);color:#2563eb;">Accountant</span>
+          <h3>Monthly</h3>
+        </div>
+        <div class="routine-period">Weekly</div>
+        <ul class="role-routine">
+          <li>Record supplier invoices and payments</li>
+          <li>Reconcile mobile money and card settlements</li>
+        </ul>
+        <div class="routine-period">End of month</div>
+        <ul class="role-routine">
+          <li>Bank reconciliation — match statement to Ledgio</li>
+          <li>Review Profit &amp; Loss statement</li>
+          <li>Review Balance Sheet</li>
+          <li>Generate VAT / tax summary for filing</li>
+          <li>Export reports to PDF for records</li>
+          <li>Lock the period to prevent retrospective edits</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Support -->
+  <div class="support-strip">
+    <div>
+      <h3>Need help during setup?</h3>
+      <p>Your Hapa Solutions representative is available throughout the onboarding process.</p>
+    </div>
+    <div class="contact-chips">
+      <div class="chip">
+        <span>Ledgio Support</span>
+        <span>ledgioapp@gmail.com</span>
+      </div>
+      <div class="chip">
+        <span>Local Partner</span>
+        <span>Hapa Solutions</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<div class="footer">
+  <span>Ledgio Business Software · Distributed by Hapa Solutions · 2026</span>
+  <a href="mailto:ledgioapp@gmail.com">Get support</a>
+</div>
