@@ -180,7 +180,7 @@ export function ReceiptLog() {
                       <TableCell className="text-right font-semibold tabular-nums">{formatMoney(Number(r.amount))}</TableCell>
                       <TableCell>
                         {r.voidedAt ? (
-                          <Badge variant="destructive">VOIDED</Badge>
+                          <Badge variant="danger">VOIDED</Badge>
                         ) : (
                           <Badge variant="default">OK</Badge>
                         )}
