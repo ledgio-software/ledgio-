@@ -2,6 +2,23 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-11] - Feature: Client Health Dashboard tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 priority: retain early Ghanaian SME clients. The AGOD Control Engine lacked any visibility into which tenants are active vs. dormant and which are at risk of churning. Added a new "Client Health" tab (#14) to the admin console that surfaces per-tenant activity, subscription status, and churn risk signals in real time.
+
+**How it works:**
+- `lastActivityAt` is derived from each tenant's most-recent `AuditLog` row (audit logs are written on every user action — invoice posted, sale rung up, etc. — making this a reliable proxy for real usage without needing a new DB column or migration).
+- `churnRisk` is computed server-side: `high` if tenant is EXPIRED, dormant 14+ days, or trial ending in ≤7 days; `medium` if dormant 7–13 days or paid renewal in ≤7 days.
+- Summary cards show totals: all clients, active paid, on trial, expired, high-risk count, trials expiring in 7 days.
+- Table is filterable by risk level and subscription status, sortable by risk, most-dormant, or most-recent activity.
+- Tab badge shows the live high-risk count so it is visible without opening the tab.
+
+**Files Affected:**
+- `backend/src/routes/adminClientHealth.ts` — NEW: GET /api/v1/admin/client-health endpoint
+- `backend/src/app.ts` — registered the new route at /api/v1/admin/client-health
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "clienthealth" tab type, state, fetchClientHealth callback, nav button, and full tab panel JSX
+
 ## [Date: 2026-09-11] - Perf: Cross-device PWA compatibility and performance overhaul
 
 **What/Why:**

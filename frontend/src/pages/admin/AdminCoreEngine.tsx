@@ -32,6 +32,8 @@ import {
   ChevronDown,
   ChevronRight,
   HandCoins,
+  HeartPulse,
+  TrendingDown,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -62,7 +64,7 @@ export function AdminCoreEngine() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -712,6 +714,57 @@ export function AdminCoreEngine() {
     }
   };
 
+  // Client Health Dashboard state
+  const [clientHealthData, setClientHealthData] = useState<{
+    summary: {
+      totalTenants: number;
+      activeTenants: number;
+      trialTenants: number;
+      expiredTenants: number;
+      dormantTenants: number;
+      highRiskTenants: number;
+      mediumRiskTenants: number;
+      trialsExpiringIn7Days: number;
+    };
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      trialEndsAt: string | null;
+      subscriptionPaidUntil: string | null;
+      createdAt: string;
+      isLive: boolean;
+      userCount: number;
+      lastActivityAt: string | null;
+      daysSinceActivity: number | null;
+      trialDaysLeft: number | null;
+      paidDaysLeft: number | null;
+      churnRisk: 'high' | 'medium' | 'low' | 'none';
+    }[];
+  } | null>(null);
+  const [clientHealthError, setClientHealthError] = useState<string | null>(null);
+  const [isLoadingClientHealth, setIsLoadingClientHealth] = useState(false);
+  const [clientHealthSort, setClientHealthSort] = useState<'risk' | 'dormant' | 'recent'>('risk');
+  const [clientHealthFilter, setClientHealthFilter] = useState<'all' | 'high' | 'medium' | 'trial' | 'active' | 'expired'>('all');
+
+  const fetchClientHealth = useCallback(() => {
+    setIsLoadingClientHealth(true);
+    setClientHealthError(null);
+    return api
+      .get("/admin/client-health", { headers: { 'x-admin-passcode': passcode } })
+      .then((res) => setClientHealthData(res.data.data))
+      .catch(() => setClientHealthError("Failed to load client health data."))
+      .finally(() => setIsLoadingClientHealth(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "clienthealth") return;
+    fetchClientHealth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
@@ -1161,6 +1214,22 @@ export function AdminCoreEngine() {
               >
                 <HandCoins className="h-4 w-4" />
                 <span>Referrals</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("clienthealth")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "clienthealth" ? "border-emerald-400 text-emerald-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <HeartPulse className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Client Health
+                  {clientHealthData && clientHealthData.summary.highRiskTenants > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {clientHealthData.summary.highRiskTenants}
+                    </span>
+                  )}
+                </span>
               </button>
             </div>
 
@@ -3322,6 +3391,236 @@ export function AdminCoreEngine() {
             )}
           </div>
         )}
+            {/* Tab: Client Health Dashboard */}
+            {activeTab === "clienthealth" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <HeartPulse className="h-5 w-5 text-emerald-400" />
+                      Client Health Dashboard
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Real-time tenant activity, subscription health, and churn risk — last activity derived from audit logs.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchClientHealth}
+                    disabled={isLoadingClientHealth}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingClientHealth ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {clientHealthError && (
+                  <div className="rounded-lg border border-rose-800 bg-rose-950/30 p-4 text-rose-400 text-sm">{clientHealthError}</div>
+                )}
+
+                {isLoadingClientHealth && !clientHealthData && (
+                  <div className="flex items-center gap-3 text-secondary-400 text-sm py-8">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Loading client health data…
+                  </div>
+                )}
+
+                {clientHealthData && (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: "Total Clients", value: clientHealthData.summary.totalTenants, color: "text-white" },
+                        { label: "Active Paid", value: clientHealthData.summary.activeTenants, color: "text-emerald-400" },
+                        { label: "On Trial", value: clientHealthData.summary.trialTenants, color: "text-amber-400" },
+                        { label: "Expired", value: clientHealthData.summary.expiredTenants, color: "text-rose-400" },
+                      ].map((stat) => (
+                        <Card key={stat.label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-xs">{stat.label}</p>
+                            <p className={`text-3xl font-black mt-1 ${stat.color}`}>{stat.value}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Churn Risk Summary */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Card className="bg-rose-950/20 border-rose-900">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <TrendingDown className="h-8 w-8 text-rose-400 shrink-0" />
+                          <div>
+                            <p className="text-rose-300 text-xs font-semibold">HIGH RISK</p>
+                            <p className="text-3xl font-black text-rose-400">{clientHealthData.summary.highRiskTenants}</p>
+                            <p className="text-rose-500 text-[10px]">dormant 14d+ or expired</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-amber-950/20 border-amber-900">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <AlertTriangle className="h-8 w-8 text-amber-400 shrink-0" />
+                          <div>
+                            <p className="text-amber-300 text-xs font-semibold">MEDIUM RISK</p>
+                            <p className="text-3xl font-black text-amber-400">{clientHealthData.summary.mediumRiskTenants}</p>
+                            <p className="text-amber-600 text-[10px]">dormant 7-13d or expiring soon</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <Clock className="h-8 w-8 text-amber-400 shrink-0" />
+                          <div>
+                            <p className="text-secondary-300 text-xs font-semibold">TRIALS EXPIRING ≤7 DAYS</p>
+                            <p className="text-3xl font-black text-amber-400">{clientHealthData.summary.trialsExpiringIn7Days}</p>
+                            <p className="text-secondary-500 text-[10px]">need conversion outreach now</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Filters & Sort */}
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-secondary-400 text-xs font-semibold">FILTER:</span>
+                      {(["all", "high", "medium", "trial", "active", "expired"] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setClientHealthFilter(f)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            clientHealthFilter === f
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {f === "all" ? "All" : f === "high" ? "High Risk" : f === "medium" ? "Medium Risk" : f.charAt(0).toUpperCase() + f.slice(1)}
+                        </button>
+                      ))}
+                      <span className="ml-4 text-secondary-400 text-xs font-semibold">SORT:</span>
+                      {(["risk", "dormant", "recent"] as const).map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setClientHealthSort(s)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            clientHealthSort === s
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {s === "risk" ? "By Risk" : s === "dormant" ? "Most Dormant" : "Most Recent"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tenant Table */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800 hover:bg-transparent">
+                              <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Tier</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Risk</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Users</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Last Activity</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Expiry / Deadline</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              const RISK_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
+                              let rows = [...clientHealthData.tenants];
+
+                              // filter
+                              if (clientHealthFilter === "high") rows = rows.filter((r) => r.churnRisk === "high");
+                              else if (clientHealthFilter === "medium") rows = rows.filter((r) => r.churnRisk === "medium");
+                              else if (clientHealthFilter === "trial") rows = rows.filter((r) => r.subscriptionStatus === "TRIAL");
+                              else if (clientHealthFilter === "active") rows = rows.filter((r) => r.subscriptionStatus === "ACTIVE");
+                              else if (clientHealthFilter === "expired") rows = rows.filter((r) => r.subscriptionStatus === "EXPIRED");
+
+                              // sort
+                              if (clientHealthSort === "risk") rows.sort((a, b) => RISK_ORDER[a.churnRisk] - RISK_ORDER[b.churnRisk]);
+                              else if (clientHealthSort === "dormant") rows.sort((a, b) => (b.daysSinceActivity ?? -1) - (a.daysSinceActivity ?? -1));
+                              else rows.sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+
+                              if (rows.length === 0) {
+                                return (
+                                  <TableRow>
+                                    <TableCell colSpan={7} className="text-center text-secondary-500 text-sm py-8">
+                                      No clients match this filter.
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+
+                              return rows.map((t) => {
+                                const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `Tier ${t.tier}`;
+                                const statusColor =
+                                  t.subscriptionStatus === "ACTIVE" ? "text-emerald-400" :
+                                  t.subscriptionStatus === "TRIAL" ? "text-amber-400" :
+                                  t.subscriptionStatus === "EXPIRED" ? "text-rose-400" : "text-secondary-400";
+                                const riskBadge = {
+                                  high: <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-800"><TrendingDown className="h-2.5 w-2.5" />HIGH</span>,
+                                  medium: <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800"><AlertTriangle className="h-2.5 w-2.5" />MEDIUM</span>,
+                                  low: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-400">LOW</span>,
+                                  none: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-500 border border-emerald-900">OK</span>,
+                                }[t.churnRisk];
+
+                                const activityLabel = t.daysSinceActivity === null
+                                  ? <span className="text-secondary-500 text-xs italic">No audit records</span>
+                                  : t.daysSinceActivity === 0
+                                  ? <span className="text-emerald-400 text-xs">Today</span>
+                                  : t.daysSinceActivity === 1
+                                  ? <span className="text-emerald-300 text-xs">Yesterday</span>
+                                  : t.daysSinceActivity <= 6
+                                  ? <span className="text-secondary-200 text-xs">{t.daysSinceActivity}d ago</span>
+                                  : t.daysSinceActivity <= 13
+                                  ? <span className="text-amber-300 text-xs">{t.daysSinceActivity}d ago</span>
+                                  : <span className="text-rose-400 text-xs font-semibold">{t.daysSinceActivity}d ago</span>;
+
+                                const expiryLabel = (() => {
+                                  if (t.subscriptionStatus === "TRIAL" && t.trialDaysLeft !== null) {
+                                    if (t.trialDaysLeft < 0) return <span className="text-rose-400 text-xs">Trial expired {Math.abs(t.trialDaysLeft)}d ago</span>;
+                                    if (t.trialDaysLeft === 0) return <span className="text-rose-400 text-xs font-bold">Trial ends TODAY</span>;
+                                    return <span className={`text-xs ${t.trialDaysLeft <= 7 ? "text-rose-300 font-semibold" : t.trialDaysLeft <= 14 ? "text-amber-300" : "text-secondary-300"}`}>Trial ends in {t.trialDaysLeft}d</span>;
+                                  }
+                                  if (t.subscriptionStatus === "ACTIVE" && t.paidDaysLeft !== null) {
+                                    if (t.paidDaysLeft < 0) return <span className="text-rose-400 text-xs">Overdue {Math.abs(t.paidDaysLeft)}d</span>;
+                                    return <span className={`text-xs ${t.paidDaysLeft <= 7 ? "text-amber-300 font-semibold" : "text-secondary-400"}`}>Renews in {t.paidDaysLeft}d</span>;
+                                  }
+                                  if (t.subscriptionStatus === "EXPIRED") return <span className="text-rose-400 text-xs font-bold">EXPIRED</span>;
+                                  return <span className="text-secondary-500 text-xs">—</span>;
+                                })();
+
+                                return (
+                                  <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-800/40">
+                                    <TableCell>
+                                      <div>
+                                        <p className="text-white text-sm font-semibold">{t.name}</p>
+                                        <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{tierLabel}</TableCell>
+                                    <TableCell className={`text-xs font-semibold ${statusColor}`}>{t.subscriptionStatus}</TableCell>
+                                    <TableCell>{riskBadge}</TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.userCount}</TableCell>
+                                    <TableCell>{activityLabel}</TableCell>
+                                    <TableCell>{expiryLabel}</TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+                  </>
+                )}
+              </div>
+            )}
+
       </main>
     </div>
   );

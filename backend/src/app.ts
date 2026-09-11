@@ -54,6 +54,7 @@ import adminErrorLogsRouter from './routes/adminErrorLogs';
 import adminUsersRouter from './routes/adminUsers';
 import adminEmergencyStopRouter from './routes/adminEmergencyStop';
 import adminReferralsRouter from './routes/adminReferrals';
+import adminClientHealthRouter from './routes/adminClientHealth';
 import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
 import syncRouter from './routes/sync';
@@ -311,6 +312,7 @@ app.use('/api/v1/admin/error-logs', adminErrorLogsRouter);
 app.use('/api/v1/admin/users', adminUsersRouter);
 app.use('/api/v1/admin/emergency-stop', adminEmergencyStopRouter);
 app.use('/api/v1/admin/referrals', adminReferralsRouter);
+app.use('/api/v1/admin/client-health', adminClientHealthRouter);
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);
