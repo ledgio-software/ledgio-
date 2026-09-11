@@ -1,0 +1,973 @@
+<title>Ledgio Brochure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600&display=swap">
+
+<style>
+  :root {
+    --navy: #0d1b2a;
+    --text: #1e2d3d;
+    --muted: #5c7080;
+    --mint-bg: #f0fdf8;
+    --white: #fafffe;
+    --rule: #d1e8e2;
+    --gold: #d97706;
+    --gold-light: #fef3c7;
+    --brand-green: #059669;
+    --brand-blue: #2563eb;
+    --gradient: linear-gradient(135deg, #059669 0%, #1d4ed8 100%);
+    --body-bg: var(--white);
+    --card-bg: var(--mint-bg);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --navy: #e8f4f0;
+      --text: #d0e8e0;
+      --muted: #8aabb0;
+      --mint-bg: #0f2420;
+      --white: #0a1a16;
+      --rule: #1e3530;
+      --gold: #fbbf24;
+      --gold-light: #1c1408;
+      --body-bg: #0a1a16;
+      --card-bg: #0f2420;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --navy: #e8f4f0;
+    --text: #d0e8e0;
+    --muted: #8aabb0;
+    --mint-bg: #0f2420;
+    --white: #0a1a16;
+    --rule: #1e3530;
+    --gold: #fbbf24;
+    --gold-light: #1c1408;
+    --body-bg: #0a1a16;
+    --card-bg: #0f2420;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: var(--body-bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding-inline: 40px;
+  }
+
+  /* ── HEADER BAND ── */
+  .header-band {
+    background: var(--gradient);
+    color: #fff;
+    padding: 36px 40px 32px;
+  }
+
+  .header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .brand-icon {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+  }
+
+  .brand-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+
+  .brand-tag {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.7);
+    margin-top: 2px;
+  }
+
+  .header-right {
+    text-align: right;
+  }
+
+  .for-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.65);
+    font-weight: 500;
+  }
+
+  .edition {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 20px;
+    font-style: italic;
+    color: #fff;
+    margin-top: 2px;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 60px 40px 52px;
+    background: var(--body-bg);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .hero-inner {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .hero-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-green);
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .hero-headline {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(38px, 6vw, 60px);
+    font-weight: 700;
+    line-height: 1.08;
+    color: var(--navy);
+    text-wrap: balance;
+    max-width: 640px;
+    margin-bottom: 24px;
+  }
+
+  .hero-headline em {
+    font-style: italic;
+    color: var(--brand-green);
+  }
+
+  .hero-body {
+    max-width: 540px;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.7;
+    margin-bottom: 36px;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+  }
+
+  .stat-divider {
+    width: 1px;
+    background: var(--rule);
+    align-self: stretch;
+  }
+
+  /* ── SECTION COMMONS ── */
+  section {
+    padding-block: 56px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .section-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    padding-inline: 40px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-green);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .section-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--navy);
+    text-wrap: balance;
+    margin-bottom: 8px;
+  }
+
+  .section-sub {
+    color: var(--muted);
+    max-width: 500px;
+    margin-bottom: 40px;
+  }
+
+  /* ── CHALLENGES ── */
+  .challenges-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .challenge-item {
+    padding: 28px 24px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .challenge-item:last-child { border-right: none; }
+
+  @media (max-width: 600px) {
+    .challenge-item { border-right: none; }
+  }
+
+  .challenge-marker {
+    width: 32px;
+    height: 3px;
+    background: var(--brand-green);
+    margin-bottom: 16px;
+  }
+
+  .challenge-problem {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #c0392b;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .challenge-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 10px;
+  }
+
+  .challenge-solution {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .challenge-solution strong {
+    color: var(--brand-green);
+    font-weight: 600;
+  }
+
+  /* ── MODULES ── */
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .module-card {
+    background: var(--body-bg);
+    padding: 24px 22px;
+  }
+
+  .module-icon {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 14px;
+    color: var(--brand-green);
+  }
+
+  .module-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 6px;
+  }
+
+  .module-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  /* ── WHO USES IT ── */
+  .roles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 24px;
+  }
+
+  .role-card {
+    background: var(--card-bg);
+    border-radius: 4px;
+    padding: 24px 20px;
+  }
+
+  .role-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--brand-green);
+  }
+
+  .role-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .role-list li {
+    font-size: 13px;
+    color: var(--muted);
+    padding-left: 14px;
+    position: relative;
+  }
+
+  .role-list li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--brand-green);
+    font-size: 11px;
+    top: 1px;
+  }
+
+  /* ── PRICING ── */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .pricing-tier {
+    background: var(--body-bg);
+    padding: 28px 22px;
+    position: relative;
+  }
+
+  .pricing-tier.featured {
+    background: var(--card-bg);
+  }
+
+  .tier-badge {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: var(--brand-green);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  .tier-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+
+  .tier-price {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .tier-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .tier-features li {
+    font-size: 12.5px;
+    color: var(--muted);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .tier-features li::before {
+    content: '✓';
+    color: var(--brand-green);
+    font-weight: 700;
+    flex-shrink: 0;
+    font-size: 12px;
+    margin-top: 1px;
+  }
+
+  /* ── CTA BAND ── */
+  .cta-band {
+    background: #0d1b2a;
+    color: #fff;
+    padding: 56px 40px;
+  }
+
+  .cta-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 32px;
+  }
+
+  .cta-headline {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #fff;
+    text-wrap: balance;
+    line-height: 1.15;
+    max-width: 400px;
+  }
+
+  .cta-headline em {
+    font-style: italic;
+    color: #6ee7b7;
+  }
+
+  .cta-contact {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .cta-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.8);
+  }
+
+  .cta-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .cta-demo-btn {
+    display: inline-block;
+    background: var(--brand-green);
+    color: #fff;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 12px 28px;
+    border-radius: 3px;
+    text-decoration: none;
+    text-transform: uppercase;
+    margin-top: 8px;
+    transition: opacity 0.15s;
+  }
+
+  .cta-demo-btn:hover { opacity: 0.88; }
+
+  /* ── FOOTER ── */
+  .footer {
+    padding: 28px 40px;
+    background: var(--body-bg);
+    border-top: 1px solid var(--rule);
+  }
+
+  .footer-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .footer-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+
+  .footer-note {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .header-band, .hero, .section-inner, .cta-band, .footer { padding-inline: 20px; }
+    .hero-stats { gap: 20px; }
+    .stat-divider { display: none; }
+  }
+
+  @media print {
+    body { font-size: 12px; }
+    .header-band { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cta-band { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+
+<!-- HEADER BAND -->
+<div class="header-band">
+  <div class="header-inner">
+    <div class="brand">
+      <svg class="brand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+        <rect width="48" height="48" rx="12" fill="rgba(255,255,255,0.2)"/>
+        <rect x="12" y="26" width="6" height="12" rx="1.5" fill="#ffffff"/>
+        <rect x="21" y="18" width="6" height="20" rx="1.5" fill="#ffffff"/>
+        <rect x="30" y="10" width="6" height="28" rx="1.5" fill="rgba(255,255,255,0.9)"/>
+      </svg>
+      <div>
+        <div class="brand-name">Ledgio</div>
+        <div class="brand-tag">School Edition</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="for-label">Partner materials for</div>
+      <div class="edition">Hapa Solutions</div>
+    </div>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Complete School Management Software</div>
+    <h1 class="hero-headline">Every coin accounted for.<br><em>Every term, every campus.</em></h1>
+    <p class="hero-body">
+      Ledgio gives school administrators, bursars, and headmasters one unified platform — from collecting fees and running payroll to managing the tuck shop and filing end-of-term financial reports.
+    </p>
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="stat-num">3</span>
+        <span class="stat-label">Plans to fit any school size</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-num">8+</span>
+        <span class="stat-label">Integrated modules</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-num">GHS</span>
+        <span class="stat-label">Ghana-first — GRA E-VAT ready</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHALLENGES -->
+<section>
+  <div class="section-inner">
+    <div class="section-label">The Problem We Solve</div>
+    <h2 class="section-title">What schools are dealing with</h2>
+    <p class="section-sub">Manual ledgers, disconnected spreadsheets, and cash handling with no audit trail create risk for schools of every size.</p>
+
+    <div class="challenges-grid">
+      <div class="challenge-item">
+        <div class="challenge-marker"></div>
+        <div class="challenge-problem">Problem</div>
+        <div class="challenge-title">Fees collected — but where is the money?</div>
+        <div class="challenge-solution">Ledgio tracks every payment, partial or full, and tells your bursar exactly who has paid, who hasn't, and the live outstanding balance at any moment. <strong>No more end-of-term surprises.</strong></div>
+      </div>
+      <div class="challenge-item">
+        <div class="challenge-marker"></div>
+        <div class="challenge-problem">Problem</div>
+        <div class="challenge-title">Canteen attendants pocketing the difference</div>
+        <div class="challenge-solution">Every tuck shop sale generates a receipt the attendant must print before the till unlocks for the next sale. The boss sees a full receipt audit log daily. <strong>Zero leakage.</strong></div>
+      </div>
+      <div class="challenge-item" style="border-right: none;">
+        <div class="challenge-marker"></div>
+        <div class="challenge-problem">Problem</div>
+        <div class="challenge-title">Payroll done by hand every month</div>
+        <div class="challenge-solution">Automate salary computation, SSNIT and PAYE deductions, and send payslips digitally. Headmaster signs off in minutes. <strong>Statutory-compliant payroll in Ghana.</strong></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODULES -->
+<section>
+  <div class="section-inner">
+    <div class="section-label">Platform Modules</div>
+    <h2 class="section-title">Everything a school needs, built in</h2>
+    <p class="section-sub">Each module works standalone or as part of a connected whole — your data flows automatically between fees, payroll, and reports.</p>
+
+    <div class="modules-grid">
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="28" height="28" rx="4" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 22l4-8 4 6 3-4 4 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="module-name">Fees & Invoicing</div>
+        <div class="module-desc">Issue term bills, track partial payments, send reminders. Drill into any student account in seconds.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="8" width="28" height="20" rx="3" stroke="currentColor" stroke-width="2"/>
+          <path d="M4 14h28" stroke="currentColor" stroke-width="2"/>
+          <circle cx="10" cy="21" r="2" fill="currentColor"/>
+          <rect x="16" y="20" width="12" height="2" rx="1" fill="currentColor"/>
+        </svg>
+        <div class="module-name">Point of Sale</div>
+        <div class="module-desc">Tuck shop, canteen, or bookshop — offline-capable POS with forced receipt printing and full audit trail.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="14" r="6" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 30c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="module-name">Payroll</div>
+        <div class="module-desc">Teacher and staff payroll with SSNIT, PAYE, loan deductions. Digital payslips. Ghana statutory-compliant.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="6" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="20" y="6" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="6" y="20" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="20" y="20" width="10" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div class="module-name">Inventory</div>
+        <div class="module-desc">Track lab supplies, textbooks, stationery, and assets. Reorder alerts before you run out.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 28V14l12-8 12 8v14H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <rect x="14" y="20" width="8" height="8" rx="1" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div class="module-name">Multi-Campus</div>
+        <div class="module-desc">Manage junior, senior, or boarding campuses from one dashboard. Consolidated financial view at the top.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="28" height="28" rx="4" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 22l5-8 5 5 4-4 6 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="module-name">Financial Reports</div>
+        <div class="module-desc">P&L, cash flow, and term-end reports ready for the headmaster, board, or Ghana Education Service.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 4l2 6h6l-5 4 2 6-5-3-5 3 2-6-5-4h6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M6 28h24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <div class="module-name">Budgeting</div>
+        <div class="module-desc">Set term or annual budgets per department. Track actual spend vs. budget live — overage alerts built in.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 4v4M18 28v4M4 18h4M28 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="18" cy="18" r="8" stroke="currentColor" stroke-width="2"/>
+          <path d="M14 18l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="module-name">Receipt Audit</div>
+        <div class="module-desc">Every POS transaction logged with cashier name, time, and shop. Downloadable PDF per receipt. Nothing hidden.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHO USES IT -->
+<section>
+  <div class="section-inner">
+    <div class="section-label">Role-Based Access</div>
+    <h2 class="section-title">The right view for every person</h2>
+    <p class="section-sub">Each staff member sees only what they need — and nothing they shouldn't.</p>
+
+    <div class="roles-grid">
+      <div class="role-card">
+        <div class="role-title">Headmaster</div>
+        <ul class="role-list">
+          <li>Executive dashboard — fees collected vs. outstanding</li>
+          <li>Term financial summaries</li>
+          <li>Staff payroll sign-off</li>
+          <li>Campus-wide budget vs. actuals</li>
+          <li>Read-only across all modules</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-title">Bursar</div>
+        <ul class="role-list">
+          <li>Issue and manage fee invoices</li>
+          <li>Record and reconcile payments</li>
+          <li>Generate term-end financial reports</li>
+          <li>Run payroll processing</li>
+          <li>Manage vendor bills and purchases</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-title">Tuck Shop</div>
+        <ul class="role-list">
+          <li>Fast POS — scan or tap item</li>
+          <li>Cash and MoMo payment recording</li>
+          <li>Forced receipt print per sale</li>
+          <li>Shift summary at close of day</li>
+          <li>No access to accounting data</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-title">Store Keeper</div>
+        <ul class="role-list">
+          <li>Receive stock into inventory</li>
+          <li>Record issues and transfers</li>
+          <li>Low-stock and reorder alerts</li>
+          <li>Batch and expiry tracking</li>
+          <li>No access to financial reports</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INDUSTRIES -->
+<section>
+  <div class="section-inner">
+    <div class="section-label">Who Uses Ledgio</div>
+    <h2 class="section-title">Built for any business that handles money</h2>
+    <p class="section-sub">Ledgio is not a school-only product. Any organisation that sells goods, pays staff, manages stock, or needs audited financial records can run on Ledgio.</p>
+
+    <div class="modules-grid">
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 10h28v20H4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M4 10l14-6 14 6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <rect x="14" y="20" width="8" height="10" rx="1" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div class="module-name">Schools &amp; Universities</div>
+        <div class="module-desc">Fees collection, tuck shop POS, payroll, inventory, multi-campus management.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="10" width="28" height="22" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 10V8a8 8 0 0116 0v2" stroke="currentColor" stroke-width="2"/>
+          <circle cx="18" cy="21" r="3" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div class="module-name">Retail Shops</div>
+        <div class="module-desc">POS, daily sales reports, stock tracking, supplier invoices, receipt audit log.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="14" width="28" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M4 18h28" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 14V8a6 6 0 0112 0v6" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div class="module-name">Wholesale Distributors</div>
+        <div class="module-desc">Bulk invoicing, credit terms, AR aging, purchase orders and reorder management.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 28V14l8-6 8 6v14" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M6 28h24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <rect x="14" y="18" width="8" height="10" rx="1" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div class="module-name">Pharmacies</div>
+        <div class="module-desc">Batch &amp; expiry tracking, FEFO dispensing, GRA E-VAT, NHIS billing, narcotics register.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="28" height="8" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="4" y="16" width="12" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="20" y="16" width="12" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <div class="module-name">Construction Firms</div>
+        <div class="module-desc">Job costing per project, material tracking, contractor payments, WIP reporting.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="12" r="7" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 32c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M24 12h4M28 12l-2-2M28 12l-2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="module-name">Service Businesses</div>
+        <div class="module-desc">Consultancies, law firms, agencies — service invoicing, payroll, GL journals, and client AR.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 28V16l12-10 12 10v12H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M14 28v-8h8v8" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+        <div class="module-name">Churches &amp; NGOs</div>
+        <div class="module-desc">Tithe / offering tracking, donor receipts, payroll, fund accounting, board financial reports.</div>
+      </div>
+      <div class="module-card">
+        <svg class="module-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 4l4 8H30l-6 5 2 8-8-5-8 5 2-8-6-5h8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+        <div class="module-name">Hotels &amp; Hospitality</div>
+        <div class="module-desc">Restaurant POS, inventory, housekeeping supplies, staff payroll, and daily revenue reports.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section>
+  <div class="section-inner">
+    <div class="section-label">Subscription Plans</div>
+    <h2 class="section-title">Scales with the school</h2>
+    <p class="section-sub">All plans include full data ownership, local GHS currency, and dedicated onboarding support.</p>
+
+    <div class="pricing-grid">
+      <div class="pricing-tier">
+        <div class="tier-name">Shop</div>
+        <div class="tier-price">Single campus · core modules</div>
+        <ul class="tier-features">
+          <li>POS &amp; inventory</li>
+          <li>Basic invoicing</li>
+          <li>Up to 3 staff accounts</li>
+          <li>Daily &amp; weekly reports</li>
+          <li>Email support</li>
+        </ul>
+      </div>
+      <div class="pricing-tier featured">
+        <div class="tier-badge">Most popular</div>
+        <div class="tier-name">Business</div>
+        <div class="tier-price">Single campus · full suite</div>
+        <ul class="tier-features">
+          <li>Everything in Shop</li>
+          <li>Payroll &amp; leave management</li>
+          <li>Budgeting &amp; purchase orders</li>
+          <li>Full financial reports</li>
+          <li>GRA E-VAT integration</li>
+          <li>Priority support</li>
+        </ul>
+      </div>
+      <div class="pricing-tier">
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-price">Multi-campus · unlimited users</div>
+        <ul class="tier-features">
+          <li>Everything in Business</li>
+          <li>Multiple campuses / warehouses</li>
+          <li>Unlimited staff accounts</li>
+          <li>Custom roles &amp; permissions</li>
+          <li>Dedicated account manager</li>
+          <li>SLA &amp; uptime guarantee</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BAND -->
+<div class="cta-band">
+  <div class="cta-inner">
+    <div>
+      <h2 class="cta-headline">Want to see it <em>live</em>?</h2>
+      <p style="color:rgba(255,255,255,0.65);font-size:14px;margin-top:12px;max-width:360px;line-height:1.6;">
+        Ledgio is cloud software that installs on any device — Windows PC, Mac, Android, or iPhone — in seconds. No app store. No IT department. No complicated setup. Just install and run.
+      </p>
+    </div>
+    <div class="cta-contact">
+      <div class="cta-item">
+        <div class="cta-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8l10 6 10-6"/></svg>
+        </div>
+        <span>ledgioapp@gmail.com</span>
+      </div>
+      <div class="cta-item">
+        <div class="cta-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="17" r="1" fill="#fff"/></svg>
+        </div>
+        <span>Works on any browser — no app download needed</span>
+      </div>
+      <div class="cta-item">
+        <div class="cta-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.66A2 2 0 012 .18h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 8a16 16 0 006.91 6.91l1.18-1.18a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+        </div>
+        <span>Contact Hapa to schedule a walkthrough</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <svg width="28" height="28" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+        <defs><linearGradient id="fg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#059669"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+        <rect width="48" height="48" rx="12" fill="url(#fg)"/>
+        <rect x="12" y="26" width="6" height="12" rx="1.5" fill="#fff"/>
+        <rect x="21" y="18" width="6" height="20" rx="1.5" fill="#fff"/>
+        <rect x="30" y="10" width="6" height="28" rx="1.5" fill="rgba(255,255,255,0.92)"/>
+      </svg>
+      <span class="footer-name">Ledgio</span>
+    </div>
+    <div class="footer-note">Confidential — prepared for Hapa Solutions · September 2026</div>
+  </div>
+</div>
