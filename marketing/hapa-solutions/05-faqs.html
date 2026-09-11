@@ -1,0 +1,738 @@
+<title>Ledgio FAQs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ink:      #0d1b2a;
+    --ink-mid:  #334155;
+    --muted:    #64748b;
+    --ground:   #ffffff;
+    --surface:  #f8fafc;
+    --mint:     #f0fdf8;
+    --border:   #e2e8f0;
+    --emerald:  #059669;
+    --blue:     #2563eb;
+    --rule:     #e2e8f0;
+    --accent-bg: rgba(5,150,105,0.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:      #f1f5f9;
+      --ink-mid:  #cbd5e1;
+      --muted:    #94a3b8;
+      --ground:   #0f172a;
+      --surface:  #1e293b;
+      --mint:     #0d2b22;
+      --border:   #334155;
+      --rule:     #1e293b;
+      --accent-bg: rgba(5,150,105,0.12);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:      #f1f5f9;
+    --ink-mid:  #cbd5e1;
+    --muted:    #94a3b8;
+    --ground:   #0f172a;
+    --surface:  #1e293b;
+    --mint:     #0d2b22;
+    --border:   #334155;
+    --rule:     #1e293b;
+    --accent-bg: rgba(5,150,105,0.12);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    line-height: 1.6;
+    padding-inline: 24px;
+    padding-block: 0;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #059669 0%, #2563eb 100%);
+    margin-inline: -24px;
+    padding: 28px 32px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 9px;
+    display: flex; align-items: flex-end; gap: 3px; padding: 7px 8px;
+  }
+  .bar { background: #fff; border-radius: 2px; width: 5px; }
+  .b1 { height: 9px; } .b2 { height: 14px; } .b3 { height: 20px; opacity:.92; }
+  .brand-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.2px;
+  }
+  .header-right { text-align: right; }
+  .header-right strong {
+    display: block; color: #fff; font-size: 14px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .header-right span { color: rgba(255,255,255,0.6); font-size: 12px; }
+
+  /* ── Search / Intro ── */
+  .intro-band {
+    background: var(--mint);
+    margin-inline: -24px;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .intro-band p {
+    font-size: 14px;
+    color: var(--ink-mid);
+    max-width: 680px;
+  }
+  .intro-band strong { color: var(--emerald); font-weight: 600; }
+
+  /* ── Layout ── */
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding-block: 40px;
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  /* ── Sidebar nav ── */
+  .sidenav {
+    position: sticky;
+    top: 24px;
+  }
+  .sidenav p {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .sidenav a {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-mid);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-left: 2px solid var(--border);
+    margin-bottom: 2px;
+    transition: color 0.15s, border-color 0.15s;
+    line-height: 1.4;
+  }
+  .sidenav a:hover,
+  .sidenav a.active {
+    color: var(--emerald);
+    border-left-color: var(--emerald);
+  }
+
+  /* ── Content ── */
+  .faq-content { min-width: 0; }
+
+  .faq-section { margin-bottom: 44px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--rule);
+    margin-bottom: 16px;
+  }
+  .section-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .section-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .section-count {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── Accordion ── */
+  .faq-item {
+    border-bottom: 1px solid var(--rule);
+  }
+  .faq-q {
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--ink);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+    text-align: left;
+    padding: 14px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    transition: color 0.15s;
+    line-height: 1.45;
+  }
+  .faq-q:hover { color: var(--emerald); }
+  .faq-q[aria-expanded="true"] { color: var(--emerald); }
+  .faq-chevron {
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    color: var(--muted);
+    transition: transform 0.25s, background 0.15s, border-color 0.15s;
+    margin-top: 2px;
+  }
+  .faq-q[aria-expanded="true"] .faq-chevron {
+    transform: rotate(180deg);
+    background: var(--accent-bg);
+    border-color: var(--emerald);
+    color: var(--emerald);
+  }
+  .faq-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.28s ease;
+  }
+  .faq-body.open {
+    grid-template-rows: 1fr;
+  }
+  .faq-inner {
+    overflow: hidden;
+  }
+  .faq-a {
+    padding: 0 0 16px 0;
+    font-size: 14px;
+    color: var(--ink-mid);
+    line-height: 1.7;
+    max-width: 620px;
+  }
+  .faq-a p { margin-bottom: 8px; }
+  .faq-a p:last-child { margin-bottom: 0; }
+  .faq-a ul {
+    list-style: none;
+    margin: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .faq-a ul li {
+    padding-left: 16px;
+    position: relative;
+    font-size: 13.5px;
+  }
+  .faq-a ul li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--emerald);
+    font-weight: 700;
+  }
+  .faq-a strong { color: var(--ink); font-weight: 600; }
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--accent-bg);
+    color: var(--emerald);
+    border: 1px solid rgba(5,150,105,0.3);
+    margin: 2px 2px 2px 0;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    background: var(--ink);
+    margin-inline: -24px;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .footer span { font-size: 12px; color: rgba(255,255,255,0.45); }
+  .footer a { color: #6ee7b7; text-decoration: none; font-size: 12px; font-weight: 500; }
+  .footer a:hover { text-decoration: underline; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .page { grid-template-columns: 1fr; gap: 0; }
+    .sidenav { display: none; }
+    .header { padding: 20px 20px 18px; }
+    .header-right { display: none; }
+    .intro-band { padding: 14px 20px; }
+    .footer { padding: 14px 20px; }
+  }
+</style>
+
+<!-- Header -->
+<div class="header">
+  <div class="brand">
+    <div class="brand-icon">
+      <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div>
+    </div>
+    <span class="brand-name">Ledgio</span>
+  </div>
+  <div class="header-right">
+    <strong>Frequently Asked Questions</strong>
+    <span>Ledgio Platform · 2026</span>
+  </div>
+</div>
+
+<!-- Intro -->
+<div class="intro-band">
+  <p>Everything you need to know about Ledgio. Can't find your answer? Email <strong>ledgioapp@gmail.com</strong> or contact your Hapa Solutions representative.</p>
+</div>
+
+<div class="page">
+
+  <!-- Sidebar -->
+  <nav class="sidenav">
+    <p>Jump to</p>
+    <a href="#getting-started" class="active">Getting Started</a>
+    <a href="#platform">Platform &amp; Devices</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing &amp; Plans</a>
+    <a href="#security">Security &amp; Data</a>
+    <a href="#support">Support</a>
+  </nav>
+
+  <!-- FAQ content -->
+  <div class="faq-content">
+
+    <!-- Section: Getting Started -->
+    <section class="faq-section" id="getting-started">
+      <div class="section-header">
+        <div class="section-dot" style="background:#059669;"></div>
+        <h2 class="section-title">Getting Started</h2>
+        <span class="section-count">5 questions</span>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          What is Ledgio?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Ledgio is <strong>cloud software for business management</strong> — combining accounting, Point of Sale (POS), inventory, invoicing, and reporting in one system.</p>
+          <p>Instead of juggling separate tools for your till, your stock, and your books, Ledgio connects them all — so every sale at the counter automatically updates your accounts and stock levels in real time.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          How do I get started with Ledgio?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Getting started is straightforward:</p>
+          <ul>
+            <li>Contact <strong>ledgioapp@gmail.com</strong> or your Hapa Solutions representative to set up your account</li>
+            <li>You'll receive login credentials for your business workspace</li>
+            <li>Your Hapa onboarding specialist walks you through the initial setup — adding your products, your team, and your shop(s)</li>
+            <li>You're live and trading, typically within a day</li>
+          </ul>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Is there a free trial?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes. Ledgio's <strong>Starter plan is free during early access</strong> — giving you POS, basic inventory, and sales invoicing for one branch with up to three users, at no cost.</p>
+          <p>When you're ready to add more branches, more users, or the full accounting suite, you can upgrade to the Business or Enterprise plan.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Do I need to install anything?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Ledgio <strong>installs directly on your device</strong> as a Progressive Web App (PWA) — a modern way to install software without going through an app store or calling IT.</p>
+          <p>On any device — Windows PC, Mac, Android, or iPhone — open your browser, go to Ledgio, tap <em>Install</em> or <em>Add to Home Screen</em>, and the software is on your device with its own icon. No app store. No download file. No IT department. Updates happen automatically in the background.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          How long does setup take?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Most businesses are up and running within <strong>one to two days</strong>. The timeline depends on how many products you need to load and how many branches you operate.</p>
+          <p>Hapa Solutions provides guided onboarding to get your product catalogue, user accounts, and till configured as quickly as possible.</p>
+        </div></div></div>
+      </div>
+    </section>
+
+    <!-- Section: Platform & Devices -->
+    <section class="faq-section" id="platform">
+      <div class="section-header">
+        <div class="section-dot" style="background:#2563eb;"></div>
+        <h2 class="section-title">Platform &amp; Devices</h2>
+        <span class="section-count">4 questions</span>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          What devices does Ledgio work on?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Ledgio works on any device with a modern browser:</p>
+          <ul>
+            <li><strong>Windows PC</strong> — Chrome, Edge, or Firefox</li>
+            <li><strong>Mac</strong> — Safari or Chrome</li>
+            <li><strong>Android phone or tablet</strong> — Chrome</li>
+            <li><strong>iPhone or iPad</strong> — Safari</li>
+          </ul>
+          <p>On any of these, you can install Ledgio as a <strong>PWA</strong> — it adds an icon and opens full-screen like a native app, without going through an app store.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          What is a PWA and why does it matter?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>A <strong>Progressive Web App (PWA)</strong> is a way to install software directly onto your device without going through an app store or downloading an installer file. You tap "Install" in your browser and Ledgio becomes a full application on your device — its own icon, its own window, works like any other software.</p>
+          <p>This matters because:</p>
+          <ul>
+            <li>Install on any device your team already has — no new hardware needed</li>
+            <li>Software updates happen automatically — you always have the latest version</li>
+            <li>Add a new till or computer in seconds — install Ledgio, log in, start selling</li>
+          </ul>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Does Ledgio work offline?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Ledgio is cloud software and requires an internet connection to record sales, update stock, and sync data across branches in real time.</p>
+          <p>We recommend a reliable Wi-Fi or mobile data connection at each till point. A basic mobile data plan is sufficient — Ledgio is designed to work well even on slower connections.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Can multiple people use Ledgio at the same time?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes — Ledgio is built for teams. Multiple cashiers, accountants, and managers can all be logged in simultaneously across different devices and branches. Each person sees only what their role permits, and all data syncs in real time.</p>
+        </div></div></div>
+      </div>
+    </section>
+
+    <!-- Section: Features -->
+    <section class="faq-section" id="features">
+      <div class="section-header">
+        <div class="section-dot" style="background:#7c3aed;"></div>
+        <h2 class="section-title">Features</h2>
+        <span class="section-count">5 questions</span>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Can I manage multiple shops or branches?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes. Ledgio supports <strong>unlimited branches and shops</strong> under one account (on Business and Enterprise plans). Each branch has its own tills, its own stock levels, and its own user assignments — while the owner gets a consolidated view across all locations.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          What payment methods does the POS accept?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>The Ledgio POS supports the following payment methods:</p>
+          <ul>
+            <li><span class="pill">Cash</span> with automatic change calculation</li>
+            <li><span class="pill">Card</span> — logged as card payment</li>
+            <li><span class="pill">Mobile Money</span> — MoMo, M-Pesa, and other mobile payment platforms</li>
+          </ul>
+          <p>The cashier selects the payment method at checkout, and the receipt and daily cash-up report reflect the split.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Does Ledgio do full accounting / bookkeeping?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes. Ledgio includes a <strong>full double-entry accounting engine</strong>:</p>
+          <ul>
+            <li>Chart of accounts (assets, liabilities, equity, income, expenses)</li>
+            <li>Bank reconciliation</li>
+            <li>Manual journal entries</li>
+            <li>Profit &amp; Loss statement, Balance Sheet, Cash Flow report</li>
+            <li>VAT / tax summary for filing</li>
+          </ul>
+          <p>Every POS sale and purchase automatically posts to the accounts — so your books are always up to date without manual re-entry.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          How does Ledgio prevent cashier fraud?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Ledgio has several built-in anti-fraud controls:</p>
+          <ul>
+            <li><strong>Force-print receipt gate</strong> — a cashier cannot record the next sale until they have opened the receipt PDF for the previous one, preventing the gap between what a customer pays and what gets recorded</li>
+            <li><strong>Receipt audit log</strong> — admins and accountants can view every transaction ever made, with date, cashier name, items, amounts, and PDF receipt</li>
+            <li><strong>Void logging</strong> — any voided sale requires a reason and records who voided it and when</li>
+            <li><strong>Daily cash-up</strong> — expected cash vs. actual cash is reconciled at the end of each shift</li>
+          </ul>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Can I generate invoices and send them to customers?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes. Ledgio's invoicing module lets you create tax-inclusive or tax-exclusive invoices, convert quotes to invoices, and issue credit notes. Every invoice can be downloaded as a PDF and shared with the customer directly.</p>
+        </div></div></div>
+      </div>
+    </section>
+
+    <!-- Section: Pricing -->
+    <section class="faq-section" id="pricing">
+      <div class="section-header">
+        <div class="section-dot" style="background:#d97706;"></div>
+        <h2 class="section-title">Pricing &amp; Plans</h2>
+        <span class="section-count">4 questions</span>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          How much does Ledgio cost?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Ledgio has three plans:</p>
+          <ul>
+            <li><strong>Starter</strong> — Free during early access. 1 branch, up to 3 users, POS and basic features.</li>
+            <li><strong>Business</strong> — Contact us for pricing. Up to 5 branches, unlimited users, full accounting and reporting suite.</li>
+            <li><strong>Enterprise</strong> — Custom pricing. Unlimited branches, custom integrations, dedicated onboarding and account manager.</li>
+          </ul>
+          <p>Contact <strong>ledgioapp@gmail.com</strong> or your Hapa Solutions representative for a quote tailored to your business size.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Is there a free plan?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes — the <strong>Starter plan is free</strong> during Ledgio's early access period. It gives you full access to the POS, basic inventory, and sales invoicing for one branch with up to three users, at no charge.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Are there any hidden fees or setup costs?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>No hidden fees. The monthly plan price covers all platform features in that plan. There are no per-transaction fees, no setup fees, and no charges for software updates — Ledgio updates automatically in the background.</p>
+          <p>Hapa Solutions may charge separately for on-site training or data migration assistance — your representative will provide a transparent quote.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Can I upgrade or downgrade my plan?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes. You can upgrade your plan at any time as your business grows. Contact <strong>ledgioapp@gmail.com</strong> and your account will be adjusted. Your data carries over completely when you upgrade — nothing is lost.</p>
+        </div></div></div>
+      </div>
+    </section>
+
+    <!-- Section: Security & Data -->
+    <section class="faq-section" id="security">
+      <div class="section-header">
+        <div class="section-dot" style="background:#059669;"></div>
+        <h2 class="section-title">Security &amp; Data</h2>
+        <span class="section-count">4 questions</span>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Is my business data safe?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes. Ledgio is built on cloud infrastructure with industry-standard security practices:</p>
+          <ul>
+            <li>All data is encrypted in transit (HTTPS) and at rest</li>
+            <li>Access requires login credentials — sessions time out automatically</li>
+            <li>Every action is logged for audit purposes</li>
+            <li>Regular automated backups ensure your data is never lost</li>
+          </ul>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Can other businesses see my data?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p><strong>Absolutely not.</strong> Ledgio is a multi-tenant platform with strict data isolation. Each business has its own completely separate workspace. No other business — including other Ledgio customers — can ever see, access, or query your data.</p>
+          <p>This isolation is enforced at the database level on every single query, not just at the application layer.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Who in my business can see what?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Ledgio uses role-based access control. You decide what each person can see and do:</p>
+          <ul>
+            <li><strong>Admin</strong> — full access, including all reports and user management</li>
+            <li><strong>Accountant</strong> — accounting, reconciliation, and financial reports</li>
+            <li><strong>Cashier</strong> — POS checkout and their own sales history only</li>
+            <li><strong>Viewer</strong> — read-only access to dashboards and reports</li>
+          </ul>
+          <p>You assign a role to each team member when you invite them, and can change it at any time.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          What happens to my data if I stop using Ledgio?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Your data belongs to you. Before closing your account, you can export your financial reports as PDFs and download your records. Contact <strong>ledgioapp@gmail.com</strong> to arrange a data export before account closure.</p>
+        </div></div></div>
+      </div>
+    </section>
+
+    <!-- Section: Support -->
+    <section class="faq-section" id="support">
+      <div class="section-header">
+        <div class="section-dot" style="background:#2563eb;"></div>
+        <h2 class="section-title">Support</h2>
+        <span class="section-count">3 questions</span>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          How do I get help if something goes wrong?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Support is available through:</p>
+          <ul>
+            <li><strong>Email:</strong> ledgioapp@gmail.com — for platform issues and account questions</li>
+            <li><strong>Hapa Solutions:</strong> your local representative for on-site and phone support</li>
+            <li><strong>Business and Enterprise customers</strong> get priority response times</li>
+          </ul>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Do you offer staff training?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Yes. Hapa Solutions provides onboarding and training as part of the setup process. This covers:</p>
+          <ul>
+            <li>Cashier training on the POS — recording sales, printing receipts, daily cash-up</li>
+            <li>Manager training on reports, inventory, and user management</li>
+            <li>Accountant training on the accounting modules and reconciliation</li>
+          </ul>
+          <p>Training is available in person or remotely depending on your location. Ask your Hapa representative for details.</p>
+        </div></div></div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" aria-expanded="false" onclick="toggle(this)">
+          Still have a question not answered here?
+          <span class="faq-chevron">▾</span>
+        </button>
+        <div class="faq-body"><div class="faq-inner"><div class="faq-a">
+          <p>Email us at <strong>ledgioapp@gmail.com</strong> or reach out to your Hapa Solutions representative and we'll get back to you as quickly as possible.</p>
+        </div></div></div>
+      </div>
+    </section>
+
+  </div><!-- /faq-content -->
+</div><!-- /page -->
+
+<!-- Footer -->
+<div class="footer">
+  <span>Ledgio Business Platform · ledgioapp@gmail.com · Distributed by Hapa Solutions</span>
+  <a href="mailto:ledgioapp@gmail.com">Ask a question</a>
+</div>
+
+<script>
+  function toggle(btn) {
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!expanded));
+    const body = btn.nextElementSibling;
+    body.classList.toggle('open', !expanded);
+  }
+
+  // Active sidebar highlight on scroll
+  const sections = document.querySelectorAll('.faq-section');
+  const navLinks = document.querySelectorAll('.sidenav a');
+  function updateNav() {
+    let active = sections[0].id;
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 120) active = s.id;
+    });
+    navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + active));
+  }
+  window.addEventListener('scroll', updateNav, { passive: true });
+  updateNav();
+</script>
