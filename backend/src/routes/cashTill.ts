@@ -1294,5 +1294,62 @@ router.get('/closeouts', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+/**
+ * GET /api/v1/tills/receipts
+ * Admin/Accountant-only: paginated receipt audit log across all shops.
+ * Query params: page (default 1), limit (default 50, max 200),
+ *               from (ISO date), to (ISO date), warehouseId, cashierId
+ */
+router.get('/receipts', requireRole('Admin', 'Accountant'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10));
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10)));
+    const skip = (page - 1) * limit;
+    const { from, to, warehouseId, cashierId } = req.query as Record<string, string | undefined>;
+
+    const receipts = await withCurrentTenantDb(prisma, async (client) => {
+      const where: any = {
+        tenantId,
+        status: 'COMPLETED',
+      };
+      if (from) where.createdAt = { ...(where.createdAt ?? {}), gte: new Date(from) };
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        where.createdAt = { ...(where.createdAt ?? {}), lte: toDate };
+      }
+      if (warehouseId) where.till = { warehouseId };
+      if (cashierId) where.createdByUserId = cashierId;
+
+      const [total, items] = await Promise.all([
+        (client as any).cashSale.count({ where }),
+        (client as any).cashSale.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            lines: true,
+            till: { include: { warehouse: { select: { name: true } } } },
+          },
+        }),
+      ]);
+
+      return { total, items };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        receipts: receipts.items,
+        pagination: { page, limit, total: receipts.total, pages: Math.ceil(receipts.total / limit) },
+      },
+    });
+  } catch (error: any) {
+    console.error('[CashTill] Error fetching receipt log:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch receipt log.' });
+  }
+});
 
 export default router;

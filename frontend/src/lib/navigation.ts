@@ -226,6 +226,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Daybook", href: "/reports/daybook", icon: BookOpen, minTier: 2 },
       { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp, minTier: 2 },
       { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Receipt Audit Log", href: "/reports/receipt-log", icon: Receipt },
       { name: "VAT Return", href: "/reports/vat-return", icon: Percent, minTier: 2 },
       { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock, minTier: 2 },
       { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3, minTier: 2 },
