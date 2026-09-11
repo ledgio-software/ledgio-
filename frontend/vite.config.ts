@@ -70,7 +70,7 @@ export default defineConfig({
         // from a cache, so /api/** is explicitly excluded from every caching
         // path: no runtimeCaching entry matches it, and navigation fallback
         // (used for client-side routing) never intercepts it either.
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/partner\//],
       },
     }),
   ],
