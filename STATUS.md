@@ -2,6 +2,39 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: Platform vulnerability audit fixes (7 issues)
+
+**What/Why:**
+Following a comprehensive security audit of the Ledgio platform, 7 vulnerabilities were identified and fixed across 3 severity levels: 3 critical, 2 high, 2 medium/low. All fixes are backward-compatible with no schema changes required.
+
+**Fixes Applied:**
+
+1. **Admin rate limiting (CRITICAL)** — Added `adminRateLimiter` (10 req/min per IP) to all `/api/v1/admin/*` routes. Created `adminPasscodeMiddleware` that centralises passcode auth for every admin route: rejects query-string passcodes (they leak into logs), logs every failed attempt with IP + path, returns 400 on query-param usage.
+
+2. **Cross-tenant JWT validation (CRITICAL)** — `tenantContextMiddleware` now asserts `req.user.tenantId === resolved tenant id`. A valid JWT for Tenant A can no longer access Tenant B's data by sending a different `X-Tenant-ID` header.
+
+3. **Data export cooldown (CRITICAL)** — Both `/data-export/json` and `/data-export/csv` enforce a 1-export-per-hour per-tenant Redis cooldown (atomic `SET NX EX`). Returns 429 with `Retry-After` when limit is hit. Fails open when Redis is down.
+
+4. **Paystack webhook replay protection (HIGH)** — Each processed webhook reference is stored in Redis for 90 days. Replayed webhooks are rejected with `{ ignored: true, reason: 'duplicate' }`.
+
+5. **Stack traces stripped in production (MEDIUM)** — `err.stack` is only stored in error logs when `NODE_ENV !== 'production'`, preventing internal paths/library versions from leaking via the admin error log dashboard.
+
+6. **OCR per-tenant daily limit (MEDIUM)** — 50 OCR requests per tenant per day via Redis `INCR` with daily TTL. Prevents cost amplification attacks from automated image uploads.
+
+7. **CORS + secret startup assertions (LOW)** — Production server refuses to start if `CORS_ALLOWED_ORIGINS` is unset or `*`, or if `BROADCAST_MASTER_SECRET` is unset.
+
+**Files Affected:**
+- `backend/src/middleware/adminPasscodeMiddleware.ts` — NEW: central passcode gate for all admin routes
+- `backend/src/middleware/rateLimiterMiddleware.ts` — added `adminRateLimiter` export
+- `backend/src/middleware/tenantContextMiddleware.ts` — added cross-tenant JWT assertion
+- `backend/src/app.ts` — applied `adminRateLimiter` + `adminPasscodeMiddleware` to `/api/v1/admin/*`; stripped production stack traces; imported new middleware
+- `backend/src/index.ts` — added CORS + secret startup assertions for production
+- `backend/src/routes/dataExport.ts` — per-tenant hourly export cooldown
+- `backend/src/routes/ocr.ts` — per-tenant daily OCR limit (50/day)
+- `backend/src/routes/subscription.ts` — Paystack webhook replay deduplication
+
+---
+
 ## [Date: 2026-09-11] - Feature: Revenue & MRR Dashboard tab in AGOD Control Engine
 
 **What/Why:**
