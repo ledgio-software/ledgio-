@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import app from './app';
 import { connectDatabase, disconnectDatabase } from './config/db';
 import { connectRedis, disconnectRedis } from './config/redis';
@@ -24,12 +25,22 @@ const startServer = async () => {
     }
   }
 
+  // Run pending DB migrations before accepting traffic
+  try {
+    console.log('[Server] Running pending DB migrations...');
+    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+    console.log('[Server] Migrations applied.');
+  } catch (err) {
+    console.error('[Server] prisma migrate deploy failed:', err);
+    // Non-fatal: DB may already be up to date; startup continues
+  }
+
   // Initialize telemetry first
   await startTelemetry();
-  
+
   const server = app.listen(PORT, async () => {
     console.log(`[Server] Backend microservice running on port ${PORT}`);
-    
+
     // Initialize database connection
     await connectDatabase();
     

@@ -100,39 +100,51 @@ let _seeded = false;
 
 async function ensureSeeded(): Promise<void> {
   if (_seeded) return;
-  const count = await prisma.teamMember.count();
-  if (count === 0) {
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hash = await scryptHash(DEFAULT_PIN, salt);
-    await prisma.teamMember.createMany({
-      data: INITIAL_ROSTER.map((m) => ({
-        id: m.id,
-        name: m.name,
-        role: m.role,
-        color: m.color,
-        assignedTabs: m.assignedTabs as string[],
-        pinHash: hash,
-        isActive: true,
-      })),
-      skipDuplicates: true,
-    });
+  try {
+    const count = await prisma.teamMember.count();
+    if (count === 0) {
+      const salt = crypto.randomBytes(16).toString('hex');
+      const hash = await scryptHash(DEFAULT_PIN, salt);
+      await prisma.teamMember.createMany({
+        data: INITIAL_ROSTER.map((m) => ({
+          id: m.id,
+          name: m.name,
+          role: m.role,
+          color: m.color,
+          assignedTabs: m.assignedTabs as string[],
+          pinHash: hash,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    _seeded = true;
+  } catch (err) {
+    // Table may not exist yet (migration pending); non-fatal — callers fall back to INITIAL_ROSTER
+    console.warn('[teamMemberService] ensureSeeded failed (table may not exist yet):', (err as Error).message);
   }
-  _seeded = true;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function getMemberPublicList(): Promise<Omit<TeamMember, 'pinHash'>[]> {
   await ensureSeeded();
-  const rows = await prisma.teamMember.findMany({
-    where: { isActive: true },
-    orderBy: { createdAt: 'asc' },
-  });
-  return rows.map((r) => {
-    const m = rowToMember(r as any);
-    const { pinHash: _p, ...rest } = m;
-    return rest;
-  });
+  try {
+    const rows = await prisma.teamMember.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((r) => {
+      const m = rowToMember(r as any);
+      const { pinHash: _p, ...rest } = m;
+      return rest;
+    });
+  } catch {
+    // DB unavailable or table missing — return the static roster so the login page still works
+    return INITIAL_ROSTER.map(({ id, name, role, color, assignedTabs }) => ({
+      id, name, role, color, assignedTabs, isActive: true,
+    }));
+  }
 }
 
 export async function getAllMembersAdmin(): Promise<Omit<TeamMember, 'pinHash'>[]> {
