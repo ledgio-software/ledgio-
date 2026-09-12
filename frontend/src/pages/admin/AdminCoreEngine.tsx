@@ -62,9 +62,16 @@ export function AdminCoreEngine() {
 
   // Master Lock State
   const [passcode, setPasscode] = useState("");
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Two-step auth: 'passcode' → 'totp' → unlocked
+  const [authStep, setAuthStep] = useState<'passcode' | 'totp'>('passcode');
+  const [totpCode, setTotpCode] = useState('');
+  const [showSetupQr, setShowSetupQr] = useState(false);
+  const [setupQrData, setSetupQrData] = useState<{ qrDataUrl: string; secret: string; configured: boolean; note: string } | null>(null);
+  const [isLoadingSetup, setIsLoadingSetup] = useState(false);
 
   // Active Hub Tab
   const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue">("broadcast");
@@ -140,7 +147,7 @@ export function AdminCoreEngine() {
   const fetchMetrics = useCallback(() => {
     setIsLoadingMetrics(true);
     setMetricsError(null);
-    const headers = { 'x-admin-passcode': passcode };
+    const headers = adminHeaders;
     return Promise.all([
       api.get("/admin/metrics", { headers }),
       api.get("/admin/error-logs/grouped", { headers }),
@@ -165,7 +172,7 @@ export function AdminCoreEngine() {
     setIsLoadingJobs(true);
     setJobsError(null);
     return api
-      .get("/admin/jobs", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/jobs", { headers: adminHeaders })
       .then((res) => setJobsData(res.data.data.jobs))
       .catch(() => setJobsError("Failed to load cron jobs."))
       .finally(() => setIsLoadingJobs(false));
@@ -182,7 +189,7 @@ export function AdminCoreEngine() {
   const handleTriggerJob = async (jobName: string) => {
     setTriggeringJob(jobName);
     try {
-      await api.post(`/admin/jobs/${encodeURIComponent(jobName)}/trigger`, {}, { headers: { 'x-admin-passcode': passcode } });
+      await api.post(`/admin/jobs/${encodeURIComponent(jobName)}/trigger`, {}, { headers: adminHeaders });
       showToast(`Job "${jobName}" triggered successfully.`, "success");
       setTimeout(fetchJobs, 1500);
     } catch (err: any) {
@@ -196,8 +203,8 @@ export function AdminCoreEngine() {
     setIsLoadingErrors(true);
     setErrorsError(null);
     return Promise.all([
-      api.get("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } }),
-      api.get("/admin/error-logs/grouped", { headers: { 'x-admin-passcode': passcode } }),
+      api.get("/admin/error-logs", { headers: adminHeaders }),
+      api.get("/admin/error-logs/grouped", { headers: adminHeaders }),
     ])
       .then(([indRes, grpRes]) => {
         setErrorsData(indRes.data.data.errors);
@@ -217,7 +224,7 @@ export function AdminCoreEngine() {
   const handleClearErrors = async () => {
     setIsClearingErrors(true);
     try {
-      await api.delete("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } });
+      await api.delete("/admin/error-logs", { headers: adminHeaders });
       setErrorsData([]);
       showToast("Error log cleared.", "success");
     } catch {
@@ -243,7 +250,7 @@ export function AdminCoreEngine() {
   const handleToggleUserActive = async (userId: string, tenantId: string, activate: boolean) => {
     setTogglingUserId(userId);
     try {
-      await api.patch(`/admin/users/${userId}/${activate ? "activate" : "deactivate"}`, {}, { headers: { 'x-admin-passcode': passcode } });
+      await api.patch(`/admin/users/${userId}/${activate ? "activate" : "deactivate"}`, {}, { headers: adminHeaders });
       showToast(`User ${activate ? "activated" : "deactivated"}.`, "success");
       setTenantUsers((prev) => ({
         ...prev,
@@ -422,11 +429,23 @@ export function AdminCoreEngine() {
   const [onboardError, setOnboardError] = useState<string | null>(null);
   const [onboardResult, setOnboardResult] = useState<{ tenant: { name: string; slug: string }; admin: { email: string } } | null>(null);
 
+  // Derived admin request headers — prefer session token; fall back to raw passcode
+  const adminHeaders = sessionToken
+    ? { 'x-admin-session': sessionToken }
+    : { 'x-admin-passcode': passcode };
+
   // Auto-check if already unlocked in session
   useEffect(() => {
-    const savedToken = sessionStorage.getItem("accountgo_admin_engine_passcode");
-    if (savedToken) {
-      setPasscode(savedToken);
+    const savedSession = sessionStorage.getItem("accountgo_admin_engine_session");
+    if (savedSession) {
+      setSessionToken(savedSession);
+      setIsUnlocked(true);
+      return;
+    }
+    // Backward-compat: upgrade old passcode-only sessions on first load
+    const savedPasscode = sessionStorage.getItem("accountgo_admin_engine_passcode");
+    if (savedPasscode) {
+      setPasscode(savedPasscode);
       setIsUnlocked(true);
     }
   }, []);
@@ -481,7 +500,7 @@ export function AdminCoreEngine() {
     setIsLoadingIntegrations(true);
     setIntegrationsError(null);
     return api
-      .get("/admin/integrations", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/integrations", { headers: adminHeaders })
       .then((res) => setIntegrationsData(res.data.data))
       .catch(() => setIntegrationsError("Failed to load integrations status."))
       .finally(() => setIsLoadingIntegrations(false));
@@ -500,7 +519,7 @@ export function AdminCoreEngine() {
     setIsLoadingTenants(true);
     setTenantsError(null);
     return api
-      .get("/tenants", { headers: { 'x-admin-passcode': passcode } })
+      .get("/tenants", { headers: adminHeaders })
       .then((res) => {
         setTenants(res.data.data.tenants);
         setTierDrafts(Object.fromEntries(res.data.data.tenants.map((t: any) => [t.id, t.tier])));
@@ -525,7 +544,7 @@ export function AdminCoreEngine() {
     const tier = tierDrafts[tenantId];
     setSavingTierId(tenantId);
     try {
-      const res = await api.put(`/tenants/${tenantId}/tier`, { tier }, { headers: { 'x-admin-passcode': passcode } });
+      const res = await api.put(`/tenants/${tenantId}/tier`, { tier }, { headers: adminHeaders });
       if (res.data.success) {
         showToast(`Plan updated to ${res.data.data.tenant.tier === 1 ? "Shop" : res.data.data.tenant.tier === 2 ? "Business" : "Enterprise"}.`, "success");
         fetchTenants();
@@ -541,7 +560,7 @@ export function AdminCoreEngine() {
     if (!deletingTenant || deleteConfirmSlug !== deletingTenant.slug) return;
     setIsDeletingTenant(true);
     try {
-      await api.delete(`/tenants/${deletingTenant.id}`, { headers: { 'x-admin-passcode': passcode } });
+      await api.delete(`/tenants/${deletingTenant.id}`, { headers: adminHeaders });
       showToast(`Tenant "${deletingTenant.name}" permanently deleted.`, "success");
       setDeletingTenant(null);
       setDeleteConfirmSlug("");
@@ -597,7 +616,7 @@ export function AdminCoreEngine() {
   useEffect(() => {
     if (!isUnlocked) return;
     api
-      .get("/admin/audit-logs/meta/values", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/audit-logs/meta/values", { headers: adminHeaders })
       .then((res) => {
         if (res.data.success) {
           setAuditActionOptions(res.data.data.actions || []);
@@ -663,7 +682,7 @@ export function AdminCoreEngine() {
   const fetchReferralData = useCallback(() => {
     setIsLoadingReferral(true);
     setReferralError(null);
-    const headers = { 'x-admin-passcode': passcode };
+    const headers = adminHeaders;
     return Promise.all([
       api.get("/admin/referrals/partners", { headers }),
       api.get("/admin/referrals/stats", { headers }),
@@ -691,7 +710,7 @@ export function AdminCoreEngine() {
         code: newPartnerCode.trim().toUpperCase(),
         commissionRate: parseFloat(newPartnerRate),
         contacts: newPartnerContacts.trim() || undefined,
-      }, { headers: { 'x-admin-passcode': passcode } });
+      }, { headers: adminHeaders });
       setShowNewPartnerForm(false);
       setNewPartnerName("");
       setNewPartnerCode("");
@@ -708,7 +727,7 @@ export function AdminCoreEngine() {
   const handleTogglePartner = async (id: string, isActive: boolean) => {
     setTogglingPartnerId(id);
     try {
-      await api.patch(`/admin/referrals/partners/${id}`, { isActive: !isActive }, { headers: { 'x-admin-passcode': passcode } });
+      await api.patch(`/admin/referrals/partners/${id}`, { isActive: !isActive }, { headers: adminHeaders });
       setReferralPartners((prev) => prev?.map((p) => p.id === id ? { ...p, isActive: !isActive } : p) ?? null);
     } catch {
       setReferralError("Failed to update partner.");
@@ -756,7 +775,7 @@ export function AdminCoreEngine() {
     setIsLoadingClientHealth(true);
     setClientHealthError(null);
     return api
-      .get("/admin/client-health", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/client-health", { headers: adminHeaders })
       .then((res) => setClientHealthData(res.data.data))
       .catch(() => setClientHealthError("Failed to load client health data."))
       .finally(() => setIsLoadingClientHealth(false));
@@ -807,7 +826,7 @@ export function AdminCoreEngine() {
     setIsLoadingChurn(true);
     setChurnError(null);
     return api
-      .get("/admin/churn-risk", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/churn-risk", { headers: adminHeaders })
       .then((res) => setChurnData(res.data.data))
       .catch(() => setChurnError("Failed to load churn risk data."))
       .finally(() => setIsLoadingChurn(false));
@@ -862,7 +881,7 @@ export function AdminCoreEngine() {
     setIsLoadingOnboarding(true);
     setOnboardingError(null);
     return api
-      .get("/admin/onboarding", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/onboarding", { headers: adminHeaders })
       .then((res) => setOnboardingData(res.data.data))
       .catch(() => setOnboardingError("Failed to load onboarding data."))
       .finally(() => setIsLoadingOnboarding(false));
@@ -910,7 +929,7 @@ export function AdminCoreEngine() {
     setIsLoadingRevenue(true);
     setRevenueError(null);
     return api
-      .get("/admin/revenue", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/revenue", { headers: adminHeaders })
       .then((res) => setRevenueData(res.data.data))
       .catch(() => setRevenueError("Failed to load revenue data."))
       .finally(() => setIsLoadingRevenue(false));
@@ -922,21 +941,62 @@ export function AdminCoreEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUnlocked, activeTab]);
 
+  // Step 1: verify the master passcode; advance to TOTP step on success.
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
     setAuthError(null);
 
     try {
-      const res = await api.post("/admin/broadcast/verify-passcode", {}, { headers: { 'x-admin-passcode': passcode } });
-      if (res.data.success) {
-        setIsUnlocked(true);
-        sessionStorage.setItem("accountgo_admin_engine_passcode", passcode);
-      }
+      await api.post("/admin/broadcast/verify-passcode", {}, { headers: { 'x-admin-passcode': passcode } });
+      setAuthStep('totp');
+      setTotpCode('');
     } catch (err: any) {
       setAuthError(err.response?.data?.error || "Invalid master passcode. Access denied.");
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  // Step 2: verify the TOTP code and exchange for a session token.
+  const handleVerifyTotp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    setAuthError(null);
+
+    try {
+      const res = await api.post("/admin/totp/verify", { totpCode }, { headers: { 'x-admin-passcode': passcode } });
+      const token: string = res.data.data.sessionToken;
+      setSessionToken(token);
+      setIsUnlocked(true);
+      sessionStorage.setItem("accountgo_admin_engine_session", token);
+      sessionStorage.removeItem("accountgo_admin_engine_passcode");
+    } catch (err: any) {
+      // 503 = TOTP not yet configured on this server → fall back to passcode-only
+      if (err.response?.status === 503) {
+        setIsUnlocked(true);
+        sessionStorage.setItem("accountgo_admin_engine_passcode", passcode);
+      } else {
+        setAuthError(err.response?.data?.error || "Invalid authenticator code. Codes expire every 30 seconds — try again.");
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Fetch QR code setup data (requires passcode; shown on the TOTP step).
+  const handleShowSetup = async () => {
+    setIsLoadingSetup(true);
+    setShowSetupQr(true);
+    setSetupQrData(null);
+    try {
+      const res = await api.get("/admin/totp/setup", { headers: { 'x-admin-passcode': passcode } });
+      setSetupQrData(res.data.data);
+    } catch {
+      setAuthError("Failed to load authenticator setup. Check your passcode and try again.");
+      setShowSetupQr(false);
+    } finally {
+      setIsLoadingSetup(false);
     }
   };
 
@@ -972,7 +1032,7 @@ export function AdminCoreEngine() {
         message,
         channel,
         targetTier: targetTier === "ALL" ? undefined : Number(targetTier),
-      }, { headers: { 'x-admin-passcode': passcode } });
+      }, { headers: adminHeaders });
 
       if (res.data.success) {
         setBroadcastResult(res.data.data);
@@ -1001,7 +1061,7 @@ export function AdminCoreEngine() {
         baseCurrency: onboardBaseCurrency,
         orgType: onboardOrgType,
         tier: onboardTier,
-      }, { headers: { 'x-admin-passcode': passcode } });
+      }, { headers: adminHeaders });
       if (res.data.success) {
         setOnboardResult(res.data.data);
         setOnboardCompanyName("");
@@ -1114,7 +1174,11 @@ export function AdminCoreEngine() {
               </span>
               <button
                 onClick={() => {
+                  sessionStorage.removeItem("accountgo_admin_engine_session");
                   sessionStorage.removeItem("accountgo_admin_engine_passcode");
+                  setSessionToken(null);
+                  setPasscode('');
+                  setAuthStep('passcode');
                   setIsUnlocked(false);
                 }}
                 className="text-secondary-400 hover:text-rose-400 transition-colors"
@@ -1146,35 +1210,121 @@ export function AdminCoreEngine() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleVerifyPasscode} className="space-y-4">
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-xs font-semibold text-secondary-300">Master Security Passcode</label>
-                    <Input
-                      type="password"
-                      value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="Enter Master Security Passcode"
-                      required
-                      className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-jetbrains text-base"
-                    />
-                  </div>
-
-                  {authError && (
-                    <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
-                      {authError}
+                {authStep === 'passcode' ? (
+                  <form onSubmit={handleVerifyPasscode} className="space-y-4">
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-xs font-semibold text-secondary-300">Master Security Passcode</label>
+                      <Input
+                        type="password"
+                        value={passcode}
+                        onChange={(e) => setPasscode(e.target.value)}
+                        placeholder="Enter Master Security Passcode"
+                        required
+                        className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-jetbrains text-base"
+                      />
                     </div>
-                  )}
 
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
-                    disabled={isVerifying}
-                  >
-                    {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Authenticate Core Engine
-                  </Button>
-                </form>
+                    {authError && (
+                      <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                        {authError}
+                      </div>
+                    )}
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
+                      disabled={isVerifying}
+                    >
+                      {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Continue
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-secondary-300">Authenticator Code</span>
+                      <button
+                        type="button"
+                        onClick={() => { setAuthStep('passcode'); setAuthError(null); setShowSetupQr(false); setSetupQrData(null); }}
+                        className="text-xs text-secondary-500 hover:text-amber-400 transition-colors"
+                      >
+                        ← Back
+                      </button>
+                    </div>
+
+                    {!showSetupQr ? (
+                      <form onSubmit={handleVerifyTotp} className="space-y-4">
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]{6}"
+                          maxLength={6}
+                          value={totpCode}
+                          onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="6-digit code from authenticator"
+                          required
+                          autoFocus
+                          className="bg-secondary-950 border-secondary-700 text-white text-center tracking-[0.4em] font-jetbrains text-xl"
+                        />
+
+                        {authError && (
+                          <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                            {authError}
+                          </div>
+                        )}
+
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
+                          disabled={isVerifying || totpCode.length !== 6}
+                        >
+                          {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Verify &amp; Unlock
+                        </Button>
+
+                        <button
+                          type="button"
+                          onClick={handleShowSetup}
+                          disabled={isLoadingSetup}
+                          className="w-full text-xs text-secondary-500 hover:text-amber-400 transition-colors pt-1"
+                        >
+                          {isLoadingSetup ? 'Loading...' : 'Set up authenticator app →'}
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="space-y-4">
+                        {setupQrData ? (
+                          <>
+                            <p className="text-xs text-secondary-400 text-left">{setupQrData.note}</p>
+                            <div className="flex justify-center">
+                              <img src={setupQrData.qrDataUrl} alt="TOTP QR Code" className="w-44 h-44 rounded-lg bg-white p-1" />
+                            </div>
+                            <div className="bg-secondary-950 border border-secondary-700 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-secondary-500 mb-1 text-left">Manual entry key</p>
+                              <p className="font-jetbrains text-xs text-amber-400 break-all text-center select-all">{setupQrData.secret}</p>
+                            </div>
+                            <p className="text-[10px] text-secondary-500 text-left">
+                              Scan with Google Authenticator, Authy, or any TOTP app. Then enter the 6-digit code above.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowSetupQr(false)}
+                              className="w-full text-xs text-amber-400 hover:text-amber-300 transition-colors font-semibold"
+                            >
+                              Done — enter my code
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex justify-center py-6">
+                            <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -3417,7 +3567,7 @@ export function AdminCoreEngine() {
 
             {/* Tab: Safety — Emergency Stop */}
             {activeTab === "safety" && (
-              <EmergencyStopPanel passcode={passcode} />
+              <EmergencyStopPanel passcode={passcode} sessionToken={sessionToken} />
             )}
 
             {/* Tab: Referral Partners */}
@@ -4415,7 +4565,7 @@ export function AdminCoreEngine() {
   );
 }
 
-function EmergencyStopPanel({ passcode }: { passcode: string }) {
+function EmergencyStopPanel({ passcode, sessionToken }: { passcode: string; sessionToken: string | null }) {
   const [state, setState] = useState<{ active: boolean; reason?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState("");
@@ -4424,7 +4574,9 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
   const [msg, setMsg] = useState<string | null>(null);
 
   const adminBase = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/admin/emergency-stop`;
-  const adminHeaders = { "x-admin-passcode": passcode, "Content-Type": "application/json" };
+  const adminHeaders = sessionToken
+    ? { "x-admin-session": sessionToken, "Content-Type": "application/json" }
+    : { "x-admin-passcode": passcode, "Content-Type": "application/json" };
 
   async function adminFetch(url: string, init?: RequestInit) {
     const res = await fetch(url, { ...init, headers: { ...adminHeaders, ...init?.headers } });

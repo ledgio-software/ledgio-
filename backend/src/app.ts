@@ -60,6 +60,7 @@ import adminClientHealthRouter from './routes/adminClientHealth';
 import adminChurnRiskRouter from './routes/adminChurnRisk';
 import adminOnboardingRouter from './routes/adminOnboarding';
 import adminRevenueRouter from './routes/adminRevenue';
+import adminTotpRouter from './routes/adminTotp';
 import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
 import syncRouter from './routes/sync';
@@ -165,12 +166,18 @@ app.use('/api/', apiRateLimiter);
 // it only sees requests that cleared the rate gate.
 app.use('/api/v1/', idorAuditMiddleware);
 
+// TOTP auth routes — mounted BEFORE the rate limiter and passcode gate because
+// they are part of the login flow itself. The verify endpoint does its own
+// inline passcode check; the setup endpoint also checks the passcode inline.
+// The rate limiter is applied separately to this prefix below.
+app.use('/api/v1/admin/totp', adminRateLimiter, adminTotpRouter);
+
 // Strict admin rate limiter (10 req/min per IP) — applied before any admin
 // handler so brute-forcing the master passcode is not feasible.
 app.use('/api/v1/admin/', adminRateLimiter);
 
-// Passcode gate for all admin routes. Applied after the rate limiter so failed
-// guesses are counted before reaching the passcode check.
+// Passcode / session token gate for all admin routes. Applied after the rate
+// limiter so failed guesses are counted before reaching the auth check.
 app.use('/api/v1/admin/', adminPasscodeMiddleware);
 
 // Metrics endpoint (no auth required for Prometheus scraping)
