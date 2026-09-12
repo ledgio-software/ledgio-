@@ -526,8 +526,6 @@ function OnboardingPanel({ teamToken }: { teamToken: string }) {
   const { data, loading, err, reload } = useAdminFetch<any>('/admin/onboarding', teamToken);
   const tenants: any[] = data?.tenants ?? [];
   const s = data?.summary;
-  const totalSteps: number = data?.totalSteps ?? 8;
-
   return (
     <div className="p-6">
       <PanelHeader tab="onboarding">
