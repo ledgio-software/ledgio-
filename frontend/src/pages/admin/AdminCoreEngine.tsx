@@ -4784,7 +4784,7 @@ export function AdminCoreEngine() {
             )}
 
             {activeTab === "team" && (
-              <TeamManagementPanel adminHeaders={adminHeaders} />
+              <TeamManagementPanel adminHeaders={adminHeaders as unknown as Record<string, string>} />
             )}
 
       </main>
