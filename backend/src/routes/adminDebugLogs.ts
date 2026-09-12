@@ -4,7 +4,7 @@ import { getDebugLogs, clearDebugLogs, debugLogStats, DebugLogFilter } from '../
 const router = Router();
 
 /** GET /api/v1/admin/debug/logs */
-router.get('/', (req: Request, res: Response): void => {
+router.get('/logs', (req: Request, res: Response): void => {
   const { level, tenantId, search, limit, offset } = req.query as Record<string, string | undefined>;
 
   const filter: DebugLogFilter = {
@@ -22,7 +22,7 @@ router.get('/', (req: Request, res: Response): void => {
 });
 
 /** DELETE /api/v1/admin/debug/logs */
-router.delete('/', (_req: Request, res: Response): void => {
+router.delete('/logs', (_req: Request, res: Response): void => {
   clearDebugLogs();
   res.json({ success: true, message: 'Debug log buffer cleared.' });
 });
