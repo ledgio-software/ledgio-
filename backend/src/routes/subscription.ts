@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
@@ -11,6 +12,9 @@ import * as paystackService from '../services/paystackService';
 import { PaystackServiceError } from '../services/paystackService';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validateBody';
+
+// Webhook references are stored in Redis for 90 days to detect replays.
+const WEBHOOK_DEDUP_TTL_SECONDS = 90 * 24 * 60 * 60;
 
 const initializeSchema = z.object({ planTier: z.number().int().min(1).max(3) });
 const verifySchema = z.object({
@@ -248,6 +252,22 @@ router.post('/webhook', async (req: Request, res: Response): Promise<void> => {
     if (event.event !== 'charge.success') {
       res.json({ success: true, ignored: true });
       return;
+    }
+
+    // Replay protection: reject any reference we have already processed.
+    // Uses SET NX EX so the check-and-mark is atomic.
+    const reference = event.data?.reference as string | undefined;
+    if (reference) {
+      const dedupKey = `paystack_webhook:${reference}`;
+      try {
+        const isNew = await redis.set(dedupKey, '1', 'EX', WEBHOOK_DEDUP_TTL_SECONDS, 'NX');
+        if (!isNew) {
+          res.json({ success: true, ignored: true, reason: 'duplicate' });
+          return;
+        }
+      } catch {
+        // Redis unavailable — process the event; idempotent updates are safe.
+      }
     }
 
     const metadata = event.data?.metadata as { tenantId?: string; planTier?: number } | undefined;

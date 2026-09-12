@@ -21,8 +21,9 @@ import journalEntriesRouter from './routes/journalEntries';
 import ledgersRouter from './routes/ledgers';
 import reportsRouter from './routes/reports';
 import { requestLoggerMiddleware } from './middleware/requestLoggerMiddleware';
+import { adminPasscodeMiddleware } from './middleware/adminPasscodeMiddleware';
 import { metricsMiddleware } from './middleware/metricsMiddleware';
-import { apiRateLimiter } from './middleware/rateLimiterMiddleware';
+import { apiRateLimiter, adminRateLimiter } from './middleware/rateLimiterMiddleware';
 import customFieldsRouter from './routes/customFields';
 import auditLogsRouter from './routes/auditLogs';
 import importRouter from './routes/import';
@@ -156,6 +157,14 @@ app.use(metricsMiddleware);
 // ── Traffic Protection ──────────────────────────────────────────────────────────
 // Global API rate limiter (100 req/min per tenant or IP)
 app.use('/api/', apiRateLimiter);
+
+// Strict admin rate limiter (10 req/min per IP) — applied before any admin
+// handler so brute-forcing the master passcode is not feasible.
+app.use('/api/v1/admin/', adminRateLimiter);
+
+// Passcode gate for all admin routes. Applied after the rate limiter so failed
+// guesses are counted before reaching the passcode check.
+app.use('/api/v1/admin/', adminPasscodeMiddleware);
 
 // Metrics endpoint (no auth required for Prometheus scraping)
 app.use('/metrics', metricsRouter);
@@ -370,7 +379,10 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     path: req.originalUrl ?? req.path,
     status,
     error: err.message ?? 'Unknown error',
-    stack: err.stack,
+    // Strip stack traces in production: they expose internal file paths and
+    // library versions that make targeted CVE attacks easier. Keep them in
+    // non-production so developers can debug locally.
+    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
     tenantId: (req as any).tenantId ?? (req as any).user?.tenantId,
     userId: (req as any).user?.id,
     ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ?? req.socket?.remoteAddress,
