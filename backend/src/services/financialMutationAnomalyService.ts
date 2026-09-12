@@ -20,7 +20,7 @@ import { redis } from '../config/redis';
 import { logger } from '../utils/logger';
 import { recordAuditLog } from './auditLogService';
 import { prisma } from '../config/db';
-import { getTenantContext } from '../context/tenantContext';
+import { withCurrentTenantDb } from '../database/tenantClient';
 
 // ── Thresholds ────────────────────────────────────────────────────────────────
 
@@ -60,19 +60,29 @@ async function redisIncr(key: string, ttl: number): Promise<number> {
 }
 
 // ── Rolling average helper ─────────────────────────────────────────────────────
+// JournalEntry lives in the per-tenant schema (no tenantId column, no total_amount).
+// We use withCurrentTenantDb and aggregate over the journal_entry_lines table:
+// the "total" for an entry is the sum of its debit lines (double-entry: debits == credits).
 
-async function getTenantRollingAverage(tenantId: string): Promise<number | null> {
+async function getTenantRollingAverage(): Promise<number | null> {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000);
-    // Use the tenant-scoped prisma through raw query average
-    const result = await prisma.$queryRaw<Array<{ avg: number | null }>>`
-      SELECT AVG(total_amount) as avg
-      FROM journal_entries
-      WHERE tenant_id = ${tenantId}
-        AND created_at >= ${thirtyDaysAgo}
-        AND status = 'POSTED'
-    `;
-    return result[0]?.avg ?? null;
+    return await withCurrentTenantDb(prisma, async (client) => {
+      // Group lines by entry and sum debits, then average across all posted entries.
+      const groups = await client.journalEntryLine.groupBy({
+        by: ['journalEntryId'],
+        _sum: { debit: true },
+        where: {
+          journalEntry: {
+            status: 'POSTED',
+            createdAt: { gte: thirtyDaysAgo },
+          },
+        },
+      });
+      if (groups.length === 0) return null;
+      const total = groups.reduce((sum, g) => sum + Number(g._sum.debit ?? 0), 0);
+      return total / groups.length;
+    });
   } catch {
     return null;
   }
@@ -86,7 +96,7 @@ async function scoreEntry(ctx: FinancialMutationContext): Promise<Signal[]> {
 
   // ── LARGE_AMOUNT: compare to 30-day rolling average ───────────────────────
   if (amount > 0) {
-    const avg = await getTenantRollingAverage(tenantId);
+    const avg = await getTenantRollingAverage();
     if (avg !== null && avg > 0 && amount > avg * LARGE_AMOUNT_MULTIPLIER) {
       signals.push({
         code: 'LARGE_AMOUNT',
