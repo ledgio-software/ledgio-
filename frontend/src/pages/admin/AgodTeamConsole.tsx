@@ -64,70 +64,732 @@ function initials(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
-// ── Generic placeholder (for tabs with no bespoke UI yet) ───────────────────
-function PlaceholderPanel({ tab, teamToken }: { tab: TabId; teamToken: string }) {
-  const [data, setData] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState('');
-
-  const endpointMap: Partial<Record<TabId, string>> = {
-    performance:  '/admin/metrics',
-    jobs:         '/admin/jobs',
-    errors:       '/admin/error-logs',
-    feedback:     '/admin/feedback',
-    analytics:    '/admin/analytics',
-    clienthealth: '/admin/client-health',
-    churnrisk:    '/admin/churn-risk',
-    onboarding:   '/admin/onboarding',
-    revenue:      '/admin/revenue',
-    debuglogs:    '/admin/debug/logs',
-    referral:     '/admin/referrals/partners',
-  };
-
-  const endpoint = endpointMap[tab];
-
-  useEffect(() => {
-    if (!endpoint || !teamToken) { setData(null); setErr(''); setLoading(false); return; }
-    api.get(endpoint, { headers: { 'x-team-token': teamToken } })
-      .then((res) => setData(JSON.stringify(res.data, null, 2)))
-      .catch((err: unknown) => {
-        const status = (err as any)?.response?.status;
-        if (status === 401) {
-          sessionStorage.removeItem('agod-team-token');
-          sessionStorage.removeItem('agod-team-member');
-          window.location.replace('/agod/login');
-        } else {
-          setErr('Failed to load data.');
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [endpoint, teamToken]);
-
+// ── Static placeholder (tabs with no live endpoint) ──────────────────────────
+function NoDataPanel({ tab }: { tab: TabId }) {
   const meta = TAB_META[tab];
+  return (
+    <div className="p-6">
+      <PanelHeader tab={tab} />
+      <div className="flex flex-col items-center justify-center py-20 text-white/30 gap-3">
+        <div className="opacity-30">{meta.icon}</div>
+        <p className="text-sm">No live data endpoint for this panel.</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Stat tile ─────────────────────────────────────────────────────────────────
+function StatTile({ label, value, sub, color = 'text-white' }: { label: string; value: string | number; sub?: string; color?: string }) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-center">
+      <p className={`text-xl font-bold ${color}`}>{value}</p>
+      <p className="text-white/30 text-xs mt-0.5">{label}</p>
+      {sub && <p className="text-white/20 text-[10px] mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Performance Panel ─────────────────────────────────────────────────────────
+function PerformancePanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/metrics', teamToken);
+
+  const fmtUptime = (s: number) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
 
   return (
     <div className="p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className={`${meta.accent.split(' ')[0]}`}>{meta.icon}</div>
-        <h2 className="text-white text-lg font-semibold">{meta.label}</h2>
-      </div>
-      {loading && (
-        <div className="flex justify-center py-16">
-          <div className="h-8 w-8 border-2 border-white/10 border-t-violet-500 rounded-full animate-spin" />
-        </div>
-      )}
+      <PanelHeader tab="performance">
+        <button onClick={reload} className="ml-auto p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </PanelHeader>
+      {loading && <Spinner />}
       {err && <p className="text-rose-400 text-sm">{err}</p>}
-      {data && (
-        <pre className="bg-white/5 border border-white/10 rounded-xl p-4 text-xs text-white/70 overflow-auto max-h-[60vh] font-mono leading-relaxed">
-          {data}
-        </pre>
+      {!loading && data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <StatTile label="Requests" value={data.requests.toLocaleString()} />
+            <StatTile label="Avg Latency" value={`${data.avgLatencyMs}ms`} color={data.avgLatencyMs > 500 ? 'text-amber-400' : 'text-emerald-400'} />
+            <StatTile label="Error Rate" value={`${(data.errorRate * 100).toFixed(1)}%`} color={data.errorRate > 0.01 ? 'text-rose-400' : 'text-emerald-400'} />
+            <StatTile label="Uptime" value={fmtUptime(data.uptime)} sub={data.nodeVersion} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              <p className="text-white/40 text-xs mb-1">Heap Used</p>
+              <p className="text-white text-lg font-bold">{data.memory?.heapUsedMb?.toFixed(1)} MB</p>
+              <p className="text-white/20 text-xs">RSS {data.memory?.rssMb?.toFixed(1)} MB</p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+              <p className="text-white/40 text-xs mb-1">Total Errors</p>
+              <p className={`text-lg font-bold ${data.errors > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{data.errors}</p>
+              <p className="text-white/20 text-xs">since last restart</p>
+            </div>
+          </div>
+          {data.buckets && data.buckets.length > 0 && (
+            <>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">Recent Buckets (5-min windows)</p>
+              <div className="overflow-x-auto rounded-xl border border-white/10">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left px-3 py-2 text-white/30 font-medium">Time</th>
+                      <th className="text-right px-3 py-2 text-white/30 font-medium">Reqs</th>
+                      <th className="text-right px-3 py-2 text-white/30 font-medium">Errors</th>
+                      <th className="text-right px-3 py-2 text-white/30 font-medium">Avg ms</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...data.buckets].reverse().slice(0, 20).map((b: any, i: number) => (
+                      <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                        <td className="px-3 py-2 text-white/50 font-mono">{new Date(b.ts).toLocaleTimeString()}</td>
+                        <td className="px-3 py-2 text-right text-white/70">{b.requests}</td>
+                        <td className={`px-3 py-2 text-right ${b.errors > 0 ? 'text-rose-400' : 'text-white/30'}`}>{b.errors}</td>
+                        <td className="px-3 py-2 text-right text-white/50">{b.avgMs ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </>
       )}
-      {!loading && !err && !data && (
-        <div className="flex flex-col items-center justify-center py-20 text-white/30 gap-3">
-          <div className="text-4xl opacity-30">{meta.icon}</div>
-          <p className="text-sm">No live data endpoint for this panel.</p>
-          <p className="text-xs">Full interactive view coming soon.</p>
+    </div>
+  );
+}
+
+// ── Error Logs Panel ──────────────────────────────────────────────────────────
+function ErrorLogsPanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/error-logs', teamToken);
+  const [clearing, setClearing] = useState(false);
+
+  const clear = async () => {
+    setClearing(true);
+    try {
+      await api.delete('/admin/error-logs', { headers: { 'x-team-token': teamToken } });
+      reload();
+    } catch { /* ignore */ } finally { setClearing(false); }
+  };
+
+  const entries: any[] = data?.errors ?? [];
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="errors">
+        <div className="ml-auto flex items-center gap-2">
+          {entries.length > 0 && (
+            <button onClick={clear} disabled={clearing}
+              className="text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40">
+              {clearing ? 'Clearing…' : 'Clear log'}
+            </button>
+          )}
+          <button onClick={reload} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
         </div>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && data && (
+        <>
+          {entries.length === 0 ? (
+            <div className="flex flex-col items-center py-16 text-white/30 gap-2">
+              <CheckCircle className="h-10 w-10" />
+              <p className="text-sm">No errors in buffer.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-white/30 text-xs mb-3">{data.count} error{data.count !== 1 ? 's' : ''} in buffer</p>
+              {entries.map((e: any, i: number) => (
+                <div key={i} className="bg-rose-500/5 border border-rose-500/20 rounded-xl px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <XCircle className="h-3.5 w-3.5 text-rose-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-rose-300 text-sm font-medium line-clamp-2">{e.message ?? e.error ?? 'Unknown error'}</p>
+                      {e.source && <p className="text-white/30 text-xs font-mono mt-0.5 truncate">{e.source}</p>}
+                      <div className="flex gap-3 mt-1.5 flex-wrap">
+                        {e.count > 1 && <span className="text-amber-400 text-xs">{e.count}× occurrences</span>}
+                        {e.route && <span className="text-white/30 text-xs font-mono">{e.route}</span>}
+                        <span className="text-white/20 text-xs ml-auto">{e.lastSeen ? new Date(e.lastSeen).toLocaleString() : (e.ts ? new Date(e.ts).toLocaleString() : '')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Feedback Panel ────────────────────────────────────────────────────────────
+const FEEDBACK_STATUS_STYLE: Record<string, string> = {
+  OPEN: 'bg-amber-500/20 text-amber-400',
+  IN_REVIEW: 'bg-violet-500/20 text-violet-400',
+  RESOLVED: 'bg-emerald-500/20 text-emerald-400',
+  CLOSED: 'bg-white/10 text-white/40',
+};
+
+function FeedbackPanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/feedback', teamToken);
+  const items: any[] = data?.items ?? [];
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="feedback">
+        <button onClick={reload} className="ml-auto p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && data && (
+        <>
+          {data.pagination && (
+            <p className="text-white/30 text-xs mb-3">{data.pagination.total} feedback entries</p>
+          )}
+          {items.length === 0 ? (
+            <div className="text-center py-12 text-white/30 text-sm">No feedback yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {items.map((f: any) => (
+                <div key={f.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {f.category && (
+                          <span className="text-xs bg-white/10 text-white/50 px-1.5 py-0.5 rounded">{f.category}</span>
+                        )}
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${FEEDBACK_STATUS_STYLE[f.status] ?? 'bg-white/10 text-white/40'}`}>
+                          {f.status}
+                        </span>
+                        {f.tenant?.name && (
+                          <span className="text-white/30 text-xs">{f.tenant.name}</span>
+                        )}
+                        <span className="text-white/20 text-xs ml-auto">{new Date(f.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-white/70 text-sm mt-1.5 line-clamp-3">{f.message ?? f.content ?? f.body ?? '—'}</p>
+                      {f.userEmail && <p className="text-white/25 text-xs mt-1">{f.userEmail}</p>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Analytics Panel ───────────────────────────────────────────────────────────
+function AnalyticsPanel({ teamToken }: { teamToken: string }) {
+  const [days, setDays] = useState(28);
+  const endpoint = `/admin/analytics?days=${days}`;
+  const { data, loading, err, reload } = useAdminFetch<any>(endpoint, teamToken, [days]);
+
+  const fmtDuration = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.round(s % 60);
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="analytics">
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex bg-white/5 border border-white/10 rounded-xl overflow-hidden text-xs">
+            {[7, 28, 90].map((d) => (
+              <button key={d} onClick={() => setDays(d)}
+                className={`px-3 py-1.5 transition-colors ${days === d ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'}`}>
+                {d}d
+              </button>
+            ))}
+          </div>
+          <button onClick={reload} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && data && !data.configured && (
+        <div className="flex flex-col items-center py-16 text-white/30 gap-2">
+          <TrendingUp className="h-10 w-10 opacity-30" />
+          <p className="text-sm">Google Analytics not configured.</p>
+          <p className="text-xs">Set GA_PROPERTY_ID and service-account credentials to enable.</p>
+        </div>
+      )}
+      {!loading && data && data.configured && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <StatTile label="Total Users" value={data.totalUsers?.toLocaleString() ?? '—'} color="text-sky-400" />
+            <StatTile label="New Users" value={data.newUsers?.toLocaleString() ?? '—'} />
+            <StatTile label="Sessions" value={data.sessions?.toLocaleString() ?? '—'} />
+            <StatTile label="Page Views" value={data.pageViews?.toLocaleString() ?? '—'} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <StatTile label="Avg Session" value={fmtDuration(data.avgSessionDuration ?? 0)} />
+            <StatTile label="Active Now" value={data.activeUsers ?? 0} color="text-emerald-400" />
+          </div>
+
+          {data.topPages?.length > 0 && (
+            <div className="mb-4">
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">Top Pages</p>
+              <div className="space-y-1">
+                {data.topPages.map((p: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3 px-3 py-2 bg-white/5 rounded-lg text-xs">
+                    <span className="text-white/20 w-4 text-right flex-shrink-0">{i + 1}</span>
+                    <span className="text-white/60 font-mono flex-1 truncate">{p.page}</span>
+                    <span className="text-white/40 flex-shrink-0">{p.views?.toLocaleString()} views</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.topCountries?.length > 0 && (
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">Top Countries</p>
+              <div className="flex flex-wrap gap-2">
+                {data.topCountries.map((c: any, i: number) => (
+                  <span key={i} className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs">
+                    <span className="text-white/60">{c.country}</span>
+                    <span className="text-white/30 ml-1.5">{c.users}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Client Health Panel ───────────────────────────────────────────────────────
+const CHURN_RISK_STYLE: Record<string, string> = {
+  high: 'bg-rose-500/20 text-rose-400',
+  medium: 'bg-amber-500/20 text-amber-400',
+  low: 'bg-emerald-500/20 text-emerald-400',
+  none: 'bg-white/5 text-white/30',
+};
+
+function ClientHealthPanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/client-health', teamToken);
+  const tenants: any[] = data?.tenants ?? [];
+  const s = data?.summary;
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="clienthealth">
+        <button onClick={reload} className="ml-auto p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && s && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <StatTile label="Total" value={s.totalTenants} />
+            <StatTile label="Active" value={s.activeTenants} color="text-emerald-400" />
+            <StatTile label="High Risk" value={s.highRiskTenants} color="text-rose-400" />
+            <StatTile label="Dormant" value={s.dormantTenants} color="text-amber-400" />
+          </div>
+          <div className="space-y-1.5 max-h-[55vh] overflow-auto">
+            {tenants.map((t: any) => (
+              <div key={t.id} className="flex items-center gap-3 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white text-sm font-medium truncate">{t.name}</span>
+                    <span className="text-white/25 text-xs">{t.slug}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-white/25 text-xs">Tier {t.tier}</span>
+                    <span className="text-white/25 text-xs">{t.userCount} users</span>
+                    {t.daysSinceActivity !== null && (
+                      <span className={`text-xs ${t.daysSinceActivity >= 14 ? 'text-amber-400' : 'text-white/25'}`}>
+                        active {t.daysSinceActivity}d ago
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${CHURN_RISK_STYLE[t.churnRisk] ?? 'bg-white/5 text-white/30'}`}>
+                  {t.churnRisk}
+                </span>
+                <span className={`text-xs flex-shrink-0 ${t.subscriptionStatus === 'ACTIVE' ? 'text-emerald-400' : t.subscriptionStatus === 'TRIAL' ? 'text-amber-400' : 'text-rose-400'}`}>
+                  {t.subscriptionStatus}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Churn Risk Panel ──────────────────────────────────────────────────────────
+const BUCKET_LABEL: Record<string, string> = {
+  expired: 'Expired', trial_critical: 'Trial Critical', trial_soon: 'Trial Soon',
+  trial_watch: 'Trial Watch', renewal_soon: 'Renewal Soon', dormant: 'Dormant',
+};
+const BUCKET_STYLE: Record<string, string> = {
+  expired: 'bg-red-500/20 text-red-400',
+  trial_critical: 'bg-rose-500/20 text-rose-400',
+  trial_soon: 'bg-orange-500/20 text-orange-400',
+  renewal_soon: 'bg-amber-500/20 text-amber-400',
+  dormant: 'bg-white/10 text-white/50',
+  trial_watch: 'bg-sky-500/20 text-sky-400',
+};
+
+function ChurnRiskPanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/churn-risk', teamToken);
+  const tenants: any[] = data?.tenants ?? [];
+  const s = data?.summary;
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="churnrisk">
+        <button onClick={reload} className="ml-auto p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && s && (
+        <>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-6">
+            {([
+              { k: 'expired', label: 'Expired', v: s.expired, c: 'text-red-400' },
+              { k: 'tc', label: 'Trial Crit.', v: s.trialCritical, c: 'text-rose-400' },
+              { k: 'ts', label: 'Trial Soon', v: s.trialSoon, c: 'text-orange-400' },
+              { k: 'rs', label: 'Renewal', v: s.renewalSoon, c: 'text-amber-400' },
+              { k: 'dm', label: 'Dormant', v: s.dormant, c: 'text-white/50' },
+              { k: 'ni', label: 'Low Adopt.', v: s.notEmbedded, c: 'text-sky-400' },
+            ] as const).map(({ k, label, v, c }) => (
+              <div key={k} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-center">
+                <p className={`text-lg font-bold ${c}`}>{v}</p>
+                <p className="text-white/30 text-[10px] mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+          {tenants.length === 0 ? (
+            <div className="flex flex-col items-center py-12 text-white/30 gap-2">
+              <CheckCircle className="h-8 w-8" />
+              <p className="text-sm">No at-risk tenants.</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-[50vh] overflow-auto">
+              {tenants.map((t: any) => (
+                <div key={t.id} className="flex items-center gap-3 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white text-sm truncate">{t.name}</span>
+                      <span className="text-white/25 text-xs">{t.slug}</span>
+                    </div>
+                    <div className="flex gap-3 mt-0.5 text-xs flex-wrap">
+                      {t.trialDaysLeft !== null && <span className="text-white/30">trial ends {t.trialDaysLeft}d</span>}
+                      {t.paidDaysLeft !== null && <span className="text-white/30">renews {t.paidDaysLeft}d</span>}
+                      {t.daysSinceActivity !== null && <span className="text-white/30">active {t.daysSinceActivity}d ago</span>}
+                      <span className="text-white/20">adopt {t.adoptionScore}/5</span>
+                    </div>
+                  </div>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${BUCKET_STYLE[t.bucket] ?? 'bg-white/10 text-white/40'}`}>
+                    {BUCKET_LABEL[t.bucket] ?? t.bucket}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Onboarding Intel Panel ────────────────────────────────────────────────────
+const MILESTONE_LABELS: Record<string, string> = {
+  teamMemberAdded: 'Team', firstJournalPosted: 'Journal',
+  firstInvoiceSent: 'Invoice', firstSaleRecorded: 'Sale',
+  firstInventoryItem: 'Inventory', bankConnected: 'Bank',
+  firstReconciliation: 'Reconcile',
+};
+
+function OnboardingPanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/onboarding', teamToken);
+  const tenants: any[] = data?.tenants ?? [];
+  const s = data?.summary;
+  const totalSteps: number = data?.totalSteps ?? 8;
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="onboarding">
+        <button onClick={reload} className="ml-auto p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && s && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <StatTile label="Total" value={s.total} />
+            <StatTile label="Fully Done" value={s.fullyOnboarded} color="text-emerald-400" />
+            <StatTile label="Stuck" value={s.stuck} color="text-rose-400" />
+            <StatTile label="Avg Completion" value={`${s.avgCompletionPct}%`} color="text-sky-400" />
+          </div>
+          <div className="space-y-2 max-h-[50vh] overflow-auto">
+            {tenants.map((t: any) => (
+              <div key={t.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white text-sm font-medium truncate">{t.name}</span>
+                      {t.isStuck && <span className="text-xs bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded-full flex-shrink-0">stuck</span>}
+                    </div>
+                    <p className="text-white/30 text-xs">{t.daysSinceSignup}d old · {t.userCount} users</p>
+                  </div>
+                  <span className={`text-sm font-bold flex-shrink-0 ${t.completionPct >= 75 ? 'text-emerald-400' : t.completionPct >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>
+                    {t.completionPct}%
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${t.completionPct >= 75 ? 'bg-emerald-500' : t.completionPct >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                    style={{ width: `${t.completionPct}%` }}
+                  />
+                </div>
+                {/* Milestone chips */}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/20'}`}>Setup</span>
+                  {t.milestoneDetail && Object.entries(t.milestoneDetail).map(([k, done]) => (
+                    <span key={k} className={`text-[10px] px-1.5 py-0.5 rounded ${done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-white/20'}`}>
+                      {MILESTONE_LABELS[k] ?? k}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          {tenants.length === 0 && (
+            <div className="text-center py-12 text-white/30 text-sm">No tenants yet.</div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Revenue Panel ─────────────────────────────────────────────────────────────
+function RevenuePanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/revenue', teamToken);
+  const s = data?.summary;
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="revenue">
+        <button onClick={reload} className="ml-auto p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && s && (
+        <>
+          {/* Big MRR/ARR */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <StatTile label="MRR (GHS)" value={`₵${s.mrr.toLocaleString()}`} color="text-cyan-400" />
+            <StatTile label="ARR (proj.)" value={`₵${s.arr.toLocaleString()}`} color="text-cyan-300" />
+            <StatTile label="Trial Pipeline" value={`₵${s.trialPipelineValue.toLocaleString()}`} color="text-amber-400" />
+            <StatTile label="At Risk" value={`₵${s.revenueAtRisk.toLocaleString()}`} color={s.revenueAtRisk > 0 ? 'text-rose-400' : 'text-white/30'} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <StatTile label="Active Paid" value={s.activePaid} color="text-emerald-400" />
+            <StatTile label="On Trial" value={s.trial} color="text-amber-400" />
+            <StatTile label="Expired" value={s.expired} color={s.expired > 0 ? 'text-rose-400' : 'text-white/30'} />
+            <StatTile label="Conversion" value={`${s.trialConversionRate}%`} />
+          </div>
+
+          {/* Tier breakdown */}
+          {data.tierBreakdown?.length > 0 && (
+            <div className="mb-6">
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">Tier Breakdown</p>
+              <div className="overflow-x-auto rounded-xl border border-white/10">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left px-3 py-2 text-white/30 font-medium">Plan</th>
+                      <th className="text-right px-3 py-2 text-white/30 font-medium">Price</th>
+                      <th className="text-right px-3 py-2 text-white/30 font-medium">Tenants</th>
+                      <th className="text-right px-3 py-2 text-white/30 font-medium">MRR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.tierBreakdown.map((t: any) => (
+                      <tr key={t.tier} className="border-b border-white/5">
+                        <td className="px-3 py-2 text-white/70">{t.name}</td>
+                        <td className="px-3 py-2 text-right text-white/50">₵{t.priceGhs}</td>
+                        <td className="px-3 py-2 text-right text-white/70">{t.activeCount}</td>
+                        <td className="px-3 py-2 text-right text-cyan-400 font-medium">₵{t.tierMrr.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Renewals due */}
+          {data.renewalsDue?.length > 0 && (
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-2">Renewals Due (next 30d)</p>
+              <div className="space-y-1.5">
+                {data.renewalsDue.map((t: any) => (
+                  <div key={t.id} className="flex items-center gap-3 px-3 py-2 bg-amber-500/5 border border-amber-500/20 rounded-lg text-xs">
+                    <span className="text-white/70 flex-1 truncate">{t.name}</span>
+                    <span className="text-amber-400">{t.renewalDaysLeft}d left</span>
+                    <span className="text-white/30">₵{t.priceGhs}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Debug Logs Panel ──────────────────────────────────────────────────────────
+const LOG_LEVEL_STYLE: Record<string, string> = {
+  ok: 'text-emerald-400', warn: 'text-amber-400', error: 'text-rose-400',
+};
+
+function DebugLogsPanel({ teamToken }: { teamToken: string }) {
+  const [level, setLevel] = useState<'' | 'ok' | 'warn' | 'error'>('');
+  const endpoint = `/admin/debug/logs${level ? `?level=${level}` : ''}`;
+  const { data, loading, err, reload } = useAdminFetch<any>(endpoint, teamToken, [level]);
+  const [clearing, setClearing] = useState(false);
+
+  const entries: any[] = data?.entries ?? [];
+
+  const clear = async () => {
+    setClearing(true);
+    try {
+      await api.delete('/admin/debug/logs', { headers: { 'x-team-token': teamToken } });
+      reload();
+    } catch { /* ignore */ } finally { setClearing(false); }
+  };
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="debuglogs">
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex bg-white/5 border border-white/10 rounded-xl overflow-hidden text-xs">
+            {(['', 'error', 'warn', 'ok'] as const).map((l) => (
+              <button key={l} onClick={() => setLevel(l)}
+                className={`px-3 py-1.5 transition-colors ${level === l ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'}`}>
+                {l === '' ? 'All' : l}
+              </button>
+            ))}
+          </div>
+          {entries.length > 0 && (
+            <button onClick={clear} disabled={clearing}
+              className="text-xs bg-white/5 hover:bg-white/10 text-white/40 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40">
+              {clearing ? '…' : 'Clear'}
+            </button>
+          )}
+          <button onClick={reload} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </PanelHeader>
+
+      {data?.stats && (
+        <div className="flex gap-4 mb-4 text-xs text-white/30">
+          <span>Total: {data.total}</span>
+          {data.stats.errors > 0 && <span className="text-rose-400">{data.stats.errors} errors</span>}
+          {data.stats.warnings > 0 && <span className="text-amber-400">{data.stats.warnings} warns</span>}
+        </div>
+      )}
+
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+
+      {!loading && entries.length === 0 && (
+        <div className="text-center py-12 text-white/30 text-sm">No log entries.</div>
+      )}
+
+      {!loading && entries.length > 0 && (
+        <div className="space-y-1 max-h-[55vh] overflow-auto font-mono">
+          {entries.map((e: any) => (
+            <div key={e.id} className={`flex items-start gap-2 px-3 py-2 rounded-lg text-xs bg-white/5 border border-white/5 ${e.level === 'error' ? 'border-rose-500/20' : e.level === 'warn' ? 'border-amber-500/10' : ''}`}>
+              <span className={`w-10 flex-shrink-0 font-bold ${LOG_LEVEL_STYLE[e.level] ?? 'text-white/40'}`}>{e.status}</span>
+              <span className="text-white/50 flex-shrink-0">{e.method}</span>
+              <span className="text-white/60 flex-1 truncate">{e.path}</span>
+              <span className={`flex-shrink-0 ${e.durationMs > 500 ? 'text-amber-400' : 'text-white/25'}`}>{e.durationMs}ms</span>
+              {e.errorMessage && <span className="text-rose-400 truncate max-w-[200px]">{e.errorMessage}</span>}
+              <span className="text-white/15 flex-shrink-0">{new Date(e.ts).toLocaleTimeString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Referral Panel ────────────────────────────────────────────────────────────
+function ReferralPanel({ teamToken }: { teamToken: string }) {
+  const { data, loading, err, reload } = useAdminFetch<any>('/admin/referrals/partners', teamToken);
+  const partners: any[] = data?.partners ?? [];
+
+  return (
+    <div className="p-6">
+      <PanelHeader tab="referral">
+        <button onClick={reload} className="ml-auto p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </PanelHeader>
+      {loading && <Spinner />}
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {!loading && (
+        <>
+          {partners.length === 0 ? (
+            <div className="text-center py-12 text-white/30 text-sm">No referral partners yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {partners.map((p: any) => (
+                <div key={p.id} className={`bg-white/5 border rounded-xl px-4 py-3 ${p.isActive ? 'border-white/10' : 'border-white/5 opacity-50'}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white text-sm font-medium">{p.name}</span>
+                        <span className="text-xs bg-white/10 text-white/50 px-1.5 py-0.5 rounded font-mono">{p.code}</span>
+                        {!p.isActive && <span className="text-xs text-white/25">inactive</span>}
+                      </div>
+                      {p.contacts && <p className="text-white/30 text-xs mt-0.5">{p.contacts}</p>}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-cyan-400 text-sm font-bold">₵{p.totalMrr?.toLocaleString() ?? 0} MRR</p>
+                      <p className="text-white/30 text-xs">{p.commissionRate}% → ₵{p.commissionDue?.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 mt-2 text-xs text-white/30">
+                    <span>{p.tenantCount} tenant{p.tenantCount !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -835,7 +1497,17 @@ function PanelContent({ tab, teamToken, member }: { tab: TabId; teamToken: strin
     case 'slowqueries':     return <SlowQueriesPanel teamToken={teamToken} />;
     case 'schemadiff':      return <SchemaDiffPanel teamToken={teamToken} />;
     case 'cohort':          return <CohortPanel teamToken={teamToken} />;
-    default:                return <PlaceholderPanel key={tab} tab={tab} teamToken={teamToken} />;
+    case 'performance':     return <PerformancePanel teamToken={teamToken} />;
+    case 'errors':          return <ErrorLogsPanel teamToken={teamToken} />;
+    case 'feedback':        return <FeedbackPanel teamToken={teamToken} />;
+    case 'analytics':       return <AnalyticsPanel teamToken={teamToken} />;
+    case 'clienthealth':    return <ClientHealthPanel teamToken={teamToken} />;
+    case 'churnrisk':       return <ChurnRiskPanel teamToken={teamToken} />;
+    case 'onboarding':      return <OnboardingPanel teamToken={teamToken} />;
+    case 'revenue':         return <RevenuePanel teamToken={teamToken} />;
+    case 'debuglogs':       return <DebugLogsPanel teamToken={teamToken} />;
+    case 'referral':        return <ReferralPanel teamToken={teamToken} />;
+    default:                return <NoDataPanel tab={tab} />;
   }
 }
 
