@@ -2,6 +2,32 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: JWT revocation via per-user credential versioning
+
+**What/Why:**
+Existing JWTs remained valid after a role change, admin password reset, or member deletion — there was no server-side way to instantly invalidate all sessions for a specific user. Implemented a per-user credential version in Redis that is embedded in tokens at issue time and checked on every request.
+
+**How it works:**
+- `getCredentialVersion(userId)` → fetches version from Redis (0 if not set)
+- At login, `completeLogin` fetches the current version and embeds it as `credentialVersion` in the JWT payload
+- `verifyJwtToken` checks `payload.credentialVersion` against the live Redis value; if stored version is higher, the token is rejected immediately
+- `revokeUserTokens(userId)` → `INCR`s the Redis version atomically, instantly invalidating all previous tokens
+
+**Triggers:**
+- `PUT /tenants/members/:id/role` — role change now invalidates active sessions immediately
+- `DELETE /tenants/members/:id` — deleted member's tokens revoked before 200 response
+- `POST /tenants/members/:id/reset-password` — password reset revokes active sessions
+
+**Backward compatibility:** Tokens without `credentialVersion` are treated as version 0, which always passes (no breaking change for existing sessions during rollout).
+
+**Files Affected:**
+- `backend/src/services/tokenRevocationService.ts` — added `getCredentialVersion`, `revokeUserTokens`
+- `backend/src/utils/jwt.ts` — added `credentialVersion` to `JwtPayload`; credential version check in `verifyJwtToken` on both cache-hit and cache-miss paths
+- `backend/src/routes/auth.ts` — `completeLogin` fetches and embeds credential version at login
+- `backend/src/routes/tenants.ts` — `revokeUserTokens` called on role change, member deletion, password reset
+
+---
+
 ## [Date: 2026-09-12] - Security: Platform vulnerability audit fixes (7 issues)
 
 **What/Why:**
