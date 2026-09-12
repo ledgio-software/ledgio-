@@ -62,6 +62,7 @@ import adminOnboardingRouter from './routes/adminOnboarding';
 import adminRevenueRouter from './routes/adminRevenue';
 import adminTotpRouter from './routes/adminTotp';
 import adminDebugLogsRouter from './routes/adminDebugLogs';
+import adminTeamAuthRouter from './routes/adminTeamAuth';
 import { debugContextMiddleware } from './middleware/debugContextMiddleware';
 import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
@@ -351,6 +352,8 @@ app.use('/api/v1/admin/churn-risk', adminChurnRiskRouter);
 app.use('/api/v1/admin/onboarding', adminOnboardingRouter);
 app.use('/api/v1/admin/revenue', adminRevenueRouter);
 app.use('/api/v1/admin/debug', adminDebugLogsRouter);
+// Team member auth — public endpoint (no master passcode required; token-scoped internally)
+app.use('/api/v1/admin/team', adminRateLimiter, adminTeamAuthRouter);
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);

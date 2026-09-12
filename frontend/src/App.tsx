@@ -34,6 +34,8 @@ const HowItWorksPage = lazy(() => import("./pages/landing/HowItWorksPage").then(
 const LegalHubPage = lazy(() => import("./pages/legal/LegalHubPage").then(m => ({ default: m.LegalHubPage })));
 const LegalDocumentPage = lazy(() => import("./pages/legal/LegalDocumentPage").then(m => ({ default: m.LegalDocumentPage })));
 const AdminCoreEngine = lazy(() => import("./pages/admin/AdminCoreEngine").then(m => ({ default: m.AdminCoreEngine })));
+const AgodTeamLogin = lazy(() => import("./pages/admin/AgodTeamLogin").then(m => ({ default: m.AgodTeamLogin })));
+const AgodTeamConsole = lazy(() => import("./pages/admin/AgodTeamConsole").then(m => ({ default: m.AgodTeamConsole })));
 const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts").then(m => ({ default: m.ChartOfAccounts })));
 const OnboardingWizard = lazy(() => import("./pages/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
 const Settings = lazy(() => import("./pages/settings/Settings").then(m => ({ default: m.Settings })));
@@ -810,6 +812,8 @@ function App() {
               <Route path="/legal" element={<LegalHubPage />} />
               <Route path="/legal/:policyName" element={<LegalDocumentPage />} />
               <Route path="/admin/core-engine" element={<AdminCoreEngine />} />
+              <Route path="/agod/login" element={<AgodTeamLogin />} />
+              <Route path="/agod/console" element={<AgodTeamConsole />} />
 
               {/* Protected Routes */}
               <Route path="/dashboard" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />

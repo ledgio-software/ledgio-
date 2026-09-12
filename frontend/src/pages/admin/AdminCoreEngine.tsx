@@ -37,6 +37,7 @@ import {
   ClipboardList,
   TrendingUp,
   DollarSign,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -74,7 +75,7 @@ export function AdminCoreEngine() {
   const [isLoadingSetup, setIsLoadingSetup] = useState(false);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue" | "debuglogs">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue" | "debuglogs" | "team">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -1659,6 +1660,15 @@ export function AdminCoreEngine() {
                     </span>
                   )}
                 </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("team")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "team" ? "border-emerald-400 text-emerald-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                <span>Team</span>
               </button>
             </div>
 
@@ -4773,7 +4783,288 @@ export function AdminCoreEngine() {
               </div>
             )}
 
+            {activeTab === "team" && (
+              <TeamManagementPanel adminHeaders={adminHeaders as unknown as Record<string, string>} />
+            )}
+
       </main>
+    </div>
+  );
+}
+
+// ── Team Management Panel ─────────────────────────────────────────────────────
+
+const VALID_COLORS = ['blue', 'cyan', 'emerald', 'rose', 'violet', 'amber', 'indigo', 'slate'] as const;
+const ALL_TABS = [
+  'broadcast', 'health', 'performance', 'jobs', 'integrations',
+  'schemas', 'audit', 'onboard', 'feedback', 'analytics', 'errors',
+  'safety', 'referral', 'clienthealth', 'churnrisk', 'onboarding',
+  'revenue', 'debuglogs',
+] as const;
+
+interface TeamMemberRow {
+  id: string; name: string; role: string; color: string;
+  assignedTabs: string[]; isActive: boolean;
+}
+
+const COLOR_DOT: Record<string, string> = {
+  blue: 'bg-blue-500', cyan: 'bg-cyan-500', emerald: 'bg-emerald-500',
+  rose: 'bg-rose-500', violet: 'bg-violet-500', amber: 'bg-amber-500',
+  indigo: 'bg-indigo-500', slate: 'bg-slate-400',
+};
+
+function TeamManagementPanel({ adminHeaders }: { adminHeaders: Record<string, string> }) {
+  const [members, setMembers] = useState<TeamMemberRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [editing, setEditing] = useState<TeamMemberRow | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newMember, setNewMember] = useState({ id: '', name: '', role: '', color: 'slate', assignedTabs: [] as string[] });
+  const [actionLoading, setActionLoading] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr('');
+    try {
+      const res = await api.get('/admin/team/members/all', { headers: adminHeaders });
+      setMembers(res.data.data);
+    } catch {
+      setErr('Failed to load team members.');
+    } finally { setLoading(false); }
+  }, [adminHeaders]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function flash(text: string) { setMsg(text); setTimeout(() => setMsg(''), 3000); }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+    setActionLoading(id + '-del');
+    try {
+      await api.delete(`/admin/team/members/${id}`, { headers: adminHeaders });
+      flash(`${name} deleted.`);
+      load();
+    } catch { flash('Delete failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleResetPin(id: string, name: string) {
+    if (!confirm(`Reset ${name}'s PIN to 0000?`)) return;
+    setActionLoading(id + '-pin');
+    try {
+      await api.post(`/admin/team/members/${id}/reset-pin`, {}, { headers: adminHeaders });
+      flash(`${name}'s PIN reset to 0000.`);
+    } catch { flash('Reset failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleToggleActive(member: TeamMemberRow) {
+    setActionLoading(member.id + '-active');
+    try {
+      await api.patch(`/admin/team/members/${member.id}`, { isActive: !member.isActive }, { headers: adminHeaders });
+      flash(`${member.name} ${member.isActive ? 'deactivated' : 'reactivated'}.`);
+      load();
+    } catch { flash('Update failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleSaveEdit() {
+    if (!editing) return;
+    setActionLoading('save');
+    try {
+      await api.patch(`/admin/team/members/${editing.id}`, {
+        name: editing.name, role: editing.role, color: editing.color, assignedTabs: editing.assignedTabs,
+      }, { headers: adminHeaders });
+      flash('Member updated.');
+      setEditing(null);
+      load();
+    } catch { flash('Update failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleCreate() {
+    if (!newMember.id || !newMember.name || !newMember.role) return;
+    setActionLoading('create');
+    try {
+      await api.post('/admin/team/members', newMember, { headers: adminHeaders });
+      flash(`${newMember.name} added. Default PIN is 0000.`);
+      setShowAdd(false);
+      setNewMember({ id: '', name: '', role: '', color: 'slate', assignedTabs: [] });
+      load();
+    } catch (e: any) {
+      flash(e?.response?.data?.error ?? 'Create failed.');
+    }
+    setActionLoading('');
+  }
+
+  function toggleTab(tabs: string[], tab: string): string[] {
+    return tabs.includes(tab) ? tabs.filter((t) => t !== tab) : [...tabs, tab];
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+            <Users className="h-5 w-5 text-emerald-400" />
+            Team Members
+          </h2>
+          <p className="text-secondary-400 text-xs mt-0.5">Manage the AGOD team roster — add, edit, deactivate, or reset PINs.</p>
+        </div>
+        <div className="flex gap-2">
+          {msg && <span className="text-emerald-400 text-xs self-center">{msg}</span>}
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}
+            className="border-secondary-700 text-secondary-300 hover:text-white gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowAdd((v) => !v)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2">
+            <UserPlus className="h-4 w-4" />
+            Add Member
+          </Button>
+        </div>
+      </div>
+
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+
+      {/* Add member form */}
+      {showAdd && (
+        <div className="bg-secondary-900 border border-emerald-500/20 rounded-xl p-4 space-y-3">
+          <h3 className="text-white text-sm font-semibold">New Team Member</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">ID (slug)</label>
+              <input value={newMember.id} onChange={(e) => setNewMember((v) => ({ ...v, id: e.target.value.toLowerCase().replace(/\s/g, '-') }))}
+                placeholder="e.g. john" className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white placeholder-secondary-500" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Full Name</label>
+              <input value={newMember.name} onChange={(e) => setNewMember((v) => ({ ...v, name: e.target.value }))}
+                placeholder="e.g. John Doe" className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white placeholder-secondary-500" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Role</label>
+              <input value={newMember.role} onChange={(e) => setNewMember((v) => ({ ...v, role: e.target.value }))}
+                placeholder="e.g. Designer" className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white placeholder-secondary-500" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Avatar Color</label>
+              <select value={newMember.color} onChange={(e) => setNewMember((v) => ({ ...v, color: e.target.value }))}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white">
+                {VALID_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-secondary-400 block mb-1">Assigned Tabs</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_TABS.map((t) => (
+                <button key={t} onClick={() => setNewMember((v) => ({ ...v, assignedTabs: toggleTab(v.assignedTabs, t) }))}
+                  className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${newMember.assignedTabs.includes(t) ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-secondary-700 text-secondary-400 hover:border-secondary-500'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleCreate} disabled={actionLoading === 'create' || !newMember.id || !newMember.name || !newMember.role}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white">
+              {actionLoading === 'create' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}
+              className="border-secondary-700 text-secondary-400">Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit member form */}
+      {editing && (
+        <div className="bg-secondary-900 border border-violet-500/20 rounded-xl p-4 space-y-3">
+          <h3 className="text-white text-sm font-semibold">Edit — {editing.name}</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Name</label>
+              <input value={editing.name} onChange={(e) => setEditing((v) => v ? { ...v, name: e.target.value } : v)}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Role</label>
+              <input value={editing.role} onChange={(e) => setEditing((v) => v ? { ...v, role: e.target.value } : v)}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Avatar Color</label>
+              <select value={editing.color} onChange={(e) => setEditing((v) => v ? { ...v, color: e.target.value } : v)}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white">
+                {VALID_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-secondary-400 block mb-1">Assigned Tabs</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_TABS.map((t) => (
+                <button key={t} onClick={() => setEditing((v) => v ? { ...v, assignedTabs: toggleTab(v.assignedTabs, t) } : v)}
+                  className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${editing.assignedTabs.includes(t) ? 'bg-violet-600 border-violet-500 text-white' : 'border-secondary-700 text-secondary-400 hover:border-secondary-500'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSaveEdit} disabled={actionLoading === 'save'}
+              className="bg-violet-600 hover:bg-violet-500 text-white">
+              {actionLoading === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(null)}
+              className="border-secondary-700 text-secondary-400">Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Members table */}
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 text-secondary-400 animate-spin" /></div>
+      ) : (
+        <div className="space-y-2">
+          {members.map((m) => (
+            <div key={m.id} className={`bg-secondary-900 border rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 ${m.isActive ? 'border-secondary-800' : 'border-secondary-800 opacity-50'}`}>
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${COLOR_DOT[m.color] ?? 'bg-slate-500'}`}>
+                <span className="text-white text-xs font-bold">{m.name.slice(0, 2).toUpperCase()}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-white text-sm font-semibold">{m.name}</span>
+                  {!m.isActive && <span className="text-[10px] bg-secondary-700 text-secondary-400 px-1.5 py-0.5 rounded">Inactive</span>}
+                </div>
+                <p className="text-secondary-400 text-xs">{m.role}</p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {m.assignedTabs.map((t) => (
+                    <span key={t} className="text-[10px] bg-secondary-800 border border-secondary-700 text-secondary-300 px-1.5 py-0.5 rounded">{t}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-1.5 flex-shrink-0">
+                <Button variant="outline" size="sm" onClick={() => setEditing(m)}
+                  className="border-secondary-700 text-secondary-300 hover:text-white h-7 px-2 text-xs">Edit</Button>
+                <Button variant="outline" size="sm" onClick={() => handleResetPin(m.id, m.name)} disabled={actionLoading === m.id + '-pin'}
+                  className="border-secondary-700 text-amber-400 hover:text-amber-300 h-7 px-2 text-xs">
+                  {actionLoading === m.id + '-pin' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Reset PIN'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleToggleActive(m)} disabled={actionLoading === m.id + '-active'}
+                  className={`border-secondary-700 h-7 px-2 text-xs ${m.isActive ? 'text-orange-400 hover:text-orange-300' : 'text-emerald-400 hover:text-emerald-300'}`}>
+                  {actionLoading === m.id + '-active' ? <Loader2 className="h-3 w-3 animate-spin" /> : m.isActive ? 'Deactivate' : 'Reactivate'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDelete(m.id, m.name)} disabled={actionLoading === m.id + '-del'}
+                  className="border-rose-800 text-rose-400 hover:text-rose-300 h-7 px-2 text-xs">
+                  {actionLoading === m.id + '-del' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Delete'}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

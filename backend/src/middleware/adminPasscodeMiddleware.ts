@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { BroadcastService } from '../services/broadcastService';
 import { verifyAdminSessionToken } from '../services/adminTotpService';
+import { verifyTeamToken } from '../services/teamMemberService';
 import { logger } from '../utils/logger';
 
 /**
@@ -39,6 +40,17 @@ export function adminPasscodeMiddleware(req: Request, res: Response, next: NextF
   const ip =
     (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ??
     req.socket?.remoteAddress;
+
+  // ── Team member token path ───────────────────────────────────────────────────
+  const teamToken = req.headers['x-team-token'] as string | undefined;
+  if (teamToken) {
+    if (verifyTeamToken(teamToken)) {
+      return next();
+    }
+    logger.warn('Team auth failure: invalid or expired team token', { path: req.originalUrl, ip });
+    res.status(401).json({ success: false, error: 'Team token is invalid or expired. Please sign in again.' });
+    return;
+  }
 
   // ── Preferred path: session token from authenticator-app login ──────────────
   const sessionToken = req.headers['x-admin-session'] as string | undefined;
