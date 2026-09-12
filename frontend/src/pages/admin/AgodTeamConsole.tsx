@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import {
   BarChart2, Activity, Briefcase, Link2, Database, FileText,
-  MessageSquare, TrendingUp, Zap, AlertTriangle, Shield,
+  MessageSquare, TrendingUp, Zap, Shield,
   Gift, Heart, UserMinus, BookOpen, DollarSign, Radio,
   Bug, LogOut, User,
 } from 'lucide-react';
@@ -22,7 +22,7 @@ type TabId =
   | 'safety' | 'referral' | 'clienthealth' | 'churnrisk' | 'onboarding'
   | 'revenue' | 'debuglogs';
 
-const TAB_META: Record<TabId, { label: string; icon: React.ReactNode; accent: string }> = {
+const TAB_META: Record<TabId, { label: string; icon: ReactNode; accent: string }> = {
   broadcast:    { label: 'Broadcast',        icon: <Radio className="h-4 w-4" />,        accent: 'text-amber-400 border-amber-400' },
   health:       { label: 'Health',           icon: <Activity className="h-4 w-4" />,      accent: 'text-amber-400 border-amber-400' },
   performance:  { label: 'Performance',      icon: <BarChart2 className="h-4 w-4" />,     accent: 'text-amber-400 border-amber-400' },
