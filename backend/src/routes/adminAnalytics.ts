@@ -1,23 +1,18 @@
 import { Router, Request, Response } from 'express';
-import { BroadcastService } from '../services/broadcastService';
 import * as gaService from '../services/googleAnalyticsService';
 
 const router = Router();
 
+// Auth is handled upstream by adminPasscodeMiddleware.
+
 /**
  * GET /api/v1/admin/analytics
  * Returns GA4 traffic data for the Core Control Engine.
- * Passcode-gated — same mechanism as all other /admin routes.
  *
  * Query params:
  *   days  — lookback window in days (default: 28, max: 90)
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
-  const passcode = (req.headers['x-admin-passcode'] as string | undefined) ?? '';
-  if (!BroadcastService.verifyPasscode(passcode)) {
-    res.status(401).json({ success: false, error: 'Invalid master passcode.' });
-    return;
-  }
 
   const days = Math.min(90, Math.max(1, Number(req.query.days) || 28));
 

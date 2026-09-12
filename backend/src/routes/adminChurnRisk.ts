@@ -1,13 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { BroadcastService } from '../services/broadcastService';
 
 const router = Router();
 
-function verifyAdminPasscode(req: Request): boolean {
-  const passcode = (req.query.passcode as string) || (req.headers['x-admin-passcode'] as string | undefined);
-  return !!passcode && BroadcastService.verifyPasscode(passcode);
-}
+// Auth is handled upstream by adminPasscodeMiddleware.
 
 // The 5 key feature areas whose audit-log actions signal a tenant has
 // actually derived value from the product. Used to compute adoption score.
@@ -33,10 +29,6 @@ const ALL_SIGNAL_ACTIONS = Object.values(FEATURE_SIGNALS).flat();
  * EXPIRED, or zero audit-log activity in the past 14 days.
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
 
   try {
     const now = new Date();

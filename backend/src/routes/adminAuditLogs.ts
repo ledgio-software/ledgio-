@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { BroadcastService } from '../services/broadcastService';
 import { buildCsv, formatAuditChanges } from '../utils/csvExport';
 
 const router = Router();
@@ -41,10 +40,7 @@ function buildAdminAuditLogWhere(
   return { where };
 }
 
-function verifyAdminPasscode(req: Request): boolean {
-  const passcode = (req.query.passcode as string) || (req.headers['x-admin-passcode'] as string | undefined);
-  return !!passcode && BroadcastService.verifyPasscode(passcode);
-}
+// Auth is handled upstream by adminPasscodeMiddleware.
 
 async function joinTenants(logs: { tenantId: string | null }[]) {
   const tenantIds = [...new Set(logs.map((log) => log.tenantId).filter((id): id is string => Boolean(id)))];
@@ -73,11 +69,6 @@ async function joinTenants(logs: { tenantId: string | null }[]) {
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!verifyAdminPasscode(req)) {
-      res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-      return;
-    }
-
     const filterResult = buildAdminAuditLogWhere(req.query);
     if ('error' in filterResult) {
       res.status(400).json({ success: false, error: filterResult.error });
@@ -124,13 +115,8 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * tenants) - feeds a <datalist> autocomplete on the admin console's Action/
  * Entity filter inputs, same purpose as the tenant-scoped equivalent.
  */
-router.get('/meta/values', async (req: Request, res: Response): Promise<void> => {
+router.get('/meta/values', async (_req: Request, res: Response): Promise<void> => {
   try {
-    if (!verifyAdminPasscode(req)) {
-      res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-      return;
-    }
-
     const [actions, entities] = await Promise.all([
       prisma.auditLog.findMany({ distinct: ['action'], select: { action: true }, orderBy: { action: 'asc' } }),
       prisma.auditLog.findMany({ distinct: ['entity'], select: { entity: true }, orderBy: { entity: 'asc' } }),
@@ -159,11 +145,6 @@ const EXPORT_ROW_CAP = 5000;
  */
 router.get('/export', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!verifyAdminPasscode(req)) {
-      res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-      return;
-    }
-
     const filterResult = buildAdminAuditLogWhere(req.query);
     if ('error' in filterResult) {
       res.status(400).json({ success: false, error: filterResult.error });
