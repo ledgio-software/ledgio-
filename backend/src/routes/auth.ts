@@ -16,6 +16,7 @@ import {
   analyzeSuccessfulLogin,
   isAccountLocked,
 } from '../services/loginAnomalyService';
+import { checkHoneypotLogin } from '../services/honeypotService';
 import {
   generateTotpSecret,
   buildOtpAuthUrl,
@@ -407,6 +408,18 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
     }
 
     const loginIp = req.ip || req.socket?.remoteAddress || 'unknown';
+
+    // Honeypot credential check — must run BEFORE the DB lookup so we never
+    // waste a query on a known fake address and never reveal whether it exists.
+    const isHoneypot = await checkHoneypotLogin(email, {
+      ip: loginIp,
+      userAgent: req.headers['user-agent'],
+    });
+    if (isHoneypot) {
+      // Indistinguishable from a real failed login — no indication a trap fired.
+      res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password.' });
+      return;
+    }
 
     const user = await findUserByEmail(prisma, email);
 

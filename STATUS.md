@@ -2,6 +2,36 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: Honeypot deception layer (credentials, tenant slugs, probe endpoints)
+
+**What/Why:**
+Implemented a three-trap honeypot deception system to detect and log attackers before they can interact with real data. All traps return responses indistinguishable from real failures — the attacker gets no signal that they triggered a trap.
+
+**Traps:**
+
+1. **Honeypot login credentials** — 12 fake privileged email addresses (`admin@ledgio.io`, `root@ledgio.io`, etc.) that no real user would ever try. Any login attempt against them fires `SECURITY.HONEYPOT_LOGIN` to the audit log and triggers a platform alert email. The check runs *before* `findUserByEmail` so the database is never queried for these addresses.
+
+2. **Honeypot tenant slugs** — 16 fake org identifiers (`admin`, `superadmin`, `root`, `internal`, `ledgio`, etc.) that attackers probe when scanning for admin panels or default accounts. Any tenant context resolution against them fires `SECURITY.HONEYPOT_TENANT`. The check runs *before* the Redis cache or DB lookup, so real tenant data is never touched.
+
+3. **Honeypot probe endpoints** — ~25 raw paths attackers enumerate on any web server (`.env`, `/admin/login`, `/wp-config.php`, `/.git/config`, `/phpinfo.php`, etc.) return convincing-but-fake responses (realistic 200s, 403s, 404s) while logging `SECURITY.HONEYPOT_PROBE`. The router is mounted *before* all real API routes.
+
+**Security alert email:**
+All three traps fire a non-blocking alert email to `ADMIN_ALERT_EMAIL` (env var) via `EmailService.sendMail`, skipped when unconfigured.
+
+**Audit log actions added:**
+- `SECURITY.HONEYPOT_LOGIN` — honeypot email credential attempted
+- `SECURITY.HONEYPOT_TENANT` — honeypot tenant slug probed
+- `SECURITY.HONEYPOT_PROBE` — honeypot probe endpoint accessed
+
+**Files Affected:**
+- `backend/src/services/honeypotService.ts` *(new)*
+- `backend/src/routes/honeypotProbes.ts` *(new)*
+- `backend/src/routes/auth.ts` — `checkHoneypotLogin` wired in `/login` before DB lookup
+- `backend/src/middleware/tenantContextMiddleware.ts` — `checkHoneypotTenant` wired in before cache/DB lookup
+- `backend/src/app.ts` — `honeypotProbesRouter` mounted before all real routes
+
+---
+
 ## [Date: 2026-09-12] - Security: Login anomaly detection engine
 
 **What/Why:**

@@ -94,6 +94,7 @@ import postDatedChequesRouter from './routes/postDatedCheques';
 import interestPolicyRouter from './routes/interestPolicy';
 import apiKeysRouter from './routes/apiKeys';
 import externalApiRouter from './routes/externalApi';
+import honeypotProbesRouter from './routes/honeypotProbes';
 
 dotenv.config();
 
@@ -168,6 +169,11 @@ app.use('/api/v1/admin/', adminPasscodeMiddleware);
 
 // Metrics endpoint (no auth required for Prometheus scraping)
 app.use('/metrics', metricsRouter);
+
+// Honeypot probe endpoints — convincing-looking responses for paths attackers
+// enumerate (/.env, /admin, /wp-login.php, etc.). Mounted before all real routes
+// so the trap fires first. Every hit is logged and triggers an alert email.
+app.use(honeypotProbesRouter);
 
 // Root HEAD handler for uptime monitors that probe HEAD /
 app.head('/', (_req, res) => res.sendStatus(200));

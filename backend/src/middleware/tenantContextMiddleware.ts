@@ -5,6 +5,7 @@ import { sanitizeSchemaName } from '../database/tenantSchemaManager';
 import { ensureTenantSchemaMigrated } from '../database/tenantMigrationRunner';
 import { getTenantFromCache, setTenantInCache } from '../cache/tenantCache';
 import { computeSubscriptionState } from './subscriptionEnforcementMiddleware';
+import { checkHoneypotTenant } from '../services/honeypotService';
 
 // Extend Express Request type to include tenantContext
 declare global {
@@ -45,6 +46,21 @@ export function createTenantContextMiddleware(options: TenantMiddlewareOptions =
     }
 
     try {
+      // Honeypot tenant slug check — runs before cache/DB lookup so probing
+      // a known fake org never touches storage and reveals no real data.
+      const isTenantHoneypot = await checkHoneypotTenant(rawIdentifier, {
+        ip: req.ip || req.socket?.remoteAddress || 'unknown',
+        userAgent: req.headers['user-agent'] as string | undefined,
+      });
+      if (isTenantHoneypot) {
+        if (options.optional) return next();
+        res.status(404).json({
+          error: 'Tenant Not Found',
+          message: `Tenant with identifier "${rawIdentifier}" is not registered.`,
+        });
+        return;
+      }
+
       let sanitizedSchema: string | null = null;
       try {
         sanitizedSchema = sanitizeSchemaName(rawIdentifier);
