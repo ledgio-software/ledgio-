@@ -15,7 +15,9 @@ function verifyPasscode(req: Request, res: Response): boolean {
 
 router.get('/', (req: Request, res: Response): void => {
   if (!verifyPasscode(req, res)) return;
-  res.json({ success: true, data: { jobs: listJobs() } });
+  const jobs = listJobs();
+  const failed = jobs.filter((j) => j.lastRun && !j.lastRun.success);
+  res.json({ success: true, data: { jobs, failedCount: failed.length, failedJobs: failed } });
 });
 
 router.post('/:name/trigger', async (req: Request, res: Response): Promise<void> => {
