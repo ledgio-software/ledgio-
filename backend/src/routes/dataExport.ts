@@ -10,6 +10,7 @@ import { requireTenantContext } from '../context/tenantContext';
 import { buildCsv } from '../utils/csvExport';
 import { recordAuditLog, actorFromRequest } from '../services/auditLogService';
 import { EXPORT_TABLES, collectTenantExportData, rowsToCsvTable } from '../services/dataExportService';
+import { analyzeExportRequest } from '../services/bulkExportAnomalyService';
 
 const EXPORT_COOLDOWN_SECONDS = 3600; // 1 hour between exports per tenant
 
@@ -120,6 +121,16 @@ router.get('/json', requireRole('Admin'), async (req: Request, res: Response): P
       details: 'Full tenant data export downloaded (JSON).',
     });
 
+    // Async anomaly detection — never blocks the response
+    analyzeExportRequest({
+      tenantId,
+      userId: req.user!.id,
+      userEmail: req.user!.email,
+      ip: req.ip || req.socket?.remoteAddress || 'unknown',
+      userAgent: req.headers['user-agent'],
+      exportKind: 'json',
+    }).catch(() => {/* already logged inside service */});
+
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="ledgio-export-${Date.now()}.json"`);
     res.status(200).json({
@@ -166,6 +177,16 @@ router.get('/csv', requireRole('Admin'), async (req: Request, res: Response): Pr
       actor: actorFromRequest(req),
       details: 'Full tenant data export downloaded (CSV/ZIP).',
     });
+
+    // Async anomaly detection — never blocks the response
+    analyzeExportRequest({
+      tenantId,
+      userId: req.user!.id,
+      userEmail: req.user!.email,
+      ip: req.ip || req.socket?.remoteAddress || 'unknown',
+      userAgent: req.headers['user-agent'],
+      exportKind: 'csv',
+    }).catch(() => {/* already logged inside service */});
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="ledgio-export-${Date.now()}.zip"`);

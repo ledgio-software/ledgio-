@@ -2,6 +2,28 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: Suspicious bulk export anomaly detection
+
+**What/Why:**
+Added a non-blocking anomaly detection layer for full data exports (JSON and CSV). Every export is already gated behind Admin-only RBAC and a per-tenant 1-hour cooldown. This layer adds signal detection on top — it never blocks a legitimate export but records `SECURITY.EXPORT_ANOMALY` to the audit log and fires an admin alert email when any signal triggers.
+
+**Signals detected:**
+1. **High user velocity** — the same user downloads more than 2 exports in any rolling 24-hour window (across export kinds). Tracked with a Redis INCR counter (24h TTL).
+2. **Off-hours export** — export request between 01:00–05:00 UTC, covering dead-of-night for most operating timezones.
+3. **New export IP** — first time this user has triggered an export from a given source IP. Per-user Redis set, 30-day TTL (same model as login anomaly IP tracking).
+4. **Multi-user tenant burst** — two or more distinct admin accounts export from the same tenant within 15 minutes, suggesting coordinated exfiltration or a compromised admin roster. Tracked with a per-tenant Redis set with 15-min TTL.
+
+**Architecture:**
+- `analyzeExportRequest(ctx)` is called after `recordAuditLog` returns, as a fire-and-forget (`.catch()`), so it never delays the download stream.
+- All Redis helpers fail-open — if Redis is unavailable, all signals return zero and no anomaly is flagged rather than blocking the export.
+- Alert email fires to `ADMIN_ALERT_EMAIL` env var (async, skipped when unconfigured).
+
+**Files Affected:**
+- `backend/src/services/bulkExportAnomalyService.ts` *(new)*
+- `backend/src/routes/dataExport.ts` — `analyzeExportRequest` wired into `/json` and `/csv` handlers post-audit-log
+
+---
+
 ## [Date: 2026-09-12] - Security: Honeypot deception layer (credentials, tenant slugs, probe endpoints)
 
 **What/Why:**
