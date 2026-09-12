@@ -9,7 +9,7 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { authRateLimiter } from '../middleware/rateLimiterMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { recordAuditLog, recordAuditLogTx } from '../services/auditLogService';
-import { revokeToken } from '../services/tokenRevocationService';
+import { revokeToken, getCredentialVersion } from '../services/tokenRevocationService';
 import {
   generateTotpSecret,
   buildOtpAuthUrl,
@@ -326,6 +326,10 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
     ? await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { orgType: true, isLive: true } })
     : null;
 
+  // Embed the current credential version so that future password resets,
+  // role changes, or member deletions can immediately invalidate this token.
+  const credentialVersion = await getCredentialVersion(user.id);
+
   const tokenPayload = {
     id: user.id,
     email: user.email,
@@ -335,6 +339,7 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
     orgType: loginTenant?.orgType,
     isLive: loginTenant?.isLive ?? false,
     isMfaEnabled: user.isMfaEnabled || false,
+    credentialVersion,
     ...(mfaVerifiedNow ? { lastMfaAt: Math.floor(Date.now() / 1000) } : {}),
   };
   const token = generateJwtToken(tokenPayload);

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { isTokenRevoked } from '../services/tokenRevocationService';
+import { isTokenRevoked, getCredentialVersion } from '../services/tokenRevocationService';
 
 export interface JwtPayload {
   id: string;
@@ -22,6 +22,11 @@ export interface JwtPayload {
   // Unix timestamp (seconds) of when TOTP MFA was last verified. Used by
   // step-up middleware to enforce re-authentication windows on sensitive routes.
   lastMfaAt?: number;
+  // Credential version at token-issue time. If the stored Redis version for
+  // this user is higher, the token was issued before a credential-changing
+  // event (password reset, role change, deletion) and is immediately invalid.
+  // Absent on tokens issued before this feature — treated as unversioned (0).
+  credentialVersion?: number;
   iat?: number;
   exp?: number;
   [key: string]: any;
@@ -226,6 +231,17 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
         notRevokedCache.delete(tokenHash);
         throw new Error('Token has been revoked');
       }
+      // Credential-version check: rejects tokens issued before a password
+      // reset, role change, or member deletion.
+      if (cached.payload.id) {
+        const currentVersion = await getCredentialVersion(cached.payload.id);
+        const tokenVersion = cached.payload.credentialVersion ?? 0;
+        if (currentVersion > tokenVersion) {
+          notRevokedCache.delete(tokenHash);
+          tokenCache.delete(tokenHash);
+          throw new Error('Token has been revoked');
+        }
+      }
       notRevokedCache.set(tokenHash, now + NOT_REVOKED_TTL);
     }
     return cached.payload;
@@ -274,6 +290,15 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
 
   if (await isTokenRevoked(tokenHash)) {
     throw new Error('Token has been revoked');
+  }
+
+  // Credential-version check on cache miss path.
+  if (payload.id) {
+    const currentVersion = await getCredentialVersion(payload.id);
+    const tokenVersion = payload.credentialVersion ?? 0;
+    if (currentVersion > tokenVersion) {
+      throw new Error('Token has been revoked');
+    }
   }
 
   // Store in cache (TTL = until token expiry)
