@@ -96,9 +96,33 @@ function rowToMember(row: {
   };
 }
 
-// ── Seed on first use ─────────────────────────────────────────────────────────
+// ── Seed on first use + migrate tab assignments ───────────────────────────────
 
 let _seeded = false;
+
+/**
+ * For each roster member that already exists in the DB, merge any tabs from
+ * INITIAL_ROSTER that are missing from their current assignedTabs. This runs
+ * once per process start and is idempotent — tabs already present are kept as-is,
+ * so any admin-added custom tabs are never overwritten.
+ */
+async function migrateTabAssignments(): Promise<void> {
+  try {
+    for (const rosterMember of INITIAL_ROSTER) {
+      const row = await prisma.teamMember.findUnique({ where: { id: rosterMember.id } });
+      if (!row) continue;
+      const current = ((row as any).assignedTabs ?? []) as string[];
+      const missing = rosterMember.assignedTabs.filter((t) => !current.includes(t));
+      if (missing.length === 0) continue;
+      await prisma.teamMember.update({
+        where: { id: rosterMember.id },
+        data: { assignedTabs: [...current, ...missing] },
+      });
+    }
+  } catch (err) {
+    console.warn('[teamMemberService] migrateTabAssignments failed:', (err as Error).message);
+  }
+}
 
 async function ensureSeeded(): Promise<void> {
   if (_seeded) return;
@@ -119,6 +143,9 @@ async function ensureSeeded(): Promise<void> {
         })),
         skipDuplicates: true,
       });
+    } else {
+      // Table already had members — migrate any new tabs from the roster.
+      await migrateTabAssignments();
     }
     _seeded = true;
   } catch (err) {
