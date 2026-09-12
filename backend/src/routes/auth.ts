@@ -17,6 +17,7 @@ import {
   isAccountLocked,
 } from '../services/loginAnomalyService';
 import { checkHoneypotLogin } from '../services/honeypotService';
+import { analyzeBotFingerprint } from '../services/botFingerprintService';
 import {
   generateTotpSecret,
   buildOtpAuthUrl,
@@ -397,7 +398,7 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
  */
 router.post('/login', authRateLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { email, password, _bf } = req.body;
 
     if (!email || !password) {
       res.status(400).json({
@@ -419,6 +420,17 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
       // Indistinguishable from a real failed login — no indication a trap fired.
       res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password.' });
       return;
+    }
+
+    // Bot fingerprint analysis — fire-and-forget, never blocks the login.
+    // Logs SECURITY.BOT_SIGNAL to the audit trail when suspicious signals fire.
+    if (_bf) {
+      analyzeBotFingerprint({
+        fingerprint: _bf,
+        email,
+        ip: loginIp,
+        userAgent: req.headers['user-agent'],
+      }).catch(() => {/* already logged inside service */});
     }
 
     const user = await findUserByEmail(prisma, email);

@@ -2,6 +2,44 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: Client-side bot fingerprinting at login
+
+**What/Why:**
+Added passive browser signal collection on the login form to help detect automated/scripted login attempts. Signals are sent as `_bf` alongside credentials, analyzed server-side, and written to the audit trail when the score exceeds the threshold. Real users are never blocked — the output is entirely observational.
+
+**Frontend (`frontend/src/lib/botFingerprint.ts` — new):**
+Collects a compact fingerprint object at form-submit time:
+- `wd` — `navigator.webdriver` (true in Selenium/Playwright/Puppeteer)
+- `ags` — presence of known automation framework globals (`__webdriver_evaluate`, `_phantom`, etc.)
+- `ttk` — milliseconds from page load to first keystroke (null if fields were programmatically filled)
+- `mm` — whether the mouse moved before submit (false is a bot signal)
+- `hc` — `navigator.hardwareConcurrency`
+- `sw/sh` — screen dimensions (0×0 in headless)
+- `vw/vh` — viewport dimensions
+- `lang/plat` — navigator language and platform
+- `ce/ls` — cookie and localStorage availability
+- `age` — total milliseconds from page load to submit
+
+Listeners are registered once at module-import time (passive, not re-attached on re-renders). Touch support is also captured for mobile vs desktop context.
+
+**Backend (`backend/src/services/botFingerprintService.ts` — new):**
+- `analyzeBotFingerprint(ctx)` scores each signal by weight (1 = weak, 2 = moderate, 3 = strong)
+- Fires `SECURITY.BOT_SIGNAL` audit log entry when total weight ≥ 3
+- Sends admin alert email (`ADMIN_ALERT_EMAIL`) for very high confidence detections (score ≥ 5)
+- All signal scoring and I/O wrapped in try/catch — never throws into the caller
+
+**Wired into (`backend/src/routes/auth.ts`):**
+- `_bf` extracted from `req.body` in the login handler
+- `analyzeBotFingerprint(...)` called as fire-and-forget after the honeypot check, before the DB lookup — never delays the login response
+
+**Files Affected:**
+- `frontend/src/lib/botFingerprint.ts` *(new)*
+- `frontend/src/pages/auth/Login.tsx` — imports `collectBotFingerprint`, attaches `_bf` to the login POST
+- `backend/src/services/botFingerprintService.ts` *(new)*
+- `backend/src/routes/auth.ts` — extracts `_bf`, calls `analyzeBotFingerprint` fire-and-forget
+
+---
+
 ## [Date: 2026-09-12] - Security: Suspicious bulk export anomaly detection
 
 **What/Why:**
