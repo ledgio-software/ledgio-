@@ -1,13 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { BroadcastService } from '../services/broadcastService';
 
 const router = Router();
 
-function verifyAdminPasscode(req: Request): boolean {
-  const passcode = (req.query.passcode as string) || (req.headers['x-admin-passcode'] as string | undefined);
-  return !!passcode && BroadcastService.verifyPasscode(passcode);
-}
+// Auth is handled upstream by adminPasscodeMiddleware.
 
 /**
  * GET /api/v1/admin/client-health
@@ -20,10 +16,6 @@ function verifyAdminPasscode(req: Request): boolean {
  * subscriptionStatus, trialEndsAt, and days-since-activity.
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
 
   try {
     const [tenants, activityRows, userCounts] = await Promise.all([

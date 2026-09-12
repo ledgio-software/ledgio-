@@ -1,14 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { BroadcastService } from '../services/broadcastService';
 import { SUBSCRIPTION_PLANS } from './subscription';
 
 const router = Router();
 
-function verifyAdminPasscode(req: Request): boolean {
-  const passcode = (req.query.passcode as string) || (req.headers['x-admin-passcode'] as string | undefined);
-  return !!passcode && BroadcastService.verifyPasscode(passcode);
-}
+// Auth is handled upstream by adminPasscodeMiddleware.
 
 const PLAN_MAP = new Map(SUBSCRIPTION_PLANS.map((p) => [p.tier, p]));
 const priceForTier = (tier: number): number => PLAN_MAP.get(tier)?.priceGhs ?? 105;
@@ -28,11 +24,6 @@ const nameForTier = (tier: number): string => PLAN_MAP.get(tier)?.name ?? 'Shop'
  *   (approximated from Tenant.createdAt for tenants that converted to ACTIVE)
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
-
   try {
     const now = new Date();
     const day30From = new Date(now.getTime() + 30 * 86_400_000);

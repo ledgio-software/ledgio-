@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { BroadcastService } from '../services/broadcastService';
 
 const router = Router();
+
+// Auth is handled upstream by adminPasscodeMiddleware.
 
 // Monthly subscription price per tier (USD). Tier 0 = free/trial counts as $0.
 const TIER_MRR: Record<number, number> = { 0: 0, 1: 29, 2: 49, 3: 99 };
@@ -11,17 +12,8 @@ function mrrForTier(tier: number): number {
   return TIER_MRR[tier] ?? 29;
 }
 
-function verifyAdminPasscode(req: Request): boolean {
-  const passcode = (req.query.passcode as string) || (req.headers['x-admin-passcode'] as string | undefined);
-  return !!passcode && BroadcastService.verifyPasscode(passcode);
-}
-
 /** GET /api/v1/admin/referrals/partners — list all partners with live stats */
 router.get('/partners', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
   try {
     const partners = await prisma.referralPartner.findMany({ orderBy: { createdAt: 'asc' } });
     const tenants = await prisma.tenant.findMany({
@@ -54,10 +46,6 @@ router.get('/partners', async (req: Request, res: Response): Promise<void> => {
 
 /** POST /api/v1/admin/referrals/partners — create a new partner */
 router.post('/partners', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
   try {
     const { name, code, commissionRate, contacts } = req.body;
     if (!name || !code) {
@@ -84,10 +72,6 @@ router.post('/partners', async (req: Request, res: Response): Promise<void> => {
 
 /** PATCH /api/v1/admin/referrals/partners/:id — update partner fields */
 router.patch('/partners/:id', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
   try {
     const { id } = req.params;
     const { name, commissionRate, contacts, isActive } = req.body;
@@ -110,10 +94,6 @@ router.patch('/partners/:id', async (req: Request, res: Response): Promise<void>
 
 /** GET /api/v1/admin/referrals/stats — cross-partner summary totals */
 router.get('/stats', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
   try {
     const [partners, tenants] = await Promise.all([
       prisma.referralPartner.findMany(),

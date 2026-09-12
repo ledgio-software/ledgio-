@@ -1,30 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { BroadcastService } from '../services/broadcastService';
 
 const router = Router();
 
-const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
+// Auth is handled upstream by adminPasscodeMiddleware.
 
-function verifyAdminPasscode(req: Request): boolean {
-  const passcode = (req.query.passcode as string) || (req.headers['x-admin-passcode'] as string | undefined);
-  return !!passcode && BroadcastService.verifyPasscode(passcode);
-}
+const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * GET /api/v1/admin/feedback
- * Platform-wide feedback view across ALL tenants — Admin Core Engine only,
- * gated by the master broadcast passcode. The tenant-scoped GET /api/v1/feedback
- * route (Admin/Auditor JWT) remains separate. This endpoint is read-only;
- * mark-reviewed is intentionally omitted here since that route requires a
- * tenant JWT.
+ * Platform-wide feedback view across ALL tenants — Admin Core Engine only.
+ * The tenant-scoped GET /api/v1/feedback route (Admin/Auditor JWT) remains separate.
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!verifyAdminPasscode(req)) {
-      res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-      return;
-    }
 
     const { tenantId, category, status, dateFrom, dateTo, limit = '50', page = '1' } = req.query;
 

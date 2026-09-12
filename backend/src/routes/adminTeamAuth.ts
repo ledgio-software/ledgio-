@@ -31,6 +31,7 @@ const VALID_TABS: AdminTab[] = [
   'schemas', 'audit', 'onboard', 'feedback', 'analytics', 'errors',
   'safety', 'referral', 'clienthealth', 'churnrisk', 'onboarding',
   'revenue', 'debuglogs',
+  'tenantinspector', 'failedpayments', 'supportqueue', 'slowqueries', 'schemadiff', 'cohort',
 ];
 
 /** GET /api/v1/admin/team/members — public roster for the login page */
