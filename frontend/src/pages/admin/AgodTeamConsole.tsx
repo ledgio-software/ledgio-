@@ -87,7 +87,7 @@ function PlaceholderPanel({ tab, teamToken }: { tab: TabId; teamToken: string })
   const endpoint = endpointMap[tab];
 
   useEffect(() => {
-    if (!endpoint || !teamToken) { setLoading(false); return; }
+    if (!endpoint || !teamToken) { setData(null); setErr(''); setLoading(false); return; }
     api.get(endpoint, { headers: { 'x-team-token': teamToken } })
       .then((res) => setData(JSON.stringify(res.data, null, 2)))
       .catch((err: unknown) => {
@@ -835,7 +835,7 @@ function PanelContent({ tab, teamToken, member }: { tab: TabId; teamToken: strin
     case 'slowqueries':     return <SlowQueriesPanel teamToken={teamToken} />;
     case 'schemadiff':      return <SchemaDiffPanel teamToken={teamToken} />;
     case 'cohort':          return <CohortPanel teamToken={teamToken} />;
-    default:                return <PlaceholderPanel tab={tab} teamToken={teamToken} />;
+    default:                return <PlaceholderPanel key={tab} tab={tab} teamToken={teamToken} />;
   }
 }
 
