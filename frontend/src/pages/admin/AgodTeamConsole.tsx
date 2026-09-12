@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { StandaloneBroadcastPanel } from './BroadcastConsolePanel';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import {
@@ -1505,6 +1506,7 @@ function PanelContent({ tab, teamToken, member }: { tab: TabId; teamToken: strin
     case 'revenue':         return <RevenuePanel teamToken={teamToken} />;
     case 'debuglogs':       return <DebugLogsPanel teamToken={teamToken} />;
     case 'referral':        return <ReferralPanel teamToken={teamToken} />;
+    case 'broadcast':       return <StandaloneBroadcastPanel />;
     default:                return <NoDataPanel tab={tab} />;
   }
 }

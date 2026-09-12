@@ -6,10 +6,7 @@ import {
   Activity,
   Database,
   History,
-  Send,
   CheckCircle2,
-  AlertOctagon,
-  Sparkles,
   Loader2,
   ArrowLeft,
   Server,
@@ -45,6 +42,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../..
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
+import { BroadcastConsolePanel } from "./BroadcastConsolePanel";
 
 const EMPTY_AUDIT_FILTERS = {
   action: "",
@@ -405,16 +403,7 @@ export function AdminCoreEngine() {
   const [auditActionOptions, setAuditActionOptions] = useState<string[]>([]);
   const [auditEntityOptions, setAuditEntityOptions] = useState<string[]>([]);
 
-  // Broadcast Form State
-  const [subject, setSubject] = useState("System Maintenance & Upgrade Notice");
-  const [message, setMessage] = useState(
-    "Ledgio ERP will undergo a scheduled system upgrade on Sunday at 2:00 AM UTC. Expect approximately 15 minutes of downtime. Thank you for your patience!"
-  );
-  const [channel, setChannel] = useState<"EMAIL" | "SMS" | "BOTH">("BOTH");
-  const [targetTier, setTargetTier] = useState<string>("ALL");
-  const [isSending, setIsSending] = useState(false);
-  const [broadcastResult, setBroadcastResult] = useState<any>(null);
-  const [confirmStep, setConfirmStep] = useState(false);
+  // Broadcast state is now managed inside BroadcastConsolePanel
 
   // Onboard Contracted Client state
   const [onboardCompanyName, setOnboardCompanyName] = useState("");
@@ -431,7 +420,7 @@ export function AdminCoreEngine() {
   const [onboardResult, setOnboardResult] = useState<{ tenant: { name: string; slug: string }; admin: { email: string } } | null>(null);
 
   // Derived admin request headers — prefer session token; fall back to raw passcode
-  const adminHeaders = sessionToken
+  const adminHeaders: Record<string, string> = sessionToken
     ? { 'x-admin-session': sessionToken }
     : { 'x-admin-passcode': passcode };
 
@@ -1061,48 +1050,6 @@ export function AdminCoreEngine() {
 
   // Deliberately plain, low-hype subject/message copy - emoji and
   // exclamation-heavy "announcement" language reads as promotional/spam to
-  // Gmail's filters (confirmed live via a real broadcast landing in spam -
-  // see broadcastService.ts's header comment and STATUS.md).
-  const applyTemplate = (type: "UPGRADE" | "MAINTENANCE" | "NEWS") => {
-    if (type === "UPGRADE") {
-      setSubject("System upgrade deployed (v2.5)");
-      setMessage(
-        "We've deployed performance upgrades to Ledgio. This includes faster POS till closeouts, real-time inventory re-allocation, and quicker SMS alerts."
-      );
-    } else if (type === "MAINTENANCE") {
-      setSubject("Scheduled maintenance this Sunday");
-      setMessage(
-        "Ledgio will undergo routine server maintenance this Sunday between 02:00 AM and 02:15 AM UTC. Database connections will be briefly paused during this window."
-      );
-    } else if (type === "NEWS") {
-      setSubject("New feature: automated weekly email reports");
-      setMessage(
-        "You can now configure automated Monday 8:00 AM Profit & Loss PDF reports sent to your email. Configure this in Settings."
-      );
-    }
-  };
-
-  const handleExecuteBroadcast = async () => {
-    setIsSending(true);
-    setBroadcastResult(null);
-    try {
-      const res = await api.post("/admin/broadcast/send", {
-        subject,
-        message,
-        channel,
-        targetTier: targetTier === "ALL" ? undefined : Number(targetTier),
-      }, { headers: adminHeaders });
-
-      if (res.data.success) {
-        setBroadcastResult(res.data.data);
-        setConfirmStep(false);
-      }
-    } catch (err: any) {
-      setAuthError(err.response?.data?.error || "Broadcast execution failed.");
-    } finally {
-      setIsSending(false);
-    }
-  };
 
   const handleOnboardClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1685,148 +1632,7 @@ export function AdminCoreEngine() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Template Switchers */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-secondary-300 flex items-center">
-                      <Sparkles className="h-4 w-4 mr-1 text-amber-400" />
-                      Quick Load Announcement Templates
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => applyTemplate("UPGRADE")}
-                        className="px-3.5 py-2 bg-secondary-800 hover:bg-secondary-700 rounded-lg text-xs font-medium border border-secondary-700 transition-colors"
-                      >
-                        🚀 System Upgrade Announcement
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyTemplate("MAINTENANCE")}
-                        className="px-3.5 py-2 bg-secondary-800 hover:bg-secondary-700 rounded-lg text-xs font-medium border border-secondary-700 transition-colors"
-                      >
-                        🛠 Scheduled Maintenance Alert
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyTemplate("NEWS")}
-                        className="px-3.5 py-2 bg-secondary-800 hover:bg-secondary-700 rounded-lg text-xs font-medium border border-secondary-700 transition-colors"
-                      >
-                        🎁 Feature Release Announcement
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Controls Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-secondary-300">Target Audience</label>
-                      <select
-                        value={targetTier}
-                        onChange={(e: any) => setTargetTier(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs"
-                      >
-                        <option value="ALL">All Business Owners (All Tenants)</option>
-                        <option value="1">Tier 1 Starter Tenants</option>
-                        <option value="2">Tier 2 Professional Tenants</option>
-                        <option value="3">Tier 3 Enterprise Tenants</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-secondary-300">Announcement Subject</label>
-                      <Input
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        className="bg-secondary-950 border-secondary-700 text-white text-xs"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-secondary-300">Dispatch Channels</label>
-                      <select
-                        value={channel}
-                        onChange={(e: any) => setChannel(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs"
-                      >
-                        <option value="BOTH">Email (Gmail SMTP) & SMS (Android Gateway)</option>
-                        <option value="EMAIL">Email Only (Gmail SMTP)</option>
-                        <option value="SMS">SMS Only (Android Gateway)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Message Body */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-secondary-300">Broadcast Message Body</label>
-                    <textarea
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      rows={5}
-                      className="w-full p-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs focus:ring-2 focus:ring-amber-500 font-sans"
-                    />
-                  </div>
-
-                  {/* Broadcast Execution Results */}
-                  {broadcastResult && (
-                    <div className="p-4 bg-emerald-950/60 border border-emerald-800 text-emerald-200 rounded-lg text-xs space-y-2">
-                      <div className="flex items-center font-bold text-emerald-400 text-sm">
-                        <CheckCircle2 className="h-5 w-5 mr-2" />
-                        System Broadcast Dispatched Successfully!
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-center font-jetbrains">
-                        <div className="p-2 bg-emerald-900/40 rounded">Total Targeted: <strong>{broadcastResult.totalTargeted}</strong></div>
-                        <div className="p-2 bg-emerald-900/40 rounded">Emails Sent: <strong>{broadcastResult.emailSentCount}</strong></div>
-                        <div className="p-2 bg-emerald-900/40 rounded">SMS Sent: <strong>{broadcastResult.smsSentCount}</strong></div>
-                        <div className="p-2 bg-emerald-900/40 rounded">Failures: <strong>{broadcastResult.failedCount}</strong></div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Execution Actions */}
-                  {confirmStep ? (
-                    <div className="p-4 bg-amber-950/60 border border-amber-800 rounded-lg space-y-3">
-                      <div className="flex items-center text-amber-300 font-bold text-xs">
-                        <AlertOctagon className="h-5 w-5 mr-2 text-amber-500" />
-                        Confirm System-Wide Upgrade Broadcast Dispatch?
-                      </div>
-                      <p className="text-[11px] text-secondary-300">
-                        This action will immediately send an Email & SMS notification to all registered business owners across tenant schemas.
-                      </p>
-                      <div className="flex space-x-3">
-                        <Button
-                          type="button"
-                          variant="primary"
-                          className="bg-amber-600 hover:bg-amber-500 text-white text-xs py-2.5 px-5"
-                          onClick={handleExecuteBroadcast}
-                          disabled={isSending}
-                        >
-                          {isSending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          Yes, Execute Broadcast Now
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-secondary-700 text-secondary-300 hover:bg-secondary-800 text-xs"
-                          onClick={() => setConfirmStep(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-center pt-4 border-t border-secondary-800">
-                      <span className="text-[11px] text-secondary-400">Batch-processed in 15-user chunks with 500ms safety delay</span>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        className="bg-amber-600 hover:bg-amber-500 text-white text-xs flex items-center py-2.5 px-5"
-                        onClick={() => setConfirmStep(true)}
-                      >
-                        <Send className="mr-2 h-4 w-4" />
-                        Broadcast System Announcement
-                      </Button>
-                    </div>
-                  )}
+                  <BroadcastConsolePanel adminHeaders={adminHeaders} />
                 </CardContent>
               </Card>
             )}
