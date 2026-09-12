@@ -2456,3 +2456,17 @@ model ReferralPartner {
 
   @@map("referral_partners")
 }
+
+model TeamMember {
+  id           String   @id
+  name         String
+  role         String
+  color        String   @default("slate")
+  assignedTabs String[] @map("assigned_tabs")
+  pinHash      String   @map("pin_hash")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("team_members")
+}
