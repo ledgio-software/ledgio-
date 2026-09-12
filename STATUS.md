@@ -2,6 +2,28 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: IDOR prevention middleware (Prisma guard + Express enumeration detector)
+
+**What/Why:**
+Added a two-layer IDOR prevention system as defense-in-depth against cross-tenant data access. The IDOR audit confirmed no current vulnerabilities (the per-schema isolation + tenantId column filters already cover all routes), so this layer makes it impossible to introduce an IDOR in the future even when a developer forgets a tenantId filter.
+
+**Layer 1 — Prisma query interceptor (`backend/src/middleware/idorGuard.ts`, `buildIdorPrismaMiddleware()`):**
+Registered as a `$use` hook on the global prisma client. For all 80 tenant-scoped models:
+- `findUnique` / `findUniqueOrThrow` → action rewritten to `findFirst` / `findFirstOrThrow` and `tenantId` injected into the where clause (rewrite required because findUnique demands a unique-constraint where clause, which precludes adding tenantId without a composite unique index).
+- `findFirst`, `findMany`, `count`, `aggregate`, `groupBy`, `updateMany`, `deleteMany` → `tenantId` silently appended to the where clause when absent.
+- `update`, `delete`, `upsert` → cannot safely inject (unique-constraint requirement); emits a `logger.warn` security entry instead so the violation is visible in logs.
+- Fail-open: no tenant context active (admin routes, system tasks, test suites) → guard is a no-op.
+
+**Layer 2 — Express enumeration detector (`idorAuditMiddleware`):**
+Mounted at `/api/v1/*`. Tracks distinct UUID-shaped path segments accessed per authenticated session per minute. Fires `logger.warn` when a single session crosses 50 distinct resource IDs in a 60-second window — a signal of automated IDOR enumeration / scraping. In-process Map with stale-key pruning at 10k entries.
+
+**Files Affected:**
+- `backend/src/middleware/idorGuard.ts` *(new)*
+- `backend/src/config/db.ts` — imports `buildIdorPrismaMiddleware` and registers it as a `$use` hook after the existing query-timeout middleware
+- `backend/src/app.ts` — imports `idorAuditMiddleware` and mounts it at `/api/v1/`
+
+---
+
 ## [Date: 2026-09-12] - Security: Client-side bot fingerprinting at login
 
 **What/Why:**

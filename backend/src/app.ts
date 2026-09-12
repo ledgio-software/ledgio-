@@ -22,6 +22,7 @@ import ledgersRouter from './routes/ledgers';
 import reportsRouter from './routes/reports';
 import { requestLoggerMiddleware } from './middleware/requestLoggerMiddleware';
 import { adminPasscodeMiddleware } from './middleware/adminPasscodeMiddleware';
+import { idorAuditMiddleware } from './middleware/idorGuard';
 import { metricsMiddleware } from './middleware/metricsMiddleware';
 import { apiRateLimiter, adminRateLimiter } from './middleware/rateLimiterMiddleware';
 import customFieldsRouter from './routes/customFields';
@@ -158,6 +159,11 @@ app.use(metricsMiddleware);
 // ── Traffic Protection ──────────────────────────────────────────────────────────
 // Global API rate limiter (100 req/min per tenant or IP)
 app.use('/api/', apiRateLimiter);
+
+// IDOR enumeration detection — logs when a session accesses an unusual number
+// of distinct resource IDs within a short window. Runs after rate limiting so
+// it only sees requests that cleared the rate gate.
+app.use('/api/v1/', idorAuditMiddleware);
 
 // Strict admin rate limiter (10 req/min per IP) — applied before any admin
 // handler so brute-forcing the master passcode is not feasible.
