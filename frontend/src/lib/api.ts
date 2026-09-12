@@ -41,14 +41,16 @@ api.interceptors.response.use(
       localStorage.removeItem('accountgo-token');
       localStorage.removeItem('accountgo-tenant-id');
 
-      // A 401 from /auth/login itself just means "wrong credentials" - Login.tsx
-      // already renders that inline from the response body, and there's no real
-      // session to tear down yet. Every other 401 means the current session went
-      // stale (expired/invalid token) - dispatch a DOM event so AuthContext (a React
-      // context this plain module can't call into directly) can force a clean
-      // logout + redirect instead of leaving the app stuck silently re-401ing.
-      const isLoginRequest = typeof error.config?.url === 'string' && error.config.url.includes('/auth/login');
-      if (!isLoginRequest) {
+      // A 401 from /auth/login just means "wrong credentials" — handled inline.
+      // A 401 from any /admin/* path belongs to the admin/team portal auth
+      // system, which manages its own session (team token stored in
+      // sessionStorage). Neither case should trigger a user-session tear-down.
+      // Every other 401 means the regular user Bearer token went stale —
+      // dispatch the event so AuthContext can force a clean logout + redirect.
+      const url = typeof error.config?.url === 'string' ? error.config.url : '';
+      const isLoginRequest = url.includes('/auth/login');
+      const isAdminRequest = url.includes('/admin/');
+      if (!isLoginRequest && !isAdminRequest) {
         window.dispatchEvent(new Event('ledgio:session-expired'));
       }
     }
