@@ -61,6 +61,8 @@ import adminChurnRiskRouter from './routes/adminChurnRisk';
 import adminOnboardingRouter from './routes/adminOnboarding';
 import adminRevenueRouter from './routes/adminRevenue';
 import adminTotpRouter from './routes/adminTotp';
+import adminDebugLogsRouter from './routes/adminDebugLogs';
+import { debugContextMiddleware } from './middleware/debugContextMiddleware';
 import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
 import syncRouter from './routes/sync';
@@ -155,6 +157,7 @@ app.use(express.json({ limit: '10mb' }));
 // ── Observability ──────────────────────────────────────────────────────────────
 // Inject X-Request-ID and structured HTTP request/latency logs on every request
 app.use(requestLoggerMiddleware);
+app.use(debugContextMiddleware);
 app.use(metricsMiddleware);
 
 // ── Traffic Protection ──────────────────────────────────────────────────────────
@@ -347,6 +350,7 @@ app.use('/api/v1/admin/client-health', adminClientHealthRouter);
 app.use('/api/v1/admin/churn-risk', adminChurnRiskRouter);
 app.use('/api/v1/admin/onboarding', adminOnboardingRouter);
 app.use('/api/v1/admin/revenue', adminRevenueRouter);
+app.use('/api/v1/admin/debug', adminDebugLogsRouter);
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);

@@ -74,7 +74,7 @@ export function AdminCoreEngine() {
   const [isLoadingSetup, setIsLoadingSetup] = useState(false);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue" | "debuglogs">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -941,6 +941,64 @@ export function AdminCoreEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUnlocked, activeTab]);
 
+  // ── Debug Logs ────────────────────────────────────────────────────────────────
+  interface DebugLogEntry {
+    id: string;
+    ts: string;
+    method: string;
+    path: string;
+    status: number;
+    durationMs: number;
+    level: 'ok' | 'warn' | 'error';
+    tenantId?: string;
+    userId?: string;
+    userEmail?: string;
+    ip?: string;
+    errorMessage?: string;
+    errorSource?: string;
+    bodyKeys?: string[];
+  }
+  interface DebugStats { total: number; ok: number; warn: number; error: number }
+
+  const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
+  const [debugTotal, setDebugTotal] = useState(0);
+  const [debugStats, setDebugStats] = useState<DebugStats | null>(null);
+  const [isLoadingDebug, setIsLoadingDebug] = useState(false);
+  const [debugError, setDebugError] = useState<string | null>(null);
+  const [debugLevelFilter, setDebugLevelFilter] = useState<'' | 'ok' | 'warn' | 'error'>('');
+  const [debugSearch, setDebugSearch] = useState('');
+  const [debugOffset, setDebugOffset] = useState(0);
+  const DEBUG_PAGE = 50;
+
+  const fetchDebugLogs = useCallback(() => {
+    setIsLoadingDebug(true);
+    setDebugError(null);
+    const params = new URLSearchParams({ limit: String(DEBUG_PAGE), offset: String(debugOffset) });
+    if (debugLevelFilter) params.set('level', debugLevelFilter);
+    if (debugSearch.trim()) params.set('search', debugSearch.trim());
+    return api
+      .get(`/admin/debug/logs?${params}`, { headers: adminHeaders })
+      .then((res) => {
+        setDebugLogs(res.data.data.entries);
+        setDebugTotal(res.data.data.total);
+        setDebugStats(res.data.data.stats);
+      })
+      .catch(() => setDebugError("Failed to load debug logs."))
+      .finally(() => setIsLoadingDebug(false));
+  }, [passcode, sessionToken, debugLevelFilter, debugSearch, debugOffset]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "debuglogs") return;
+    fetchDebugLogs();
+  }, [isUnlocked, activeTab, debugLevelFilter, debugSearch, debugOffset]);
+
+  const clearDebugLogs = async () => {
+    await api.delete("/admin/debug/logs", { headers: adminHeaders });
+    setDebugLogs([]);
+    setDebugTotal(0);
+    setDebugStats(null);
+  };
+
   // Step 1: verify the master passcode; advance to TOTP step on success.
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1582,6 +1640,22 @@ export function AdminCoreEngine() {
                   {revenueData && revenueData.summary.revenueAtRisk > 0 && (
                     <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-amber-600 text-white text-[10px] font-bold leading-none">
                       !
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("debuglogs")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "debuglogs" ? "border-violet-400 text-violet-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <Activity className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Debug Logs
+                  {debugStats && debugStats.error > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {debugStats.error}
                     </span>
                   )}
                 </span>
@@ -4557,6 +4631,145 @@ export function AdminCoreEngine() {
                     )}
                   </>
                 )}
+              </div>
+            )}
+
+            {/* Debug Logs Tab */}
+            {activeTab === "debuglogs" && (
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <Activity className="h-5 w-5 text-violet-400" />
+                      Debug Request Log
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Last 500 requests — searchable by debugId, path, tenant, or error. Entries older than 24h are pruned automatically.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={fetchDebugLogs} disabled={isLoadingDebug}
+                      className="border-secondary-700 text-secondary-300 hover:text-white gap-2">
+                      {isLoadingDebug ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      Refresh
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={clearDebugLogs}
+                      className="border-rose-700 text-rose-400 hover:text-white gap-2">
+                      Clear Buffer
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Stats tiles */}
+                {debugStats && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: "Total", value: debugStats.total, color: "text-white" },
+                      { label: "OK (2xx)", value: debugStats.ok, color: "text-emerald-400" },
+                      { label: "Warn (4xx)", value: debugStats.warn, color: "text-amber-400" },
+                      { label: "Error (5xx)", value: debugStats.error, color: "text-rose-400" },
+                    ].map((s) => (
+                      <div key={s.label} className="bg-secondary-800 rounded-lg p-3 text-center">
+                        <div className={`text-2xl font-extrabold ${s.color}`}>{s.value}</div>
+                        <div className="text-secondary-400 text-xs mt-0.5">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <select
+                    value={debugLevelFilter}
+                    onChange={(e) => { setDebugLevelFilter(e.target.value as '' | 'ok' | 'warn' | 'error'); setDebugOffset(0); }}
+                    className="bg-secondary-800 border border-secondary-700 rounded px-2 py-1.5 text-xs text-white"
+                  >
+                    <option value="">All levels</option>
+                    <option value="ok">OK (2xx)</option>
+                    <option value="warn">Warn (4xx)</option>
+                    <option value="error">Error (5xx)</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Search debugId, path, tenant, error…"
+                    value={debugSearch}
+                    onChange={(e) => { setDebugSearch(e.target.value); setDebugOffset(0); }}
+                    className="bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-xs text-white placeholder-secondary-500 w-64"
+                  />
+                  <span className="text-secondary-500 text-xs ml-auto">{debugTotal} matching</span>
+                </div>
+
+                {debugError && <div className="text-rose-400 text-sm">{debugError}</div>}
+
+                {/* Table */}
+                {debugLogs.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-secondary-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-secondary-900 text-secondary-400 uppercase tracking-wider">
+                        <tr>
+                          <th className="px-3 py-2">DebugId</th>
+                          <th className="px-3 py-2">Time</th>
+                          <th className="px-3 py-2">Method</th>
+                          <th className="px-3 py-2">Path</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">ms</th>
+                          <th className="px-3 py-2">Tenant</th>
+                          <th className="px-3 py-2">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-secondary-800">
+                        {debugLogs.map((log) => (
+                          <tr key={log.id} className={`hover:bg-secondary-800/50 ${log.level === 'error' ? 'bg-rose-950/20' : log.level === 'warn' ? 'bg-amber-950/20' : ''}`}>
+                            <td className="px-3 py-2 font-mono text-violet-300">{log.id}</td>
+                            <td className="px-3 py-2 text-secondary-400 whitespace-nowrap">{new Date(log.ts).toLocaleTimeString()}</td>
+                            <td className="px-3 py-2">
+                              <span className={`font-bold ${log.method === 'GET' ? 'text-sky-400' : log.method === 'POST' ? 'text-emerald-400' : log.method === 'DELETE' ? 'text-rose-400' : 'text-amber-400'}`}>
+                                {log.method}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-secondary-300 max-w-[200px] truncate" title={log.path}>{log.path}</td>
+                            <td className="px-3 py-2">
+                              <span className={`font-bold ${log.status >= 500 ? 'text-rose-400' : log.status >= 400 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {log.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-secondary-300">{log.durationMs}</td>
+                            <td className="px-3 py-2 text-secondary-400 font-mono text-[10px] truncate max-w-[80px]" title={log.tenantId}>{log.tenantId ? log.tenantId.slice(0, 8) : '—'}</td>
+                            <td className="px-3 py-2 text-rose-300 max-w-[160px] truncate" title={log.errorMessage}>{log.errorMessage ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  !isLoadingDebug && (
+                    <div className="text-center text-secondary-500 py-12 text-sm">
+                      {debugLevelFilter || debugSearch ? 'No logs match your filter.' : 'No requests captured yet. Make some API calls and refresh.'}
+                    </div>
+                  )
+                )}
+
+                {/* Pagination */}
+                {debugTotal > DEBUG_PAGE && (
+                  <div className="flex items-center justify-between pt-2">
+                    <Button variant="outline" size="sm" onClick={() => setDebugOffset(Math.max(0, debugOffset - DEBUG_PAGE))}
+                      disabled={debugOffset === 0} className="border-secondary-700 text-secondary-300 hover:text-white">
+                      Previous
+                    </Button>
+                    <span className="text-secondary-400 text-xs">
+                      {debugOffset + 1}–{Math.min(debugOffset + DEBUG_PAGE, debugTotal)} of {debugTotal}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setDebugOffset(debugOffset + DEBUG_PAGE)}
+                      disabled={debugOffset + DEBUG_PAGE >= debugTotal} className="border-secondary-700 text-secondary-300 hover:text-white">
+                      Next
+                    </Button>
+                  </div>
+                )}
+
+                <div className="text-secondary-600 text-xs pt-2 border-t border-secondary-800">
+                  Each row has a unique <span className="font-mono text-violet-400">x-debug-id</span> header on the response — search by it to trace a specific request end-to-end. Buffer is in-process memory; it resets on server restart.
+                </div>
               </div>
             )}
 

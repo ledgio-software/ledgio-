@@ -2,6 +2,33 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: TOTP two-factor authentication for AGOD admin console
+
+**What/Why:**
+Added authenticator-app (Google Authenticator / Authy) second factor to the AGOD admin console. The login flow is now two-step: master passcode → TOTP code → 8-hour session token. Existing deployments without `ADMIN_TOTP_SECRET` configured fall back to passcode-only automatically (backward compatible).
+
+**Auth flow:**
+1. Admin enters master passcode → frontend advances to TOTP step.
+2. Admin enters 6-digit code from authenticator app → `POST /api/v1/admin/totp/verify` validates both credentials, returns an 8-hour HMAC-SHA256 JWT session token.
+3. All subsequent admin API calls send `x-admin-session: <token>` header instead of the raw passcode.
+4. `GET /api/v1/admin/totp/setup` (passcode-gated) returns QR code data URL + plain secret for initial device enrollment.
+
+**Implementation details:**
+- RFC 6238 TOTP implemented from scratch using `node:crypto` (HMAC-SHA1, 30-second window, ±1 step tolerance) — no external TOTP library required.
+- Session tokens are plain `{ alg: HS256 }` JWTs signed with `BROADCAST_MASTER_SECRET`; no new env var needed.
+- TOTP secret stored in `ADMIN_TOTP_SECRET` env var; server returns 503 if not set, prompting setup.
+- Frontend stores session token in `sessionStorage` (key `accountgo_admin_engine_session`); clears old passcode key on upgrade.
+- All 15+ admin API call sites updated to prefer `x-admin-session` header over raw `x-admin-passcode`.
+
+**Files Affected:**
+- `backend/src/services/adminTotpService.ts` *(new)* — base32 codec, HOTP/TOTP core, session token issue/verify
+- `backend/src/routes/adminTotp.ts` *(new)* — `GET /setup`, `POST /verify` endpoints
+- `backend/src/middleware/adminPasscodeMiddleware.ts` — accepts `x-admin-session` (preferred) or `x-admin-passcode` (fallback); rejects both from query string
+- `backend/src/app.ts` — mounts TOTP routes before the passcode gate with their own rate limiter
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — two-step login UI, session token state, QR setup panel, global `adminHeaders` computed value
+
+---
+
 ## [Date: 2026-09-12] - Security: Financial mutation anomaly detection
 
 **What/Why:**
