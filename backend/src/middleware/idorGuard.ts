@@ -140,6 +140,33 @@ const REWRITE_TO_FIRST: Record<string, string> = {
 // We emit a security warning instead of blocking.
 const WARN_ONLY_ACTIONS = new Set(['update', 'delete', 'upsert']);
 
+// ── Composite unique key expansion ──────────────────────────────────────────
+// Prisma allows `{ warehouseId_itemId: { warehouseId, itemId } }` in findUnique
+// but NOT in findFirst. After rewriting the action we must flatten those entries
+// into individual fields. Detection heuristic: a key whose name is exactly the
+// underscore-joined concatenation of the sub-object's own keys is a composite
+// unique key accessor.
+function expandCompositeKeys(where: Record<string, any>): Record<string, any> {
+  const expanded: Record<string, any> = {};
+  for (const [key, value] of Object.entries(where)) {
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      key.includes('_')
+    ) {
+      const valueKeys = Object.keys(value);
+      if (valueKeys.length > 1 && valueKeys.join('_') === key) {
+        // This is a composite unique key accessor — spread its fields inline.
+        Object.assign(expanded, value);
+        continue;
+      }
+    }
+    expanded[key] = value;
+  }
+  return expanded;
+}
+
 // ── Layer 1: Prisma middleware factory ───────────────────────────────────────
 
 /**
@@ -168,7 +195,11 @@ export function buildIdorPrismaMiddleware() {
         params.action = REWRITE_TO_FIRST[action];
         const where = params.args?.where ?? {};
         if (!where.tenantId) {
-          params.args = { ...params.args, where: { ...where, tenantId } };
+          // Prisma composite unique key accessors (e.g. warehouseId_itemId: { warehouseId, itemId })
+          // are only valid in findUnique. After rewriting to findFirst we must expand them into
+          // their individual field equivalents so findFirst can accept the where clause.
+          const expanded = expandCompositeKeys(where);
+          params.args = { ...params.args, where: { ...expanded, tenantId } };
           logger.debug(`[IDORGuard] Rewrote ${action}→${params.action} and injected tenantId for ${params.model}`);
         }
         return next(params);
