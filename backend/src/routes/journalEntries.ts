@@ -8,6 +8,8 @@ import * as journalEntryService from '../services/journalEntryService';
 import { JournalEntryServiceError } from '../services/journalEntryService';
 import { JournalEntryStatus } from '../repository/journalEntryRepository';
 import { actorFromRequest } from '../services/auditLogService';
+import { analyzeFinancialMutation } from '../services/financialMutationAnomalyService';
+import { getTenantContext } from '../context/tenantContext';
 
 const router = Router();
 
@@ -104,6 +106,25 @@ router.post('/', requireRole('Accountant'), checkEmergencyStop, async (req: Requ
         journalEntry,
       },
     });
+
+    const tenantId = getTenantContext()?.tenantId;
+    const actor = actorFromRequest(req);
+    if (tenantId && actor.userId) {
+      const totalAmount = (journalEntry.lines ?? []).reduce(
+        (sum: number, l: any) => sum + Number(l.debit ?? 0),
+        0,
+      );
+      analyzeFinancialMutation({
+        amount: totalAmount,
+        entryDate: journalEntry.entryDate?.toISOString?.() ?? journalEntry.entryDate ?? new Date().toISOString(),
+        userId: actor.userId,
+        userEmail: actor.userEmail ?? '',
+        tenantId,
+        entryRef: journalEntry.entryNumber,
+        operation: 'create',
+        ip: req.ip ?? req.socket?.remoteAddress ?? '',
+      }).catch(() => {});
+    }
   } catch (error: any) {
     if (error instanceof JournalEntryServiceError) {
       res.status(error.statusCode).json({
@@ -173,6 +194,25 @@ router.post('/:id/post', requireRole('Accountant'), checkEmergencyStop, requireR
         journalEntry,
       },
     });
+
+    const tenantId = getTenantContext()?.tenantId;
+    const actor = actorFromRequest(req);
+    if (tenantId && actor.userId) {
+      const totalAmount = (journalEntry.lines ?? []).reduce(
+        (sum: number, l: any) => sum + Number(l.debit ?? 0),
+        0,
+      );
+      analyzeFinancialMutation({
+        amount: totalAmount,
+        entryDate: journalEntry.entryDate?.toISOString?.() ?? journalEntry.entryDate ?? new Date().toISOString(),
+        userId: actor.userId,
+        userEmail: actor.userEmail ?? '',
+        tenantId,
+        entryRef: journalEntry.entryNumber,
+        operation: 'post',
+        ip: req.ip ?? req.socket?.remoteAddress ?? '',
+      }).catch(() => {});
+    }
   } catch (error: any) {
     if (error instanceof JournalEntryServiceError) {
       res.status(error.statusCode).json({

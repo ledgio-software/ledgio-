@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: Financial mutation anomaly detection
+
+**What/Why:**
+Added an accounting-specific fraud detection layer that fires fire-and-forget after every journal entry create and post operation. The service scores the mutation against six behavioral signals and writes a `SECURITY.FINANCIAL_ANOMALY` audit log entry when the total weight meets the threshold. High-confidence detections (score ≥5) also trigger an admin alert email. Never blocks the operation — purely observational.
+
+**Signals detected (with weights):**
+- `LARGE_AMOUNT` (weight 3) — entry total exceeds 10× the tenant's 30-day rolling average of posted entries
+- `OFF_HOURS` (weight 2) — mutation recorded between 01:00–05:00 UTC
+- `HIGH_VELOCITY` (weight 2) — user created >20 entries in a 10-minute rolling window (Redis-backed counter)
+- `ROUND_NUMBER_LARGE` (weight 1) — amount ≥10,000 with ≥3 trailing zeros (common fraud pattern)
+- `THRESHOLD_CREEP` (weight 2) — amount within 5% below a configured approval threshold (9 common breakpoints)
+- `BACKDATED_ENTRY` (weight 2) — entry date >30 days before today
+
+**Files Affected:**
+- `backend/src/services/financialMutationAnomalyService.ts` *(new)* — signal scoring, audit log, admin email alert
+- `backend/src/routes/journalEntries.ts` — imported service + `getTenantContext`; fire-and-forget call wired after successful `POST /` (create) and `POST /:id/post` operations
+
+---
+
 ## [Date: 2026-09-12] - Security: IDOR prevention middleware (Prisma guard + Express enumeration detector)
 
 **What/Why:**
