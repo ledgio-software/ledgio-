@@ -16,6 +16,7 @@ import { onboardingRateLimiter } from '../middleware/rateLimiterMiddleware';
 import { encryptCredential } from '../utils/credentialEncryption';
 import { hashPassword } from '../utils/password';
 import { EmailService } from '../services/EmailService';
+import { revokeUserTokens } from '../services/tokenRevocationService';
 
 const router = Router();
 
@@ -693,9 +694,13 @@ router.put('/members/:id/role', authenticateJwt, tenantContextMiddleware, requir
       return updated;
     });
 
+    // Revoke the member's existing tokens so the role change takes effect
+    // immediately, not just on their next login.
+    await revokeUserTokens(id);
+
     return res.status(200).json({
       success: true,
-      message: 'Role updated. This takes effect the next time the member logs in.',
+      message: 'Role updated. The member\'s active sessions have been invalidated and they will need to log in again.',
       data: { id: updated.id, role: updated.role },
     });
   } catch (error: any) {
@@ -753,6 +758,10 @@ router.delete('/members/:id', authenticateJwt, tenantContextMiddleware, requireR
       });
     });
 
+    // Revoke any active tokens for the deleted member so they cannot continue
+    // using the app after removal. Fire-and-forget; Redis errors are non-fatal.
+    revokeUserTokens(id).catch(() => {});
+
     return res.status(200).json({ success: true, message: 'Team member removed.' });
   } catch (error: any) {
     console.error('[TenantMembers] Error removing member:', error);
@@ -795,6 +804,10 @@ router.post('/members/:id/reset-password', authenticateJwt, tenantContextMiddlew
         details: `Admin-initiated password reset for team member ${member.name} (${member.email}).`,
       });
     });
+
+    // Revoke any active sessions for the member — their old password no longer
+    // works, so their active JWT should not either.
+    await revokeUserTokens(id);
 
     const emailConfigured = EmailService.isConfigured();
     if (emailConfigured) {

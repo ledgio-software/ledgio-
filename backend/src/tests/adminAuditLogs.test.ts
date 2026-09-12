@@ -102,14 +102,17 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
     const noPasscode = await request(app).get('/api/v1/admin/audit-logs');
     expect(noPasscode.status).toBe(401);
 
-    const wrongPasscode = await request(app).get('/api/v1/admin/audit-logs').query({ passcode: 'wrong' });
+    const wrongPasscode = await request(app)
+      .get('/api/v1/admin/audit-logs')
+      .set('x-admin-passcode', 'wrong-passcode-value');
     expect(wrongPasscode.status).toBe(401);
   });
 
   it('returns logs across ALL tenants with tenant name/slug joined, given the correct passcode', async () => {
     const res = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', limit: '200' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ limit: '200' });
 
     expect(res.status).toBe(200);
     const logs = res.body.data.logs;
@@ -132,7 +135,8 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
   it('supports pagination', async () => {
     const res = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', limit: '1', page: '1' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ limit: '1', page: '1' });
     expect(res.status).toBe(200);
     expect(res.body.data.logs.length).toBe(1);
     expect(res.body.data.pagination.limit).toBe(1);
@@ -150,7 +154,8 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
   it('filters by tenantId to a single tenant', async () => {
     const res = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', tenantId: tenant1Id, limit: '200' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ tenantId: tenant1Id, limit: '200' });
 
     expect(res.status).toBe(200);
     const details = res.body.data.logs.map((l: any) => l.details);
@@ -161,19 +166,22 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
   it('filters by action, entity, and userEmail', async () => {
     const byAction = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', action: 'test_action', limit: '200' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ action: 'test_action', limit: '200' });
     expect(byAction.status).toBe(200);
     expect(byAction.body.data.logs.length).toBeGreaterThanOrEqual(2);
 
     const byEntity = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', entity: 'TEST_ENTITY', limit: '200' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ entity: 'TEST_ENTITY', limit: '200' });
     expect(byEntity.status).toBe(200);
     expect(byEntity.body.data.logs.every((l: any) => l.entity === 'TEST_ENTITY')).toBe(true);
 
     const byEmailMiss = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', userEmail: 'nobody-matches-this@example.com', limit: '200' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ userEmail: 'nobody-matches-this@example.com', limit: '200' });
     expect(byEmailMiss.status).toBe(200);
     expect(byEmailMiss.body.data.logs).toHaveLength(0);
   });
@@ -181,7 +189,8 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
   it('rejects a malformed date filter', async () => {
     const res = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', dateFrom: 'not-a-date' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ dateFrom: 'not-a-date' });
     expect(res.status).toBe(400);
   });
 
@@ -191,7 +200,8 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
 
     const res = await request(app)
       .get('/api/v1/admin/audit-logs/export')
-      .query({ passcode: 'test-master-passcode', tenantId: tenant1Id });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ tenantId: tenant1Id });
 
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/csv');
@@ -207,7 +217,8 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
   it('filters by exact entityId across all tenants', async () => {
     const res = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', entityId: 'entity-1-fixed-id' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ entityId: 'entity-1-fixed-id' });
 
     expect(res.status).toBe(200);
     const details = res.body.data.logs.map((l: any) => l.details);
@@ -218,7 +229,8 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
   it('filters by ipAddress substring across all tenants', async () => {
     const res = await request(app)
       .get('/api/v1/admin/audit-logs')
-      .query({ passcode: 'test-master-passcode', ipAddress: '203.0.113' });
+      .set('x-admin-passcode', 'test-master-passcode')
+      .query({ ipAddress: '203.0.113' });
 
     expect(res.status).toBe(200);
     const details = res.body.data.logs.map((l: any) => l.details);
@@ -232,7 +244,7 @@ describe('GET /api/v1/admin/audit-logs (platform-wide, passcode-gated)', () => {
 
     const res = await request(app)
       .get('/api/v1/admin/audit-logs/meta/values')
-      .query({ passcode: 'test-master-passcode' });
+      .set('x-admin-passcode', 'test-master-passcode');
     expect(res.status).toBe(200);
     expect(res.body.data.actions).toEqual(expect.arrayContaining(['TEST_ACTION']));
     expect(res.body.data.entities).toEqual(expect.arrayContaining(['TEST_ENTITY']));

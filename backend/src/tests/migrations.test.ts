@@ -14,6 +14,9 @@ const mockRunAllTenantMigrations = runAllTenantMigrations as jest.MockedFunction
 const adminToken = generateJwtToken({ id: 'platform-admin-1', email: 'platform-admin@example.com', role: 'Admin' });
 const viewerToken = generateJwtToken({ id: 'viewer-1', email: 'viewer@example.com', role: 'Viewer' });
 
+// The adminPasscodeMiddleware now requires the passcode via the x-admin-passcode header.
+const testPasscode = process.env.BROADCAST_MASTER_SECRET!;
+
 describe('POST /api/v1/admin/migrations/run', () => {
   beforeEach(() => {
     // Re-apply mock implementations after jest resetMocks:true clears them
@@ -37,6 +40,7 @@ describe('POST /api/v1/admin/migrations/run', () => {
     const response = await request(app)
       .post('/api/v1/admin/migrations/run')
       .set('Authorization', `Bearer ${adminToken}`)
+      .set('x-admin-passcode', testPasscode)
       .send({ tenantSchema: 'acme' });
 
     expect(response.status).toBe(200);
@@ -49,6 +53,7 @@ describe('POST /api/v1/admin/migrations/run', () => {
     const response = await request(app)
       .post('/api/v1/admin/migrations/run')
       .set('Authorization', `Bearer ${adminToken}`)
+      .set('x-admin-passcode', testPasscode)
       .send({ allTenants: true });
 
     expect(response.status).toBe(200);
@@ -69,6 +74,7 @@ describe('POST /api/v1/admin/migrations/run', () => {
     const response = await request(app)
       .post('/api/v1/admin/migrations/run')
       .set('Authorization', `Bearer ${viewerToken}`)
+      .set('x-admin-passcode', testPasscode)
       .send({ allTenants: true });
 
     expect(response.status).toBe(403);

@@ -9,6 +9,21 @@ import { registerJob } from './services/cronJobRegistry';
 const PORT = process.env.PORT || 4000;
 
 const startServer = async () => {
+  // Guard: refuse to start if CORS is misconfigured in production.
+  // An open wildcard or missing origin setting would let any website make
+  // credentialed cross-origin requests against tenant data.
+  if (process.env.NODE_ENV === 'production') {
+    const corsOrigin = process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '';
+    if (!corsOrigin || corsOrigin.trim() === '*') {
+      console.error('[Server] FATAL: CORS_ALLOWED_ORIGINS must not be empty or "*" in production. Set it to your frontend origin (e.g. https://app.ledgio.com). Refusing to start.');
+      process.exit(1);
+    }
+    if (!process.env.BROADCAST_MASTER_SECRET) {
+      console.error('[Server] FATAL: BROADCAST_MASTER_SECRET is not set. Admin endpoints would be open without a passcode. Refusing to start.');
+      process.exit(1);
+    }
+  }
+
   // Initialize telemetry first
   await startTelemetry();
   

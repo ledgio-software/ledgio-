@@ -32,6 +32,11 @@ import {
   ChevronDown,
   ChevronRight,
   HandCoins,
+  HeartPulse,
+  TrendingDown,
+  ClipboardList,
+  TrendingUp,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -57,12 +62,19 @@ export function AdminCoreEngine() {
 
   // Master Lock State
   const [passcode, setPasscode] = useState("");
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Two-step auth: 'passcode' → 'totp' → unlocked
+  const [authStep, setAuthStep] = useState<'passcode' | 'totp'>('passcode');
+  const [totpCode, setTotpCode] = useState('');
+  const [showSetupQr, setShowSetupQr] = useState(false);
+  const [setupQrData, setSetupQrData] = useState<{ qrDataUrl: string; secret: string; configured: boolean; note: string } | null>(null);
+  const [isLoadingSetup, setIsLoadingSetup] = useState(false);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -135,7 +147,7 @@ export function AdminCoreEngine() {
   const fetchMetrics = useCallback(() => {
     setIsLoadingMetrics(true);
     setMetricsError(null);
-    const headers = { 'x-admin-passcode': passcode };
+    const headers = adminHeaders;
     return Promise.all([
       api.get("/admin/metrics", { headers }),
       api.get("/admin/error-logs/grouped", { headers }),
@@ -160,7 +172,7 @@ export function AdminCoreEngine() {
     setIsLoadingJobs(true);
     setJobsError(null);
     return api
-      .get("/admin/jobs", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/jobs", { headers: adminHeaders })
       .then((res) => setJobsData(res.data.data.jobs))
       .catch(() => setJobsError("Failed to load cron jobs."))
       .finally(() => setIsLoadingJobs(false));
@@ -177,7 +189,7 @@ export function AdminCoreEngine() {
   const handleTriggerJob = async (jobName: string) => {
     setTriggeringJob(jobName);
     try {
-      await api.post(`/admin/jobs/${encodeURIComponent(jobName)}/trigger`, {}, { headers: { 'x-admin-passcode': passcode } });
+      await api.post(`/admin/jobs/${encodeURIComponent(jobName)}/trigger`, {}, { headers: adminHeaders });
       showToast(`Job "${jobName}" triggered successfully.`, "success");
       setTimeout(fetchJobs, 1500);
     } catch (err: any) {
@@ -191,8 +203,8 @@ export function AdminCoreEngine() {
     setIsLoadingErrors(true);
     setErrorsError(null);
     return Promise.all([
-      api.get("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } }),
-      api.get("/admin/error-logs/grouped", { headers: { 'x-admin-passcode': passcode } }),
+      api.get("/admin/error-logs", { headers: adminHeaders }),
+      api.get("/admin/error-logs/grouped", { headers: adminHeaders }),
     ])
       .then(([indRes, grpRes]) => {
         setErrorsData(indRes.data.data.errors);
@@ -212,7 +224,7 @@ export function AdminCoreEngine() {
   const handleClearErrors = async () => {
     setIsClearingErrors(true);
     try {
-      await api.delete("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } });
+      await api.delete("/admin/error-logs", { headers: adminHeaders });
       setErrorsData([]);
       showToast("Error log cleared.", "success");
     } catch {
@@ -238,7 +250,7 @@ export function AdminCoreEngine() {
   const handleToggleUserActive = async (userId: string, tenantId: string, activate: boolean) => {
     setTogglingUserId(userId);
     try {
-      await api.patch(`/admin/users/${userId}/${activate ? "activate" : "deactivate"}`, {}, { headers: { 'x-admin-passcode': passcode } });
+      await api.patch(`/admin/users/${userId}/${activate ? "activate" : "deactivate"}`, {}, { headers: adminHeaders });
       showToast(`User ${activate ? "activated" : "deactivated"}.`, "success");
       setTenantUsers((prev) => ({
         ...prev,
@@ -417,11 +429,23 @@ export function AdminCoreEngine() {
   const [onboardError, setOnboardError] = useState<string | null>(null);
   const [onboardResult, setOnboardResult] = useState<{ tenant: { name: string; slug: string }; admin: { email: string } } | null>(null);
 
+  // Derived admin request headers — prefer session token; fall back to raw passcode
+  const adminHeaders = sessionToken
+    ? { 'x-admin-session': sessionToken }
+    : { 'x-admin-passcode': passcode };
+
   // Auto-check if already unlocked in session
   useEffect(() => {
-    const savedToken = sessionStorage.getItem("accountgo_admin_engine_passcode");
-    if (savedToken) {
-      setPasscode(savedToken);
+    const savedSession = sessionStorage.getItem("accountgo_admin_engine_session");
+    if (savedSession) {
+      setSessionToken(savedSession);
+      setIsUnlocked(true);
+      return;
+    }
+    // Backward-compat: upgrade old passcode-only sessions on first load
+    const savedPasscode = sessionStorage.getItem("accountgo_admin_engine_passcode");
+    if (savedPasscode) {
+      setPasscode(savedPasscode);
       setIsUnlocked(true);
     }
   }, []);
@@ -476,7 +500,7 @@ export function AdminCoreEngine() {
     setIsLoadingIntegrations(true);
     setIntegrationsError(null);
     return api
-      .get("/admin/integrations", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/integrations", { headers: adminHeaders })
       .then((res) => setIntegrationsData(res.data.data))
       .catch(() => setIntegrationsError("Failed to load integrations status."))
       .finally(() => setIsLoadingIntegrations(false));
@@ -495,7 +519,7 @@ export function AdminCoreEngine() {
     setIsLoadingTenants(true);
     setTenantsError(null);
     return api
-      .get("/tenants", { headers: { 'x-admin-passcode': passcode } })
+      .get("/tenants", { headers: adminHeaders })
       .then((res) => {
         setTenants(res.data.data.tenants);
         setTierDrafts(Object.fromEntries(res.data.data.tenants.map((t: any) => [t.id, t.tier])));
@@ -520,7 +544,7 @@ export function AdminCoreEngine() {
     const tier = tierDrafts[tenantId];
     setSavingTierId(tenantId);
     try {
-      const res = await api.put(`/tenants/${tenantId}/tier`, { tier }, { headers: { 'x-admin-passcode': passcode } });
+      const res = await api.put(`/tenants/${tenantId}/tier`, { tier }, { headers: adminHeaders });
       if (res.data.success) {
         showToast(`Plan updated to ${res.data.data.tenant.tier === 1 ? "Shop" : res.data.data.tenant.tier === 2 ? "Business" : "Enterprise"}.`, "success");
         fetchTenants();
@@ -536,7 +560,7 @@ export function AdminCoreEngine() {
     if (!deletingTenant || deleteConfirmSlug !== deletingTenant.slug) return;
     setIsDeletingTenant(true);
     try {
-      await api.delete(`/tenants/${deletingTenant.id}`, { headers: { 'x-admin-passcode': passcode } });
+      await api.delete(`/tenants/${deletingTenant.id}`, { headers: adminHeaders });
       showToast(`Tenant "${deletingTenant.name}" permanently deleted.`, "success");
       setDeletingTenant(null);
       setDeleteConfirmSlug("");
@@ -592,7 +616,7 @@ export function AdminCoreEngine() {
   useEffect(() => {
     if (!isUnlocked) return;
     api
-      .get("/admin/audit-logs/meta/values", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/audit-logs/meta/values", { headers: adminHeaders })
       .then((res) => {
         if (res.data.success) {
           setAuditActionOptions(res.data.data.actions || []);
@@ -658,7 +682,7 @@ export function AdminCoreEngine() {
   const fetchReferralData = useCallback(() => {
     setIsLoadingReferral(true);
     setReferralError(null);
-    const headers = { 'x-admin-passcode': passcode };
+    const headers = adminHeaders;
     return Promise.all([
       api.get("/admin/referrals/partners", { headers }),
       api.get("/admin/referrals/stats", { headers }),
@@ -686,7 +710,7 @@ export function AdminCoreEngine() {
         code: newPartnerCode.trim().toUpperCase(),
         commissionRate: parseFloat(newPartnerRate),
         contacts: newPartnerContacts.trim() || undefined,
-      }, { headers: { 'x-admin-passcode': passcode } });
+      }, { headers: adminHeaders });
       setShowNewPartnerForm(false);
       setNewPartnerName("");
       setNewPartnerCode("");
@@ -703,7 +727,7 @@ export function AdminCoreEngine() {
   const handleTogglePartner = async (id: string, isActive: boolean) => {
     setTogglingPartnerId(id);
     try {
-      await api.patch(`/admin/referrals/partners/${id}`, { isActive: !isActive }, { headers: { 'x-admin-passcode': passcode } });
+      await api.patch(`/admin/referrals/partners/${id}`, { isActive: !isActive }, { headers: adminHeaders });
       setReferralPartners((prev) => prev?.map((p) => p.id === id ? { ...p, isActive: !isActive } : p) ?? null);
     } catch {
       setReferralError("Failed to update partner.");
@@ -712,21 +736,267 @@ export function AdminCoreEngine() {
     }
   };
 
+  // Client Health Dashboard state
+  const [clientHealthData, setClientHealthData] = useState<{
+    summary: {
+      totalTenants: number;
+      activeTenants: number;
+      trialTenants: number;
+      expiredTenants: number;
+      dormantTenants: number;
+      highRiskTenants: number;
+      mediumRiskTenants: number;
+      trialsExpiringIn7Days: number;
+    };
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      trialEndsAt: string | null;
+      subscriptionPaidUntil: string | null;
+      createdAt: string;
+      isLive: boolean;
+      userCount: number;
+      lastActivityAt: string | null;
+      daysSinceActivity: number | null;
+      trialDaysLeft: number | null;
+      paidDaysLeft: number | null;
+      churnRisk: 'high' | 'medium' | 'low' | 'none';
+    }[];
+  } | null>(null);
+  const [clientHealthError, setClientHealthError] = useState<string | null>(null);
+  const [isLoadingClientHealth, setIsLoadingClientHealth] = useState(false);
+  const [clientHealthSort, setClientHealthSort] = useState<'risk' | 'dormant' | 'recent'>('risk');
+  const [clientHealthFilter, setClientHealthFilter] = useState<'all' | 'high' | 'medium' | 'trial' | 'active' | 'expired'>('all');
+
+  const fetchClientHealth = useCallback(() => {
+    setIsLoadingClientHealth(true);
+    setClientHealthError(null);
+    return api
+      .get("/admin/client-health", { headers: adminHeaders })
+      .then((res) => setClientHealthData(res.data.data))
+      .catch(() => setClientHealthError("Failed to load client health data."))
+      .finally(() => setIsLoadingClientHealth(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "clienthealth") return;
+    fetchClientHealth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // Churn Risk Tracker state
+  const [churnData, setChurnData] = useState<{
+    summary: {
+      total: number;
+      expired: number;
+      trialCritical: number;
+      trialSoon: number;
+      trialWatch: number;
+      renewalSoon: number;
+      dormant: number;
+      notEmbedded: number;
+    };
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      trialEndsAt: string | null;
+      subscriptionPaidUntil: string | null;
+      createdAt: string;
+      isLive: boolean;
+      userCount: number;
+      lastActivityAt: string | null;
+      daysSinceActivity: number | null;
+      trialDaysLeft: number | null;
+      paidDaysLeft: number | null;
+      adoptionScore: number;
+      adoptionDetail: { invoicing: boolean; bookkeeping: boolean; inventory: boolean; sales: boolean; banking: boolean };
+      bucket: 'expired' | 'trial_critical' | 'trial_soon' | 'trial_watch' | 'renewal_soon' | 'dormant';
+    }[];
+  } | null>(null);
+  const [churnError, setChurnError] = useState<string | null>(null);
+  const [isLoadingChurn, setIsLoadingChurn] = useState(false);
+
+  const fetchChurnRisk = useCallback(() => {
+    setIsLoadingChurn(true);
+    setChurnError(null);
+    return api
+      .get("/admin/churn-risk", { headers: adminHeaders })
+      .then((res) => setChurnData(res.data.data))
+      .catch(() => setChurnError("Failed to load churn risk data."))
+      .finally(() => setIsLoadingChurn(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "churnrisk") return;
+    fetchChurnRisk();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // Onboarding Completion Tracker state
+  const [onboardingData, setOnboardingData] = useState<{
+    summary: {
+      total: number;
+      fullyOnboarded: number;
+      halfOrMore: number;
+      barelyStarted: number;
+      stuck: number;
+      avgCompletionPct: number;
+    };
+    totalSteps: number;
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      isLive: boolean;
+      createdAt: string;
+      userCount: number;
+      daysSinceSignup: number;
+      completionScore: number;
+      completionPct: number;
+      isStuck: boolean;
+      milestoneDetail: {
+        teamMemberAdded: boolean;
+        firstJournalPosted: boolean;
+        firstInvoiceSent: boolean;
+        firstSaleRecorded: boolean;
+        firstInventoryItem: boolean;
+        bankConnected: boolean;
+        firstReconciliation: boolean;
+      };
+    }[];
+  } | null>(null);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [isLoadingOnboarding, setIsLoadingOnboarding] = useState(false);
+  const [onboardingFilter, setOnboardingFilter] = useState<'all' | 'stuck' | 'complete' | 'started' | 'bare'>('all');
+
+  const fetchOnboarding = useCallback(() => {
+    setIsLoadingOnboarding(true);
+    setOnboardingError(null);
+    return api
+      .get("/admin/onboarding", { headers: adminHeaders })
+      .then((res) => setOnboardingData(res.data.data))
+      .catch(() => setOnboardingError("Failed to load onboarding data."))
+      .finally(() => setIsLoadingOnboarding(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "onboarding") return;
+    fetchOnboarding();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // Revenue & MRR Dashboard state
+  const [revenueData, setRevenueData] = useState<{
+    summary: {
+      totalTenants: number;
+      activePaid: number;
+      trial: number;
+      expired: number;
+      mrr: number;
+      arr: number;
+      trialPipelineValue: number;
+      revenueAtRisk: number;
+      renewalsDueIn30Days: number;
+      avgRevenuePerTenant: number;
+      trialConversionRate: number;
+    };
+    tierBreakdown: { tier: number; name: string; priceGhs: number; activeCount: number; tierMrr: number }[];
+    renewalsDue: {
+      id: string; name: string; slug: string; tier: number; tierName: string; priceGhs: number;
+      subscriptionStatus: string; subscriptionPaidUntil: string | null; renewalDaysLeft: number | null;
+    }[];
+    monthlyActivations: { month: string; count: number; mrr: number }[];
+    allTenants: {
+      id: string; name: string; slug: string; tier: number; tierName: string; priceGhs: number;
+      subscriptionStatus: string; trialEndsAt: string | null; subscriptionPaidUntil: string | null;
+      createdAt: string; isLive: boolean; trialDaysLeft: number | null;
+      renewalDaysLeft: number | null; isRevenueAtRisk: boolean;
+    }[];
+  } | null>(null);
+  const [revenueError, setRevenueError] = useState<string | null>(null);
+  const [isLoadingRevenue, setIsLoadingRevenue] = useState(false);
+  const [revenueView, setRevenueView] = useState<'overview' | 'renewals' | 'all'>('overview');
+
+  const fetchRevenue = useCallback(() => {
+    setIsLoadingRevenue(true);
+    setRevenueError(null);
+    return api
+      .get("/admin/revenue", { headers: adminHeaders })
+      .then((res) => setRevenueData(res.data.data))
+      .catch(() => setRevenueError("Failed to load revenue data."))
+      .finally(() => setIsLoadingRevenue(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "revenue") return;
+    fetchRevenue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // Step 1: verify the master passcode; advance to TOTP step on success.
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
     setAuthError(null);
 
     try {
-      const res = await api.post("/admin/broadcast/verify-passcode", {}, { headers: { 'x-admin-passcode': passcode } });
-      if (res.data.success) {
-        setIsUnlocked(true);
-        sessionStorage.setItem("accountgo_admin_engine_passcode", passcode);
-      }
+      await api.post("/admin/broadcast/verify-passcode", {}, { headers: { 'x-admin-passcode': passcode } });
+      setAuthStep('totp');
+      setTotpCode('');
     } catch (err: any) {
       setAuthError(err.response?.data?.error || "Invalid master passcode. Access denied.");
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  // Step 2: verify the TOTP code and exchange for a session token.
+  const handleVerifyTotp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    setAuthError(null);
+
+    try {
+      const res = await api.post("/admin/totp/verify", { totpCode }, { headers: { 'x-admin-passcode': passcode } });
+      const token: string = res.data.data.sessionToken;
+      setSessionToken(token);
+      setIsUnlocked(true);
+      sessionStorage.setItem("accountgo_admin_engine_session", token);
+      sessionStorage.removeItem("accountgo_admin_engine_passcode");
+    } catch (err: any) {
+      // 503 = TOTP not yet configured on this server → fall back to passcode-only
+      if (err.response?.status === 503) {
+        setIsUnlocked(true);
+        sessionStorage.setItem("accountgo_admin_engine_passcode", passcode);
+      } else {
+        setAuthError(err.response?.data?.error || "Invalid authenticator code. Codes expire every 30 seconds — try again.");
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Fetch QR code setup data (requires passcode; shown on the TOTP step).
+  const handleShowSetup = async () => {
+    setIsLoadingSetup(true);
+    setShowSetupQr(true);
+    setSetupQrData(null);
+    try {
+      const res = await api.get("/admin/totp/setup", { headers: { 'x-admin-passcode': passcode } });
+      setSetupQrData(res.data.data);
+    } catch {
+      setAuthError("Failed to load authenticator setup. Check your passcode and try again.");
+      setShowSetupQr(false);
+    } finally {
+      setIsLoadingSetup(false);
     }
   };
 
@@ -762,7 +1032,7 @@ export function AdminCoreEngine() {
         message,
         channel,
         targetTier: targetTier === "ALL" ? undefined : Number(targetTier),
-      }, { headers: { 'x-admin-passcode': passcode } });
+      }, { headers: adminHeaders });
 
       if (res.data.success) {
         setBroadcastResult(res.data.data);
@@ -791,7 +1061,7 @@ export function AdminCoreEngine() {
         baseCurrency: onboardBaseCurrency,
         orgType: onboardOrgType,
         tier: onboardTier,
-      }, { headers: { 'x-admin-passcode': passcode } });
+      }, { headers: adminHeaders });
       if (res.data.success) {
         setOnboardResult(res.data.data);
         setOnboardCompanyName("");
@@ -904,7 +1174,11 @@ export function AdminCoreEngine() {
               </span>
               <button
                 onClick={() => {
+                  sessionStorage.removeItem("accountgo_admin_engine_session");
                   sessionStorage.removeItem("accountgo_admin_engine_passcode");
+                  setSessionToken(null);
+                  setPasscode('');
+                  setAuthStep('passcode');
                   setIsUnlocked(false);
                 }}
                 className="text-secondary-400 hover:text-rose-400 transition-colors"
@@ -936,35 +1210,121 @@ export function AdminCoreEngine() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleVerifyPasscode} className="space-y-4">
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-xs font-semibold text-secondary-300">Master Security Passcode</label>
-                    <Input
-                      type="password"
-                      value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="Enter Master Security Passcode"
-                      required
-                      className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-jetbrains text-base"
-                    />
-                  </div>
-
-                  {authError && (
-                    <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
-                      {authError}
+                {authStep === 'passcode' ? (
+                  <form onSubmit={handleVerifyPasscode} className="space-y-4">
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-xs font-semibold text-secondary-300">Master Security Passcode</label>
+                      <Input
+                        type="password"
+                        value={passcode}
+                        onChange={(e) => setPasscode(e.target.value)}
+                        placeholder="Enter Master Security Passcode"
+                        required
+                        className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-jetbrains text-base"
+                      />
                     </div>
-                  )}
 
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
-                    disabled={isVerifying}
-                  >
-                    {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Authenticate Core Engine
-                  </Button>
-                </form>
+                    {authError && (
+                      <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                        {authError}
+                      </div>
+                    )}
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
+                      disabled={isVerifying}
+                    >
+                      {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Continue
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-secondary-300">Authenticator Code</span>
+                      <button
+                        type="button"
+                        onClick={() => { setAuthStep('passcode'); setAuthError(null); setShowSetupQr(false); setSetupQrData(null); }}
+                        className="text-xs text-secondary-500 hover:text-amber-400 transition-colors"
+                      >
+                        ← Back
+                      </button>
+                    </div>
+
+                    {!showSetupQr ? (
+                      <form onSubmit={handleVerifyTotp} className="space-y-4">
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]{6}"
+                          maxLength={6}
+                          value={totpCode}
+                          onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="6-digit code from authenticator"
+                          required
+                          autoFocus
+                          className="bg-secondary-950 border-secondary-700 text-white text-center tracking-[0.4em] font-jetbrains text-xl"
+                        />
+
+                        {authError && (
+                          <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                            {authError}
+                          </div>
+                        )}
+
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
+                          disabled={isVerifying || totpCode.length !== 6}
+                        >
+                          {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Verify &amp; Unlock
+                        </Button>
+
+                        <button
+                          type="button"
+                          onClick={handleShowSetup}
+                          disabled={isLoadingSetup}
+                          className="w-full text-xs text-secondary-500 hover:text-amber-400 transition-colors pt-1"
+                        >
+                          {isLoadingSetup ? 'Loading...' : 'Set up authenticator app →'}
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="space-y-4">
+                        {setupQrData ? (
+                          <>
+                            <p className="text-xs text-secondary-400 text-left">{setupQrData.note}</p>
+                            <div className="flex justify-center">
+                              <img src={setupQrData.qrDataUrl} alt="TOTP QR Code" className="w-44 h-44 rounded-lg bg-white p-1" />
+                            </div>
+                            <div className="bg-secondary-950 border border-secondary-700 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-secondary-500 mb-1 text-left">Manual entry key</p>
+                              <p className="font-jetbrains text-xs text-amber-400 break-all text-center select-all">{setupQrData.secret}</p>
+                            </div>
+                            <p className="text-[10px] text-secondary-500 text-left">
+                              Scan with Google Authenticator, Authy, or any TOTP app. Then enter the 6-digit code above.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowSetupQr(false)}
+                              className="w-full text-xs text-amber-400 hover:text-amber-300 transition-colors font-semibold"
+                            >
+                              Done — enter my code
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex justify-center py-6">
+                            <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1161,6 +1521,70 @@ export function AdminCoreEngine() {
               >
                 <HandCoins className="h-4 w-4" />
                 <span>Referrals</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("clienthealth")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "clienthealth" ? "border-emerald-400 text-emerald-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <HeartPulse className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Client Health
+                  {clientHealthData && clientHealthData.summary.highRiskTenants > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {clientHealthData.summary.highRiskTenants}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("churnrisk")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "churnrisk" ? "border-rose-400 text-rose-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <TrendingDown className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Churn Risk
+                  {churnData && (churnData.summary.trialCritical + churnData.summary.expired) > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {churnData.summary.trialCritical + churnData.summary.expired}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("onboarding")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "onboarding" ? "border-violet-400 text-violet-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Onboarding
+                  {onboardingData && onboardingData.summary.stuck > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-violet-600 text-white text-[10px] font-bold leading-none">
+                      {onboardingData.summary.stuck}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("revenue")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "revenue" ? "border-cyan-400 text-cyan-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Revenue
+                  {revenueData && revenueData.summary.revenueAtRisk > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-amber-600 text-white text-[10px] font-bold leading-none">
+                      !
+                    </span>
+                  )}
+                </span>
               </button>
             </div>
 
@@ -3143,7 +3567,7 @@ export function AdminCoreEngine() {
 
             {/* Tab: Safety — Emergency Stop */}
             {activeTab === "safety" && (
-              <EmergencyStopPanel passcode={passcode} />
+              <EmergencyStopPanel passcode={passcode} sessionToken={sessionToken} />
             )}
 
             {/* Tab: Referral Partners */}
@@ -3322,12 +3746,826 @@ export function AdminCoreEngine() {
             )}
           </div>
         )}
+            {/* Tab: Churn Risk Tracker */}
+            {activeTab === "churnrisk" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <TrendingDown className="h-5 w-5 text-rose-400" />
+                      Churn Risk Tracker
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      At-risk tenants sorted by urgency + feature adoption — who to call and what to say.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchChurnRisk}
+                    disabled={isLoadingChurn}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingChurn ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {churnError && (
+                  <div className="rounded-lg border border-rose-800 bg-rose-950/30 p-4 text-rose-400 text-sm">{churnError}</div>
+                )}
+
+                {isLoadingChurn && !churnData && (
+                  <div className="flex items-center gap-3 text-secondary-400 text-sm py-8">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Analysing churn risk signals…
+                  </div>
+                )}
+
+                {churnData && (
+                  <>
+                    {/* Summary strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: "Total at risk", value: churnData.summary.total, color: "text-white" },
+                        { label: "Trial ≤3 days", value: churnData.summary.trialCritical, color: "text-rose-400" },
+                        { label: "Expired", value: churnData.summary.expired, color: "text-rose-400" },
+                        { label: "Not yet embedded", value: churnData.summary.notEmbedded, color: "text-amber-400", note: "score 0–1 features" },
+                      ].map((s) => (
+                        <Card key={s.label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-xs">{s.label}</p>
+                            <p className={`text-3xl font-black mt-1 ${s.color}`}>{s.value}</p>
+                            {s.note && <p className="text-secondary-600 text-[10px] mt-0.5">{s.note}</p>}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {churnData.tenants.length === 0 ? (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <CardContent className="py-12 text-center text-secondary-500 text-sm">
+                          No at-risk tenants right now.
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      (() => {
+                        const BUCKETS: { key: typeof churnData.tenants[0]['bucket']; label: string; urgency: string; color: string }[] = [
+                          { key: 'expired',        label: 'Expired — already churned',         urgency: 'Re-engage now',         color: 'border-rose-800 bg-rose-950/20' },
+                          { key: 'trial_critical', label: 'Trial ends in ≤3 days',             urgency: 'Call today',            color: 'border-rose-800 bg-rose-950/20' },
+                          { key: 'trial_soon',     label: 'Trial ends in 4–7 days',            urgency: 'Reach out this week',   color: 'border-amber-800 bg-amber-950/20' },
+                          { key: 'renewal_soon',   label: 'Renewal due in ≤14 days',           urgency: 'Confirm renewal',       color: 'border-amber-800 bg-amber-950/20' },
+                          { key: 'dormant',        label: 'Dormant 14+ days',                  urgency: 'Check-in needed',       color: 'border-secondary-700 bg-secondary-900' },
+                          { key: 'trial_watch',    label: 'Trial ends in 8–30 days',           urgency: 'Monitor closely',       color: 'border-secondary-700 bg-secondary-900' },
+                        ];
+
+                        const FEATURES: { key: keyof typeof churnData.tenants[0]['adoptionDetail']; label: string }[] = [
+                          { key: 'invoicing',    label: 'Invoicing' },
+                          { key: 'bookkeeping',  label: 'Books' },
+                          { key: 'inventory',    label: 'Inventory' },
+                          { key: 'sales',        label: 'Sales' },
+                          { key: 'banking',      label: 'Banking' },
+                        ];
+
+                        return (
+                          <div className="space-y-5">
+                            {BUCKETS.map(({ key, label, urgency, color }) => {
+                              const rows = churnData.tenants.filter((t) => t.bucket === key);
+                              if (rows.length === 0) return null;
+                              return (
+                                <div key={key} className={`rounded-xl border ${color} overflow-hidden`}>
+                                  <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-white text-sm font-bold">{label}</span>
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-300">{rows.length}</span>
+                                    </div>
+                                    <span className="text-xs text-secondary-400 italic">{urgency}</span>
+                                  </div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="border-white/5 hover:bg-transparent">
+                                        <TableHead className="text-secondary-400 text-xs pl-5">Client</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Tier</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Deadline</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Last active</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Score</TableHead>
+                                        {FEATURES.map((f) => (
+                                          <TableHead key={f.key} className="text-secondary-400 text-xs text-center">{f.label}</TableHead>
+                                        ))}
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {rows.map((t) => {
+                                        const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `T${t.tier}`;
+                                        const deadlineLabel = (() => {
+                                          if (t.bucket === 'expired') return <span className="text-rose-400 text-xs font-bold">EXPIRED</span>;
+                                          if (t.bucket === 'trial_critical' || t.bucket === 'trial_soon' || t.bucket === 'trial_watch') {
+                                            if (t.trialDaysLeft !== null && t.trialDaysLeft <= 0) return <span className="text-rose-400 text-xs font-bold">TODAY</span>;
+                                            return <span className={`text-xs ${(t.trialDaysLeft ?? 99) <= 3 ? 'text-rose-300 font-semibold' : (t.trialDaysLeft ?? 99) <= 7 ? 'text-amber-300' : 'text-secondary-300'}`}>Trial ends in {t.trialDaysLeft}d</span>;
+                                          }
+                                          if (t.bucket === 'renewal_soon') return <span className={`text-xs ${(t.paidDaysLeft ?? 99) <= 7 ? 'text-amber-300 font-semibold' : 'text-secondary-300'}`}>Renewal in {t.paidDaysLeft}d</span>;
+                                          return <span className="text-secondary-500 text-xs">—</span>;
+                                        })();
+                                        const activityLabel = t.daysSinceActivity === null
+                                          ? <span className="text-secondary-600 text-xs italic">never</span>
+                                          : t.daysSinceActivity === 0
+                                          ? <span className="text-emerald-400 text-xs">today</span>
+                                          : <span className={`text-xs ${t.daysSinceActivity >= 14 ? 'text-rose-400 font-semibold' : t.daysSinceActivity >= 7 ? 'text-amber-300' : 'text-secondary-300'}`}>{t.daysSinceActivity}d ago</span>;
+                                        const scoreColor = t.adoptionScore === 0 ? 'text-rose-400' : t.adoptionScore <= 2 ? 'text-amber-400' : t.adoptionScore <= 3 ? 'text-secondary-200' : 'text-emerald-400';
+
+                                        return (
+                                          <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
+                                            <TableCell className="pl-5">
+                                              <div>
+                                                <p className="text-white text-sm font-semibold">{t.name}</p>
+                                                <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="text-secondary-400 text-xs">{tierLabel}</TableCell>
+                                            <TableCell>{deadlineLabel}</TableCell>
+                                            <TableCell>{activityLabel}</TableCell>
+                                            <TableCell>
+                                              <span className={`text-sm font-bold ${scoreColor}`}>{t.adoptionScore}<span className="text-secondary-600 text-xs">/5</span></span>
+                                            </TableCell>
+                                            {FEATURES.map((f) => (
+                                              <TableCell key={f.key} className="text-center">
+                                                {t.adoptionDetail[f.key]
+                                                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mx-auto" />
+                                                  : <XCircle className="h-3.5 w-3.5 text-secondary-700 mx-auto" />}
+                                              </TableCell>
+                                            ))}
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()
+                    )}
+
+                    {/* Adoption legend */}
+                    <div className="flex flex-wrap gap-4 text-xs text-secondary-500 pt-2 border-t border-secondary-800">
+                      <span className="font-semibold text-secondary-300">Feature adoption legend:</span>
+                      <span><span className="text-emerald-400">●</span> Used at least once in audit log</span>
+                      <span><span className="text-secondary-600">●</span> No audit record (never used or pre-audit)</span>
+                      <span>Score 0-1 = not yet embedded, at very high churn risk regardless of trial status</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Client Health Dashboard */}
+            {activeTab === "clienthealth" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <HeartPulse className="h-5 w-5 text-emerald-400" />
+                      Client Health Dashboard
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Real-time tenant activity, subscription health, and churn risk — last activity derived from audit logs.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchClientHealth}
+                    disabled={isLoadingClientHealth}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingClientHealth ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {clientHealthError && (
+                  <div className="rounded-lg border border-rose-800 bg-rose-950/30 p-4 text-rose-400 text-sm">{clientHealthError}</div>
+                )}
+
+                {isLoadingClientHealth && !clientHealthData && (
+                  <div className="flex items-center gap-3 text-secondary-400 text-sm py-8">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Loading client health data…
+                  </div>
+                )}
+
+                {clientHealthData && (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: "Total Clients", value: clientHealthData.summary.totalTenants, color: "text-white" },
+                        { label: "Active Paid", value: clientHealthData.summary.activeTenants, color: "text-emerald-400" },
+                        { label: "On Trial", value: clientHealthData.summary.trialTenants, color: "text-amber-400" },
+                        { label: "Expired", value: clientHealthData.summary.expiredTenants, color: "text-rose-400" },
+                      ].map((stat) => (
+                        <Card key={stat.label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-xs">{stat.label}</p>
+                            <p className={`text-3xl font-black mt-1 ${stat.color}`}>{stat.value}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Churn Risk Summary */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Card className="bg-rose-950/20 border-rose-900">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <TrendingDown className="h-8 w-8 text-rose-400 shrink-0" />
+                          <div>
+                            <p className="text-rose-300 text-xs font-semibold">HIGH RISK</p>
+                            <p className="text-3xl font-black text-rose-400">{clientHealthData.summary.highRiskTenants}</p>
+                            <p className="text-rose-500 text-[10px]">dormant 14d+ or expired</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-amber-950/20 border-amber-900">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <AlertTriangle className="h-8 w-8 text-amber-400 shrink-0" />
+                          <div>
+                            <p className="text-amber-300 text-xs font-semibold">MEDIUM RISK</p>
+                            <p className="text-3xl font-black text-amber-400">{clientHealthData.summary.mediumRiskTenants}</p>
+                            <p className="text-amber-600 text-[10px]">dormant 7-13d or expiring soon</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <Clock className="h-8 w-8 text-amber-400 shrink-0" />
+                          <div>
+                            <p className="text-secondary-300 text-xs font-semibold">TRIALS EXPIRING ≤7 DAYS</p>
+                            <p className="text-3xl font-black text-amber-400">{clientHealthData.summary.trialsExpiringIn7Days}</p>
+                            <p className="text-secondary-500 text-[10px]">need conversion outreach now</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Filters & Sort */}
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-secondary-400 text-xs font-semibold">FILTER:</span>
+                      {(["all", "high", "medium", "trial", "active", "expired"] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setClientHealthFilter(f)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            clientHealthFilter === f
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {f === "all" ? "All" : f === "high" ? "High Risk" : f === "medium" ? "Medium Risk" : f.charAt(0).toUpperCase() + f.slice(1)}
+                        </button>
+                      ))}
+                      <span className="ml-4 text-secondary-400 text-xs font-semibold">SORT:</span>
+                      {(["risk", "dormant", "recent"] as const).map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setClientHealthSort(s)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            clientHealthSort === s
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {s === "risk" ? "By Risk" : s === "dormant" ? "Most Dormant" : "Most Recent"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tenant Table */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800 hover:bg-transparent">
+                              <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Tier</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Risk</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Users</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Last Activity</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Expiry / Deadline</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              const RISK_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
+                              let rows = [...clientHealthData.tenants];
+
+                              // filter
+                              if (clientHealthFilter === "high") rows = rows.filter((r) => r.churnRisk === "high");
+                              else if (clientHealthFilter === "medium") rows = rows.filter((r) => r.churnRisk === "medium");
+                              else if (clientHealthFilter === "trial") rows = rows.filter((r) => r.subscriptionStatus === "TRIAL");
+                              else if (clientHealthFilter === "active") rows = rows.filter((r) => r.subscriptionStatus === "ACTIVE");
+                              else if (clientHealthFilter === "expired") rows = rows.filter((r) => r.subscriptionStatus === "EXPIRED");
+
+                              // sort
+                              if (clientHealthSort === "risk") rows.sort((a, b) => RISK_ORDER[a.churnRisk] - RISK_ORDER[b.churnRisk]);
+                              else if (clientHealthSort === "dormant") rows.sort((a, b) => (b.daysSinceActivity ?? -1) - (a.daysSinceActivity ?? -1));
+                              else rows.sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+
+                              if (rows.length === 0) {
+                                return (
+                                  <TableRow>
+                                    <TableCell colSpan={7} className="text-center text-secondary-500 text-sm py-8">
+                                      No clients match this filter.
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+
+                              return rows.map((t) => {
+                                const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `Tier ${t.tier}`;
+                                const statusColor =
+                                  t.subscriptionStatus === "ACTIVE" ? "text-emerald-400" :
+                                  t.subscriptionStatus === "TRIAL" ? "text-amber-400" :
+                                  t.subscriptionStatus === "EXPIRED" ? "text-rose-400" : "text-secondary-400";
+                                const riskBadge = {
+                                  high: <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-800"><TrendingDown className="h-2.5 w-2.5" />HIGH</span>,
+                                  medium: <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800"><AlertTriangle className="h-2.5 w-2.5" />MEDIUM</span>,
+                                  low: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-400">LOW</span>,
+                                  none: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-500 border border-emerald-900">OK</span>,
+                                }[t.churnRisk];
+
+                                const activityLabel = t.daysSinceActivity === null
+                                  ? <span className="text-secondary-500 text-xs italic">No audit records</span>
+                                  : t.daysSinceActivity === 0
+                                  ? <span className="text-emerald-400 text-xs">Today</span>
+                                  : t.daysSinceActivity === 1
+                                  ? <span className="text-emerald-300 text-xs">Yesterday</span>
+                                  : t.daysSinceActivity <= 6
+                                  ? <span className="text-secondary-200 text-xs">{t.daysSinceActivity}d ago</span>
+                                  : t.daysSinceActivity <= 13
+                                  ? <span className="text-amber-300 text-xs">{t.daysSinceActivity}d ago</span>
+                                  : <span className="text-rose-400 text-xs font-semibold">{t.daysSinceActivity}d ago</span>;
+
+                                const expiryLabel = (() => {
+                                  if (t.subscriptionStatus === "TRIAL" && t.trialDaysLeft !== null) {
+                                    if (t.trialDaysLeft < 0) return <span className="text-rose-400 text-xs">Trial expired {Math.abs(t.trialDaysLeft)}d ago</span>;
+                                    if (t.trialDaysLeft === 0) return <span className="text-rose-400 text-xs font-bold">Trial ends TODAY</span>;
+                                    return <span className={`text-xs ${t.trialDaysLeft <= 7 ? "text-rose-300 font-semibold" : t.trialDaysLeft <= 14 ? "text-amber-300" : "text-secondary-300"}`}>Trial ends in {t.trialDaysLeft}d</span>;
+                                  }
+                                  if (t.subscriptionStatus === "ACTIVE" && t.paidDaysLeft !== null) {
+                                    if (t.paidDaysLeft < 0) return <span className="text-rose-400 text-xs">Overdue {Math.abs(t.paidDaysLeft)}d</span>;
+                                    return <span className={`text-xs ${t.paidDaysLeft <= 7 ? "text-amber-300 font-semibold" : "text-secondary-400"}`}>Renews in {t.paidDaysLeft}d</span>;
+                                  }
+                                  if (t.subscriptionStatus === "EXPIRED") return <span className="text-rose-400 text-xs font-bold">EXPIRED</span>;
+                                  return <span className="text-secondary-500 text-xs">—</span>;
+                                })();
+
+                                return (
+                                  <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-800/40">
+                                    <TableCell>
+                                      <div>
+                                        <p className="text-white text-sm font-semibold">{t.name}</p>
+                                        <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{tierLabel}</TableCell>
+                                    <TableCell className={`text-xs font-semibold ${statusColor}`}>{t.subscriptionStatus}</TableCell>
+                                    <TableCell>{riskBadge}</TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.userCount}</TableCell>
+                                    <TableCell>{activityLabel}</TableCell>
+                                    <TableCell>{expiryLabel}</TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Onboarding Completion Tracker */}
+            {activeTab === "onboarding" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <ClipboardList className="h-5 w-5 text-violet-400" />
+                      Onboarding Completion Tracker
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Per-tenant setup progress across 8 milestones. Stuck clients ({">"} 7 days, {"<"} 4 steps) need outreach.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchOnboarding}
+                    disabled={isLoadingOnboarding}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingOnboarding ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {onboardingError && (
+                  <div className="rounded-lg bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 text-sm">
+                    {onboardingError}
+                  </div>
+                )}
+
+                {isLoadingOnboarding && !onboardingData && (
+                  <div className="flex items-center gap-2 text-secondary-400 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading onboarding data…
+                  </div>
+                )}
+
+                {onboardingData && (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {[
+                        { label: "Total Tenants", value: onboardingData.summary.total, color: "text-white" },
+                        { label: "Fully Onboarded", value: onboardingData.summary.fullyOnboarded, color: "text-emerald-400" },
+                        { label: "Half or More", value: onboardingData.summary.halfOrMore, color: "text-amber-400" },
+                        { label: "Barely Started", value: onboardingData.summary.barelyStarted, color: "text-orange-400" },
+                        { label: "Stuck (need call)", value: onboardingData.summary.stuck, color: "text-rose-400" },
+                        { label: "Avg Completion", value: `${onboardingData.summary.avgCompletionPct}%`, color: "text-violet-400" },
+                      ].map(({ label, value, color }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-[10px] uppercase tracking-wide mb-1">{label}</p>
+                            <p className={`text-2xl font-extrabold ${color}`} style={{ fontFamily: "'Syne', sans-serif" }}>{value}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Filter Row */}
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {(['all', 'stuck', 'complete', 'started', 'bare'] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setOnboardingFilter(f)}
+                          className={`px-3 py-1 rounded-full border transition-colors ${
+                            onboardingFilter === f
+                              ? "border-violet-500 bg-violet-900/30 text-violet-300"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {f === 'all' ? 'All Tenants' : f === 'stuck' ? 'Stuck Only' : f === 'complete' ? 'Fully Onboarded' : f === 'started' ? 'In Progress' : 'Barely Started'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tenant Milestone Table */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800 hover:bg-transparent">
+                              <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Score</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Wizard</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Team</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Journal</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Invoice</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Sale</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Inventory</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Bank</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Reconcile</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Days</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              let rows = [...onboardingData.tenants];
+                              if (onboardingFilter === 'stuck') rows = rows.filter((r) => r.isStuck);
+                              else if (onboardingFilter === 'complete') rows = rows.filter((r) => r.completionScore === onboardingData.totalSteps);
+                              else if (onboardingFilter === 'started') rows = rows.filter((r) => r.completionScore >= 2 && r.completionScore < onboardingData.totalSteps);
+                              else if (onboardingFilter === 'bare') rows = rows.filter((r) => r.completionScore < 2);
+                              rows.sort((a, b) => {
+                                if (a.isStuck !== b.isStuck) return a.isStuck ? -1 : 1;
+                                return a.completionScore - b.completionScore;
+                              });
+                              if (rows.length === 0) {
+                                return (
+                                  <TableRow>
+                                    <TableCell colSpan={12} className="text-center text-secondary-500 text-sm py-8">
+                                      No clients match this filter.
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+                              return rows.map((t) => {
+                                const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `T${t.tier}`;
+                                const pctColor = t.completionPct >= 75 ? "text-emerald-400" : t.completionPct >= 50 ? "text-amber-400" : t.completionPct >= 25 ? "text-orange-400" : "text-rose-400";
+                                const check = (val: boolean) => val
+                                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mx-auto" />
+                                  : <XCircle className="h-3.5 w-3.5 text-secondary-700 mx-auto" />;
+                                return (
+                                  <TableRow key={t.id} className={`border-secondary-800 hover:bg-secondary-800/50 ${t.isStuck ? 'bg-rose-900/10' : ''}`}>
+                                    <TableCell>
+                                      <div>
+                                        <p className="text-white text-sm font-semibold">{t.name}</p>
+                                        <p className="text-secondary-500 text-[10px]">{t.slug} · {tierLabel} · {t.subscriptionStatus}</p>
+                                        <p className="text-secondary-600 text-[10px]">{t.userCount} user{t.userCount !== 1 ? 's' : ''}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <span className={`font-bold text-sm ${pctColor}`}>{t.completionScore}/{onboardingData.totalSteps}</span>
+                                      <div className="w-16 h-1 bg-secondary-700 rounded-full mt-1">
+                                        <div className={`h-1 rounded-full ${t.completionPct >= 75 ? 'bg-emerald-400' : t.completionPct >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${t.completionPct}%` }} />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">{check(t.isLive)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.teamMemberAdded)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstJournalPosted)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstInvoiceSent)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstSaleRecorded)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstInventoryItem)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.bankConnected)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstReconciliation)}</TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">{t.daysSinceSignup}d</TableCell>
+                                    <TableCell>
+                                      {t.isStuck ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-900/40 text-rose-300 text-[10px] font-bold border border-rose-700">
+                                          STUCK
+                                        </span>
+                                      ) : t.completionScore === onboardingData.totalSteps ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 text-[10px] font-bold border border-emerald-700">
+                                          COMPLETE
+                                        </span>
+                                      ) : t.completionScore >= Math.ceil(onboardingData.totalSteps / 2) ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 text-[10px] font-bold border border-amber-700">
+                                          IN PROGRESS
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-400 text-[10px] font-bold border border-secondary-700">
+                                          STARTED
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+
+                    {/* Legend */}
+                    <div className="flex flex-wrap gap-4 text-xs text-secondary-500 pt-2 border-t border-secondary-800">
+                      <span className="font-semibold text-secondary-300">Step guide:</span>
+                      <span><span className="text-emerald-400">✓</span> = done (detected in audit log or isLive flag)</span>
+                      <span><span className="text-secondary-600">✗</span> = not yet completed</span>
+                      <span><span className="text-rose-400">STUCK</span> = signed up {">"}7 days ago, {"<"} 4 of 8 steps done — call them</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Revenue & MRR Dashboard */}
+            {activeTab === "revenue" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <TrendingUp className="h-5 w-5 text-cyan-400" />
+                      Revenue & MRR Dashboard
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Monthly recurring revenue, tier breakdown, trial pipeline, and upcoming renewals.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchRevenue}
+                    disabled={isLoadingRevenue}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingRevenue ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {revenueError && (
+                  <div className="rounded-lg bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 text-sm">
+                    {revenueError}
+                  </div>
+                )}
+
+                {isLoadingRevenue && !revenueData && (
+                  <div className="flex items-center gap-2 text-secondary-400 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading revenue data…
+                  </div>
+                )}
+
+                {revenueData && (
+                  <>
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {[
+                        { label: "MRR", value: `GHS ${revenueData.summary.mrr.toLocaleString()}`, sub: "active paid tenants", color: "text-cyan-400" },
+                        { label: "ARR (Projected)", value: `GHS ${revenueData.summary.arr.toLocaleString()}`, sub: "MRR × 12", color: "text-emerald-400" },
+                        { label: "Trial Pipeline", value: `GHS ${revenueData.summary.trialPipelineValue.toLocaleString()}`, sub: `${revenueData.summary.trial} active trials`, color: "text-amber-400" },
+                        { label: "Revenue at Risk", value: `GHS ${revenueData.summary.revenueAtRisk.toLocaleString()}`, sub: `${revenueData.summary.renewalsDueIn30Days} renewals + expired`, color: revenueData.summary.revenueAtRisk > 0 ? "text-rose-400" : "text-secondary-400" },
+                        { label: "Active Paid", value: String(revenueData.summary.activePaid), sub: "of " + revenueData.summary.totalTenants + " total", color: "text-white" },
+                        { label: "Trial Conversion", value: `${revenueData.summary.trialConversionRate}%`, sub: "paid / total tenants", color: "text-violet-400" },
+                        { label: "Avg Rev / Tenant", value: `GHS ${revenueData.summary.avgRevenuePerTenant}`, sub: "active paid only", color: "text-secondary-300" },
+                        { label: "Renewals in 30d", value: String(revenueData.summary.renewalsDueIn30Days), sub: "need retention action", color: revenueData.summary.renewalsDueIn30Days > 0 ? "text-orange-400" : "text-secondary-400" },
+                      ].map(({ label, value, sub, color }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-[10px] uppercase tracking-wide mb-1">{label}</p>
+                            <p className={`text-xl font-extrabold ${color}`} style={{ fontFamily: "'Syne', sans-serif" }}>{value}</p>
+                            <p className="text-secondary-600 text-[10px] mt-0.5">{sub}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Tier Breakdown */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {revenueData.tierBreakdown.map((t) => (
+                        <Card key={t.tier} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="text-white font-bold text-sm">{t.name} Plan</p>
+                                <p className="text-secondary-400 text-xs">GHS {t.priceGhs}/mo per tenant</p>
+                              </div>
+                              <DollarSign className="h-5 w-5 text-cyan-600" />
+                            </div>
+                            <p className="text-2xl font-extrabold text-cyan-400" style={{ fontFamily: "'Syne', sans-serif" }}>
+                              GHS {t.tierMrr.toLocaleString()}
+                            </p>
+                            <p className="text-secondary-500 text-xs mt-1">{t.activeCount} active tenant{t.activeCount !== 1 ? 's' : ''}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Monthly Activations Sparkline */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-secondary-300">New Paid Activations — Last 12 Months</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-end gap-1 h-20">
+                          {(() => {
+                            const maxCount = Math.max(...revenueData.monthlyActivations.map((m) => m.count), 1);
+                            return revenueData.monthlyActivations.map((m) => (
+                              <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                                <div
+                                  className="w-full bg-cyan-500/70 rounded-t"
+                                  style={{ height: `${Math.max(4, Math.round((m.count / maxCount) * 64))}px` }}
+                                  title={`${m.month}: ${m.count} new paid, GHS ${m.mrr}`}
+                                />
+                                <span className="text-[8px] text-secondary-600 leading-none">{m.month}</span>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                        <p className="text-secondary-600 text-[10px] mt-2">Bucketed by sign-up month for active paid tenants.</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Sub-views */}
+                    <div className="flex gap-2 text-xs">
+                      {(['overview', 'renewals', 'all'] as const).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setRevenueView(v)}
+                          className={`px-3 py-1 rounded-full border transition-colors ${
+                            revenueView === v
+                              ? "border-cyan-500 bg-cyan-900/30 text-cyan-300"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {v === 'overview' ? 'Overview' : v === 'renewals' ? `Renewals Due (${revenueData.summary.renewalsDueIn30Days})` : 'All Tenants'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Renewals Due Table */}
+                    {revenueView === 'renewals' && (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-secondary-800 hover:bg-transparent">
+                                <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Plan</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Monthly Value</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Renews In</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Renewal Date</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {revenueData.renewalsDue.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="text-center text-secondary-500 text-sm py-8">
+                                    No renewals due in the next 30 days.
+                                  </TableCell>
+                                </TableRow>
+                              ) : revenueData.renewalsDue.map((t) => {
+                                const urgencyColor = (t.renewalDaysLeft ?? 99) <= 7 ? "text-rose-400" : (t.renewalDaysLeft ?? 99) <= 14 ? "text-orange-400" : "text-amber-400";
+                                return (
+                                  <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-800/50">
+                                    <TableCell>
+                                      <p className="text-white text-sm font-semibold">{t.name}</p>
+                                      <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.tierName}</TableCell>
+                                    <TableCell className="text-cyan-400 text-sm font-bold">GHS {t.priceGhs}</TableCell>
+                                    <TableCell className={`font-bold text-sm ${urgencyColor}`}>
+                                      {t.renewalDaysLeft}d
+                                    </TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">
+                                      {t.subscriptionPaidUntil ? new Date(t.subscriptionPaidUntil).toLocaleDateString('en-GB') : '—'}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* All Tenants Revenue Table */}
+                    {revenueView === 'all' && (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-secondary-800 hover:bg-transparent">
+                                <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Plan</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Monthly Value</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Paid Until / Trial Ends</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {revenueData.allTenants.map((t) => {
+                                const statusColor = t.subscriptionStatus === 'ACTIVE' ? 'text-emerald-400' : t.subscriptionStatus === 'TRIAL' ? 'text-amber-400' : 'text-rose-400';
+                                const dateLabel = t.subscriptionStatus === 'ACTIVE' && t.subscriptionPaidUntil
+                                  ? new Date(t.subscriptionPaidUntil).toLocaleDateString('en-GB')
+                                  : t.subscriptionStatus === 'TRIAL' && t.trialEndsAt
+                                  ? `Trial ends ${new Date(t.trialEndsAt).toLocaleDateString('en-GB')}`
+                                  : '—';
+                                return (
+                                  <TableRow key={t.id} className={`border-secondary-800 hover:bg-secondary-800/50 ${t.isRevenueAtRisk ? 'bg-rose-900/10' : ''}`}>
+                                    <TableCell>
+                                      <p className="text-white text-sm font-semibold">{t.name}</p>
+                                      <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.tierName}</TableCell>
+                                    <TableCell className={`text-xs font-semibold ${statusColor}`}>{t.subscriptionStatus}</TableCell>
+                                    <TableCell className={`font-bold text-sm ${t.subscriptionStatus === 'ACTIVE' ? 'text-cyan-400' : t.subscriptionStatus === 'TRIAL' ? 'text-amber-300/60' : 'text-rose-400/60'}`}>
+                                      GHS {t.priceGhs}
+                                    </TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">{dateLabel}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </Card>
+                    )}
+
+                    {revenueView === 'overview' && (
+                      <div className="text-secondary-500 text-xs pt-2 border-t border-secondary-800">
+                        MRR counts only ACTIVE paid tenants at their tier price. Trial pipeline value shows potential MRR if all active trials convert. Revenue at risk = expired tenants + renewals due in ≤30 days.
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
       </main>
     </div>
   );
 }
 
-function EmergencyStopPanel({ passcode }: { passcode: string }) {
+function EmergencyStopPanel({ passcode, sessionToken }: { passcode: string; sessionToken: string | null }) {
   const [state, setState] = useState<{ active: boolean; reason?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState("");
@@ -3336,7 +4574,9 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
   const [msg, setMsg] = useState<string | null>(null);
 
   const adminBase = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/admin/emergency-stop`;
-  const adminHeaders = { "x-admin-passcode": passcode, "Content-Type": "application/json" };
+  const adminHeaders: Record<string, string> = sessionToken
+    ? { "x-admin-session": sessionToken, "Content-Type": "application/json" }
+    : { "x-admin-passcode": passcode, "Content-Type": "application/json" };
 
   async function adminFetch(url: string, init?: RequestInit) {
     const res = await fetch(url, { ...init, headers: { ...adminHeaders, ...init?.headers } });

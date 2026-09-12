@@ -21,8 +21,10 @@ import journalEntriesRouter from './routes/journalEntries';
 import ledgersRouter from './routes/ledgers';
 import reportsRouter from './routes/reports';
 import { requestLoggerMiddleware } from './middleware/requestLoggerMiddleware';
+import { adminPasscodeMiddleware } from './middleware/adminPasscodeMiddleware';
+import { idorAuditMiddleware } from './middleware/idorGuard';
 import { metricsMiddleware } from './middleware/metricsMiddleware';
-import { apiRateLimiter } from './middleware/rateLimiterMiddleware';
+import { apiRateLimiter, adminRateLimiter } from './middleware/rateLimiterMiddleware';
 import customFieldsRouter from './routes/customFields';
 import auditLogsRouter from './routes/auditLogs';
 import importRouter from './routes/import';
@@ -54,6 +56,11 @@ import adminErrorLogsRouter from './routes/adminErrorLogs';
 import adminUsersRouter from './routes/adminUsers';
 import adminEmergencyStopRouter from './routes/adminEmergencyStop';
 import adminReferralsRouter from './routes/adminReferrals';
+import adminClientHealthRouter from './routes/adminClientHealth';
+import adminChurnRiskRouter from './routes/adminChurnRisk';
+import adminOnboardingRouter from './routes/adminOnboarding';
+import adminRevenueRouter from './routes/adminRevenue';
+import adminTotpRouter from './routes/adminTotp';
 import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
 import syncRouter from './routes/sync';
@@ -89,6 +96,7 @@ import postDatedChequesRouter from './routes/postDatedCheques';
 import interestPolicyRouter from './routes/interestPolicy';
 import apiKeysRouter from './routes/apiKeys';
 import externalApiRouter from './routes/externalApi';
+import honeypotProbesRouter from './routes/honeypotProbes';
 
 dotenv.config();
 
@@ -153,8 +161,32 @@ app.use(metricsMiddleware);
 // Global API rate limiter (100 req/min per tenant or IP)
 app.use('/api/', apiRateLimiter);
 
+// IDOR enumeration detection — logs when a session accesses an unusual number
+// of distinct resource IDs within a short window. Runs after rate limiting so
+// it only sees requests that cleared the rate gate.
+app.use('/api/v1/', idorAuditMiddleware);
+
+// TOTP auth routes — mounted BEFORE the rate limiter and passcode gate because
+// they are part of the login flow itself. The verify endpoint does its own
+// inline passcode check; the setup endpoint also checks the passcode inline.
+// The rate limiter is applied separately to this prefix below.
+app.use('/api/v1/admin/totp', adminRateLimiter, adminTotpRouter);
+
+// Strict admin rate limiter (10 req/min per IP) — applied before any admin
+// handler so brute-forcing the master passcode is not feasible.
+app.use('/api/v1/admin/', adminRateLimiter);
+
+// Passcode / session token gate for all admin routes. Applied after the rate
+// limiter so failed guesses are counted before reaching the auth check.
+app.use('/api/v1/admin/', adminPasscodeMiddleware);
+
 // Metrics endpoint (no auth required for Prometheus scraping)
 app.use('/metrics', metricsRouter);
+
+// Honeypot probe endpoints — convincing-looking responses for paths attackers
+// enumerate (/.env, /admin, /wp-login.php, etc.). Mounted before all real routes
+// so the trap fires first. Every hit is logged and triggers an alert email.
+app.use(honeypotProbesRouter);
 
 // Root HEAD handler for uptime monitors that probe HEAD /
 app.head('/', (_req, res) => res.sendStatus(200));
@@ -311,6 +343,10 @@ app.use('/api/v1/admin/error-logs', adminErrorLogsRouter);
 app.use('/api/v1/admin/users', adminUsersRouter);
 app.use('/api/v1/admin/emergency-stop', adminEmergencyStopRouter);
 app.use('/api/v1/admin/referrals', adminReferralsRouter);
+app.use('/api/v1/admin/client-health', adminClientHealthRouter);
+app.use('/api/v1/admin/churn-risk', adminChurnRiskRouter);
+app.use('/api/v1/admin/onboarding', adminOnboardingRouter);
+app.use('/api/v1/admin/revenue', adminRevenueRouter);
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);
@@ -362,7 +398,10 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     path: req.originalUrl ?? req.path,
     status,
     error: err.message ?? 'Unknown error',
-    stack: err.stack,
+    // Strip stack traces in production: they expose internal file paths and
+    // library versions that make targeted CVE attacks easier. Keep them in
+    // non-production so developers can debug locally.
+    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
     tenantId: (req as any).tenantId ?? (req as any).user?.tenantId,
     userId: (req as any).user?.id,
     ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ?? req.socket?.remoteAddress,

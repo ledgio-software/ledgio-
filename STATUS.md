@@ -2,6 +2,321 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: Financial mutation anomaly detection
+
+**What/Why:**
+Added an accounting-specific fraud detection layer that fires fire-and-forget after every journal entry create and post operation. The service scores the mutation against six behavioral signals and writes a `SECURITY.FINANCIAL_ANOMALY` audit log entry when the total weight meets the threshold. High-confidence detections (score ≥5) also trigger an admin alert email. Never blocks the operation — purely observational.
+
+**Signals detected (with weights):**
+- `LARGE_AMOUNT` (weight 3) — entry total exceeds 10× the tenant's 30-day rolling average of posted entries
+- `OFF_HOURS` (weight 2) — mutation recorded between 01:00–05:00 UTC
+- `HIGH_VELOCITY` (weight 2) — user created >20 entries in a 10-minute rolling window (Redis-backed counter)
+- `ROUND_NUMBER_LARGE` (weight 1) — amount ≥10,000 with ≥3 trailing zeros (common fraud pattern)
+- `THRESHOLD_CREEP` (weight 2) — amount within 5% below a configured approval threshold (9 common breakpoints)
+- `BACKDATED_ENTRY` (weight 2) — entry date >30 days before today
+
+**Files Affected:**
+- `backend/src/services/financialMutationAnomalyService.ts` *(new)* — signal scoring, audit log, admin email alert
+- `backend/src/routes/journalEntries.ts` — imported service + `getTenantContext`; fire-and-forget call wired after successful `POST /` (create) and `POST /:id/post` operations
+
+---
+
+## [Date: 2026-09-12] - Security: IDOR prevention middleware (Prisma guard + Express enumeration detector)
+
+**What/Why:**
+Added a two-layer IDOR prevention system as defense-in-depth against cross-tenant data access. The IDOR audit confirmed no current vulnerabilities (the per-schema isolation + tenantId column filters already cover all routes), so this layer makes it impossible to introduce an IDOR in the future even when a developer forgets a tenantId filter.
+
+**Layer 1 — Prisma query interceptor (`backend/src/middleware/idorGuard.ts`, `buildIdorPrismaMiddleware()`):**
+Registered as a `$use` hook on the global prisma client. For all 80 tenant-scoped models:
+- `findUnique` / `findUniqueOrThrow` → action rewritten to `findFirst` / `findFirstOrThrow` and `tenantId` injected into the where clause (rewrite required because findUnique demands a unique-constraint where clause, which precludes adding tenantId without a composite unique index).
+- `findFirst`, `findMany`, `count`, `aggregate`, `groupBy`, `updateMany`, `deleteMany` → `tenantId` silently appended to the where clause when absent.
+- `update`, `delete`, `upsert` → cannot safely inject (unique-constraint requirement); emits a `logger.warn` security entry instead so the violation is visible in logs.
+- Fail-open: no tenant context active (admin routes, system tasks, test suites) → guard is a no-op.
+
+**Layer 2 — Express enumeration detector (`idorAuditMiddleware`):**
+Mounted at `/api/v1/*`. Tracks distinct UUID-shaped path segments accessed per authenticated session per minute. Fires `logger.warn` when a single session crosses 50 distinct resource IDs in a 60-second window — a signal of automated IDOR enumeration / scraping. In-process Map with stale-key pruning at 10k entries.
+
+**Files Affected:**
+- `backend/src/middleware/idorGuard.ts` *(new)*
+- `backend/src/config/db.ts` — imports `buildIdorPrismaMiddleware` and registers it as a `$use` hook after the existing query-timeout middleware
+- `backend/src/app.ts` — imports `idorAuditMiddleware` and mounts it at `/api/v1/`
+
+---
+
+## [Date: 2026-09-12] - Security: Client-side bot fingerprinting at login
+
+**What/Why:**
+Added passive browser signal collection on the login form to help detect automated/scripted login attempts. Signals are sent as `_bf` alongside credentials, analyzed server-side, and written to the audit trail when the score exceeds the threshold. Real users are never blocked — the output is entirely observational.
+
+**Frontend (`frontend/src/lib/botFingerprint.ts` — new):**
+Collects a compact fingerprint object at form-submit time:
+- `wd` — `navigator.webdriver` (true in Selenium/Playwright/Puppeteer)
+- `ags` — presence of known automation framework globals (`__webdriver_evaluate`, `_phantom`, etc.)
+- `ttk` — milliseconds from page load to first keystroke (null if fields were programmatically filled)
+- `mm` — whether the mouse moved before submit (false is a bot signal)
+- `hc` — `navigator.hardwareConcurrency`
+- `sw/sh` — screen dimensions (0×0 in headless)
+- `vw/vh` — viewport dimensions
+- `lang/plat` — navigator language and platform
+- `ce/ls` — cookie and localStorage availability
+- `age` — total milliseconds from page load to submit
+
+Listeners are registered once at module-import time (passive, not re-attached on re-renders). Touch support is also captured for mobile vs desktop context.
+
+**Backend (`backend/src/services/botFingerprintService.ts` — new):**
+- `analyzeBotFingerprint(ctx)` scores each signal by weight (1 = weak, 2 = moderate, 3 = strong)
+- Fires `SECURITY.BOT_SIGNAL` audit log entry when total weight ≥ 3
+- Sends admin alert email (`ADMIN_ALERT_EMAIL`) for very high confidence detections (score ≥ 5)
+- All signal scoring and I/O wrapped in try/catch — never throws into the caller
+
+**Wired into (`backend/src/routes/auth.ts`):**
+- `_bf` extracted from `req.body` in the login handler
+- `analyzeBotFingerprint(...)` called as fire-and-forget after the honeypot check, before the DB lookup — never delays the login response
+
+**Files Affected:**
+- `frontend/src/lib/botFingerprint.ts` *(new)*
+- `frontend/src/pages/auth/Login.tsx` — imports `collectBotFingerprint`, attaches `_bf` to the login POST
+- `backend/src/services/botFingerprintService.ts` *(new)*
+- `backend/src/routes/auth.ts` — extracts `_bf`, calls `analyzeBotFingerprint` fire-and-forget
+
+---
+
+## [Date: 2026-09-12] - Security: Suspicious bulk export anomaly detection
+
+**What/Why:**
+Added a non-blocking anomaly detection layer for full data exports (JSON and CSV). Every export is already gated behind Admin-only RBAC and a per-tenant 1-hour cooldown. This layer adds signal detection on top — it never blocks a legitimate export but records `SECURITY.EXPORT_ANOMALY` to the audit log and fires an admin alert email when any signal triggers.
+
+**Signals detected:**
+1. **High user velocity** — the same user downloads more than 2 exports in any rolling 24-hour window (across export kinds). Tracked with a Redis INCR counter (24h TTL).
+2. **Off-hours export** — export request between 01:00–05:00 UTC, covering dead-of-night for most operating timezones.
+3. **New export IP** — first time this user has triggered an export from a given source IP. Per-user Redis set, 30-day TTL (same model as login anomaly IP tracking).
+4. **Multi-user tenant burst** — two or more distinct admin accounts export from the same tenant within 15 minutes, suggesting coordinated exfiltration or a compromised admin roster. Tracked with a per-tenant Redis set with 15-min TTL.
+
+**Architecture:**
+- `analyzeExportRequest(ctx)` is called after `recordAuditLog` returns, as a fire-and-forget (`.catch()`), so it never delays the download stream.
+- All Redis helpers fail-open — if Redis is unavailable, all signals return zero and no anomaly is flagged rather than blocking the export.
+- Alert email fires to `ADMIN_ALERT_EMAIL` env var (async, skipped when unconfigured).
+
+**Files Affected:**
+- `backend/src/services/bulkExportAnomalyService.ts` *(new)*
+- `backend/src/routes/dataExport.ts` — `analyzeExportRequest` wired into `/json` and `/csv` handlers post-audit-log
+
+---
+
+## [Date: 2026-09-12] - Security: Honeypot deception layer (credentials, tenant slugs, probe endpoints)
+
+**What/Why:**
+Implemented a three-trap honeypot deception system to detect and log attackers before they can interact with real data. All traps return responses indistinguishable from real failures — the attacker gets no signal that they triggered a trap.
+
+**Traps:**
+
+1. **Honeypot login credentials** — 12 fake privileged email addresses (`admin@ledgio.io`, `root@ledgio.io`, etc.) that no real user would ever try. Any login attempt against them fires `SECURITY.HONEYPOT_LOGIN` to the audit log and triggers a platform alert email. The check runs *before* `findUserByEmail` so the database is never queried for these addresses.
+
+2. **Honeypot tenant slugs** — 16 fake org identifiers (`admin`, `superadmin`, `root`, `internal`, `ledgio`, etc.) that attackers probe when scanning for admin panels or default accounts. Any tenant context resolution against them fires `SECURITY.HONEYPOT_TENANT`. The check runs *before* the Redis cache or DB lookup, so real tenant data is never touched.
+
+3. **Honeypot probe endpoints** — ~25 raw paths attackers enumerate on any web server (`.env`, `/admin/login`, `/wp-config.php`, `/.git/config`, `/phpinfo.php`, etc.) return convincing-but-fake responses (realistic 200s, 403s, 404s) while logging `SECURITY.HONEYPOT_PROBE`. The router is mounted *before* all real API routes.
+
+**Security alert email:**
+All three traps fire a non-blocking alert email to `ADMIN_ALERT_EMAIL` (env var) via `EmailService.sendMail`, skipped when unconfigured.
+
+**Audit log actions added:**
+- `SECURITY.HONEYPOT_LOGIN` — honeypot email credential attempted
+- `SECURITY.HONEYPOT_TENANT` — honeypot tenant slug probed
+- `SECURITY.HONEYPOT_PROBE` — honeypot probe endpoint accessed
+
+**Files Affected:**
+- `backend/src/services/honeypotService.ts` *(new)*
+- `backend/src/routes/honeypotProbes.ts` *(new)*
+- `backend/src/routes/auth.ts` — `checkHoneypotLogin` wired in `/login` before DB lookup
+- `backend/src/middleware/tenantContextMiddleware.ts` — `checkHoneypotTenant` wired in before cache/DB lookup
+- `backend/src/app.ts` — `honeypotProbesRouter` mounted before all real routes
+
+---
+
+## [Date: 2026-09-12] - Security: Login anomaly detection engine
+
+**What/Why:**
+Implemented a multi-signal login anomaly detection engine to defend against credential stuffing, brute-force bots, account takeover, and impossible-velocity attacks. The system runs on every login attempt using Redis for all state — no extra database tables required.
+
+**Signals detected:**
+1. **IP burst guard** — if any single IP submits >20 login attempts within 60 seconds (a bot/stuffing pattern), every subsequent attempt from that IP is rejected with 429 for the remainder of the window.
+2. **Per-account lockout** — 5 consecutive wrong passwords within 15 minutes locks the account for 15 minutes. The lockout key is cleared automatically on the next successful login.
+3. **New IP detection** — each user's known IP set is stored in Redis (30-day TTL). First login from an unseen IP is flagged in the audit log as `SECURITY.LOGIN_ANOMALY`.
+4. **Impossible velocity** — if a user successfully logs in from IP-A and then logs in from a different IP-B within 10 minutes, it is flagged as a possible simultaneous session takeover.
+
+**Security email alerts:**
+Account lockout and anomaly signals both trigger a non-blocking security email to the account owner via `EmailService.sendMail` (skipped when email is unconfigured, e.g. test environments).
+
+**Audit log actions added:**
+- `AUTH.LOGIN_FAILED` — now includes consecutive-attempt count (`x/5`)
+- `SECURITY.ACCOUNT_LOCKED` — emitted when lockout threshold is reached
+- `SECURITY.LOGIN_ANOMALY` — emitted on new-IP or impossible-velocity signal
+
+**Architecture:**
+- Pre-login check (`preLoginCheck`) runs *before* password verification so locked accounts and burst IPs get 429 without leaking timing information about whether the password is correct.
+- Post-login analysis (`analyzeSuccessfulLogin`) runs *after* a confirmed successful login — anomaly signals are informational and never block a correct credential.
+- All state is Redis-only (TTL-governed keys); the service degrades gracefully if Redis is unavailable and never throws into the login path.
+
+**Files Affected:**
+- `backend/src/services/loginAnomalyService.ts` *(new)*
+- `backend/src/routes/auth.ts`
+
+---
+
+## [Date: 2026-09-12] - Fix: CI test failures after security hardening (adminPasscodeMiddleware + cross-tenant JWT check)
+
+**What/Why:**
+Four test suites failed in CI after the security changes shipped in the previous commit:
+
+1. **adminAuditLogs.test.ts** — used `passcode` as a query parameter. The new `adminPasscodeMiddleware` rejects query-string passcodes with 400, so all tests using `.query({ passcode: ... })` broke. Fixed by converting to `.set('x-admin-passcode', ...)` header throughout.
+
+2. **adminBroadcastEncrypted.test.ts** — the "verify passcode" and "batch broadcast" tests sent the passcode only in the request body. The middleware gate requires it in the `x-admin-passcode` header. Fixed by adding the header alongside the body field (the body field is still required by the route's own BroadcastService.verifyPasscode call).
+
+3. **migrations.test.ts** — migration endpoint tests didn't include `x-admin-passcode` at all. Added the header to all requests that expected 200 or 403 so they can reach the auth/role middleware.
+
+4. **tenantSchemaSwitching.test.ts** — the auto-migration provisioning test used `tenant1Token` (tenantId=tenant1) to request `tenant3Slug` (tenantId=tenant3), triggering the new cross-tenant JWT assertion (403). Fixed by generating a tenant3-scoped JWT with `generateJwtToken` for that one test case.
+
+**Files Affected:**
+- `backend/src/tests/adminAuditLogs.test.ts`
+- `backend/src/tests/adminBroadcastEncrypted.test.ts`
+- `backend/src/tests/migrations.test.ts`
+- `backend/src/tests/tenantSchemaSwitching.test.ts`
+
+---
+
+## [Date: 2026-09-12] - Security: JWT revocation via per-user credential versioning
+
+**What/Why:**
+Existing JWTs remained valid after a role change, admin password reset, or member deletion — there was no server-side way to instantly invalidate all sessions for a specific user. Implemented a per-user credential version in Redis that is embedded in tokens at issue time and checked on every request.
+
+**How it works:**
+- `getCredentialVersion(userId)` → fetches version from Redis (0 if not set)
+- At login, `completeLogin` fetches the current version and embeds it as `credentialVersion` in the JWT payload
+- `verifyJwtToken` checks `payload.credentialVersion` against the live Redis value; if stored version is higher, the token is rejected immediately
+- `revokeUserTokens(userId)` → `INCR`s the Redis version atomically, instantly invalidating all previous tokens
+
+**Triggers:**
+- `PUT /tenants/members/:id/role` — role change now invalidates active sessions immediately
+- `DELETE /tenants/members/:id` — deleted member's tokens revoked before 200 response
+- `POST /tenants/members/:id/reset-password` — password reset revokes active sessions
+
+**Backward compatibility:** Tokens without `credentialVersion` are treated as version 0, which always passes (no breaking change for existing sessions during rollout).
+
+**Files Affected:**
+- `backend/src/services/tokenRevocationService.ts` — added `getCredentialVersion`, `revokeUserTokens`
+- `backend/src/utils/jwt.ts` — added `credentialVersion` to `JwtPayload`; credential version check in `verifyJwtToken` on both cache-hit and cache-miss paths
+- `backend/src/routes/auth.ts` — `completeLogin` fetches and embeds credential version at login
+- `backend/src/routes/tenants.ts` — `revokeUserTokens` called on role change, member deletion, password reset
+
+---
+
+## [Date: 2026-09-12] - Security: Platform vulnerability audit fixes (7 issues)
+
+**What/Why:**
+Following a comprehensive security audit of the Ledgio platform, 7 vulnerabilities were identified and fixed across 3 severity levels: 3 critical, 2 high, 2 medium/low. All fixes are backward-compatible with no schema changes required.
+
+**Fixes Applied:**
+
+1. **Admin rate limiting (CRITICAL)** — Added `adminRateLimiter` (10 req/min per IP) to all `/api/v1/admin/*` routes. Created `adminPasscodeMiddleware` that centralises passcode auth for every admin route: rejects query-string passcodes (they leak into logs), logs every failed attempt with IP + path, returns 400 on query-param usage.
+
+2. **Cross-tenant JWT validation (CRITICAL)** — `tenantContextMiddleware` now asserts `req.user.tenantId === resolved tenant id`. A valid JWT for Tenant A can no longer access Tenant B's data by sending a different `X-Tenant-ID` header.
+
+3. **Data export cooldown (CRITICAL)** — Both `/data-export/json` and `/data-export/csv` enforce a 1-export-per-hour per-tenant Redis cooldown (atomic `SET NX EX`). Returns 429 with `Retry-After` when limit is hit. Fails open when Redis is down.
+
+4. **Paystack webhook replay protection (HIGH)** — Each processed webhook reference is stored in Redis for 90 days. Replayed webhooks are rejected with `{ ignored: true, reason: 'duplicate' }`.
+
+5. **Stack traces stripped in production (MEDIUM)** — `err.stack` is only stored in error logs when `NODE_ENV !== 'production'`, preventing internal paths/library versions from leaking via the admin error log dashboard.
+
+6. **OCR per-tenant daily limit (MEDIUM)** — 50 OCR requests per tenant per day via Redis `INCR` with daily TTL. Prevents cost amplification attacks from automated image uploads.
+
+7. **CORS + secret startup assertions (LOW)** — Production server refuses to start if `CORS_ALLOWED_ORIGINS` is unset or `*`, or if `BROADCAST_MASTER_SECRET` is unset.
+
+**Files Affected:**
+- `backend/src/middleware/adminPasscodeMiddleware.ts` — NEW: central passcode gate for all admin routes
+- `backend/src/middleware/rateLimiterMiddleware.ts` — added `adminRateLimiter` export
+- `backend/src/middleware/tenantContextMiddleware.ts` — added cross-tenant JWT assertion
+- `backend/src/app.ts` — applied `adminRateLimiter` + `adminPasscodeMiddleware` to `/api/v1/admin/*`; stripped production stack traces; imported new middleware
+- `backend/src/index.ts` — added CORS + secret startup assertions for production
+- `backend/src/routes/dataExport.ts` — per-tenant hourly export cooldown
+- `backend/src/routes/ocr.ts` — per-tenant daily OCR limit (50/day)
+- `backend/src/routes/subscription.ts` — Paystack webhook replay deduplication
+
+---
+
+## [Date: 2026-09-11] - Feature: Revenue & MRR Dashboard tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: after knowing who is at risk (Client Health), who to call (Churn Risk), and who is stuck (Onboarding), AGOD needs to see the financial picture — what revenue is currently locked in, what is in the pipeline from trials, and what is at risk from lapsing renewals. Added a 17th tab showing MRR, ARR, tier breakdown, trial pipeline value, revenue at risk, and upcoming renewals.
+
+**How it works:**
+- MRR = sum of tier prices for all ACTIVE paid tenants (tier 1 = GHS 105, tier 2 = GHS 305, tier 3 = GHS 510 per month)
+- Tier prices come from the existing `SUBSCRIPTION_PLANS` constant in `subscription.ts` — no duplication
+- Revenue at risk = EXPIRED tenants + ACTIVE tenants with renewal due in ≤30 days
+- Trial pipeline value = sum of tier prices for all TRIAL tenants (potential MRR if all convert)
+- Monthly activations chart: new ACTIVE paid tenants bucketed by `createdAt` month for last 12 months
+- Renewals Due sub-view: sorted by urgency (days left), with color coding (≤7d rose, ≤14d orange, ≤30d amber)
+- All Tenants sub-view: full revenue table with at-risk row highlighting
+- Cyan tab nav badge shows `!` when any revenue is at risk
+
+**Files Affected:**
+- `backend/src/routes/adminRevenue.ts` — NEW: GET /api/v1/admin/revenue endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "revenue" tab type, state, fetch, nav button (TrendingUp icon, cyan theme), and full tab panel JSX with KPI tiles, tier cards, activations bar chart, and Renewals Due/All Tenants sub-views
+
+## [Date: 2026-09-11] - Feature: Onboarding Completion Tracker tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: AGOD needs to see which tenants are progressing through setup milestones so they can identify "stuck" clients (signed up >7 days ago, completed <50% of steps) and initiate proactive outreach. Added a 16th tab to the admin console showing per-tenant completion of 8 onboarding milestones plus a stuck-client call list.
+
+**How it works:**
+- Step 0 = `Tenant.isLive` (onboarding wizard complete — opening balances validated)
+- Steps 1–7 = presence of specific audit log actions per tenant (team member added, first journal, first invoice, first sale, first inventory item, bank connected, first reconciliation)
+- `completionScore` (0–8), `completionPct`, and `isStuck` (>7 days old, score < 4) computed server-side
+- Summary cards: total tenants, fully onboarded, half-or-more, barely started, stuck count, avg completion %
+- Milestone table shows ✓/✗ per step per tenant with a mini progress bar; row highlighted red when stuck
+- Tab nav badge shows stuck-client count so AGOD sees the alert without opening the tab
+- Filters: All / Stuck Only / Fully Onboarded / In Progress / Barely Started
+
+**Files Affected:**
+- `backend/src/routes/adminOnboarding.ts` — NEW: GET /api/v1/admin/onboarding endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "onboarding" tab type, state, fetch, nav button (ClipboardList icon, violet theme), and full tab panel JSX
+
+## [Date: 2026-09-11] - Feature: Churn Risk Tracker tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: the Client Health tab shows *who is dormant*; the Churn Risk Tracker shows *who needs a call right now and what to say*. Added a 15th tab that groups at-risk tenants by urgency bucket and overlays feature adoption signals so AGOD knows whether a tenant hasn't converted yet because they've never found the product's value (score 0-1) vs. are an active user who may just need a renewal nudge.
+
+**How it works:**
+- Backend derives at-risk tenants from subscription status + trial/renewal expiry dates
+- Feature adoption is detected from distinct `(tenantId, action)` pairs in AuditLog for 5 key feature areas: Invoicing, Bookkeeping, Inventory, Sales, Banking
+- Adoption score 0-5: score 0-1 = "not yet embedded" (very high churn risk regardless of trial status)
+- Urgency buckets (sorted most-urgent first): Expired, Trial ≤3d (critical), Trial 4-7d (soon), Renewal ≤14d, Dormant 14d+, Trial 8-30d (watch)
+- Tab badge shows critical count (expired + trial ≤3d) so it is visible without opening the tab
+- Feature columns (✓/✗ per area) give AGOD talking points for the outreach call
+
+**Files Affected:**
+- `backend/src/routes/adminChurnRisk.ts` — NEW: GET /api/v1/admin/churn-risk endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "churnrisk" tab type, state, fetch, nav button, and full tab panel JSX
+
+## [Date: 2026-09-11] - Feature: Client Health Dashboard tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 priority: retain early Ghanaian SME clients. The AGOD Control Engine lacked any visibility into which tenants are active vs. dormant and which are at risk of churning. Added a new "Client Health" tab (#14) to the admin console that surfaces per-tenant activity, subscription status, and churn risk signals in real time.
+
+**How it works:**
+- `lastActivityAt` is derived from each tenant's most-recent `AuditLog` row (audit logs are written on every user action — invoice posted, sale rung up, etc. — making this a reliable proxy for real usage without needing a new DB column or migration).
+- `churnRisk` is computed server-side: `high` if tenant is EXPIRED, dormant 14+ days, or trial ending in ≤7 days; `medium` if dormant 7–13 days or paid renewal in ≤7 days.
+- Summary cards show totals: all clients, active paid, on trial, expired, high-risk count, trials expiring in 7 days.
+- Table is filterable by risk level and subscription status, sortable by risk, most-dormant, or most-recent activity.
+- Tab badge shows the live high-risk count so it is visible without opening the tab.
+
+**Files Affected:**
+- `backend/src/routes/adminClientHealth.ts` — NEW: GET /api/v1/admin/client-health endpoint
+- `backend/src/app.ts` — registered the new route at /api/v1/admin/client-health
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "clienthealth" tab type, state, fetchClientHealth callback, nav button, and full tab panel JSX
+
 ## [Date: 2026-09-11] - Perf: Cross-device PWA compatibility and performance overhaul
 
 **What/Why:**

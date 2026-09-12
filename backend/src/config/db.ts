@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { buildIdorPrismaMiddleware } from '../middleware/idorGuard';
 
 // Configurable via env — defaults match the statement_timeout in DATABASE_URL (30 s),
 // but fire 5 s earlier so the API returns a structured error before Postgres kills
@@ -35,6 +36,9 @@ export const prisma = new PrismaClient({
   );
   return Promise.race([next(params), deadline]);
 });
+
+// IDOR prevention: auto-inject tenantId into reads on tenant-scoped models.
+(prisma as any).$use(buildIdorPrismaMiddleware());
 
 // Slow-query and critical-query logging.
 prisma.$on('query' as any, (e: any) => {

@@ -174,6 +174,14 @@ describe('Strict Tenant Context & Request-Level Schema Switching (BE-110)', () =
       });
       tenant3Id = t3.id;
 
+      // Generate a JWT scoped to tenant 3 so the cross-tenant JWT check passes.
+      const tenant3Token = generateJwtToken({
+        id: 'auto-migrate-test-user',
+        email: 'admin@auto-migrated-corp.test',
+        role: 'Admin',
+        tenantId: tenant3Id,
+      });
+
       // Verify schema does not exist yet
       const existsBefore = await checkSchemaExists(prisma, tenant3Schema);
       expect(existsBefore).toBe(false);
@@ -181,7 +189,7 @@ describe('Strict Tenant Context & Request-Level Schema Switching (BE-110)', () =
       // Make API call with Tenant 3 header. Middleware should invoke ensureTenantSchemaMigrated automatically
       const res = await request(app)
         .get('/api/v1/accounts')
-        .set('Authorization', `Bearer ${tenant1Token}`)
+        .set('Authorization', `Bearer ${tenant3Token}`)
         .set('X-Tenant-Slug', tenant3Slug);
 
       expect(res.status).toBe(200);

@@ -3,6 +3,13 @@ import axios from 'axios';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
+import { requireTenantContext } from '../context/tenantContext';
+import { redis } from '../config/redis';
+
+// 50 OCR requests per tenant per day. Each call is a paid Anthropic API
+// request; this cap prevents a compromised account from running up a large
+// bill via automated image uploads.
+const OCR_DAILY_LIMIT = 50;
 
 const router = Router();
 router.use(authenticateJwt);
@@ -30,6 +37,30 @@ router.post(
     if (!apiKey) {
       res.status(503).json({ success: false, error: 'OCR service not configured.' });
       return;
+    }
+
+    // Per-tenant daily OCR limit — prevents cost amplification from a
+    // compromised account uploading images in a tight loop.
+    try {
+      const { tenantId } = requireTenantContext();
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+      const limitKey = `ocr_daily:${tenantId}:${today}`;
+      const count = await redis.incr(limitKey);
+      if (count === 1) {
+        // First request today — set the key to expire at midnight UTC + 1 hour
+        const secondsUntilTomorrow = Math.ceil((new Date().setUTCHours(25, 0, 0, 0) - Date.now()) / 1000);
+        await redis.expire(limitKey, secondsUntilTomorrow);
+      }
+      if (count > OCR_DAILY_LIMIT) {
+        res.status(429).json({
+          success: false,
+          error: `OCR limit reached (${OCR_DAILY_LIMIT}/day). Try again tomorrow.`,
+        });
+        return;
+      }
+    } catch {
+      // Redis unavailable — allow the request; the upstream Anthropic rate
+      // limit is the last line of defence in that case.
     }
 
     const { imageBase64, mimeType = 'image/jpeg' } = req.body ?? {};

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import archiver from 'archiver';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
@@ -9,6 +10,34 @@ import { requireTenantContext } from '../context/tenantContext';
 import { buildCsv } from '../utils/csvExport';
 import { recordAuditLog, actorFromRequest } from '../services/auditLogService';
 import { EXPORT_TABLES, collectTenantExportData, rowsToCsvTable } from '../services/dataExportService';
+import { analyzeExportRequest } from '../services/bulkExportAnomalyService';
+
+const EXPORT_COOLDOWN_SECONDS = 3600; // 1 hour between exports per tenant
+
+/**
+ * Enforces a per-tenant cooldown on data exports.
+ * Returns { allowed: true } or { allowed: false, retryAfterSeconds }.
+ *
+ * Uses Redis SET NX EX so the check-and-set is atomic — no race condition
+ * between two simultaneous export requests from the same tenant.
+ */
+async function checkExportCooldown(
+  tenantId: string,
+  kind: 'json' | 'csv',
+): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number }> {
+  const key = `export_cooldown:${kind}:${tenantId}`;
+  try {
+    // SET key 1 EX cooldown NX returns 'OK' if set (first request), null if already set
+    const result = await redis.set(key, '1', 'EX', EXPORT_COOLDOWN_SECONDS, 'NX');
+    if (result === 'OK') return { allowed: true };
+    const ttl = await redis.ttl(key);
+    return { allowed: false, retryAfterSeconds: ttl > 0 ? ttl : EXPORT_COOLDOWN_SECONDS };
+  } catch {
+    // Redis unavailable — fail open (allow the export) rather than blocking
+    // a legitimate user. The audit log still captures every export.
+    return { allowed: true };
+  }
+}
 
 // Deliberately NOT behind tierEnforcementMiddleware and NOT rate-limited
 // beyond the tenant's normal authenticated-request budget - full data export
@@ -69,6 +98,17 @@ router.get('/json', requireRole('Admin'), async (req: Request, res: Response): P
   try {
     const { tenantId, tenantName } = requireTenantContext();
 
+    const cooldown = await checkExportCooldown(tenantId, 'json');
+    if (!cooldown.allowed) {
+      res.setHeader('Retry-After', String(cooldown.retryAfterSeconds));
+      res.status(429).json({
+        success: false,
+        error: `Data exports are limited to once per hour. Try again in ${Math.ceil(cooldown.retryAfterSeconds / 60)} minute(s).`,
+        retryAfterSeconds: cooldown.retryAfterSeconds,
+      });
+      return;
+    }
+
     const tables = await withCurrentTenantDb(prisma, async (client) => {
       return collectTenantExportData(client, tenantId);
     });
@@ -80,6 +120,16 @@ router.get('/json', requireRole('Admin'), async (req: Request, res: Response): P
       actor: actorFromRequest(req),
       details: 'Full tenant data export downloaded (JSON).',
     });
+
+    // Async anomaly detection — never blocks the response
+    analyzeExportRequest({
+      tenantId,
+      userId: req.user!.id,
+      userEmail: req.user!.email,
+      ip: req.ip || req.socket?.remoteAddress || 'unknown',
+      userAgent: req.headers['user-agent'],
+      exportKind: 'json',
+    }).catch(() => {/* already logged inside service */});
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="ledgio-export-${Date.now()}.json"`);
@@ -102,6 +152,18 @@ router.get('/json', requireRole('Admin'), async (req: Request, res: Response): P
 router.get('/csv', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId, tenantName } = requireTenantContext();
+
+    const cooldown = await checkExportCooldown(tenantId, 'csv');
+    if (!cooldown.allowed) {
+      res.setHeader('Retry-After', String(cooldown.retryAfterSeconds));
+      res.status(429).json({
+        success: false,
+        error: `Data exports are limited to once per hour. Try again in ${Math.ceil(cooldown.retryAfterSeconds / 60)} minute(s).`,
+        retryAfterSeconds: cooldown.retryAfterSeconds,
+      });
+      return;
+    }
+
     const name = tenantName || 'Business';
 
     const tables = await withCurrentTenantDb(prisma, async (client) => {
@@ -115,6 +177,16 @@ router.get('/csv', requireRole('Admin'), async (req: Request, res: Response): Pr
       actor: actorFromRequest(req),
       details: 'Full tenant data export downloaded (CSV/ZIP).',
     });
+
+    // Async anomaly detection — never blocks the response
+    analyzeExportRequest({
+      tenantId,
+      userId: req.user!.id,
+      userEmail: req.user!.email,
+      ip: req.ip || req.socket?.remoteAddress || 'unknown',
+      userAgent: req.headers['user-agent'],
+      exportKind: 'csv',
+    }).catch(() => {/* already logged inside service */});
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="ledgio-export-${Date.now()}.zip"`);
