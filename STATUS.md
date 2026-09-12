@@ -2,6 +2,27 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Fix: CI test failures after security hardening (adminPasscodeMiddleware + cross-tenant JWT check)
+
+**What/Why:**
+Four test suites failed in CI after the security changes shipped in the previous commit:
+
+1. **adminAuditLogs.test.ts** — used `passcode` as a query parameter. The new `adminPasscodeMiddleware` rejects query-string passcodes with 400, so all tests using `.query({ passcode: ... })` broke. Fixed by converting to `.set('x-admin-passcode', ...)` header throughout.
+
+2. **adminBroadcastEncrypted.test.ts** — the "verify passcode" and "batch broadcast" tests sent the passcode only in the request body. The middleware gate requires it in the `x-admin-passcode` header. Fixed by adding the header alongside the body field (the body field is still required by the route's own BroadcastService.verifyPasscode call).
+
+3. **migrations.test.ts** — migration endpoint tests didn't include `x-admin-passcode` at all. Added the header to all requests that expected 200 or 403 so they can reach the auth/role middleware.
+
+4. **tenantSchemaSwitching.test.ts** — the auto-migration provisioning test used `tenant1Token` (tenantId=tenant1) to request `tenant3Slug` (tenantId=tenant3), triggering the new cross-tenant JWT assertion (403). Fixed by generating a tenant3-scoped JWT with `generateJwtToken` for that one test case.
+
+**Files Affected:**
+- `backend/src/tests/adminAuditLogs.test.ts`
+- `backend/src/tests/adminBroadcastEncrypted.test.ts`
+- `backend/src/tests/migrations.test.ts`
+- `backend/src/tests/tenantSchemaSwitching.test.ts`
+
+---
+
 ## [Date: 2026-09-12] - Security: JWT revocation via per-user credential versioning
 
 **What/Why:**
