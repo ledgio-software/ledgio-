@@ -63,6 +63,12 @@ import adminRevenueRouter from './routes/adminRevenue';
 import adminTotpRouter from './routes/adminTotp';
 import adminDebugLogsRouter from './routes/adminDebugLogs';
 import adminTeamAuthRouter from './routes/adminTeamAuth';
+import adminTenantInspectorRouter from './routes/adminTenantInspector';
+import adminFailedPaymentsRouter from './routes/adminFailedPayments';
+import adminSupportQueueRouter from './routes/adminSupportQueue';
+import adminSlowQueriesRouter from './routes/adminSlowQueries';
+import adminCohortRouter from './routes/adminCohort';
+import adminSchemaDiffRouter from './routes/adminSchemaDiff';
 import { debugContextMiddleware } from './middleware/debugContextMiddleware';
 import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
@@ -357,6 +363,12 @@ app.use('/api/v1/admin/churn-risk', adminChurnRiskRouter);
 app.use('/api/v1/admin/onboarding', adminOnboardingRouter);
 app.use('/api/v1/admin/revenue', adminRevenueRouter);
 app.use('/api/v1/admin/debug', adminDebugLogsRouter);
+app.use('/api/v1/admin/tenants', adminTenantInspectorRouter);
+app.use('/api/v1/admin/failed-payments', adminFailedPaymentsRouter);
+app.use('/api/v1/admin/support-queue', adminSupportQueueRouter);
+app.use('/api/v1/admin/slow-queries', adminSlowQueriesRouter);
+app.use('/api/v1/admin/cohort', adminCohortRouter);
+app.use('/api/v1/admin/schema-diff', adminSchemaDiffRouter);
 
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints

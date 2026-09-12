@@ -15,7 +15,8 @@ export type AdminTab =
   | 'broadcast' | 'health' | 'performance' | 'jobs' | 'integrations'
   | 'schemas' | 'audit' | 'onboard' | 'feedback' | 'analytics' | 'errors'
   | 'safety' | 'referral' | 'clienthealth' | 'churnrisk' | 'onboarding'
-  | 'revenue' | 'debuglogs';
+  | 'revenue' | 'debuglogs'
+  | 'tenantinspector' | 'failedpayments' | 'supportqueue' | 'slowqueries' | 'schemadiff' | 'cohort';
 
 export interface TeamMember {
   id: string;
@@ -32,17 +33,18 @@ const DEFAULT_PIN = '0000';
 const INITIAL_ROSTER: Omit<TeamMember, 'pinHash' | 'isActive'>[] = [
   { id: 'michael',  name: 'Michael',         role: 'Frontend Engineer I',       color: 'blue',   assignedTabs: ['performance', 'debuglogs'] },
   { id: 'anthony',  name: 'Anthony',          role: 'Frontend Engineer II',      color: 'cyan',   assignedTabs: ['debuglogs', 'feedback', 'safety'] },
-  { id: 'kingsley', name: 'Kingsley',         role: 'Backend Engineer',          color: 'emerald', assignedTabs: ['jobs', 'errors', 'debuglogs', 'schemas'] },
-  { id: 'sandra',   name: 'Sandra',           role: 'Sales Executive',           color: 'rose',   assignedTabs: ['revenue', 'referral', 'analytics'] },
+  { id: 'kingsley', name: 'Kingsley',         role: 'Backend Engineer',          color: 'emerald', assignedTabs: ['jobs', 'errors', 'debuglogs', 'schemas', 'slowqueries', 'schemadiff'] },
+  { id: 'sandra',   name: 'Sandra',           role: 'Sales Executive',           color: 'rose',   assignedTabs: ['revenue', 'referral', 'analytics', 'tenantinspector', 'failedpayments', 'cohort', 'supportqueue'] },
   { id: 'innocent', name: 'Innocent',         role: 'AI Engineer',               color: 'violet', assignedTabs: ['safety', 'integrations', 'performance'] },
-  { id: 'george',   name: 'George',           role: 'Researcher',                color: 'amber',  assignedTabs: ['analytics', 'feedback', 'churnrisk', 'onboarding'] },
-  { id: 'daniel',   name: 'Daniel',           role: 'Finance & Lead Architect',  color: 'indigo', assignedTabs: ['revenue', 'analytics', 'clienthealth', 'churnrisk', 'performance', 'errors', 'debuglogs', 'jobs', 'integrations'] },
+  { id: 'george',   name: 'George',           role: 'Researcher',                color: 'amber',  assignedTabs: ['analytics', 'feedback', 'churnrisk', 'onboarding', 'cohort', 'tenantinspector'] },
+  { id: 'daniel',   name: 'Daniel',           role: 'Finance & Lead Architect',  color: 'indigo', assignedTabs: ['revenue', 'analytics', 'clienthealth', 'churnrisk', 'performance', 'errors', 'debuglogs', 'jobs', 'integrations', 'failedpayments', 'slowqueries', 'schemadiff'] },
   {
     id: 'pm', name: 'Project Manager', role: 'Project Manager', color: 'slate',
     assignedTabs: [
       'broadcast', 'audit', 'clienthealth', 'churnrisk', 'onboarding', 'analytics',
       'feedback', 'revenue', 'performance', 'health', 'jobs', 'integrations',
       'schemas', 'onboard', 'errors', 'safety', 'referral', 'debuglogs',
+      'tenantinspector', 'failedpayments', 'supportqueue', 'slowqueries', 'schemadiff', 'cohort',
     ],
   },
 ];

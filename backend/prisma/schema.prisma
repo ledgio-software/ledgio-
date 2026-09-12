@@ -2470,3 +2470,23 @@ model TeamMember {
 
   @@map("team_members")
 }
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  status      String   @default("OPEN")
+  priority    String   @default("MEDIUM")
+  assignedTo  String?  @map("assigned_to")
+  tenantId    String?  @map("tenant_id")
+  tenantName  String?  @map("tenant_name")
+  errorLogRef String?  @map("error_log_ref")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([assignedTo])
+  @@index([tenantId])
+  @@map("support_tickets")
+}

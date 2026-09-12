@@ -2,6 +2,52 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - AGOD Admin Console: 7 new diagnostic panels + Job Retry UI
+
+**What/Why:**
+Expanded the AGOD team console from a read-only dashboard into a fully interactive ops tool. Eight capabilities were requested by the team; seven are now fully wired end-to-end (the eighth — real-time error-rate alerting via email/SMS — requires external delivery infrastructure and is deferred).
+
+**New backend routes (all protected by `adminPasscodeMiddleware` / team tokens):**
+- `GET /api/v1/admin/tenants` — search tenants by name/slug; returns subscription status, tier, schema, last activity, active user count
+- `PATCH /api/v1/admin/tenants/:id` — master-admin-only suspend/reactivate (checks `x-admin-session` or `x-admin-passcode`)
+- `GET /api/v1/admin/failed-payments` — surfaces `FAILED` or stale-PENDING (>24 h) Paystack charges grouped by tenant
+- `POST /api/v1/admin/failed-payments/:id/retry` — resets a charge to PENDING so it can be retried
+- `GET /admin/support-queue`, `POST`, `PATCH/:id`, `DELETE/:id` — lightweight in-app ticket tracker linked to tenant + error log refs
+- `GET /api/v1/admin/slow-queries` — reads in-memory 200-entry ring buffer from `db.ts`; returns `top10ByDuration` and `recent`
+- `GET /api/v1/admin/cohort?days=7` — tenants created in last N days with derived `onboardingStep` (Registered → Invited team → Active → Live)
+- `GET /api/v1/admin/schema-diff` — reads `_prisma_migrations` table; shows applied/failed/in-progress counts + tenant schema mapping
+- `GET /api/v1/admin/jobs` — now returns `failedCount` + `failedJobs[]` alongside all jobs
+
+**New Prisma model:**
+- `SupportTicket` — `support_tickets` table with status, priority, assignedTo, tenantId, errorLogRef, notes; migration `20260912000002_add_support_tickets`
+
+**Frontend (AgodTeamConsole.tsx):**
+- Complete rewrite with 6 new bespoke panel components: `TenantInspectorPanel`, `FailedPaymentsPanel`, `SupportQueuePanel`, `SlowQueriesPanel`, `SchemaDiffPanel`, `CohortPanel`
+- **`JobRetryPanel`** replaces the `PlaceholderPanel` for the `jobs` tab: one-click "Run now" buttons per job, failed jobs highlighted in red with last error, `animate-spin` on trigger
+- Shared `useAdminFetch<T>` hook with 401 redirect and reload support
+- `PanelContent` router maps each tab to its dedicated component
+
+**teamMemberService.ts:**
+- Added 6 new `AdminTab` union types: `tenantinspector | failedpayments | supportqueue | slowqueries | schemadiff | cohort`
+- Updated `INITIAL_ROSTER` to assign new panels by role: Kingsley → `slowqueries`, `schemadiff`; Sandra → `tenantinspector`, `failedpayments`, `cohort`, `supportqueue`; George → `cohort`, `tenantinspector`; Daniel → `failedpayments`, `slowqueries`, `schemadiff`; PM → all new panels
+
+**Files Affected:**
+- `backend/prisma/schema.prisma` — `SupportTicket` model added
+- `backend/prisma/migrations/20260912000002_add_support_tickets/migration.sql` *(new)*
+- `backend/src/config/db.ts` — `slowQueryBuffer` ring buffer + `SlowQueryEntry` interface exported
+- `backend/src/routes/adminTenantInspector.ts` *(new)*
+- `backend/src/routes/adminFailedPayments.ts` *(new)*
+- `backend/src/routes/adminSupportQueue.ts` *(new)*
+- `backend/src/routes/adminSlowQueries.ts` *(new)*
+- `backend/src/routes/adminCohort.ts` *(new)*
+- `backend/src/routes/adminSchemaDiff.ts` *(new)*
+- `backend/src/routes/adminJobs.ts` — expose `failedJobs[]`
+- `backend/src/app.ts` — 6 new route mounts
+- `backend/src/services/teamMemberService.ts` — new tab types + roster assignments
+- `frontend/src/pages/admin/AgodTeamConsole.tsx` — complete rewrite with 7 dedicated panels
+
+---
+
 ## [Date: 2026-09-12] - Security: TOTP two-factor authentication for AGOD admin console
 
 **What/Why:**
