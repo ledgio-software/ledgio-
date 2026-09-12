@@ -176,6 +176,11 @@ app.use('/api/v1/', idorAuditMiddleware);
 // The rate limiter is applied separately to this prefix below.
 app.use('/api/v1/admin/totp', adminRateLimiter, adminTotpRouter);
 
+// Team auth routes — mounted BEFORE the passcode gate because GET /members and
+// POST /login are public (used by the team login page). CRUD routes inside the
+// router self-protect via isMasterAdmin(), so no global gate is needed here.
+app.use('/api/v1/admin/team', adminRateLimiter, adminTeamAuthRouter);
+
 // Strict admin rate limiter (10 req/min per IP) — applied before any admin
 // handler so brute-forcing the master passcode is not feasible.
 app.use('/api/v1/admin/', adminRateLimiter);
@@ -352,8 +357,7 @@ app.use('/api/v1/admin/churn-risk', adminChurnRiskRouter);
 app.use('/api/v1/admin/onboarding', adminOnboardingRouter);
 app.use('/api/v1/admin/revenue', adminRevenueRouter);
 app.use('/api/v1/admin/debug', adminDebugLogsRouter);
-// Team member auth — public endpoint (no master passcode required; token-scoped internally)
-app.use('/api/v1/admin/team', adminRateLimiter, adminTeamAuthRouter);
+
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);
