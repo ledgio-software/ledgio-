@@ -385,7 +385,6 @@ function SupportQueuePanel({ teamToken, member }: { teamToken: string; member: T
   const [newPriority, setNewPriority] = useState('MEDIUM');
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editStatus, setEditStatus] = useState('');
 
   const createTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -485,7 +484,7 @@ function SupportQueuePanel({ teamToken, member }: { teamToken: string; member: T
                       <button onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded-lg bg-white/5 text-white/40 hover:bg-white/10">✕</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditId(t.id); setEditStatus(t.status); }}
+                    <button onClick={() => setEditId(t.id)}
                       className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/30 hover:text-white/60 transition-colors">
                       <Pencil className="h-3 w-3" />
                     </button>
