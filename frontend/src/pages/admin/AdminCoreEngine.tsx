@@ -4574,7 +4574,7 @@ function EmergencyStopPanel({ passcode, sessionToken }: { passcode: string; sess
   const [msg, setMsg] = useState<string | null>(null);
 
   const adminBase = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/admin/emergency-stop`;
-  const adminHeaders = sessionToken
+  const adminHeaders: Record<string, string> = sessionToken
     ? { "x-admin-session": sessionToken, "Content-Type": "application/json" }
     : { "x-admin-passcode": passcode, "Content-Type": "application/json" };
 
