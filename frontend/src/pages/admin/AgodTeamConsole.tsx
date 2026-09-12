@@ -76,10 +76,19 @@ function PlaceholderPanel({ tab, teamToken }: { tab: TabId; teamToken: string })
   const endpoint = endpointMap[tab];
 
   useEffect(() => {
-    if (!endpoint) { setLoading(false); return; }
+    if (!endpoint || !teamToken) { setLoading(false); return; }
     api.get(endpoint, { headers: { 'x-team-token': teamToken } })
       .then((res) => setData(JSON.stringify(res.data, null, 2)))
-      .catch(() => setErr('Failed to load data.'))
+      .catch((err: unknown) => {
+        const status = (err as any)?.response?.status;
+        if (status === 401) {
+          sessionStorage.removeItem('agod-team-token');
+          sessionStorage.removeItem('agod-team-member');
+          window.location.replace('/agod/login');
+        } else {
+          setErr('Failed to load data.');
+        }
+      })
       .finally(() => setLoading(false));
   }, [endpoint, teamToken]);
 
