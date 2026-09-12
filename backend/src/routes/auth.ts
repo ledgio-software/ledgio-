@@ -11,6 +11,12 @@ import { requireRole } from '../middleware/rbacMiddleware';
 import { recordAuditLog, recordAuditLogTx } from '../services/auditLogService';
 import { revokeToken, getCredentialVersion } from '../services/tokenRevocationService';
 import {
+  preLoginCheck,
+  recordFailedLogin as anomalyRecordFailed,
+  analyzeSuccessfulLogin,
+  isAccountLocked,
+} from '../services/loginAnomalyService';
+import {
   generateTotpSecret,
   buildOtpAuthUrl,
   generateQrCodeDataUrl,
@@ -344,12 +350,24 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
   };
   const token = generateJwtToken(tokenPayload);
 
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+
+  // Anomaly analysis (new-IP, impossible velocity). Never blocks the login —
+  // result is informational and written to the audit log internally.
+  await analyzeSuccessfulLogin({
+    userId: user.id,
+    email: user.email,
+    tenantId: user.tenantId || null,
+    ip,
+    userAgent: req.headers['user-agent'],
+  });
+
   await recordAuditLog({
     action: 'AUTH.LOGIN_SUCCESS',
     entity: 'User',
     entityId: user.id,
     tenantId: user.tenantId || null,
-    actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
+    actor: { userId: user.id, userEmail: user.email, ipAddress: ip },
   });
 
   res.status(200).json({
@@ -388,12 +406,27 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
       return;
     }
 
+    const loginIp = req.ip || req.socket?.remoteAddress || 'unknown';
+
     const user = await findUserByEmail(prisma, email);
+
+    // Pre-login anomaly check: IP burst guard + per-account lockout.
+    // Run after the user lookup so we can pass userId (needed for lockout key),
+    // but before password verification to avoid timing oracles on locked accounts.
+    const preCheck = await preLoginCheck(email, user?.id, loginIp);
+    if (preCheck.blocked) {
+      res.status(429).json({
+        error: 'Too Many Requests',
+        message: preCheck.reason || 'Too many login attempts. Please try again later.',
+      });
+      return;
+    }
+
     if (!user || !user.password) {
       await recordAuditLog({
         action: 'AUTH.LOGIN_FAILED',
         entity: 'User',
-        actor: { userEmail: email, ipAddress: req.ip || req.socket?.remoteAddress || null },
+        actor: { userEmail: email, ipAddress: loginIp },
         details: `Login failed for "${email}": no matching account.`,
       });
       res.status(401).json({
@@ -409,7 +442,7 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
         entity: 'User',
         entityId: user.id,
         tenantId: user.tenantId || null,
-        actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
+        actor: { userId: user.id, userEmail: user.email, ipAddress: loginIp },
         details: `Login failed for "${email}": account deactivated.`,
       });
       res.status(401).json({
@@ -421,13 +454,13 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
 
     const isPasswordValid = verifyPassword(password, user.password);
     if (!isPasswordValid) {
-      await recordAuditLog({
-        action: 'AUTH.LOGIN_FAILED',
-        entity: 'User',
-        entityId: user.id,
-        tenantId: user.tenantId || null,
-        actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
-        details: `Login failed for "${email}": invalid password.`,
+      // Anomaly service tracks consecutive failures and locks the account
+      // after MAX_FAILED_ATTEMPTS — it writes its own audit log entry.
+      await anomalyRecordFailed({
+        userId: user.id,
+        email: user.email,
+        tenantId: user.tenantId ?? null,
+        ip: loginIp,
       });
       res.status(401).json({
         error: 'Unauthorized',

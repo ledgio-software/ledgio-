@@ -2,6 +2,36 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-12] - Security: Login anomaly detection engine
+
+**What/Why:**
+Implemented a multi-signal login anomaly detection engine to defend against credential stuffing, brute-force bots, account takeover, and impossible-velocity attacks. The system runs on every login attempt using Redis for all state — no extra database tables required.
+
+**Signals detected:**
+1. **IP burst guard** — if any single IP submits >20 login attempts within 60 seconds (a bot/stuffing pattern), every subsequent attempt from that IP is rejected with 429 for the remainder of the window.
+2. **Per-account lockout** — 5 consecutive wrong passwords within 15 minutes locks the account for 15 minutes. The lockout key is cleared automatically on the next successful login.
+3. **New IP detection** — each user's known IP set is stored in Redis (30-day TTL). First login from an unseen IP is flagged in the audit log as `SECURITY.LOGIN_ANOMALY`.
+4. **Impossible velocity** — if a user successfully logs in from IP-A and then logs in from a different IP-B within 10 minutes, it is flagged as a possible simultaneous session takeover.
+
+**Security email alerts:**
+Account lockout and anomaly signals both trigger a non-blocking security email to the account owner via `EmailService.sendMail` (skipped when email is unconfigured, e.g. test environments).
+
+**Audit log actions added:**
+- `AUTH.LOGIN_FAILED` — now includes consecutive-attempt count (`x/5`)
+- `SECURITY.ACCOUNT_LOCKED` — emitted when lockout threshold is reached
+- `SECURITY.LOGIN_ANOMALY` — emitted on new-IP or impossible-velocity signal
+
+**Architecture:**
+- Pre-login check (`preLoginCheck`) runs *before* password verification so locked accounts and burst IPs get 429 without leaking timing information about whether the password is correct.
+- Post-login analysis (`analyzeSuccessfulLogin`) runs *after* a confirmed successful login — anomaly signals are informational and never block a correct credential.
+- All state is Redis-only (TTL-governed keys); the service degrades gracefully if Redis is unavailable and never throws into the login path.
+
+**Files Affected:**
+- `backend/src/services/loginAnomalyService.ts` *(new)*
+- `backend/src/routes/auth.ts`
+
+---
+
 ## [Date: 2026-09-12] - Fix: CI test failures after security hardening (adminPasscodeMiddleware + cross-tenant JWT check)
 
 **What/Why:**
