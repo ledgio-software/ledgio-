@@ -25,6 +25,20 @@ const startServer = async () => {
     }
   }
 
+  // Resolve a migration that rolled back due to DROP INDEX without IF EXISTS.
+  // The repair migration below (20260912170000_repair_cash_sale_void_and_creator)
+  // re-applies all changes idempotently, so we mark the original as applied to
+  // prevent migrate deploy from retrying the unfixed SQL on every startup.
+  try {
+    execSync(
+      'npx prisma migrate resolve --applied 20260731121052_add_cash_sale_void_and_creator',
+      { stdio: 'pipe' },
+    );
+    console.log('[Server] Resolved rolled-back migration 20260731121052_add_cash_sale_void_and_creator.');
+  } catch (_) {
+    // Already applied or not found — both are fine; suppress the error.
+  }
+
   // Run pending DB migrations before accepting traffic
   try {
     console.log('[Server] Running pending DB migrations...');

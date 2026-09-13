@@ -38,7 +38,7 @@ const FAQ_ITEMS: { question: string; answer: string }[] = [
   {
     question: "How do the SMS shortage alerts work?",
     answer:
-      "When a shop till closes with a cash shortage, an instant SMS alert is sent to your registered owner mobile number via our Android SMS Gateway. Available on all plans.",
+      "When a shop till closes with a cash shortage, an instant SMS alert is sent to your registered owner mobile number. Available on all plans.",
   },
   {
     question: "What's included in the weekly email reports?",
@@ -186,7 +186,8 @@ export function LandingPage() {
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.05]">
-            Stop Guessing<br />
+            Stop Guessing{' '}
+            <br />
             <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-blue-400 bg-clip-text text-transparent">
               Where the Money Went.
             </span>
@@ -216,7 +217,7 @@ export function LandingPage() {
 
           <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-secondary-400">
             <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-            Free trial • No credit card • Workspace provisioned instantly
+            90-day free trial • No credit card • Workspace provisioned instantly
           </p>
 
           {/* Stat strip */}
@@ -240,7 +241,7 @@ export function LandingPage() {
       <section id="gallery" className="py-20 border-t border-secondary-800/60 bg-secondary-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Real People. Real Businesses.</h2>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Built for Businesses Like Yours.</h2>
             <p className="mt-3 text-secondary-400 text-sm">Built for owners who want total visibility, not more spreadsheets.</p>
           </div>
           <ImageCarousel />
@@ -374,7 +375,7 @@ export function LandingPage() {
                 step: "02",
                 icon: Zap,
                 title: "Dual-Lock Verification",
-                body: "Click the link sent to your email and enter the 4-digit SMS code dispatched via our Android SMS Gateway. Takes under 60 seconds.",
+                body: "Click the link sent to your email and enter the 4-digit SMS code sent to your phone. Takes under 60 seconds.",
               },
               {
                 step: "03",

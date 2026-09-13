@@ -33,7 +33,7 @@ export function HowItWorksPage() {
               <div className="text-xs font-bold text-emerald-400 mb-2">STEP 02</div>
               <h4 className="text-lg font-bold text-white mb-2">Dual-Lock Verification</h4>
               <p className="text-xs text-secondary-400 leading-relaxed">
-                Click the verification link sent to your Email and enter the 4-Digit SMS Code dispatched via our Android SMS Gateway.
+                Click the verification link sent to your Email and enter the 4-Digit SMS Code sent to your phone.
               </p>
             </div>
 
