@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-14] - School Module: 5 ERP Gap Features (Complete)
+
+**What/Why:**
+Filled five capability gaps in the school ERP module to bring it closer to production-ready status: scholarship billing integration, class ranking on report cards, attendance summary report, class promotion workflow, and scholarship badge in bulk invoicing UI.
+
+**Backend changes:**
+- `schoolFeeCollection.ts` — `POST /generate-invoices` now applies PERCENT/FIXED_AMOUNT scholarship discounts per student; response includes `discountedCount`
+- `schoolReportCards.ts` — GET report card now computes `classRank`, `classSize`, `classAverage` by aggregating all active classmates' assessments in the same term
+- `schoolAttendance.ts` — new `GET /summary` route aggregates per-student attendance totals (present/absent/late/excused/rate) for a given term, with optional class filter
+- `schoolStudents.ts` — new `POST /promote` route (Admin only) bulk-moves active students from one class to another; accepts optional `studentIds` for selective promotion
+
+**Frontend changes:**
+- `FeeCollection.tsx` — scholarship badge (purple pill with Gift icon) on discounted invoice rows; `discountedCount` shown in generate toast message
+- `ReportCards.tsx` — class rank and class average displayed on report card view and in print output
+- `Attendance.tsx` — new Summary tab with per-student attendance table, class filter, color-coded rate column (green ≥80%, amber ≥50%, red <50%), Print button
+- `Students.tsx` — Promote Class button (Admin only) opens modal with From/To class dropdowns and confirmation warning
+
+---
+
 ## [Date: 2026-09-14] - School Module: 10 New ERP Modules (Complete)
 
 **What/Why:**
