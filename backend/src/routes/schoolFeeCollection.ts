@@ -4,6 +4,7 @@ import { requireTenantContext } from '../context/tenantContext';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { actorFromRequest } from '../services/auditLogService';
 import { recordInvoicePayment } from '../services/invoicePaymentService';
+import { SmsService } from '../services/smsService';
 
 const router = Router();
 
@@ -372,6 +373,84 @@ router.post('/generate-invoices', requireRole('Accountant', 'Admin'), async (req
       success: true,
       data: { generated, skipped, termId, termName: term.name },
       message: `Generated ${generated} invoice${generated !== 1 ? 's' : ''} (${skipped} already existed).`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/school/fee-collection/send-reminders
+ * Send SMS fee reminders to guardians of all defaulters for a given term.
+ * Accountant or Admin only. Returns counts of sent / failed / skipped (no phone).
+ */
+router.post('/send-reminders', requireRole('Accountant', 'Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { termId } = req.body as { termId?: string };
+
+    if (!termId) {
+      res.status(400).json({ success: false, error: 'termId is required.' });
+      return;
+    }
+
+    const [term, students, schedules, termInvoices, tenant] = await Promise.all([
+      prisma.academicTerm.findFirst({ where: { id: termId, tenantId }, select: { name: true, endDate: true } }),
+      prisma.student.findMany({ where: { tenantId, isActive: true } }),
+      prisma.feeSchedule.findMany({ where: { tenantId, termId } }),
+      prisma.invoice.findMany({
+        where: { tenantId, clientTxnId: { startsWith: 'SF:' }, status: { not: 'VOIDED' } },
+        select: { clientTxnId: true, total: true, amountPaid: true },
+      }),
+      prisma.tenant.findFirst({ where: { id: tenantId }, select: { name: true } }),
+    ]);
+
+    if (!term) {
+      res.status(404).json({ success: false, error: 'Term not found.' });
+      return;
+    }
+
+    const scheduleSet = new Set(schedules.map((s) => s.id));
+    const invoicesByStudent = new Map<string, typeof termInvoices>();
+    for (const inv of termInvoices) {
+      const m = inv.clientTxnId?.match(/^SF:([a-z0-9-]+):([a-z0-9-]+)$/i);
+      if (!m || !scheduleSet.has(m[1])) continue;
+      const sid = m[2];
+      if (!invoicesByStudent.has(sid)) invoicesByStudent.set(sid, []);
+      invoicesByStudent.get(sid)!.push(inv);
+    }
+
+    let sent = 0;
+    let failed = 0;
+    let skipped = 0;
+    const schoolName = tenant?.name ?? 'School';
+
+    for (const student of students) {
+      const mySchedules = schedules.filter((s) => !s.className || s.className === student.className);
+      const myInvoices = invoicesByStudent.get(student.id) ?? [];
+      if (mySchedules.length === 0 || myInvoices.length === 0) continue;
+      const totalOwed = mySchedules.reduce((sum, s) => sum + Number(s.amount), 0);
+      const totalPaid = myInvoices.reduce((sum, inv) => sum + Number(inv.amountPaid), 0);
+      const balance = totalOwed - totalPaid;
+      if (balance <= 0) continue;
+
+      const phone = student.guardianPhone?.trim();
+      if (!phone) { skipped++; continue; }
+
+      const message =
+        `${schoolName}: Dear ${student.guardianName ?? 'Guardian'}, ` +
+        `${student.firstName} ${student.lastName} (${student.className}) ` +
+        `has an outstanding school fee balance of GHS ${balance.toFixed(2)} ` +
+        `for ${term.name}. Please pay at the school accounts office. Thank you.`;
+
+      const ok = await SmsService.send(phone, message);
+      if (ok) { sent++; } else { failed++; }
+    }
+
+    res.json({
+      success: true,
+      data: { sent, failed, skipped },
+      message: `SMS reminders sent: ${sent} delivered, ${failed} failed, ${skipped} skipped (no phone).`,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

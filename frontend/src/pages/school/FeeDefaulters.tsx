@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { AlertTriangle, Loader2, Printer, Settings } from "lucide-react";
+import { AlertTriangle, Loader2, Printer, Settings, MessageSquare } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface LateFineConfig {
@@ -50,7 +50,10 @@ export function FeeDefaulters() {
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [configDraft, setConfigDraft] = useState<LateFineConfig>({ enabled: false, ratePerDay: 0, graceDays: 0 });
   const [savingConfig, setSavingConfig] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
+  const [showSmsConfirm, setShowSmsConfirm] = useState(false);
   const isAdmin = (user?.role ?? "").toLowerCase() === "admin";
+  const canSendSms = isAdmin || (user?.role ?? "").toLowerCase() === "accountant";
 
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS" }).format(n);
@@ -102,6 +105,24 @@ export function FeeDefaulters() {
     }
   }
 
+  async function sendReminders() {
+    if (!selectedTermId) return;
+    setSendingReminders(true);
+    setShowSmsConfirm(false);
+    try {
+      const res = await api.post("/school/fee-collection/send-reminders", { termId: selectedTermId });
+      const { sent, failed, skipped } = res.data?.data ?? { sent: 0, failed: 0, skipped: 0 };
+      showToast(
+        `SMS reminders: ${sent} sent${failed > 0 ? `, ${failed} failed` : ""}${skipped > 0 ? `, ${skipped} skipped (no phone)` : ""}.`,
+        failed > 0 ? "error" : "success"
+      );
+    } catch {
+      showToast("Failed to send SMS reminders.", "error");
+    } finally {
+      setSendingReminders(false);
+    }
+  }
+
   const totalBalance = defaulters.reduce((s, d) => s + d.balance, 0);
   const totalLateFine = defaulters.reduce((s, d) => s + d.lateFineAmount, 0);
   const totalDue = defaulters.reduce((s, d) => s + d.totalDue, 0);
@@ -127,6 +148,19 @@ export function FeeDefaulters() {
               </option>
             ))}
           </select>
+          {canSendSms && defaulters.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSmsConfirm(true)}
+              disabled={sendingReminders}
+            >
+              {sendingReminders
+                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                : <MessageSquare className="h-4 w-4 mr-1" />}
+              SMS Reminders
+            </Button>
+          )}
           {isAdmin && (
             <Button variant="outline" size="sm" onClick={() => { setConfigDraft(lateFineConfig); setShowConfigPanel((v) => !v); }}>
               <Settings className="h-4 w-4 mr-1" /> Late Fine
@@ -187,6 +221,30 @@ export function FeeDefaulters() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {showSmsConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-background rounded-lg shadow-xl p-6 max-w-sm w-full mx-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              <h2 className="text-base font-semibold">Send SMS Reminders</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Send an SMS fee reminder to the guardian of each defaulter listed below
+              ({defaulters.length} student{defaulters.length !== 1 ? "s" : ""}).
+              Guardians without a phone number will be skipped.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowSmsConfirm(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={sendReminders}>
+                <MessageSquare className="h-4 w-4 mr-1" /> Send Now
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {loading ? (
