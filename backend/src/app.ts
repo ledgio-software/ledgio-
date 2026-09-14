@@ -95,6 +95,10 @@ import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
+import schoolStudentsRouter from './routes/schoolStudents';
+import schoolTermsRouter from './routes/schoolTerms';
+import schoolFeeSchedulesRouter from './routes/schoolFeeSchedules';
+import schoolFeeCollectionRouter from './routes/schoolFeeCollection';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
 import scenariosRouter from './routes/scenarios';
@@ -261,6 +265,12 @@ app.use('/api/v1/tills', cashTillRouter);
 
 // Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
 app.use('/api/v1/pharmacy', pharmacyRouter);
+
+// School module (NONPROFIT/SCHOOL org-type tenants)
+app.use('/api/v1/school/students', schoolStudentsRouter);
+app.use('/api/v1/school/terms', schoolTermsRouter);
+app.use('/api/v1/school/fee-schedules', schoolFeeSchedulesRouter);
+app.use('/api/v1/school/fee-collection', schoolFeeCollectionRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);

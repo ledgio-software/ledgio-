@@ -41,6 +41,8 @@ import {
   Layers,
   Cog,
   Key,
+  GraduationCap,
+  CalendarDays,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -252,6 +254,16 @@ export const navigationGroups: NavGroup[] = [
       { name: "Bulk Data Import", href: "/import", icon: FileUp },
       { name: "Team Management", href: "/team", icon: Users },
       { name: "API Keys", href: "/settings/api-keys", icon: Key, minTier: 2 },
+    ],
+  },
+  {
+    sectionTitle: "SCHOOL",
+    orgTypeOnly: "NONPROFIT",
+    items: [
+      { name: "Students", href: "/school/students", icon: GraduationCap },
+      { name: "Academic Terms", href: "/school/terms", icon: CalendarDays },
+      { name: "Fee Schedules", href: "/school/fee-schedules", icon: Receipt },
+      { name: "Fee Collection", href: "/school/fee-collection", icon: BookOpen },
     ],
   },
   {

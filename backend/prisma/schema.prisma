@@ -2497,3 +2497,60 @@ model SupportTicket {
   @@index([tenantId])
   @@map("support_tickets")
 }
+
+// ─── School Module ───────────────────────────────────────────────────────────
+
+model Student {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  studentCode   String    @map("student_code")
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  className     String    @map("class_name")
+  guardianName  String    @map("guardian_name")
+  guardianPhone String    @map("guardian_phone")
+  guardianEmail String?   @map("guardian_email")
+  dateOfBirth   DateTime? @map("date_of_birth")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, studentCode])
+  @@index([tenantId])
+  @@index([tenantId, className])
+  @@map("students")
+}
+
+model AcademicTerm {
+  id           String        @id @default(uuid())
+  tenantId     String        @map("tenant_id")
+  name         String
+  academicYear String        @map("academic_year")
+  startDate    DateTime      @map("start_date")
+  endDate      DateTime      @map("end_date")
+  isCurrent    Boolean       @default(false) @map("is_current")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  feeSchedules FeeSchedule[]
+
+  @@index([tenantId])
+  @@map("academic_terms")
+}
+
+model FeeSchedule {
+  id        String       @id @default(uuid())
+  tenantId  String       @map("tenant_id")
+  termId    String       @map("term_id")
+  term      AcademicTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  feeName   String       @map("fee_name")
+  className String?      @map("class_name")
+  amount    Decimal      @db.Decimal(15, 2)
+  dueDate   DateTime?    @map("due_date")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, termId])
+  @@map("fee_schedules")
+}
