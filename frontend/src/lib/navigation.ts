@@ -151,6 +151,8 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/reports/benford-analysis',
     // No customer CRM (schools use Students module)
     '/customers',
+    // Retail POS executive report (shops, tills, till closeouts) — not applicable to schools
+    '/reports/executive',
   ]),
 };
 
