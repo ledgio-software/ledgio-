@@ -2502,6 +2502,21 @@ model SupportTicket {
 
 // ─── School Module ───────────────────────────────────────────────────────────
 
+model SchoolClass {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String   // e.g. "Primary 3A", "JHS 1B", "KG 2"
+  level     String   // CRECHE | NURSERY | KG | PRIMARY | JHS
+  capacity  Int      @default(30)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("school_classes")
+}
+
 model Student {
   id            String    @id @default(uuid())
   tenantId      String    @map("tenant_id")

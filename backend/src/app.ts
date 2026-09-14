@@ -95,6 +95,7 @@ import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
+import schoolClassesRouter from './routes/schoolClasses';
 import schoolStudentsRouter from './routes/schoolStudents';
 import schoolTermsRouter from './routes/schoolTerms';
 import schoolFeeSchedulesRouter from './routes/schoolFeeSchedules';
@@ -278,6 +279,7 @@ app.use('/api/v1/tills', cashTillRouter);
 app.use('/api/v1/pharmacy', pharmacyRouter);
 
 // School module (NONPROFIT/SCHOOL org-type tenants)
+app.use('/api/v1/school/classes', schoolClassesRouter);
 app.use('/api/v1/school/students', schoolStudentsRouter);
 app.use('/api/v1/school/terms', schoolTermsRouter);
 app.use('/api/v1/school/fee-schedules', schoolFeeSchedulesRouter);

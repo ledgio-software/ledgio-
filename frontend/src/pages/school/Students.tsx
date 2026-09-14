@@ -10,6 +10,12 @@ import { useAuth } from "../../contexts/AuthContext";
 import { confirm } from "../../components/ui/AlertDialog";
 import { Plus, Edit2, Trash2, GraduationCap, Phone, Search, Loader2, ArrowUpCircle } from "lucide-react";
 
+interface SchoolClass {
+  id: string;
+  name: string;
+  level: string;
+}
+
 interface Student {
   id: string;
   studentCode: string;
@@ -49,6 +55,7 @@ export function Students() {
   const [promoteStudentIds, setPromoteStudentIds] = useState<string[]>([]);
   const [promoteAll, setPromoteAll] = useState(true);
   const [promoting, setPromoting] = useState(false);
+  const [schoolClasses, setSchoolClasses] = useState<SchoolClass[]>([]);
 
   const isReadOnly = WRITE_ROLES.has((user?.role ?? "").toLowerCase());
   const isAdmin = (user?.role ?? "").toLowerCase() === "admin";
@@ -66,6 +73,12 @@ export function Students() {
   }, [showToast]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    api.get("/school/classes").then((res) => {
+      setSchoolClasses(res.data.data.classes as SchoolClass[]);
+    }).catch(() => {/* non-blocking */});
+  }, []);
 
   function openAdd() { setEditing(null); setForm(emptyForm); setModalOpen(true); }
   function openEdit(s: Student) {
@@ -109,11 +122,13 @@ export function Students() {
     }
   }
 
-  // Promote helpers
-  const classes = [...new Set(students.filter((s) => s.isActive).map((s) => s.className))].sort();
+  // Promote helpers — use registered class names; fall back to names found on active students
+  const classNames = schoolClasses.length > 0
+    ? schoolClasses.map((c) => c.name)
+    : [...new Set(students.filter((s) => s.isActive).map((s) => s.className))].sort();
 
   function openPromote() {
-    setPromoteFrom(classes[0] ?? "");
+    setPromoteFrom(classNames[0] ?? "");
     setPromoteTo("");
     setPromoteAll(true);
     setPromoteStudentIds([]);
@@ -199,7 +214,7 @@ export function Students() {
           onChange={(e) => setClassFilter(e.target.value)}
         >
           <option value="">All Classes</option>
-          {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+          {classNames.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
@@ -275,7 +290,21 @@ export function Students() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Class *</label>
-            <Input value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} placeholder="e.g. Form 1A, JHS 2B, Primary 3" />
+            {schoolClasses.length > 0 ? (
+              <select
+                value={form.className}
+                onChange={(e) => setForm({ ...form, className: e.target.value })}
+                className="w-full border border-secondary-300 dark:border-secondary-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white"
+              >
+                <option value="">— Select a class —</option>
+                {schoolClasses.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            ) : (
+              <Input value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} placeholder="e.g. Primary 3A, JHS 2B" />
+            )}
+            {schoolClasses.length === 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">No classes set up yet. <a href="/school/classes" className="underline">Add classes first</a> for a dropdown.</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Guardian / Parent Name *</label>
@@ -316,7 +345,7 @@ export function Students() {
                 onChange={(e) => { setPromoteFrom(e.target.value); setPromoteStudentIds([]); setPromoteAll(true); }}
               >
                 <option value="">— Select —</option>
-                {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+                {classNames.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
@@ -327,15 +356,8 @@ export function Students() {
                 onChange={(e) => setPromoteTo(e.target.value)}
               >
                 <option value="">— Select —</option>
-                {classes.map((c) => <option key={c} value={c}>{c}</option>)}
-                {/* allow typing a new class name not in existing list */}
+                {classNames.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <Input
-                className="mt-1"
-                placeholder="Or type a new class name…"
-                value={promoteTo}
-                onChange={(e) => setPromoteTo(e.target.value)}
-              />
             </div>
           </div>
 
