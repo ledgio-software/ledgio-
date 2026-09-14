@@ -129,7 +129,7 @@ export function FeeSchedules() {
   }
 
   async function handleDelete(s: FeeSchedule) {
-    const ok = await confirm({ title: "Delete Fee Schedule", description: `Delete "${s.feeName}"? Invoices already generated will not be deleted.`, confirmText: "Delete", variant: "destructive" });
+    const ok = await confirm({ title: "Delete Fee Schedule", description: `Delete "${s.feeName}"? Invoices already generated will not be deleted.`, confirmLabel: "Delete", variant: "danger" });
     if (!ok) return;
     try {
       await api.delete(`/school/fee-schedules/${s.id}`);
@@ -144,7 +144,7 @@ export function FeeSchedules() {
     const ok = await confirm({
       title: "Generate Invoices",
       description: `Generate fee invoices for "${s.feeName}"${s.className ? ` (${s.className})` : " (all classes)"}? Students who already have an invoice for this schedule will be skipped.`,
-      confirmText: "Generate",
+      confirmLabel: "Generate",
     });
     if (!ok) return;
     setGenerating(s.id);
@@ -253,7 +253,7 @@ export function FeeSchedules() {
         </CardContent>
       </Card>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Fee Schedule" : "New Fee Schedule"}>
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Fee Schedule" : "New Fee Schedule"}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Term *</label>

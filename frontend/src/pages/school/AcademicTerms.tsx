@@ -79,7 +79,7 @@ export function AcademicTerms() {
   }
 
   async function handleDelete(t: AcademicTerm) {
-    const ok = await confirm({ title: "Delete Term", description: `Delete "${t.name}"? All fee schedules for this term will also be deleted.`, confirmText: "Delete", variant: "destructive" });
+    const ok = await confirm({ title: "Delete Term", description: `Delete "${t.name}"? All fee schedules for this term will also be deleted.`, confirmLabel: "Delete", variant: "danger" });
     if (!ok) return;
     try {
       await api.delete(`/school/terms/${t.id}`);
@@ -176,7 +176,7 @@ export function AcademicTerms() {
         </CardContent>
       </Card>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Term" : "New Academic Term"}>
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Term" : "New Academic Term"}>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Term Name *</label>

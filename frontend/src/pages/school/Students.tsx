@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/Card";
+import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
@@ -8,7 +8,7 @@ import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { confirm } from "../../components/ui/AlertDialog";
-import { Plus, Edit2, Trash2, X, GraduationCap, Phone, Mail, Search, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, GraduationCap, Phone, Search, Loader2 } from "lucide-react";
 
 interface Student {
   id: string;
@@ -89,7 +89,7 @@ export function Students() {
   }
 
   async function handleDelete(s: Student) {
-    const ok = await confirm({ title: "Delete Student", description: `Remove ${s.firstName} ${s.lastName}? This cannot be undone.`, confirmText: "Delete", variant: "destructive" });
+    const ok = await confirm({ title: "Delete Student", description: `Remove ${s.firstName} ${s.lastName}? This cannot be undone.`, confirmLabel: "Delete", variant: "danger" });
     if (!ok) return;
     try {
       await api.delete(`/school/students/${s.id}`);
@@ -195,7 +195,7 @@ export function Students() {
         </CardContent>
       </Card>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Student" : "Add Student"}>
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Student" : "Add Student"}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
