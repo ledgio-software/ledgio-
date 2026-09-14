@@ -13,7 +13,6 @@ import {
   ShoppingCart,
   FileText,
   Package,
-  GraduationCap,
   Users,
   BadgeDollarSign,
 } from "lucide-react";
