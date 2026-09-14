@@ -1,9 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
+import { authenticateJwt } from '../middleware/authMiddleware';
+import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { requireRole } from '../middleware/rbacMiddleware';
 
 const router = Router();
+
+router.use(authenticateJwt);
+router.use(tenantContextMiddleware);
 
 // GET /api/v1/school/terms
 router.get('/', async (_req: Request, res: Response): Promise<void> => {

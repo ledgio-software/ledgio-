@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
+import { authenticateJwt } from '../middleware/authMiddleware';
+import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { actorFromRequest } from '../services/auditLogService';
@@ -7,6 +9,9 @@ import { recordInvoicePayment } from '../services/invoicePaymentService';
 import { SmsService } from '../services/smsService';
 
 const router = Router();
+
+router.use(authenticateJwt);
+router.use(tenantContextMiddleware);
 
 /**
  * GET /api/v1/school/fee-collection/info
