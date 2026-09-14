@@ -8,6 +8,20 @@ import { recordInvoicePayment } from '../services/invoicePaymentService';
 const router = Router();
 
 /**
+ * GET /api/v1/school/fee-collection/info
+ * Returns basic school info (name) for the current tenant.
+ */
+router.get('/info', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const tenant = await prisma.tenant.findFirst({ where: { id: tenantId }, select: { name: true } });
+    res.json({ success: true, data: { name: tenant?.name ?? 'School' } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/v1/school/fee-collection?termId=
  * Returns per-student fee payment status for the given term.
  * For each student: lists all fee schedules for their class,

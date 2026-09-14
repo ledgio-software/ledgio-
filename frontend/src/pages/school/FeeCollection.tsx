@@ -7,7 +7,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { BookOpen, Loader2, Phone, CreditCard, CheckCircle2, Gift, Zap } from "lucide-react";
+import { BookOpen, Loader2, Phone, CreditCard, CheckCircle2, Gift, Zap, Printer } from "lucide-react";
 
 interface AcademicTerm {
   id: string;
@@ -50,6 +50,10 @@ interface Summary {
 }
 
 interface Receipt {
+  receiptRef: string;
+  issuedAt: string;
+  schoolName: string;
+  cashierName: string;
   studentName: string;
   studentCode: string;
   className: string;
@@ -102,6 +106,8 @@ export function FeeCollection() {
   const [collecting, setCollecting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
+  const [schoolName, setSchoolName] = useState("School");
+
   // Generate invoices state
   const [generating, setGenerating] = useState(false);
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
@@ -115,6 +121,12 @@ export function FeeCollection() {
   const canCollect = CAN_COLLECT_ROLES.has((user?.role ?? "").toLowerCase());
   const canWaive = CAN_WAIVE_ROLES.has((user?.role ?? "").toLowerCase());
   const canGenerate = CAN_COLLECT_ROLES.has((user?.role ?? "").toLowerCase());
+
+  useEffect(() => {
+    api.get("/school/fee-collection/info").then((res) => {
+      setSchoolName(res.data?.data?.name ?? "School");
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.get("/school/terms").then((res) => {
@@ -168,7 +180,12 @@ export function FeeCollection() {
         paymentMode,
       });
       const term = terms.find((t) => t.id === selectedTermId);
+      const now = new Date();
       setReceipt({
+        receiptRef: `RCP-${now.getTime().toString(36).toUpperCase()}`,
+        issuedAt: now.toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }),
+        schoolName,
+        cashierName: user?.name ?? "Cashier",
         studentName: `${collectTarget.student.firstName} ${collectTarget.student.lastName}`,
         studentCode: collectTarget.student.studentCode,
         className: collectTarget.student.className,
@@ -185,6 +202,46 @@ export function FeeCollection() {
     } finally {
       setCollecting(false);
     }
+  }
+
+  function printReceipt(r: Receipt) {
+    const modeName = PAYMENT_MODES.find((m) => m.value === r.paymentMode)?.label ?? r.paymentMode;
+    const fmtGhs = (n: number) => `GHS ${n.toFixed(2)}`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Receipt ${r.receiptRef}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:monospace;font-size:12px;width:300px;padding:12px;color:#000;background:#fff}
+  .center{text-align:center} .bold{font-weight:bold} .lg{font-size:15px} .sm{font-size:10px}
+  .sep{border-top:1px dashed #555;margin:8px 0}
+  .row{display:flex;justify-content:space-between;margin:3px 0}
+  .amt{font-size:14px;font-weight:bold}
+  @media print{@page{margin:0;size:80mm auto}}
+</style></head><body>
+<div class="center bold lg">${r.schoolName}</div>
+<div class="center sm">FEE PAYMENT RECEIPT</div>
+<div class="sep"></div>
+<div class="row"><span>Receipt No:</span><span class="bold">${r.receiptRef}</span></div>
+<div class="row"><span>Date:</span><span>${r.issuedAt}</span></div>
+<div class="sep"></div>
+<div class="row"><span>Student:</span><span class="bold">${r.studentName}</span></div>
+<div class="row"><span>ID:</span><span>${r.studentCode}</span></div>
+<div class="row"><span>Class:</span><span>${r.className}</span></div>
+<div class="row"><span>Guardian:</span><span>${r.guardianName}</span></div>
+<div class="row"><span>Term:</span><span>${r.termName}</span></div>
+<div class="sep"></div>
+<div class="row"><span>Payment Mode:</span><span>${modeName}</span></div>
+<div class="row amt"><span>Amount Paid:</span><span>${fmtGhs(r.totalPaid)}</span></div>
+${r.change > 0 ? `<div class="row"><span>Change:</span><span>${fmtGhs(r.change)}</span></div>` : ""}
+<div class="sep"></div>
+<div class="row sm"><span>Cashier:</span><span>${r.cashierName}</span></div>
+<div class="center sm" style="margin-top:8px">Thank you. Keep this receipt for your records.</div>
+<script>window.onload=()=>{window.print();}<\/script>
+</body></html>`;
+    const w = window.open("", "_blank", "width=360,height=520");
+    if (!w) { window.print(); return; }
+    w.document.write(html);
+    w.document.close();
   }
 
   async function handleGenerate() {
@@ -465,18 +522,20 @@ export function FeeCollection() {
               <CheckCircle2 className="w-6 h-6" />
               <span className="font-semibold text-lg">Payment Recorded</span>
             </div>
-            <div className="bg-secondary-50 dark:bg-secondary-800 rounded-lg p-4 space-y-2 text-sm">
+            <div className="bg-secondary-50 dark:bg-secondary-800 rounded-lg p-4 space-y-2 text-sm font-mono">
+              <div className="text-center font-semibold text-base text-secondary-900 dark:text-white mb-1">{receipt.schoolName}</div>
+              <div className="flex justify-between text-xs text-secondary-400">
+                <span>{receipt.receiptRef}</span>
+                <span>{receipt.issuedAt}</span>
+              </div>
+              <div className="border-t border-dashed border-secondary-300 dark:border-secondary-600 my-1" />
               <div className="flex justify-between">
                 <span className="text-secondary-500">Student</span>
-                <span className="font-medium">{receipt.studentName}</span>
+                <span className="font-medium text-right">{receipt.studentName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-secondary-500">Code</span>
-                <span className="font-mono text-xs">{receipt.studentCode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-secondary-500">Class</span>
-                <span>{receipt.className}</span>
+                <span className="text-secondary-500">ID / Class</span>
+                <span className="text-xs">{receipt.studentCode} · {receipt.className}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-secondary-500">Guardian</span>
@@ -486,12 +545,12 @@ export function FeeCollection() {
                 <span className="text-secondary-500">Term</span>
                 <span>{receipt.termName}</span>
               </div>
-              <div className="border-t border-secondary-200 dark:border-secondary-700 my-1" />
+              <div className="border-t border-dashed border-secondary-300 dark:border-secondary-600 my-1" />
               <div className="flex justify-between">
-                <span className="text-secondary-500">Payment Mode</span>
+                <span className="text-secondary-500">Mode</span>
                 <span>{PAYMENT_MODES.find((m) => m.value === receipt.paymentMode)?.label ?? receipt.paymentMode}</span>
               </div>
-              <div className="flex justify-between text-base font-semibold">
+              <div className="flex justify-between text-base font-bold">
                 <span>Amount Paid</span>
                 <span className="text-emerald-600 dark:text-emerald-400">{fmt(receipt.totalPaid)}</span>
               </div>
@@ -501,10 +560,14 @@ export function FeeCollection() {
                   <span>{fmt(receipt.change)}</span>
                 </div>
               )}
+              <div className="border-t border-dashed border-secondary-300 dark:border-secondary-600 my-1" />
+              <div className="text-xs text-secondary-400 text-center">Cashier: {receipt.cashierName}</div>
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" onClick={() => { setCollectTarget(null); setReceipt(null); }}>Close</Button>
-              <Button onClick={() => window.print()}>Print Receipt</Button>
+              <Button onClick={() => printReceipt(receipt)}>
+                <Printer className="w-4 h-4 mr-1" />Print Receipt
+              </Button>
             </div>
           </div>
         ) : collectTarget && (
