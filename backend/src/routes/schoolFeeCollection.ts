@@ -124,7 +124,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-const VALID_MODES = new Set(['CASH', 'MOBILE_MONEY', 'CHEQUE', 'BANK_TRANSFER']);
+const VALID_MODES = new Set(['CASH', 'MOBILE_MONEY', 'CHEQUE', 'BANK_TRANSFER', 'WAIVER']);
 
 /**
  * POST /api/v1/school/fee-collection/collect
@@ -209,6 +209,96 @@ router.post('/collect', requireRole('Accountant', 'Admin'), async (req: Request,
       invoicesUpdated: results.length,
       message: `Payment of GHS ${totalPaid.toFixed(2)} recorded via ${mode.replace('_', ' ')}.`,
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/school/fee-collection/waive
+ * Apply a fee waiver (full or partial) to a specific invoice for a student.
+ * Admin only. Records the waiver as an invoice payment with method WAIVER.
+ */
+router.post('/waive', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const actor = actorFromRequest(req);
+    const { invoiceId, amount, reason } = req.body;
+
+    if (!invoiceId || amount === undefined) {
+      res.status(400).json({ success: false, error: 'invoiceId and amount are required.' });
+      return;
+    }
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      res.status(400).json({ success: false, error: 'amount must be a positive number.' });
+      return;
+    }
+
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, tenantId, clientTxnId: { startsWith: 'SF:' } },
+    });
+    if (!invoice) {
+      res.status(404).json({ success: false, error: 'Invoice not found.' });
+      return;
+    }
+    const balance = Number(invoice.total) - Number(invoice.amountPaid);
+    if (balance <= 0) {
+      res.status(400).json({ success: false, error: 'Invoice is already fully paid.' });
+      return;
+    }
+    const waiverAmount = Math.min(numAmount, balance);
+
+    await recordInvoicePayment(invoice.id, actor, {
+      amount: waiverAmount,
+      method: 'WAIVER' as any,
+      description: reason ? `Fee waiver: ${reason}` : 'Fee waiver',
+    });
+
+    res.json({
+      success: true,
+      waivedAmount: waiverAmount,
+      message: `Waiver of GHS ${waiverAmount.toFixed(2)} applied.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/v1/school/fee-collection/late-fine-config
+ * PUT /api/v1/school/fee-collection/late-fine-config
+ * Manage late fine configuration: rate per day (GHS), grace period days, enabled flag.
+ * Stored in tenants.school_config as JSON.
+ */
+router.get('/late-fine-config', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const tenant = await prisma.tenant.findFirst({ where: { id: tenantId }, select: { schoolConfig: true } });
+    const schoolConfig = tenant?.schoolConfig ? JSON.parse(tenant.schoolConfig) : {};
+    const config = schoolConfig.lateFine ?? { enabled: false, ratePerDay: 0, graceDays: 0 };
+    res.json({ success: true, data: { config } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/late-fine-config', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { ratePerDay, graceDays, enabled } = req.body;
+    const lateFine = {
+      enabled: Boolean(enabled),
+      ratePerDay: Math.max(0, Number(ratePerDay ?? 0)),
+      graceDays: Math.max(0, Number(graceDays ?? 0)),
+    };
+    const tenant = await prisma.tenant.findFirst({ where: { id: tenantId }, select: { schoolConfig: true } });
+    const existing = tenant?.schoolConfig ? JSON.parse(tenant.schoolConfig) : {};
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { schoolConfig: JSON.stringify({ ...existing, lateFine }) },
+    });
+    res.json({ success: true, data: { config: lateFine } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

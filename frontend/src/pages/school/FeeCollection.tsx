@@ -7,7 +7,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { BookOpen, Loader2, Phone, CreditCard, CheckCircle2 } from "lucide-react";
+import { BookOpen, Loader2, Phone, CreditCard, CheckCircle2, Gift } from "lucide-react";
 
 interface AcademicTerm {
   id: string;
@@ -82,6 +82,7 @@ const PAYMENT_MODES = [
 ];
 
 const CAN_COLLECT_ROLES = new Set(["admin", "accountant"]);
+const CAN_WAIVE_ROLES = new Set(["admin"]);
 
 export function FeeCollection() {
   const { user } = useAuth();
@@ -101,7 +102,14 @@ export function FeeCollection() {
   const [collecting, setCollecting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
+  // Waiver modal state
+  const [waiveTarget, setWaiveTarget] = useState<{ invoice: InvoiceSummary; student: StudentRow["student"] } | null>(null);
+  const [waiveAmount, setWaiveAmount] = useState("");
+  const [waiveReason, setWaiveReason] = useState("");
+  const [waiving, setWaiving] = useState(false);
+
   const canCollect = CAN_COLLECT_ROLES.has((user?.role ?? "").toLowerCase());
+  const canWaive = CAN_WAIVE_ROLES.has((user?.role ?? "").toLowerCase());
 
   useEffect(() => {
     api.get("/school/terms").then((res) => {
@@ -171,6 +179,33 @@ export function FeeCollection() {
       showToast(e?.response?.data?.error ?? "Failed to record payment.", "error");
     } finally {
       setCollecting(false);
+    }
+  }
+
+  function openWaive(row: StudentRow, inv: InvoiceSummary) {
+    setWaiveTarget({ invoice: inv, student: row.student });
+    setWaiveAmount(String((inv.total - inv.amountPaid).toFixed(2)));
+    setWaiveReason("");
+  }
+
+  async function handleWaive() {
+    if (!waiveTarget) return;
+    const amt = parseFloat(waiveAmount);
+    if (isNaN(amt) || amt <= 0) { showToast("Enter a valid waiver amount.", "error"); return; }
+    setWaiving(true);
+    try {
+      await api.post("/school/fee-collection/waive", {
+        invoiceId: waiveTarget.invoice.id,
+        amount: amt,
+        reason: waiveReason.trim() || undefined,
+      });
+      showToast(`Waiver of GHS ${amt.toFixed(2)} applied.`, "success");
+      setWaiveTarget(null);
+      load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Failed to apply waiver.", "error");
+    } finally {
+      setWaiving(false);
     }
   }
 
@@ -316,6 +351,48 @@ export function FeeCollection() {
         </CardContent>
       </Card>
 
+      {/* Waiver Modal */}
+      <Modal
+        isOpen={!!waiveTarget}
+        onClose={() => setWaiveTarget(null)}
+        title={`Apply Waiver — ${waiveTarget?.student.firstName} ${waiveTarget?.student.lastName}`}
+      >
+        {waiveTarget && (
+          <div className="space-y-4">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-300">
+              <div className="font-medium mb-1">Invoice balance</div>
+              <div className="font-mono text-lg">{fmt(waiveTarget.invoice.total - waiveTarget.invoice.amountPaid)}</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Waiver Amount (GHS) *</label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={waiveAmount}
+                onChange={(e) => setWaiveAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Reason (optional)</label>
+              <Input
+                value={waiveReason}
+                onChange={(e) => setWaiveReason(e.target.value)}
+                placeholder="e.g. Staff child, scholarship, hardship"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setWaiveTarget(null)}>Cancel</Button>
+              <Button onClick={handleWaive} disabled={waiving} className="bg-amber-600 hover:bg-amber-700 text-white">
+                {waiving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Gift className="w-4 h-4 mr-1" />}
+                Apply Waiver
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Collect Fee Modal */}
       <Modal
         isOpen={!!collectTarget}
@@ -379,12 +456,22 @@ export function FeeCollection() {
                 {collectTarget.invoices
                   .filter((inv) => inv.status !== "PAID" && inv.status !== "VOIDED")
                   .map((inv) => (
-                    <div key={inv.id} className="flex justify-between">
+                    <div key={inv.id} className="flex items-center justify-between gap-2">
                       <span className="text-secondary-600 dark:text-secondary-400">
                         Invoice <span className="font-mono text-xs">{inv.id.slice(-6).toUpperCase()}</span>
                         {inv.dueDate && <span className="ml-2 text-xs text-secondary-400">due {new Date(inv.dueDate).toLocaleDateString("en-GB")}</span>}
                       </span>
-                      <span className="font-mono text-red-600 dark:text-red-400">{fmt(inv.total - inv.amountPaid)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-red-600 dark:text-red-400">{fmt(inv.total - inv.amountPaid)}</span>
+                        {canWaive && collectTarget && (
+                          <button
+                            className="text-xs text-amber-600 hover:underline whitespace-nowrap"
+                            onClick={() => { setCollectTarget(null); openWaive(collectTarget, inv); }}
+                          >
+                            Waive
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 <div className="border-t border-secondary-200 dark:border-secondary-700 pt-1 flex justify-between font-semibold">

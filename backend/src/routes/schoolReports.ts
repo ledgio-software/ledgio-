@@ -27,6 +27,11 @@ router.get('/fee-defaulters', async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const tenant = await prisma.tenant.findFirst({ where: { id: tenantId }, select: { schoolConfig: true } });
+    const schoolConfig = tenant?.schoolConfig ? JSON.parse(tenant.schoolConfig) : {};
+    const lateFine: { enabled: boolean; ratePerDay: number; graceDays: number } =
+      schoolConfig.lateFine ?? { enabled: false, ratePerDay: 0, graceDays: 0 };
+
     const [students, schedules, termInvoices] = await Promise.all([
       prisma.student.findMany({
         where: { tenantId, isActive: true },
@@ -69,6 +74,12 @@ router.get('/fee-defaulters', async (req: Request, res: Response): Promise<void>
         return Math.max(max, d);
       }, 0);
 
+      const effectiveDaysOverdue = Math.max(0, daysOverdue - lateFine.graceDays);
+      const lateFineAmount =
+        lateFine.enabled && effectiveDaysOverdue > 0
+          ? Math.round(balance * lateFine.ratePerDay * effectiveDaysOverdue * 100) / 100
+          : 0;
+
       defaulters.push({
         student: {
           id: student.id,
@@ -83,11 +94,13 @@ router.get('/fee-defaulters', async (req: Request, res: Response): Promise<void>
         totalPaid,
         balance,
         daysOverdue: Math.max(0, daysOverdue),
+        lateFineAmount,
+        totalDue: balance + lateFineAmount,
         paymentStatus: totalPaid > 0 ? 'partial' : 'unpaid',
       });
     }
 
-    res.json({ success: true, data: { termId: resolvedTermId, defaulters } });
+    res.json({ success: true, data: { termId: resolvedTermId, defaulters, lateFineConfig: lateFine } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

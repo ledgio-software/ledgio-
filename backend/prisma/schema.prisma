@@ -99,6 +99,8 @@ model Tenant {
   posEnabled              Boolean   @default(true) @map("pos_enabled")
   // Referral code used when this tenant signed up (links to ReferralPartner.code).
   referralCode            String?   @map("referral_code")
+  // School module config stored as JSON string. Currently: { lateFine: { enabled, ratePerDay, graceDays } }
+  schoolConfig            String?   @map("school_config")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 

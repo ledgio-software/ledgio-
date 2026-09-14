@@ -4,7 +4,14 @@ import { Button } from "../../components/ui/Button";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { AlertTriangle, Loader2, Printer } from "lucide-react";
+import { AlertTriangle, Loader2, Printer, Settings } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+
+interface LateFineConfig {
+  enabled: boolean;
+  ratePerDay: number;
+  graceDays: number;
+}
 
 interface AcademicTerm {
   id: string;
@@ -27,15 +34,23 @@ interface Defaulter {
   totalPaid: number;
   balance: number;
   daysOverdue: number;
+  lateFineAmount: number;
+  totalDue: number;
   paymentStatus: "partial" | "unpaid";
 }
 
 export function FeeDefaulters() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [selectedTermId, setSelectedTermId] = useState("");
   const [defaulters, setDefaulters] = useState<Defaulter[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lateFineConfig, setLateFineConfig] = useState<LateFineConfig>({ enabled: false, ratePerDay: 0, graceDays: 0 });
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [configDraft, setConfigDraft] = useState<LateFineConfig>({ enabled: false, ratePerDay: 0, graceDays: 0 });
+  const [savingConfig, setSavingConfig] = useState(false);
+  const isAdmin = (user?.role ?? "").toLowerCase() === "admin";
 
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS" }).format(n);
@@ -47,6 +62,11 @@ export function FeeDefaulters() {
       const current = list.find((t) => t.isCurrent);
       if (current) setSelectedTermId(current.id);
     });
+    api.get("/school/fee-collection/late-fine-config").then((r) => {
+      const cfg = r.data?.data?.config ?? { enabled: false, ratePerDay: 0, graceDays: 0 };
+      setLateFineConfig(cfg);
+      setConfigDraft(cfg);
+    });
   }, []);
 
   const load = useCallback(async () => {
@@ -55,6 +75,7 @@ export function FeeDefaulters() {
     try {
       const res = await api.get(`/school/reports/fee-defaulters?termId=${selectedTermId}`);
       setDefaulters(res.data?.data?.defaulters ?? []);
+      if (res.data?.data?.lateFineConfig) setLateFineConfig(res.data.data.lateFineConfig);
     } catch {
       showToast("Failed to load defaulters report", "error");
     } finally {
@@ -66,7 +87,24 @@ export function FeeDefaulters() {
     load();
   }, [load]);
 
+  async function saveConfig() {
+    setSavingConfig(true);
+    try {
+      await api.put("/school/fee-collection/late-fine-config", configDraft);
+      setLateFineConfig(configDraft);
+      setShowConfigPanel(false);
+      showToast("Late fine settings saved.", "success");
+      load();
+    } catch {
+      showToast("Failed to save settings.", "error");
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
   const totalBalance = defaulters.reduce((s, d) => s + d.balance, 0);
+  const totalLateFine = defaulters.reduce((s, d) => s + d.lateFineAmount, 0);
+  const totalDue = defaulters.reduce((s, d) => s + d.totalDue, 0);
   const selectedTerm = terms.find((t) => t.id === selectedTermId);
 
   return (
@@ -89,11 +127,67 @@ export function FeeDefaulters() {
               </option>
             ))}
           </select>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => { setConfigDraft(lateFineConfig); setShowConfigPanel((v) => !v); }}>
+              <Settings className="h-4 w-4 mr-1" /> Late Fine
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-1" /> Print
           </Button>
         </div>
       </div>
+
+      {showConfigPanel && isAdmin && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="font-medium text-sm">Late Fine Configuration</h3>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="lf-enabled"
+                checked={configDraft.enabled}
+                onChange={(e) => setConfigDraft((d) => ({ ...d, enabled: e.target.checked }))}
+              />
+              <label htmlFor="lf-enabled" className="text-sm">Enable late fines</label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Rate per day (GHS per GHS owed)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  className="w-full border rounded px-2 py-1.5 text-sm bg-background"
+                  value={configDraft.ratePerDay}
+                  onChange={(e) => setConfigDraft((d) => ({ ...d, ratePerDay: parseFloat(e.target.value) || 0 }))}
+                  disabled={!configDraft.enabled}
+                />
+                <p className="text-xs text-muted-foreground mt-0.5">e.g. 0.01 = 1% of balance per overdue day</p>
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Grace period (days)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="w-full border rounded px-2 py-1.5 text-sm bg-background"
+                  value={configDraft.graceDays}
+                  onChange={(e) => setConfigDraft((d) => ({ ...d, graceDays: parseInt(e.target.value) || 0 }))}
+                  disabled={!configDraft.enabled}
+                />
+                <p className="text-xs text-muted-foreground mt-0.5">Fine starts after this many overdue days</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowConfigPanel(false)}>Cancel</Button>
+              <Button size="sm" onClick={saveConfig} disabled={savingConfig}>
+                {savingConfig ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Save
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -115,12 +209,18 @@ export function FeeDefaulters() {
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead className="text-right">Days Overdue</TableHead>
                     <TableHead>Status</TableHead>
+                    {lateFineConfig.enabled && (
+                      <>
+                        <TableHead className="text-right">Late Fine</TableHead>
+                        <TableHead className="text-right">Total Due</TableHead>
+                      </>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {defaulters.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={lateFineConfig.enabled ? 11 : 9} className="text-center py-10 text-muted-foreground">
                         {selectedTermId
                           ? "No defaulters for this term."
                           : "Select a term to view defaulters."}
@@ -163,6 +263,16 @@ export function FeeDefaulters() {
                             {d.paymentStatus === "partial" ? "Partial" : "Unpaid"}
                           </span>
                         </TableCell>
+                        {lateFineConfig.enabled && (
+                          <>
+                            <TableCell className="text-right tabular-nums text-amber-600">
+                              {d.lateFineAmount > 0 ? fmt(d.lateFineAmount) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums font-semibold text-red-700">
+                              {fmt(d.totalDue)}
+                            </TableCell>
+                          </>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -175,9 +285,17 @@ export function FeeDefaulters() {
                   {defaulters.length} defaulter{defaulters.length !== 1 ? "s" : ""} ·{" "}
                   {selectedTerm ? `${selectedTerm.name} (${selectedTerm.academicYear})` : ""}
                 </span>
-                <span className="font-semibold text-red-600">
-                  Total Outstanding: {fmt(totalBalance)}
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="font-semibold text-red-600">
+                    Outstanding: {fmt(totalBalance)}
+                  </span>
+                  {lateFineConfig.enabled && totalLateFine > 0 && (
+                    <>
+                      <span className="text-amber-600">Late Fines: {fmt(totalLateFine)}</span>
+                      <span className="font-bold text-red-700">Total Due: {fmt(totalDue)}</span>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </CardContent>
