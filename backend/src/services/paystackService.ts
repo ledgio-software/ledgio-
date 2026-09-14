@@ -34,6 +34,21 @@ export interface PaystackVerifyResult {
   amount: number; // converted back to native-currency major unit
   currency: string;
   gatewayResponse?: string;
+  // Reusable payment authorization captured after a successful charge.
+  // Populated when Paystack returns an authorization object (card or MoMo).
+  authorization?: {
+    authCode: string;
+    channel: string; // "card" | "mobile_money"
+    summary: string; // e.g. "Visa **** 4082" or "MTN MoMo **** 0234"
+  };
+}
+
+export interface PaystackChargeAuthInput {
+  email: string;
+  amount: number; // native-currency major unit
+  authorizationCode: string;
+  currency?: string;
+  reference?: string;
 }
 
 export interface PaystackBank {
@@ -252,16 +267,83 @@ export async function verifyTransaction(reference: string): Promise<PaystackVeri
     const rawStatus = String(data?.status || '').toLowerCase();
     const status: PaystackVerifiedStatus =
       rawStatus === 'success' || rawStatus === 'failed' || rawStatus === 'abandoned' ? rawStatus : 'pending';
+
+    let authorization: PaystackVerifyResult['authorization'];
+    const auth = data?.authorization;
+    if (auth?.authorization_code) {
+      const channel = String(auth.channel || 'card').toLowerCase();
+      const last4 = auth.last4 || '****';
+      const summary = channel === 'mobile_money'
+        ? `${auth.bank || 'Mobile Money'} **** ${last4}`
+        : `${auth.card_type || 'Card'} **** ${last4}`;
+      authorization = { authCode: auth.authorization_code, channel, summary };
+    }
+
     return {
       status,
       reference: data?.reference || reference,
       amount: fromSubunit(Number(data?.amount || 0)),
       currency: data?.currency || 'GHS',
       gatewayResponse: data?.gateway_response,
+      authorization,
     };
   } catch (error: any) {
     throw new PaystackServiceError(
       error.response?.data?.message || 'Failed to verify Paystack transaction.',
+      error.response?.status || 502
+    );
+  }
+}
+
+/**
+ * POST /transaction/charge_authorization — charges a previously saved
+ * Paystack authorization code (card or Mobile Money) without requiring a new
+ * checkout. Used by the auto-renewal cron to charge subscribers before their
+ * plan expires. Returns the same shape as verifyTransaction so callers can
+ * treat the result uniformly.
+ */
+export async function chargeAuthorization(input: PaystackChargeAuthInput): Promise<PaystackVerifyResult> {
+  try {
+    const reference = input.reference || `autorenew_${Date.now()}`;
+    const response = await axios.post(
+      `${baseUrl()}/transaction/charge_authorization`,
+      {
+        email: input.email,
+        amount: toSubunit(input.amount),
+        authorization_code: input.authorizationCode,
+        currency: input.currency || 'GHS',
+        reference,
+      },
+      { headers: { Authorization: authHeader(), 'Content-Type': 'application/json' }, timeout: PAYSTACK_TIMEOUT_MS },
+    );
+    const data = response.data?.data;
+    const rawStatus = String(data?.status || '').toLowerCase();
+    const status: PaystackVerifiedStatus =
+      rawStatus === 'success' || rawStatus === 'failed' || rawStatus === 'abandoned' ? rawStatus : 'pending';
+
+    let authorization: PaystackVerifyResult['authorization'];
+    const auth = data?.authorization;
+    if (auth?.authorization_code) {
+      const channel = String(auth.channel || 'card').toLowerCase();
+      const last4 = auth.last4 || '****';
+      const summary = channel === 'mobile_money'
+        ? `${auth.bank || 'Mobile Money'} **** ${last4}`
+        : `${auth.card_type || 'Card'} **** ${last4}`;
+      authorization = { authCode: auth.authorization_code, channel, summary };
+    }
+
+    return {
+      status,
+      reference: data?.reference || reference,
+      amount: fromSubunit(Number(data?.amount || 0)),
+      currency: data?.currency || 'GHS',
+      gatewayResponse: data?.gateway_response,
+      authorization,
+    };
+  } catch (error: any) {
+    if (error instanceof PaystackServiceError) throw error;
+    throw new PaystackServiceError(
+      error.response?.data?.message || 'Failed to charge payment authorization.',
       error.response?.status || 502
     );
   }
