@@ -39,12 +39,13 @@ function SubscriptionTab() {
   const [error, setError] = useState<string | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState(false);
 
   useEffect(() => {
     api.get<any>("/subscription/status").then((r) => {
       setStatus(r.data);
       setSelectedTier(r.data.tier ?? 1);
-    }).catch(() => {});
+    }).catch(() => setStatusError(true));
   }, []);
 
   async function handlePay() {
@@ -85,6 +86,12 @@ function SubscriptionTab() {
 
   return (
     <div className="space-y-6">
+      {statusError && (
+        <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-red-800 dark:text-red-300 text-sm">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden />
+          <p>Could not load your subscription status. Please refresh the page or contact support if this continues.</p>
+        </div>
+      )}
       {/* Current plan summary */}
       {status && (
         <Card>
@@ -191,7 +198,16 @@ function SubscriptionTab() {
                 </div>
               )}
               <p className="text-sm text-secondary-600 dark:text-secondary-400">After completing payment on Paystack, click below to activate your plan.</p>
-              {verifyError && <p className="text-red-600 dark:text-red-400 text-sm">{verifyError}</p>}
+              {verifyError && (
+                <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-red-800 dark:text-red-300 text-sm">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden />
+                  <div>
+                    <p className="font-semibold">Payment verification failed</p>
+                    <p>{verifyError}</p>
+                    <p className="mt-1 text-xs opacity-75">If you were charged, contact <a href="mailto:ledgioapp@gmail.com" className="underline">ledgioapp@gmail.com</a> with your payment reference.</p>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={handleVerify} disabled={isVerifying}>
                   {isVerifying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Verifying…</> : "I've completed payment"}

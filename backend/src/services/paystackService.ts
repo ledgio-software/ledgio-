@@ -9,6 +9,7 @@ export interface PaystackInitializeInput {
   currency: string;
   reference: string;
   callbackUrl?: string;
+  metadata?: Record<string, unknown>;
   // The tenant's Paystack subaccount code (ACCT_...) - when present,
   // Paystack automatically splits and settles this payment directly to the
   // tenant's own bank account (see Subaccount below). Omitted for a tenant
@@ -216,6 +217,7 @@ export async function initializeTransaction(input: PaystackInitializeInput): Pro
         reference: input.reference,
         callback_url: input.callbackUrl,
         channels: ['mobile_money', 'card'],
+        ...(input.metadata && { metadata: input.metadata }),
         ...(input.subaccountCode && { subaccount: input.subaccountCode }),
       },
       { headers: { Authorization: authHeader(), 'Content-Type': 'application/json' }, timeout: PAYSTACK_TIMEOUT_MS }
