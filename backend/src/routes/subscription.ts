@@ -147,14 +147,16 @@ router.post('/initialize', requireRole('Admin'), validateBody(initializeSchema),
 
     const user = (req as any).user;
     const reference = `sub_${context.tenantId}_${planTier}_${Date.now()}`;
-    const callbackUrl = process.env.PAYSTACK_SUBSCRIPTION_CALLBACK_URL || process.env.APP_URL || '';
+    const appUrl = (process.env.PAYSTACK_SUBSCRIPTION_CALLBACK_URL || process.env.APP_URL || '').replace(/\/$/, '');
 
     const result = await paystackService.initializeTransaction({
       email: user.email,
       amount: plan.priceGhs,
       currency: 'GHS',
       reference,
-      callbackUrl: callbackUrl ? `${callbackUrl}?tab=subscription&ref=${reference}` : undefined,
+      // /verify is the SPA route that auto-calls POST /subscription/verify on load
+      callbackUrl: appUrl ? `${appUrl}/verify?ref=${reference}` : undefined,
+      metadata: { tenantId: context.tenantId, planTier },
     });
 
     res.json({ success: true, authorizationUrl: result.authorizationUrl, reference: result.reference, plan });
