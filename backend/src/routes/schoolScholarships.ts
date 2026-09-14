@@ -20,20 +20,45 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       orderBy: { awardedDate: 'desc' },
     });
 
-    // Attach student info
+    // Attach student and term info
     const studentIds = [...new Set(scholarships.map((s) => s.studentId))];
-    const students = await prisma.student.findMany({
-      where: { tenantId, id: { in: studentIds } },
-      select: { id: true, firstName: true, lastName: true, className: true, studentCode: true },
-    });
+    const termIds = [...new Set(scholarships.map((s) => s.termId).filter(Boolean))] as string[];
+
+    const [students, terms] = await Promise.all([
+      prisma.student.findMany({
+        where: { tenantId, id: { in: studentIds } },
+        select: { id: true, firstName: true, lastName: true, className: true, studentCode: true },
+      }),
+      termIds.length > 0
+        ? prisma.academicTerm.findMany({ where: { tenantId, id: { in: termIds } }, select: { id: true, name: true, academicYear: true } })
+        : [],
+    ]);
+
     const studentMap: Record<string, (typeof students)[0]> = {};
     for (const s of students) studentMap[s.id] = s;
 
-    const rows = scholarships.map((s) => ({
-      ...s,
-      discountValue: Number(s.discountValue),
-      student: studentMap[s.studentId] ?? null,
-    }));
+    const termMap: Record<string, (typeof terms)[0]> = {};
+    for (const t of terms) termMap[t.id] = t;
+
+    const rows = scholarships.map((s) => {
+      const stu = studentMap[s.studentId];
+      const term = s.termId ? termMap[s.termId] : null;
+      return {
+        id: s.id,
+        studentId: s.studentId,
+        studentName: stu ? `${stu.firstName} ${stu.lastName}` : '—',
+        studentCode: stu?.studentCode ?? '',
+        className: stu?.className ?? '',
+        termId: s.termId,
+        termName: term ? `${term.name} (${term.academicYear})` : null,
+        scholarshipName: s.scholarshipName,
+        discountType: s.discountType,
+        discountValue: Number(s.discountValue),
+        reason: s.reason,
+        awardedDate: s.awardedDate.toISOString(),
+        student: stu ?? null,
+      };
+    });
 
     res.json({ success: true, data: { scholarships: rows } });
   } catch (err: any) {

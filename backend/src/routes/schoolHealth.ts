@@ -23,19 +23,24 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const healthMap: Record<string, (typeof healthRecords)[0]> = {};
     for (const h of healthRecords) healthMap[h.studentId] = h;
 
-    const rows = students.map((s) => ({
-      student: {
-        id: s.id,
+    const records = students.map((s) => {
+      const h = healthMap[s.id] ?? null;
+      return {
+        studentId: s.id,
+        studentName: `${s.firstName} ${s.lastName}`,
         studentCode: s.studentCode,
-        firstName: s.firstName,
-        lastName: s.lastName,
         className: s.className,
-      },
-      health: healthMap[s.id] ?? null,
-      hasRecord: !!healthMap[s.id],
-    }));
+        hasRecord: !!h,
+        bloodGroup: h?.bloodGroup ?? null,
+        allergies: h ? h.allergies.split(',').map((x) => x.trim()).filter(Boolean) : [],
+        medicalConditions: h ? h.medicalConditions.split(',').map((x) => x.trim()).filter(Boolean) : [],
+        emergencyContact: h?.emergencyContact ?? null,
+        emergencyPhone: h?.emergencyPhone ?? null,
+        vaccinationNotes: h?.vaccinationNotes ?? null,
+      };
+    });
 
-    res.json({ success: true, data: { rows } });
+    res.json({ success: true, data: { records, rows: records } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
