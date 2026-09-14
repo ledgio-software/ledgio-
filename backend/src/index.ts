@@ -107,6 +107,11 @@ const startServer = async () => {
     GraEvatCronService.init();
     registerJob('GRA E-VAT Sync', '*/15 * * * *', '15-minute sweep to clear pending/failed GRA VSDC invoices within the 48-hour mandate window', () => GraEvatCronService.runSync());
 
+    // Initialize daily subscription auto-renewal sweep (charges saved card/MoMo before plan expires)
+    const { SubscriptionAutoRenewCronService } = require('./services/subscriptionAutoRenewCronService');
+    SubscriptionAutoRenewCronService.init();
+    registerJob('Subscription Auto-Renew', '30 6 * * *', 'Daily auto-charge of saved card/MoMo before subscription expires', () => SubscriptionAutoRenewCronService.processAutoRenewals?.() ?? Promise.resolve());
+
     // Initialize daily fixed-asset depreciation sweep
     const { FixedAssetDepreciationCronService } = require('./services/fixedAssetDepreciationCronService');
     FixedAssetDepreciationCronService.init();

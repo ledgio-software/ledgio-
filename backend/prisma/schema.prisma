@@ -76,6 +76,13 @@ model Tenant {
   subscriptionStatus      String    @default("TRIAL") @map("subscription_status")
   trialEndsAt             DateTime? @map("trial_ends_at")
   subscriptionPaidUntil   DateTime? @map("subscription_paid_until")
+  // Auto-renewal: Paystack reusable authorization code captured after first
+  // payment. When set, the auto-renew cron charges this card/MoMo daily
+  // before the subscription expires so the tenant never loses access.
+  paystackAuthCode        String?   @map("paystack_auth_code")
+  paystackAuthChannel     String?   @map("paystack_auth_channel") // "card" | "mobile_money"
+  paystackAuthSummary     String?   @map("paystack_auth_summary") // "Visa **** 4082" | "MTN MoMo **** 0234"
+  autoRenewEnabled        Boolean   @default(true) @map("auto_renew_enabled")
   // Owner/manager phone number that automated SMS alerts (till-close
   // summaries, cash shortage warnings) go to. Optional - alerts are skipped
   // (not sent to a shared/hardcoded fallback) when unset for this tenant.

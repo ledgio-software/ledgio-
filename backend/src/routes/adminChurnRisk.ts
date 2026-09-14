@@ -55,11 +55,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         _max: { createdAt: true },
         where: { tenantId: { not: null } },
       }),
-      // Feature adoption: distinct (tenantId, action) pairs for key actions
-      prisma.auditLog.findMany({
+      // Feature adoption: unique (tenantId, action) pairs for key actions
+      prisma.auditLog.groupBy({
+        by: ['tenantId', 'action'],
         where: { action: { in: ALL_SIGNAL_ACTIONS }, tenantId: { not: null } },
-        select: { tenantId: true, action: true },
-        distinct: ['tenantId', 'action'],
       }),
       // Active user count per tenant
       prisma.user.groupBy({
@@ -124,7 +123,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       // priority: expired > trial_critical > trial_soon > renewal_soon > dormant
       let bucket: 'expired' | 'trial_critical' | 'trial_soon' | 'trial_watch' | 'renewal_soon' | 'dormant' | null = null;
 
-      if (t.subscriptionStatus === 'EXPIRED') {
+      if (t.subscriptionStatus === 'EXPIRED' || t.subscriptionStatus === 'GRACE') {
         bucket = 'expired';
       } else if (t.subscriptionStatus === 'TRIAL') {
         if (trialDaysLeft !== null && trialDaysLeft <= 3) bucket = 'trial_critical';

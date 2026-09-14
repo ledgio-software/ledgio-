@@ -67,7 +67,15 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
     const context = req.tenantContext!;
     const tenant = await prisma.tenant.findUnique({
       where: { id: context.tenantId },
-      select: { tier: true, subscriptionStatus: true, trialEndsAt: true, subscriptionPaidUntil: true },
+      select: {
+        tier: true,
+        subscriptionStatus: true,
+        trialEndsAt: true,
+        subscriptionPaidUntil: true,
+        paystackAuthChannel: true,
+        paystackAuthSummary: true,
+        autoRenewEnabled: true,
+      },
     });
     if (!tenant) {
       res.status(404).json({ success: false, error: 'Tenant not found.' });
@@ -110,6 +118,10 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
       graceDaysRemaining,
       renewalDaysRemaining,
       subscriptionPaidUntil: tenant.subscriptionPaidUntil?.toISOString() ?? null,
+      savedPaymentMethod: tenant.paystackAuthSummary
+        ? { channel: tenant.paystackAuthChannel, summary: tenant.paystackAuthSummary }
+        : null,
+      autoRenewEnabled: tenant.autoRenewEnabled,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -201,12 +213,23 @@ router.post('/verify', requireRole('Admin'), validateBody(verifySchema), async (
     const tenant = await prisma.tenant.findUnique({ where: { id: context.tenantId }, select: { tier: true } });
     const newTier = plan.tier > (tenant?.tier ?? 1) ? plan.tier : (tenant?.tier ?? 1);
 
+    // Capture the reusable authorization so auto-renewal can charge it later
+    const authUpdate = verification.authorization
+      ? {
+          paystackAuthCode: verification.authorization.authCode,
+          paystackAuthChannel: verification.authorization.channel,
+          paystackAuthSummary: verification.authorization.summary,
+          autoRenewEnabled: true,
+        }
+      : {};
+
     await prisma.tenant.update({
       where: { id: context.tenantId },
       data: {
         subscriptionStatus: 'ACTIVE',
         subscriptionPaidUntil,
         tier: newTier,
+        ...authUpdate,
       },
     });
 
@@ -300,6 +323,54 @@ router.post('/webhook', async (req: Request, res: Response): Promise<void> => {
     await invalidateTenantCacheById(metadata.tenantId);
 
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/v1/subscription/payment-method
+ * Removes the stored Paystack authorization and disables auto-renewal.
+ * The tenant can still pay manually on next renewal.
+ */
+router.delete('/payment-method', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const context = requireTenantContext();
+    await prisma.tenant.update({
+      where: { id: context.tenantId },
+      data: {
+        paystackAuthCode: null,
+        paystackAuthChannel: null,
+        paystackAuthSummary: null,
+        autoRenewEnabled: false,
+      },
+    });
+    await invalidateTenantCacheById(context.tenantId);
+    res.json({ success: true, message: 'Payment method removed. Auto-renewal is now off.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/v1/subscription/auto-renew
+ * Toggles auto-renewal on or off without removing the saved payment method.
+ * Body: { enabled: boolean }
+ */
+router.patch('/auto-renew', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { enabled } = req.body as { enabled: boolean };
+    if (typeof enabled !== 'boolean') {
+      res.status(400).json({ success: false, error: '`enabled` must be a boolean.' });
+      return;
+    }
+    const context = requireTenantContext();
+    await prisma.tenant.update({
+      where: { id: context.tenantId },
+      data: { autoRenewEnabled: enabled },
+    });
+    await invalidateTenantCacheById(context.tenantId);
+    res.json({ success: true, autoRenewEnabled: enabled });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

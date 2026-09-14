@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Building2, Globe, Mail, Smartphone, Send, CheckCircle2, Download, FileJson, FileArchive, ShieldCheck, Copy, Sparkles, Stamp, ExternalLink, Wallet, CreditCard, Check, Loader2, AlertTriangle } from "lucide-react";
+import { Building2, Globe, Mail, Smartphone, Send, CheckCircle2, Download, FileJson, FileArchive, ShieldCheck, Copy, Sparkles, Stamp, ExternalLink, Wallet, CreditCard, Check, Loader2, AlertTriangle, RefreshCw, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { Button } from "../../components/ui/Button";
@@ -27,6 +27,8 @@ function SubscriptionTab() {
   const [status, setStatus] = useState<{
     state: string; planName: string; tier: number; priceGhs: number;
     trialDaysRemaining: number | null; trialEndsAt: string | null; subscriptionPaidUntil: string | null;
+    savedPaymentMethod: { channel: string | null; summary: string } | null;
+    autoRenewEnabled: boolean;
   } | null>(null);
   const [selectedTier, setSelectedTier] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -75,6 +77,30 @@ function SubscriptionTab() {
     } catch (err: any) {
       setVerifyError(err.response?.data?.error || "Could not verify. Please wait a moment and try again.");
     } finally { setIsVerifying(false); }
+  }
+
+  const [removingMethod, setRemovingMethod] = useState(false);
+  const [togglingRenew, setTogglingRenew] = useState(false);
+
+  async function handleRemovePaymentMethod() {
+    if (!confirm("Remove saved payment method? Auto-renewal will be turned off.")) return;
+    setRemovingMethod(true);
+    try {
+      await api.delete("/subscription/payment-method");
+      setStatus((s) => s ? { ...s, savedPaymentMethod: null, autoRenewEnabled: false } : s);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Could not remove payment method.");
+    } finally { setRemovingMethod(false); }
+  }
+
+  async function handleToggleAutoRenew(enabled: boolean) {
+    setTogglingRenew(true);
+    try {
+      await api.patch("/subscription/auto-renew", { enabled });
+      setStatus((s) => s ? { ...s, autoRenewEnabled: enabled } : s);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Could not update auto-renewal setting.");
+    } finally { setTogglingRenew(false); }
   }
 
   const stateColor: Record<string, string> = {
@@ -126,6 +152,60 @@ function SubscriptionTab() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Saved payment method / auto-renewal */}
+      {status && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-emerald-500" />
+              Auto-Renewal
+            </CardTitle>
+            <CardDescription>
+              When enabled, Ledgio charges your saved payment method automatically before your plan expires.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {status.savedPaymentMethod ? (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-3 flex-1 px-4 py-3 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-secondary-50 dark:bg-secondary-900">
+                  <CreditCard className="h-4 w-4 text-secondary-500 flex-shrink-0" aria-hidden />
+                  <span className="text-sm font-medium">{status.savedPaymentMethod.summary}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleAutoRenew(!status.autoRenewEnabled)}
+                    disabled={togglingRenew}
+                    aria-label={status.autoRenewEnabled ? "Disable auto-renewal" : "Enable auto-renewal"}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-secondary-200 dark:border-secondary-700 text-sm font-medium transition-colors hover:bg-secondary-100 dark:hover:bg-secondary-800"
+                  >
+                    {togglingRenew ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    ) : status.autoRenewEnabled ? (
+                      <ToggleRight className="h-4 w-4 text-emerald-500" aria-hidden />
+                    ) : (
+                      <ToggleLeft className="h-4 w-4 text-secondary-400" aria-hidden />
+                    )}
+                    {status.autoRenewEnabled ? "Auto-renew on" : "Auto-renew off"}
+                  </button>
+                  <button
+                    onClick={handleRemovePaymentMethod}
+                    disabled={removingMethod}
+                    aria-label="Remove saved payment method"
+                    className="p-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    {removingMethod ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-secondary-500">
+                No payment method saved. Complete a payment below — your card or Mobile Money account will be saved automatically for future renewals.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
