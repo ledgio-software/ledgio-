@@ -5,13 +5,28 @@ import { requireRole } from '../middleware/rbacMiddleware';
 
 const router = Router();
 
-// GET /api/v1/school/students
-router.get('/', async (_req: Request, res: Response): Promise<void> => {
+// GET /api/v1/school/students?search=&limit=
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
+    const { search, limit } = req.query as { search?: string; limit?: string };
+    const take = limit ? Math.min(200, parseInt(limit, 10)) : undefined;
     const students = await prisma.student.findMany({
-      where: { tenantId },
+      where: {
+        tenantId,
+        ...(search
+          ? {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+                { studentCode: { contains: search, mode: 'insensitive' } },
+                { className: { contains: search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ className: 'asc' }, { lastName: 'asc' }, { firstName: 'asc' }],
+      ...(take ? { take } : {}),
     });
     res.json({ success: true, data: { students } });
   } catch (err: any) {

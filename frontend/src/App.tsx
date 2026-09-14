@@ -52,6 +52,9 @@ const SchoolStudents = lazy(() => import("./pages/school/Students").then(m => ({
 const AcademicTerms = lazy(() => import("./pages/school/AcademicTerms").then(m => ({ default: m.AcademicTerms })));
 const FeeSchedules = lazy(() => import("./pages/school/FeeSchedules").then(m => ({ default: m.FeeSchedules })));
 const FeeCollection = lazy(() => import("./pages/school/FeeCollection").then(m => ({ default: m.FeeCollection })));
+const FeeDefaulters = lazy(() => import("./pages/school/FeeDefaulters").then(m => ({ default: m.FeeDefaulters })));
+const DemandVsCollection = lazy(() => import("./pages/school/DemandVsCollection").then(m => ({ default: m.DemandVsCollection })));
+const StudentLedger = lazy(() => import("./pages/school/StudentLedger").then(m => ({ default: m.StudentLedger })));
 const ExpenseClaims = lazy(() => import("./pages/expenses/ExpenseClaims").then(m => ({ default: m.ExpenseClaims })));
 const Budgets = lazy(() => import("./pages/reports/Budgets").then(m => ({ default: m.Budgets })));
 const TeamManagement = lazy(() => import("./pages/team/TeamManagement").then(m => ({ default: m.TeamManagement })));
@@ -896,6 +899,9 @@ function App() {
               <Route path="/school/terms" element={<ProtectedRoute><MainLayout><AcademicTerms /></MainLayout></ProtectedRoute>} />
               <Route path="/school/fee-schedules" element={<ProtectedRoute><MainLayout><FeeSchedules /></MainLayout></ProtectedRoute>} />
               <Route path="/school/fee-collection" element={<ProtectedRoute><MainLayout><FeeCollection /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/fee-defaulters" element={<ProtectedRoute><MainLayout><FeeDefaulters /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/demand-vs-collection" element={<ProtectedRoute><MainLayout><DemandVsCollection /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/student-ledger" element={<ProtectedRoute><MainLayout><StudentLedger /></MainLayout></ProtectedRoute>} />
               <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing" element={<ProtectedRoute><MainLayout><Manufacturing /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing/jobs" element={<ProtectedRoute><MainLayout><Jobs /></MainLayout></ProtectedRoute>} />
