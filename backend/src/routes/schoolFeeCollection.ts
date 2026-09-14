@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
 import { requireTenantContext } from '../context/tenantContext';
+import { requireRole } from '../middleware/rbacMiddleware';
+import { actorFromRequest } from '../services/auditLogService';
+import { recordInvoicePayment } from '../services/invoicePaymentService';
 
 const router = Router();
 
@@ -116,6 +119,96 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     });
 
     res.json({ success: true, data: { termId: resolvedTermId, students: rows, summary } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+const VALID_MODES = new Set(['CASH', 'MOBILE_MONEY', 'CHEQUE', 'BANK_TRANSFER']);
+
+/**
+ * POST /api/v1/school/fee-collection/collect
+ * Record a fee payment for a student for the given term.
+ * Applies the payment to the student's outstanding school-fee invoices
+ * (oldest first) until the amount is exhausted.
+ */
+router.post('/collect', requireRole('Accountant', 'Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const actor = actorFromRequest(req);
+    const { studentId, termId, amount, paymentMode } = req.body;
+
+    if (!studentId || !termId || amount === undefined) {
+      res.status(400).json({ success: false, error: 'studentId, termId, and amount are required.' });
+      return;
+    }
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      res.status(400).json({ success: false, error: 'amount must be a positive number.' });
+      return;
+    }
+    const mode = (paymentMode || 'CASH') as string;
+    if (!VALID_MODES.has(mode)) {
+      res.status(400).json({ success: false, error: `paymentMode must be one of: ${[...VALID_MODES].join(', ')}` });
+      return;
+    }
+
+    // Validate student and term belong to this tenant
+    const [student, schedules] = await Promise.all([
+      prisma.student.findFirst({ where: { id: studentId, tenantId } }),
+      prisma.feeSchedule.findMany({ where: { tenantId, termId } }),
+    ]);
+    if (!student) {
+      res.status(404).json({ success: false, error: 'Student not found.' });
+      return;
+    }
+    if (schedules.length === 0) {
+      res.status(404).json({ success: false, error: 'No fee schedules found for this term.' });
+      return;
+    }
+
+    const scheduleIds = schedules.map((s) => s.id);
+
+    // Find all unpaid/partial school fee invoices for this student+term
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        tenantId,
+        clientTxnId: { in: scheduleIds.map((sid) => `SF:${sid}:${studentId}`) },
+        status: { notIn: ['PAID', 'VOIDED'] },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (invoices.length === 0) {
+      res.status(400).json({ success: false, error: 'No outstanding invoices found for this student in this term.' });
+      return;
+    }
+
+    let remaining = numAmount;
+    const results: { invoiceId: string; paid: number }[] = [];
+
+    for (const inv of invoices) {
+      if (remaining <= 0) break;
+      const balance = Number(inv.total) - Number(inv.amountPaid);
+      if (balance <= 0) continue;
+      const toPay = Math.min(remaining, balance);
+      await recordInvoicePayment(inv.id, actor, {
+        amount: toPay,
+        method: mode as any,
+        description: `School fee payment — ${student.firstName} ${student.lastName} (${student.className})`,
+      });
+      results.push({ invoiceId: inv.id, paid: toPay });
+      remaining -= toPay;
+    }
+
+    const totalPaid = numAmount - remaining;
+    res.json({
+      success: true,
+      totalPaid,
+      change: Math.max(0, remaining),
+      invoicesUpdated: results.length,
+      message: `Payment of GHS ${totalPaid.toFixed(2)} recorded via ${mode.replace('_', ' ')}.`,
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
