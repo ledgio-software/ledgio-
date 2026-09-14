@@ -122,6 +122,22 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
     '/pdc', '/reports/interest-charges',
   ]),
+  NONPROFIT: new Set([
+    // No product sales or stock
+    '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
+    '/inventory', '/inventory/serial-numbers', '/analytics/inventory',
+    // No manufacturing or job costing
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/cost-categories',
+    // No interest or price lists (schools don't charge interest or maintain product price lists)
+    '/reports/interest-charges', '/settings/price-lists',
+    // Reports irrelevant to schools
+    '/reports/monthly-sales-ledger', '/reports/sales-channel',
+    '/reports/landed-costs', '/reports/stock-movement',
+    '/reports/stock-aging', '/reports/registers',
+    // No customer CRM (schools use Students module)
+    '/customers',
+  ]),
 };
 
 const BUSINESS_HIDDEN: ReadonlySet<string> = new Set([
@@ -441,10 +457,9 @@ export function getVisibleNavGroups(
   if (orgType === "NONPROFIT") {
     groups = groups
       .map((group) => {
+        // INVENTORY section is entirely irrelevant for schools (handled by ORG_TYPE_HIDDEN too, belt-and-suspenders)
         if (group.sectionTitle === "INVENTORY & GODOWNS") return null;
-        if (group.sectionTitle === "SALES & PURCHASES") {
-          return { ...group, items: group.items.filter((item) => item.href !== "/pos") };
-        }
+        // Add Funds to Finance & Banking for grant/endowment tracking
         if (group.sectionTitle === "FINANCE & BANKING") {
           return { ...group, items: [...group.items, { name: "Funds", href: "/settings/funds", icon: Landmark }] };
         }
