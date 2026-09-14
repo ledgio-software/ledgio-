@@ -135,6 +135,8 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/purchase-orders', '/payment-matching',
     // No interest charges or product price lists
     '/reports/interest-charges', '/settings/price-lists',
+    // WHT is a GRA obligation for commercial entities; schools are typically exempt
+    '/settings/wht-rates',
     // Advanced accounting features not used in school context
     '/settings/scenarios', '/settings/voucher-classes', '/pdc',
     // Reports irrelevant to schools
@@ -151,6 +153,8 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/reports/benford-analysis',
     // No customer CRM (schools use Students module)
     '/customers',
+    // Retail POS executive report (shops, tills, till closeouts) — not applicable to schools
+    '/reports/executive',
   ]),
 };
 
@@ -347,6 +351,28 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
   cashier: ["/dashboard", "/inventory", "/pos", "/expenses"],
   "warehouse manager": ["/dashboard", "/inventory", "/analytics/inventory", "/purchase-orders", "/expenses"],
   hr: ["/dashboard", "/team", "/expenses", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave"],
+  // School-specific restricted roles — see to full school module set they teach/manage.
+  // Admin (Head Teacher) and Accountant (Bursar) are unrestricted so they see the full nav.
+  teacher: [
+    "/dashboard",
+    "/school/students",
+    "/school/attendance",
+    "/school/assessments",
+    "/school/report-cards",
+    "/school/timetable",
+    "/school/events",
+  ],
+  "class teacher": [
+    "/dashboard",
+    "/school/students",
+    "/school/attendance",
+    "/school/assessments",
+    "/school/report-cards",
+    "/school/timetable",
+    "/school/events",
+    "/school/health",
+    "/school/certificates",
+  ],
   "payroll officer": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
   "payroll approver": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
   "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/delivery-notes", "/payment-matching", "/expenses", "/inventory", "/vendors"],
@@ -431,6 +457,7 @@ export const SETTINGS_RESTRICTED_ROLES = new Set([
   "hr", "payroll officer", "payroll approver",
   "accounts payable clerk", "accounts receivable clerk",
   "auditor", "external accountant", "viewer",
+  "teacher", "class teacher",
 ]);
 
 export function isSettingsRestricted(role: string | undefined): boolean {
