@@ -155,6 +155,8 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/customers',
     // Retail POS executive report (shops, tills, till closeouts) — not applicable to schools
     '/reports/executive',
+    // Tax Rates configure VAT/NHIL on sales invoices; educational services are VAT-exempt under GRA
+    '/settings/tax-rates',
   ]),
 };
 

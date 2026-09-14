@@ -13,6 +13,8 @@ import {
   ShoppingCart,
   FileText,
   Package,
+  Users,
+  BadgeDollarSign,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -258,7 +260,7 @@ export function OnboardingWizard() {
               { label: "Business Profile", done: status.checklist.businessProfileComplete },
               { label: "Chart of Accounts", done: status.checklist.chartOfAccountsReady },
               { label: "Opening Balances", done: status.checklist.openingBalancesPosted },
-              { label: "First Transaction", done: status.checklist.firstTransactionRecorded },
+              { label: isNonprofit ? "First Fee Collected" : "First Transaction", done: status.checklist.firstTransactionRecorded },
             ].map((item) => (
               <div key={item.label} className="flex items-center gap-2 text-xs">
                 {item.done ? (
@@ -302,7 +304,7 @@ export function OnboardingWizard() {
       {activeStep === "profile" && (
         <Card>
           <CardHeader>
-            <CardTitle>Tell us about your business</CardTitle>
+            <CardTitle>{isNonprofit ? "Tell us about your school" : "Tell us about your business"}</CardTitle>
             <CardDescription>This drives which defaults and tax behavior make sense for you.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -349,40 +351,73 @@ export function OnboardingWizard() {
               <CardTitle>You're all set — start using Ledgio</CardTitle>
             </div>
             <CardDescription>
-              Your workspace is ready. The accounting engine runs in the background — just start selling and
-              recording. You can set up a chart of accounts and opening balances from Settings when you need them.
+              {isNonprofit
+                ? "Your school workspace is ready. Start by setting up your fee schedules, enrolling students, and recording fee collections."
+                : "Your workspace is ready. The accounting engine runs in the background — just start selling and recording. You can set up a chart of accounts and opening balances from Settings when you need them."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => navigate("/pos")}
-                className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-              >
-                <ShoppingCart className="h-8 w-8 text-primary-600" aria-hidden="true" />
-                <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Make a Sale</span>
-                <span className="text-xs text-secondary-500">Open the till and record sales</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/invoices")}
-                className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-              >
-                <FileText className="h-8 w-8 text-primary-600" aria-hidden="true" />
-                <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Send an Invoice</span>
-                <span className="text-xs text-secondary-500">Bill a customer on credit</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/inventory")}
-                className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-              >
-                <Package className="h-8 w-8 text-primary-600" aria-hidden="true" />
-                <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Add Stock</span>
-                <span className="text-xs text-secondary-500">Load your products and inventory</span>
-              </button>
-            </div>
+            {isNonprofit ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/school/fee-schedules")}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                >
+                  <BookOpen className="h-8 w-8 text-primary-600" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Set Up Fee Schedules</span>
+                  <span className="text-xs text-secondary-500">Define tuition and levy amounts per term</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/school/students")}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                >
+                  <Users className="h-8 w-8 text-primary-600" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Add Students</span>
+                  <span className="text-xs text-secondary-500">Enrol students and manage their records</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/school/fee-collection")}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                >
+                  <BadgeDollarSign className="h-8 w-8 text-primary-600" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Collect Fees</span>
+                  <span className="text-xs text-secondary-500">Record school fee payments from parents</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/pos")}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                >
+                  <ShoppingCart className="h-8 w-8 text-primary-600" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Make a Sale</span>
+                  <span className="text-xs text-secondary-500">Open the till and record sales</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/invoices")}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                >
+                  <FileText className="h-8 w-8 text-primary-600" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Send an Invoice</span>
+                  <span className="text-xs text-secondary-500">Bill a customer on credit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/inventory")}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-secondary-200 dark:border-secondary-700 p-5 text-center hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                >
+                  <Package className="h-8 w-8 text-primary-600" aria-hidden="true" />
+                  <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">Add Stock</span>
+                  <span className="text-xs text-secondary-500">Load your products and inventory</span>
+                </button>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>
@@ -550,10 +585,16 @@ export function OnboardingWizard() {
         <Card className="border-primary-200 bg-primary-50/20 dark:bg-primary-950/10">
           <CardContent className="py-4 flex items-center justify-between">
             <p className="text-sm text-secondary-700 dark:text-secondary-300">
-              You're live. Record your first real transaction to finish setup.
+              {isNonprofit
+                ? "You're live. Collect your first fee payment to finish setup."
+                : "You're live. Record your first real transaction to finish setup."}
             </p>
-            <Button type="button" variant="primary" onClick={() => navigate("/journals/new")}>
-              Record First Transaction
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => navigate(isNonprofit ? "/school/fee-collection" : "/journals/new")}
+            >
+              {isNonprofit ? "Collect First Fee" : "Record First Transaction"}
               <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
             </Button>
           </CardContent>
