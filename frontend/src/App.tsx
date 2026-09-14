@@ -19,6 +19,8 @@ import {
   ShoppingCart, Package, FileText as FileTextIcon, DollarSign,
   Wallet as WalletIcon, ArrowLeftRight, ClipboardList, BarChart2,
   Receipt as ReceiptIcon, Store, AlertTriangle, CheckCircle2, TrendingUp,
+  Users, GraduationCap, CalendarCheck, BookOpen, ClipboardCheck,
+  FileSpreadsheet, BadgeDollarSign, HeartPulse, Award,
 } from "lucide-react";
 import { useProfitAndLoss } from "./hooks/useProfitAndLoss";
 import { useAccounts } from "./hooks/useAccounts";
@@ -202,16 +204,18 @@ const Dashboard = () => {
   const { settings } = useTenantSettings();
   const { mode } = useWorkspaceMode();
 
-  // Roles with a reduced nav (Shop Manager, Cashier, HR, Auditor) don't have
-  // backend read access to company-wide P&L/ledger data (rbacMiddleware.ts's
-  // scoped-role rules) - the underlying hooks above still fire regardless
-  // (rules of hooks), but their 403s are swallowed by the hooks' own
-  // catch/console.error, so just skip rendering these cards rather than
-  // showing stale/zeroed figures. Also not shown to these roles: financial
-  // data they have no operational need for anyway.
+  // Roles with a reduced nav (Shop Manager, Cashier, HR, Auditor, Teacher, etc.)
+  // don't have backend read access to company-wide P&L/ledger data
+  // (rbacMiddleware.ts's scoped-role rules) - the underlying hooks above still
+  // fire regardless (rules of hooks), but their 403s are swallowed by the
+  // hooks' own catch/console.error, so just skip rendering these cards rather
+  // than showing stale/zeroed figures.
   const isRestrictedRole = getVisibleHrefs((user?.role || "").toLowerCase().trim()) !== null;
+  const isSchool = user?.orgType === 'NONPROFIT';
+  const role = (user?.role || '').toLowerCase().trim();
+  const isSchoolRestrictedRole = isSchool && (role === 'teacher' || role === 'class teacher');
 
-  const showGuidedPanel = !isRestrictedRole && (mode === "operations" || mode === "business");
+  const showGuidedPanel = !isRestrictedRole && !isSchool && (mode === "operations" || mode === "business");
 
   // One-time self-heal for tenants with POS sales recorded before revenue
   // posting existed (see routes/cashTill.ts POST /tills/sales) - an old
@@ -223,7 +227,7 @@ const Dashboard = () => {
   // effect included) - not per every render.
   const backfillAttempted = useRef(false);
   useEffect(() => {
-    if (isRestrictedRole || backfillAttempted.current) return;
+    if (isRestrictedRole || isSchool || backfillAttempted.current) return;
     backfillAttempted.current = true;
     api.post('/tills/backfill-revenue')
       .then((response) => {
@@ -263,8 +267,11 @@ const Dashboard = () => {
     return formatCurrency(amount);
   };
 
-  const headerSubtitle =
-    mode === "operations"
+  const headerSubtitle = isSchool
+    ? isSchoolRestrictedRole
+      ? "Welcome back. Use the quick links below to get started."
+      : "School overview — fees, enrolment, and academic progress at a glance."
+    : mode === "operations"
       ? "Here's your business at a glance. Tap a quick action below to get started."
       : mode === "business"
       ? "Sales, purchases, and finance — all in one place."
@@ -281,7 +288,7 @@ const Dashboard = () => {
             {headerSubtitle}
           </p>
         </div>
-        {!isRestrictedRole && mode === "professional" && (
+        {!isRestrictedRole && !isSchool && mode === "professional" && (
           <Button variant="primary" onClick={() => navigate("/journals/new")}>
             New Voucher
           </Button>
@@ -292,7 +299,7 @@ const Dashboard = () => {
         <GuidedOperationsPanel mode={mode as "operations" | "business"} />
       )}
 
-      {!isRestrictedRole && (
+      {!isRestrictedRole && !isSchool && (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -353,8 +360,13 @@ const Dashboard = () => {
         </div>
       )}
 
-      {isRestrictedRole && <ShopManagerDashboard />}
-      {!isRestrictedRole && <DashboardFinanceWidgets currency={settings.baseCurrency} />}
+      {/* School-specific dashboards take over for school tenants */}
+      {isSchoolRestrictedRole && <TeacherDashboard />}
+      {isSchool && !isSchoolRestrictedRole && !isRestrictedRole && <SchoolAdminDashboard />}
+      {/* Retail/general restricted roles (Shop Manager, Cashier, etc.) */}
+      {!isSchool && isRestrictedRole && <ShopManagerDashboard />}
+      {/* Full finance widgets for unrestricted non-school roles */}
+      {!isSchool && !isRestrictedRole && <DashboardFinanceWidgets currency={settings.baseCurrency} />}
     </div>
   );
 };
@@ -564,6 +576,192 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── School Admin / Bursar dashboard (orgType === NONPROFIT, unrestricted role) ─
+function SchoolAdminDashboard() {
+  const { settings } = useTenantSettings();
+  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: settings.baseCurrency }).format(n);
+  const [data, setData] = useState<{
+    studentCount: number | null;
+    activeTerm: string | null;
+    feesCollectedTerm: number | null;
+    feesOutstandingTerm: number | null;
+  }>({ studentCount: null, activeTerm: null, feesCollectedTerm: null, feesOutstandingTerm: null });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.allSettled([
+      api.get('/school/students?limit=1'),
+      api.get('/school/terms'),
+      api.get('/school/fee-collection/info'),
+    ]).then(([studentsRes, termsRes, feeRes]) => {
+      let studentCount: number | null = null;
+      let activeTerm: string | null = null;
+      let activeTermId: string | null = null;
+
+      if (studentsRes.status === 'fulfilled') {
+        studentCount = studentsRes.value.data?.data?.students?.length ?? null;
+        // Re-fetch without limit to get real count
+        api.get('/school/students').then((r) => {
+          setData((d) => ({ ...d, studentCount: r.data?.data?.students?.length ?? 0 }));
+        }).catch(() => {});
+      }
+      if (termsRes.status === 'fulfilled') {
+        const terms: any[] = termsRes.value.data?.data?.terms ?? [];
+        const active = terms.find((t: any) => t.isActive) ?? terms[0];
+        if (active) { activeTerm = active.name; activeTermId = active.id; }
+      }
+      setData((d) => ({ ...d, studentCount: studentCount ?? d.studentCount, activeTerm }));
+
+      if (activeTermId && feeRes.status === 'fulfilled') {
+        const info = feeRes.value.data?.data ?? {};
+        setData((d) => ({
+          ...d,
+          feesCollectedTerm: info.totalCollected != null ? Number(info.totalCollected) : null,
+          feesOutstandingTerm: info.totalOutstanding != null ? Number(info.totalOutstanding) : null,
+        }));
+      }
+    }).finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const SCHOOL_QUICK_ACTIONS = [
+    { label: 'Collect Fees',       href: '/school/fee-collection',  icon: BadgeDollarSign, color: 'emerald' },
+    { label: 'Mark Attendance',    href: '/school/attendance',      icon: CalendarCheck,   color: 'blue'    },
+    { label: 'Enter Assessments',  href: '/school/assessments',     icon: ClipboardCheck,  color: 'purple'  },
+    { label: 'View Students',      href: '/school/students',        icon: Users,           color: 'indigo'  },
+    { label: 'Report Cards',       href: '/school/report-cards',    icon: FileSpreadsheet, color: 'orange'  },
+    { label: 'Fee Defaulters',     href: '/school/fee-defaulters',  icon: AlertTriangle,   color: 'red'     },
+    { label: 'School MIS',         href: '/school/mis',             icon: BarChart2,       color: 'teal'    },
+    { label: 'Admissions',         href: '/school/admissions',      icon: GraduationCap,   color: 'sky'     },
+  ];
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 animate-pulse">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 rounded-xl bg-secondary-100 dark:bg-secondary-800" />)}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* KPI tiles */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <Users className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data.studentCount ?? '—'}</div>
+            <p className="text-xs text-secondary-500 mt-1">Active enrolments</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Current Term</CardTitle>
+            <BookOpen className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold truncate">{data.activeTerm ?? '—'}</div>
+            <p className="text-xs text-secondary-500 mt-1">Active academic term</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Fees Collected</CardTitle>
+            <BadgeDollarSign className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+              {data.feesCollectedTerm != null ? fmt(data.feesCollectedTerm) : '—'}
+            </div>
+            <p className="text-xs text-secondary-500 mt-1">This term</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Outstanding Fees</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${(data.feesOutstandingTerm ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-secondary-900 dark:text-secondary-50'}`}>
+              {data.feesOutstandingTerm != null ? fmt(data.feesOutstandingTerm) : '—'}
+            </div>
+            <p className="text-xs text-secondary-500 mt-1">This term</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick-action tiles */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold text-secondary-900 dark:text-secondary-50">Quick Actions</CardTitle>
+          <p className="text-xs text-secondary-500 dark:text-secondary-400">Jump to the most-used school modules.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {SCHOOL_QUICK_ACTIONS.map(({ label, href, icon: Icon, color }) => (
+              <Link key={label} to={href} className={`flex flex-col items-center gap-2 rounded-xl p-4 text-center text-xs font-medium transition-all duration-150 ${ACTION_COLOR_CLASSES[color] ?? ACTION_COLOR_CLASSES.blue}`}>
+                <Icon className="h-6 w-6 flex-shrink-0" />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Teacher / Class Teacher dashboard (school restricted role) ─────────────────
+function TeacherDashboard() {
+  const { user } = useAuth();
+  const isClassTeacher = (user?.role || '').toLowerCase().trim() === 'class teacher';
+
+  const TEACHER_ACTIONS = [
+    { label: 'Mark Attendance',   href: '/school/attendance',   icon: CalendarCheck,  color: 'blue'    },
+    { label: 'Enter Assessments', href: '/school/assessments',  icon: ClipboardCheck, color: 'purple'  },
+    { label: 'Report Cards',      href: '/school/report-cards', icon: FileSpreadsheet, color: 'orange' },
+    { label: 'Timetable',         href: '/school/timetable',    icon: BookOpen,       color: 'teal'    },
+    { label: 'Students',          href: '/school/students',     icon: Users,          color: 'indigo'  },
+    { label: 'School Events',     href: '/school/events',       icon: Award,          color: 'emerald' },
+    ...(isClassTeacher ? [
+      { label: 'Student Health',  href: '/school/health',       icon: HeartPulse,     color: 'red'     },
+      { label: 'Certificates',    href: '/school/certificates',  icon: GraduationCap, color: 'sky'     },
+    ] : []),
+  ];
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold text-secondary-900 dark:text-secondary-50">
+            {isClassTeacher ? 'Class Teacher Portal' : 'Teacher Portal'}
+          </CardTitle>
+          <p className="text-xs text-secondary-500 dark:text-secondary-400">
+            {isClassTeacher
+              ? 'Manage attendance, assessments, report cards, and health records for your class.'
+              : 'Record attendance, enter assessment scores, and generate report cards.'}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {TEACHER_ACTIONS.map(({ label, href, icon: Icon, color }) => (
+              <Link key={label} to={href} className={`flex flex-col items-center gap-2 rounded-xl p-4 text-center text-xs font-medium transition-all duration-150 ${ACTION_COLOR_CLASSES[color] ?? ACTION_COLOR_CLASSES.blue}`}>
+                <Icon className="h-6 w-6 flex-shrink-0" />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
