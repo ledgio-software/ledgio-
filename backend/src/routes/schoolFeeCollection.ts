@@ -266,6 +266,105 @@ router.post('/waive', requireRole('Admin'), async (req: Request, res: Response):
 });
 
 /**
+ * POST /api/v1/school/fee-collection/generate-invoices
+ * Bulk-generate school fee invoices for all eligible students in a term.
+ * Idempotent — skips students that already have an invoice for a given schedule.
+ * Uses (or creates) a per-tenant "School Fees" system customer as the invoice owner.
+ */
+router.post('/generate-invoices', requireRole('Accountant', 'Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { termId } = req.body as { termId?: string };
+
+    if (!termId) {
+      res.status(400).json({ success: false, error: 'termId is required.' });
+      return;
+    }
+
+    const [term, schedules, students] = await Promise.all([
+      prisma.academicTerm.findFirst({ where: { id: termId, tenantId } }),
+      prisma.feeSchedule.findMany({ where: { tenantId, termId } }),
+      prisma.student.findMany({ where: { tenantId, isActive: true } }),
+    ]);
+
+    if (!term) {
+      res.status(404).json({ success: false, error: 'Term not found.' });
+      return;
+    }
+    if (schedules.length === 0) {
+      res.status(400).json({ success: false, error: 'No fee schedules found for this term.' });
+      return;
+    }
+
+    // Find or create a system customer for school fee invoices
+    const SCHOOL_CUSTOMER_EMAIL = `__school__@ledgio.internal`;
+    let schoolCustomer = await prisma.customer.findFirst({
+      where: { tenantId, email: SCHOOL_CUSTOMER_EMAIL },
+      select: { id: true },
+    });
+    if (!schoolCustomer) {
+      schoolCustomer = await prisma.customer.create({
+        data: { tenantId, name: 'School Fees Account', email: SCHOOL_CUSTOMER_EMAIL },
+        select: { id: true },
+      });
+    }
+
+    // Index existing SF invoices for this term to skip duplicates
+    const scheduleIds = schedules.map((s) => s.id);
+    const existingClientTxnIds = new Set(
+      (await prisma.invoice.findMany({
+        where: {
+          tenantId,
+          clientTxnId: { in: scheduleIds.flatMap((sid) => students.map((st) => `SF:${sid}:${st.id}`)) },
+        },
+        select: { clientTxnId: true },
+      })).map((inv) => inv.clientTxnId!)
+    );
+
+    let generated = 0;
+    let skipped = 0;
+    const dueDate = term.endDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    for (const student of students) {
+      const eligibleSchedules = schedules.filter((s) => !s.className || s.className === student.className);
+      for (const schedule of eligibleSchedules) {
+        const clientTxnId = `SF:${schedule.id}:${student.id}`;
+        if (existingClientTxnIds.has(clientTxnId)) {
+          skipped++;
+          continue;
+        }
+        const amount = Number(schedule.amount);
+        await prisma.invoice.create({
+          data: {
+            tenantId,
+            invoiceNumber: `SF-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+            customerId: schoolCustomer.id,
+            dueDate,
+            currency: 'GHS',
+            exchangeRate: 1.0,
+            subtotal: amount,
+            tax: 0,
+            total: amount,
+            baseCurrencyAmount: amount,
+            status: 'SENT',
+            clientTxnId,
+          },
+        });
+        generated++;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { generated, skipped, termId, termName: term.name },
+      message: `Generated ${generated} invoice${generated !== 1 ? 's' : ''} (${skipped} already existed).`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/v1/school/fee-collection/late-fine-config
  * PUT /api/v1/school/fee-collection/late-fine-config
  * Manage late fine configuration: rate per day (GHS), grace period days, enabled flag.

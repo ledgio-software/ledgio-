@@ -7,7 +7,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { BookOpen, Loader2, Phone, CreditCard, CheckCircle2, Gift } from "lucide-react";
+import { BookOpen, Loader2, Phone, CreditCard, CheckCircle2, Gift, Zap } from "lucide-react";
 
 interface AcademicTerm {
   id: string;
@@ -102,6 +102,10 @@ export function FeeCollection() {
   const [collecting, setCollecting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
+  // Generate invoices state
+  const [generating, setGenerating] = useState(false);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+
   // Waiver modal state
   const [waiveTarget, setWaiveTarget] = useState<{ invoice: InvoiceSummary; student: StudentRow["student"] } | null>(null);
   const [waiveAmount, setWaiveAmount] = useState("");
@@ -110,6 +114,7 @@ export function FeeCollection() {
 
   const canCollect = CAN_COLLECT_ROLES.has((user?.role ?? "").toLowerCase());
   const canWaive = CAN_WAIVE_ROLES.has((user?.role ?? "").toLowerCase());
+  const canGenerate = CAN_COLLECT_ROLES.has((user?.role ?? "").toLowerCase());
 
   useEffect(() => {
     api.get("/school/terms").then((res) => {
@@ -179,6 +184,21 @@ export function FeeCollection() {
       showToast(e?.response?.data?.error ?? "Failed to record payment.", "error");
     } finally {
       setCollecting(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!selectedTermId) return;
+    setGenerating(true);
+    setShowGenerateConfirm(false);
+    try {
+      const res = await api.post("/school/fee-collection/generate-invoices", { termId: selectedTermId });
+      showToast(res.data.message, "success");
+      load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Failed to generate invoices.", "error");
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -257,6 +277,19 @@ export function FeeCollection() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {canGenerate && summary && summary.notGenerated > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+          <Zap className="h-4 w-4 text-amber-600 flex-shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+            {summary.notGenerated} student{summary.notGenerated !== 1 ? "s" : ""} have no invoice for this term.
+          </p>
+          <Button size="sm" onClick={() => setShowGenerateConfirm(true)} disabled={generating}>
+            {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Zap className="h-3.5 w-3.5 mr-1" />}
+            Generate Invoices
+          </Button>
         </div>
       )}
 
@@ -350,6 +383,33 @@ export function FeeCollection() {
           )}
         </CardContent>
       </Card>
+
+      {/* Generate Invoices Confirmation */}
+      <Modal
+        isOpen={showGenerateConfirm}
+        onClose={() => setShowGenerateConfirm(false)}
+        title="Generate Fee Invoices"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-secondary-600 dark:text-secondary-400">
+            This will create invoices for all students who don't have one yet for the selected term.
+            Students who already have invoices will be skipped. This action is safe to run multiple times.
+          </p>
+          {summary && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-sm">
+              <span className="font-semibold text-amber-800 dark:text-amber-300">{summary.notGenerated}</span>
+              <span className="text-amber-700 dark:text-amber-400"> student{summary.notGenerated !== 1 ? "s" : ""} will receive invoices.</span>
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowGenerateConfirm(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleGenerate} disabled={generating}>
+              {generating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+              Generate
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Waiver Modal */}
       <Modal
