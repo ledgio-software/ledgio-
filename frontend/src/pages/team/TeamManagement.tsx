@@ -28,6 +28,21 @@ const ROLE_OPTIONS: { value: string; label: string; description: string }[] = [
   { value: "External Accountant", label: "External Accountant", description: "Time-limited read-only accounting access — no user management or payments" },
 ];
 
+// School-specific roles shown when the tenant is a school (NONPROFIT org type).
+const SCHOOL_ROLE_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: "Admin", label: "Admin (Head Teacher / Principal)", description: "Full access — user management, settings, all school modules" },
+  { value: "Accountant", label: "Bursar / Accountant", description: "Fee collection, invoicing, payments, financial reports — no self-approval" },
+  { value: "Finance Controller", label: "Finance Controller", description: "Period close, journal review, financial reports, approval policy" },
+  { value: "Teacher", label: "Teacher", description: "Attendance entry, assessments, report cards for their assigned classes" },
+  { value: "Class Teacher", label: "Class Teacher", description: "Full class management — attendance, assessments, report cards, student records for their class" },
+  { value: "Admissions Officer", label: "Admissions Officer", description: "Manage admissions applications, enrol accepted students" },
+  { value: "HR", label: "HR / Staff Records", description: "Employee records, leave management, staff loans — no payroll release" },
+  { value: "Payroll Officer", label: "Payroll Officer", description: "Prepare staff payroll runs — cannot post/release (requires Payroll Approver)" },
+  { value: "Payroll Approver", label: "Payroll Approver", description: "Approve and release staff payroll — separate from Payroll Officer" },
+  { value: "Auditor", label: "Auditor", description: "Read-only access to financial records, audit logs, and approved exports" },
+  { value: "Viewer", label: "Viewer (School Board / Governor)", description: "Read-only dashboards and approved reports" },
+];
+
 const LOCATION_SCOPED_ROLES = new Set(["shop manager", "cashier", "warehouse manager"]);
 
 function isLocationScopedRole(role: string): boolean {
@@ -270,6 +285,8 @@ export function TeamManagement() {
   };
 
   const isAdmin = user?.role === "Admin";
+  const isSchool = (user?.orgType ?? "").toUpperCase() === "NONPROFIT";
+  const roleOptions = isSchool ? SCHOOL_ROLE_OPTIONS : ROLE_OPTIONS;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -279,7 +296,9 @@ export function TeamManagement() {
             Team Management
           </h2>
           <p className="text-secondary-500 dark:text-secondary-400 mt-1">
-            Manage your workspace staff, invite team members, and assign access roles.
+            {isSchool
+              ? "Manage school staff, invite teachers and administrators, and assign access roles."
+              : "Manage your workspace staff, invite team members, and assign access roles."}
           </p>
         </div>
 
@@ -318,7 +337,7 @@ export function TeamManagement() {
             <UserCheck className="mr-2 h-5 w-5 text-primary-600 dark:text-primary-400" />
             Active Team Members ({members.length})
           </CardTitle>
-          <CardDescription>Users with access to this business workspace.</CardDescription>
+          <CardDescription>{isSchool ? "Staff with access to this school workspace." : "Users with access to this business workspace."}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -330,7 +349,7 @@ export function TeamManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Shop Access</TableHead>
+                  {!isSchool && <TableHead>Shop Access</TableHead>}
                   <TableHead>Status</TableHead>
                   {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
@@ -347,20 +366,22 @@ export function TeamManagement() {
                         {member.role}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs">
-                      {isLocationScopedRole(member.role) ? (
-                        (member.warehouseAccess?.length || 0) === 0 ? (
-                          <span className="text-red-500 flex items-center"><MapPin className="h-3 w-3 mr-1" />No shops assigned</span>
+                    {!isSchool && (
+                      <TableCell className="text-xs">
+                        {isLocationScopedRole(member.role) ? (
+                          (member.warehouseAccess?.length || 0) === 0 ? (
+                            <span className="text-red-500 flex items-center"><MapPin className="h-3 w-3 mr-1" />No shops assigned</span>
+                          ) : (
+                            <span className="text-secondary-600 dark:text-secondary-300 flex items-center">
+                              <MapPin className="h-3 w-3 mr-1 text-primary-500" />
+                              {member.warehouseAccess!.map((a) => a.warehouse.name).join(", ")}
+                            </span>
+                          )
                         ) : (
-                          <span className="text-secondary-600 dark:text-secondary-300 flex items-center">
-                            <MapPin className="h-3 w-3 mr-1 text-primary-500" />
-                            {member.warehouseAccess!.map((a) => a.warehouse.name).join(", ")}
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-secondary-400">All shops</span>
-                      )}
-                    </TableCell>
+                          <span className="text-secondary-400">All shops</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       {onlineUserIds.has(member.id) ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -380,7 +401,7 @@ export function TeamManagement() {
                           <UserCog className="mr-1.5 h-3.5 w-3.5" />
                           Change Role
                         </Button>
-                        {isLocationScopedRole(member.role) && (
+                        {!isSchool && isLocationScopedRole(member.role) && (
                           <Button variant="outline" size="sm" onClick={() => openAccessModal(member)} className="inline-flex items-center text-xs">
                             <Settings2 className="mr-1.5 h-3.5 w-3.5" />
                             Manage Access
@@ -517,16 +538,16 @@ export function TeamManagement() {
               onChange={(e) => { setInviteRole(e.target.value); setInviteWarehouseIds([]); }}
             >
               <option value="">-- Select Role --</option>
-              {ROLE_OPTIONS.map((r) => (
+              {roleOptions.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
             {inviteRole && (
               <p className="text-[11px] text-secondary-500 mt-1">
-                {ROLE_OPTIONS.find((r) => r.value === inviteRole)?.description}
+                {roleOptions.find((r) => r.value === inviteRole)?.description}
               </p>
             )}
-            {!inviteRole && (
+            {!inviteRole && !isSchool && (
               <p className="text-[11px] text-secondary-500 mt-1">
                 Shop Manager, Cashier, and Warehouse Manager are location-scoped — assign a shop/warehouse below.
               </p>
@@ -616,7 +637,7 @@ export function TeamManagement() {
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
             >
-              {ROLE_OPTIONS.map((r) => (
+              {roleOptions.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
