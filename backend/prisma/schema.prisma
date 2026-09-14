@@ -99,6 +99,8 @@ model Tenant {
   posEnabled              Boolean   @default(true) @map("pos_enabled")
   // Referral code used when this tenant signed up (links to ReferralPartner.code).
   referralCode            String?   @map("referral_code")
+  // School module config stored as JSON string. Currently: { lateFine: { enabled, ratePerDay, graceDays } }
+  schoolConfig            String?   @map("school_config")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
@@ -2553,4 +2555,149 @@ model FeeSchedule {
   @@index([tenantId])
   @@index([tenantId, termId])
   @@map("fee_schedules")
+}
+
+// ─── School ERP Extension ────────────────────────────────────────────────────
+
+model SchoolAttendance {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  studentId String   @map("student_id")
+  termId    String   @map("term_id")
+  date      DateTime @db.Date
+  status    String   @default("PRESENT") // PRESENT | ABSENT | LATE | EXCUSED
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, studentId, date])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, termId])
+  @@map("school_attendance")
+}
+
+model StudentAssessment {
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+  studentId   String  @map("student_id")
+  termId      String  @map("term_id")
+  subjectName String  @map("subject_name")
+  examType    String  @map("exam_type") // MIDTERM | ENDTERM | QUIZ | PROJECT | OTHER
+  score       Decimal @db.Decimal(8, 2)
+  maxScore    Decimal @map("max_score") @db.Decimal(8, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, termId])
+  @@index([tenantId, studentId])
+  @@map("student_assessments")
+}
+
+model Admission {
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  applicationNumber  String   @map("application_number")
+  applicantFirstName String   @map("applicant_first_name")
+  applicantLastName  String   @map("applicant_last_name")
+  dateOfBirth        DateTime? @map("date_of_birth")
+  applyingClass      String   @map("applying_class")
+  parentName         String   @map("parent_name")
+  parentPhone        String   @map("parent_phone")
+  parentEmail        String?  @map("parent_email")
+  status             String   @default("PENDING") // PENDING | REVIEWING | ACCEPTED | REJECTED | ENROLLED
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, applicationNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("admissions")
+}
+
+model TimetableSlot {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  className   String   @map("class_name")
+  dayOfWeek   String   @map("day_of_week") // MON | TUE | WED | THU | FRI | SAT
+  startTime   String   @map("start_time") // e.g. "08:00"
+  endTime     String   @map("end_time")   // e.g. "09:00"
+  subjectName String   @map("subject_name")
+  teacherName String?  @map("teacher_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, className])
+  @@map("timetable_slots")
+}
+
+model SchoolCertificate {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  studentId       String   @map("student_id")
+  certificateType String   @map("certificate_type") // LEAVING | COMPLETION | CONDUCT | TRANSFER | SCHOLARSHIP
+  issuedDate      DateTime @map("issued_date")
+  issuedBy        String   @map("issued_by")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@map("school_certificates")
+}
+
+model Scholarship {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  studentId      String   @map("student_id")
+  termId         String?  @map("term_id")
+  scholarshipName String  @map("scholarship_name")
+  discountType   String   @map("discount_type") // PERCENT | FIXED_AMOUNT
+  discountValue  Decimal  @map("discount_value") @db.Decimal(15, 2)
+  reason         String?
+  awardedDate    DateTime @map("awarded_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@map("scholarships")
+}
+
+model StudentHealth {
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  studentId          String   @map("student_id")
+  bloodGroup         String?  @map("blood_group")
+  allergies          String   @default("") // comma-separated
+  medicalConditions  String   @default("") @map("medical_conditions") // comma-separated
+  emergencyContact   String?  @map("emergency_contact")
+  emergencyPhone     String?  @map("emergency_phone")
+  vaccinationNotes   String?  @map("vaccination_notes")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, studentId])
+  @@index([tenantId])
+  @@map("student_health")
+}
+
+model SchoolEvent {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  title       String
+  description String?
+  eventDate   DateTime @map("event_date")
+  endDate     DateTime? @map("end_date")
+  eventType   String   @map("event_type") // ACADEMIC | SPORTS | CULTURAL | HOLIDAY | EXAM | MEETING | OTHER
+  location    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, eventDate])
+  @@map("school_events")
 }

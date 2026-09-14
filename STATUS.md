@@ -2,6 +2,84 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-14] - School Module: 5 ERP Gap Features (Complete)
+
+**What/Why:**
+Filled five capability gaps in the school ERP module to bring it closer to production-ready status: scholarship billing integration, class ranking on report cards, attendance summary report, class promotion workflow, and scholarship badge in bulk invoicing UI.
+
+**Backend changes:**
+- `schoolFeeCollection.ts` — `POST /generate-invoices` now applies PERCENT/FIXED_AMOUNT scholarship discounts per student; response includes `discountedCount`
+- `schoolReportCards.ts` — GET report card now computes `classRank`, `classSize`, `classAverage` by aggregating all active classmates' assessments in the same term
+- `schoolAttendance.ts` — new `GET /summary` route aggregates per-student attendance totals (present/absent/late/excused/rate) for a given term, with optional class filter
+- `schoolStudents.ts` — new `POST /promote` route (Admin only) bulk-moves active students from one class to another; accepts optional `studentIds` for selective promotion
+
+**Frontend changes:**
+- `FeeCollection.tsx` — scholarship badge (purple pill with Gift icon) on discounted invoice rows; `discountedCount` shown in generate toast message
+- `ReportCards.tsx` — class rank and class average displayed on report card view and in print output
+- `Attendance.tsx` — new Summary tab with per-student attendance table, class filter, color-coded rate column (green ≥80%, amber ≥50%, red <50%), Print button
+- `Students.tsx` — Promote Class button (Admin only) opens modal with From/To class dropdowns and confirmation warning
+
+---
+
+## [Date: 2026-09-14] - School Module: 10 New ERP Modules (Complete)
+
+**What/Why:**
+Expanded the school ERP from fee management only to a comprehensive school management system covering attendance, assessments, report cards, admissions, timetable, certificates, scholarships, health records, events calendar, and MIS dashboard — matching Vidyalaya-class ERP capabilities.
+
+**Backend (new route files):**
+- `schoolAttendance.ts` — daily bulk attendance per class (PRESENT/ABSENT/LATE/EXCUSED), with GET by class+date and POST bulk upsert
+- `schoolAssessments.ts` — student assessment scores (MIDTERM/ENDTERM/QUIZ/PROJECT/OTHER), full CRUD with grade calculation
+- `schoolReportCards.ts` — aggregates assessments + attendance per student per term into printable report card
+- `schoolAdmissions.ts` — admission application lifecycle (PENDING→REVIEWING→ACCEPTED/REJECTED→ENROLLED), auto-generates ADM-YYYY-NNNN codes
+- `schoolTimetable.ts` — class timetable slots (day, time, subject, teacher), CRUD per class
+- `schoolCertificates.ts` — issue LEAVING/COMPLETION/CONDUCT/TRANSFER/SCHOLARSHIP certificates with print endpoint
+- `schoolScholarships.ts` — award PERCENT or FIXED_AMOUNT discounts per student per term
+- `schoolHealth.ts` — upsert blood group, allergies, medical conditions, emergency contacts, vaccination notes per student
+- `schoolEvents.ts` — school calendar events (ACADEMIC/SPORTS/CULTURAL/HOLIDAY/EXAM/MEETING/OTHER) filtered by month/year
+- `schoolMIS.ts` — aggregated management dashboard: students by class, fee collection rate, attendance rate, avg assessment score, admissions summary, upcoming events
+- `app.ts` — all 10 new route prefixes registered under `/api/v1/school/`
+
+**Prisma schema — 8 new models:**
+- `SchoolAttendance`, `StudentAssessment`, `Admission`, `TimetableSlot`, `SchoolCertificate`, `Scholarship`, `StudentHealth`, `SchoolEvent`
+- Migration: `20260914120000_school_erp_modules`
+
+**Frontend (new pages in `frontend/src/pages/school/`):**
+- `Attendance.tsx` — class + date selector, per-student status picker, bulk save
+- `Assessments.tsx` — term + class filter, score table with grade letters, add/edit modal
+- `ReportCards.tsx` — student + term selector, printable card with subject grades + attendance summary
+- `Admissions.tsx` — kanban-style status management, auto-generated application numbers
+- `Timetable.tsx` — class timetable grid view, add/edit slots
+- `Certificates.tsx` — certificate issuance and print
+- `Scholarships.tsx` — award and manage student discounts
+- `StudentHealth.tsx` — health record per student (blood group, allergies, emergency contact, vaccinations)
+- `SchoolEvents.tsx` — monthly calendar view with event cards and type badges
+- `SchoolMIS.tsx` — KPI tiles, students-by-class bar chart, fee collection progress, admissions funnel, upcoming events
+- `App.tsx` — 10 new lazy-loaded routes added
+- `navigation.ts` — 10 new sidebar nav items under SCHOOL section (NONPROFIT org type only)
+
+**PR:** https://github.com/ledgio-software/ledgio-/pull/50
+
+---
+
+## [Date: 2026-09-14] - School Module: SMS Fee Reminders for Defaulters
+
+**What/Why:**
+Added one-click bulk SMS fee reminders so accountants can notify all defaulting guardians without manually calling each one.
+
+**Backend — `schoolFeeCollection.ts`:**
+- New `POST /api/v1/school/fee-collection/send-reminders` (Accountant + Admin roles)
+- Resolves defaulters using the same invoice/schedule logic as the defaulters report
+- Sends a personalised SMS per guardian via `SmsService` (Arkesel → mNotify → Android Gateway fallback chain)
+- SMS message includes school name, student name, class, outstanding balance, and term name
+- Guardians without a phone number are counted as `skipped`; returns `{ sent, failed, skipped }`
+
+**Frontend — `FeeDefaulters.tsx`:**
+- "SMS Reminders" button in toolbar (visible to Admin and Accountant when defaulters list is non-empty)
+- Confirmation modal shows the count of students to be messaged before sending
+- Loading spinner while request is in-flight; toast reports sent / failed / skipped breakdown on completion
+
+**Files changed:** `backend/src/routes/schoolFeeCollection.ts`, `frontend/src/pages/school/FeeDefaulters.tsx`
+
 ## [Date: 2026-09-12] - AGOD Admin Console: 7 new diagnostic panels + Job Retry UI
 
 **What/Why:**

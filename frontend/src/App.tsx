@@ -52,6 +52,19 @@ const SchoolStudents = lazy(() => import("./pages/school/Students").then(m => ({
 const AcademicTerms = lazy(() => import("./pages/school/AcademicTerms").then(m => ({ default: m.AcademicTerms })));
 const FeeSchedules = lazy(() => import("./pages/school/FeeSchedules").then(m => ({ default: m.FeeSchedules })));
 const FeeCollection = lazy(() => import("./pages/school/FeeCollection").then(m => ({ default: m.FeeCollection })));
+const FeeDefaulters = lazy(() => import("./pages/school/FeeDefaulters").then(m => ({ default: m.FeeDefaulters })));
+const DemandVsCollection = lazy(() => import("./pages/school/DemandVsCollection").then(m => ({ default: m.DemandVsCollection })));
+const StudentLedger = lazy(() => import("./pages/school/StudentLedger").then(m => ({ default: m.StudentLedger })));
+const SchoolAttendance = lazy(() => import("./pages/school/Attendance").then(m => ({ default: m.Attendance })));
+const SchoolAssessments = lazy(() => import("./pages/school/Assessments").then(m => ({ default: m.Assessments })));
+const SchoolReportCards = lazy(() => import("./pages/school/ReportCards").then(m => ({ default: m.ReportCards })));
+const SchoolAdmissions = lazy(() => import("./pages/school/Admissions").then(m => ({ default: m.Admissions })));
+const SchoolTimetable = lazy(() => import("./pages/school/Timetable").then(m => ({ default: m.Timetable })));
+const SchoolCertificates = lazy(() => import("./pages/school/Certificates").then(m => ({ default: m.Certificates })));
+const SchoolScholarships = lazy(() => import("./pages/school/Scholarships").then(m => ({ default: m.Scholarships })));
+const SchoolStudentHealth = lazy(() => import("./pages/school/StudentHealth").then(m => ({ default: m.StudentHealth })));
+const SchoolEventsPage = lazy(() => import("./pages/school/SchoolEvents").then(m => ({ default: m.SchoolEvents })));
+const SchoolMIS = lazy(() => import("./pages/school/SchoolMIS").then(m => ({ default: m.SchoolMIS })));
 const ExpenseClaims = lazy(() => import("./pages/expenses/ExpenseClaims").then(m => ({ default: m.ExpenseClaims })));
 const Budgets = lazy(() => import("./pages/reports/Budgets").then(m => ({ default: m.Budgets })));
 const TeamManagement = lazy(() => import("./pages/team/TeamManagement").then(m => ({ default: m.TeamManagement })));
@@ -896,6 +909,19 @@ function App() {
               <Route path="/school/terms" element={<ProtectedRoute><MainLayout><AcademicTerms /></MainLayout></ProtectedRoute>} />
               <Route path="/school/fee-schedules" element={<ProtectedRoute><MainLayout><FeeSchedules /></MainLayout></ProtectedRoute>} />
               <Route path="/school/fee-collection" element={<ProtectedRoute><MainLayout><FeeCollection /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/fee-defaulters" element={<ProtectedRoute><MainLayout><FeeDefaulters /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/demand-vs-collection" element={<ProtectedRoute><MainLayout><DemandVsCollection /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/student-ledger" element={<ProtectedRoute><MainLayout><StudentLedger /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/attendance" element={<ProtectedRoute><MainLayout><SchoolAttendance /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/assessments" element={<ProtectedRoute><MainLayout><SchoolAssessments /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/report-cards" element={<ProtectedRoute><MainLayout><SchoolReportCards /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/admissions" element={<ProtectedRoute><MainLayout><SchoolAdmissions /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/timetable" element={<ProtectedRoute><MainLayout><SchoolTimetable /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/certificates" element={<ProtectedRoute><MainLayout><SchoolCertificates /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/scholarships" element={<ProtectedRoute><MainLayout><SchoolScholarships /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/health" element={<ProtectedRoute><MainLayout><SchoolStudentHealth /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/events" element={<ProtectedRoute><MainLayout><SchoolEventsPage /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/mis" element={<ProtectedRoute><MainLayout><SchoolMIS /></MainLayout></ProtectedRoute>} />
               <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing" element={<ProtectedRoute><MainLayout><Manufacturing /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing/jobs" element={<ProtectedRoute><MainLayout><Jobs /></MainLayout></ProtectedRoute>} />

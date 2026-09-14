@@ -1,15 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Modal } from "../../components/ui/Modal";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { BookOpen, Loader2, Phone } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { BookOpen, Loader2, Phone, CreditCard, CheckCircle2, Gift, Zap, Printer } from "lucide-react";
 
 interface AcademicTerm {
   id: string;
   name: string;
   academicYear: string;
   isCurrent: boolean;
+}
+
+interface InvoiceSummary {
+  id: string;
+  status: string;
+  total: number;
+  amountPaid: number;
+  dueDate: string | null;
+  scheduleAmount: number;
 }
 
 interface StudentRow {
@@ -26,6 +39,7 @@ interface StudentRow {
   totalPaid: number;
   balance: number;
   paymentStatus: "paid" | "partial" | "unpaid" | "not_generated";
+  invoices: InvoiceSummary[];
 }
 
 interface Summary {
@@ -34,6 +48,21 @@ interface Summary {
   partial: number;
   unpaid: number;
   notGenerated: number;
+}
+
+interface Receipt {
+  receiptRef: string;
+  issuedAt: string;
+  schoolName: string;
+  cashierName: string;
+  studentName: string;
+  studentCode: string;
+  className: string;
+  guardianName: string;
+  totalPaid: number;
+  change: number;
+  paymentMode: string;
+  termName: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -50,7 +79,18 @@ const STATUS_CLASS: Record<string, string> = {
   not_generated: "bg-secondary-100 text-secondary-500 dark:bg-secondary-800",
 };
 
+const PAYMENT_MODES = [
+  { value: "CASH", label: "Cash" },
+  { value: "MOBILE_MONEY", label: "Mobile Money" },
+  { value: "CHEQUE", label: "Cheque" },
+  { value: "BANK_TRANSFER", label: "Bank Transfer" },
+];
+
+const CAN_COLLECT_ROLES = new Set(["admin", "accountant"]);
+const CAN_WAIVE_ROLES = new Set(["admin"]);
+
 export function FeeCollection() {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [selectedTermId, setSelectedTermId] = useState("");
@@ -59,6 +99,35 @@ export function FeeCollection() {
   const [loading, setLoading] = useState(true);
   const [classFilter, setClassFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+
+  // Collect modal state
+  const [collectTarget, setCollectTarget] = useState<StudentRow | null>(null);
+  const [collectAmount, setCollectAmount] = useState("");
+  const [paymentMode, setPaymentMode] = useState("CASH");
+  const [collecting, setCollecting] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+
+  const [schoolName, setSchoolName] = useState("School");
+
+  // Generate invoices state
+  const [generating, setGenerating] = useState(false);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+
+  // Waiver modal state
+  const [waiveTarget, setWaiveTarget] = useState<{ invoice: InvoiceSummary; student: StudentRow["student"] } | null>(null);
+  const [waiveAmount, setWaiveAmount] = useState("");
+  const [waiveReason, setWaiveReason] = useState("");
+  const [waiving, setWaiving] = useState(false);
+
+  const canCollect = CAN_COLLECT_ROLES.has((user?.role ?? "").toLowerCase());
+  const canWaive = CAN_WAIVE_ROLES.has((user?.role ?? "").toLowerCase());
+  const canGenerate = CAN_COLLECT_ROLES.has((user?.role ?? "").toLowerCase());
+
+  useEffect(() => {
+    api.get("/school/fee-collection/info").then((res) => {
+      setSchoolName(res.data?.data?.name ?? "School");
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     api.get("/school/terms").then((res) => {
@@ -88,6 +157,137 @@ export function FeeCollection() {
   }, [selectedTermId, showToast]);
 
   useEffect(() => { if (selectedTermId) load(); }, [selectedTermId]);
+
+  function openCollect(row: StudentRow) {
+    setCollectTarget(row);
+    setCollectAmount(String(row.balance.toFixed(2)));
+    setPaymentMode("CASH");
+    setReceipt(null);
+  }
+
+  async function handleCollect() {
+    if (!collectTarget || !selectedTermId) return;
+    const amt = parseFloat(collectAmount);
+    if (isNaN(amt) || amt <= 0) {
+      showToast("Enter a valid amount.", "error");
+      return;
+    }
+    setCollecting(true);
+    try {
+      const res = await api.post("/school/fee-collection/collect", {
+        studentId: collectTarget.student.id,
+        termId: selectedTermId,
+        amount: amt,
+        paymentMode,
+      });
+      const term = terms.find((t) => t.id === selectedTermId);
+      const now = new Date();
+      setReceipt({
+        receiptRef: `RCP-${now.getTime().toString(36).toUpperCase()}`,
+        issuedAt: now.toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }),
+        schoolName,
+        cashierName: user?.name ?? "Cashier",
+        studentName: `${collectTarget.student.firstName} ${collectTarget.student.lastName}`,
+        studentCode: collectTarget.student.studentCode,
+        className: collectTarget.student.className,
+        guardianName: collectTarget.student.guardianName,
+        totalPaid: res.data.totalPaid,
+        change: res.data.change,
+        paymentMode,
+        termName: term ? `${term.name} (${term.academicYear})` : "",
+      });
+      showToast(res.data.message, "success");
+      load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Failed to record payment.", "error");
+    } finally {
+      setCollecting(false);
+    }
+  }
+
+  function printReceipt(r: Receipt) {
+    const modeName = PAYMENT_MODES.find((m) => m.value === r.paymentMode)?.label ?? r.paymentMode;
+    const fmtGhs = (n: number) => `GHS ${n.toFixed(2)}`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Receipt ${r.receiptRef}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:monospace;font-size:12px;width:300px;padding:12px;color:#000;background:#fff}
+  .center{text-align:center} .bold{font-weight:bold} .lg{font-size:15px} .sm{font-size:10px}
+  .sep{border-top:1px dashed #555;margin:8px 0}
+  .row{display:flex;justify-content:space-between;margin:3px 0}
+  .amt{font-size:14px;font-weight:bold}
+  @media print{@page{margin:0;size:80mm auto}}
+</style></head><body>
+<div class="center bold lg">${r.schoolName}</div>
+<div class="center sm">FEE PAYMENT RECEIPT</div>
+<div class="sep"></div>
+<div class="row"><span>Receipt No:</span><span class="bold">${r.receiptRef}</span></div>
+<div class="row"><span>Date:</span><span>${r.issuedAt}</span></div>
+<div class="sep"></div>
+<div class="row"><span>Student:</span><span class="bold">${r.studentName}</span></div>
+<div class="row"><span>ID:</span><span>${r.studentCode}</span></div>
+<div class="row"><span>Class:</span><span>${r.className}</span></div>
+<div class="row"><span>Guardian:</span><span>${r.guardianName}</span></div>
+<div class="row"><span>Term:</span><span>${r.termName}</span></div>
+<div class="sep"></div>
+<div class="row"><span>Payment Mode:</span><span>${modeName}</span></div>
+<div class="row amt"><span>Amount Paid:</span><span>${fmtGhs(r.totalPaid)}</span></div>
+${r.change > 0 ? `<div class="row"><span>Change:</span><span>${fmtGhs(r.change)}</span></div>` : ""}
+<div class="sep"></div>
+<div class="row sm"><span>Cashier:</span><span>${r.cashierName}</span></div>
+<div class="center sm" style="margin-top:8px">Thank you. Keep this receipt for your records.</div>
+<script>window.onload=()=>{window.print();}<\/script>
+</body></html>`;
+    const w = window.open("", "_blank", "width=360,height=520");
+    if (!w) { window.print(); return; }
+    w.document.write(html);
+    w.document.close();
+  }
+
+  async function handleGenerate() {
+    if (!selectedTermId) return;
+    setGenerating(true);
+    setShowGenerateConfirm(false);
+    try {
+      const res = await api.post("/school/fee-collection/generate-invoices", { termId: selectedTermId });
+      const { generated, discountedCount } = res.data.data ?? {};
+      const discountMsg = discountedCount > 0 ? ` (${discountedCount} with scholarship discounts applied)` : "";
+      showToast(`Generated ${generated ?? 0} invoice${generated !== 1 ? "s" : ""}${discountMsg}.`, "success");
+      load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Failed to generate invoices.", "error");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function openWaive(row: StudentRow, inv: InvoiceSummary) {
+    setWaiveTarget({ invoice: inv, student: row.student });
+    setWaiveAmount(String((inv.total - inv.amountPaid).toFixed(2)));
+    setWaiveReason("");
+  }
+
+  async function handleWaive() {
+    if (!waiveTarget) return;
+    const amt = parseFloat(waiveAmount);
+    if (isNaN(amt) || amt <= 0) { showToast("Enter a valid waiver amount.", "error"); return; }
+    setWaiving(true);
+    try {
+      await api.post("/school/fee-collection/waive", {
+        invoiceId: waiveTarget.invoice.id,
+        amount: amt,
+        reason: waiveReason.trim() || undefined,
+      });
+      showToast(`Waiver of GHS ${amt.toFixed(2)} applied.`, "success");
+      setWaiveTarget(null);
+      load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Failed to apply waiver.", "error");
+    } finally {
+      setWaiving(false);
+    }
+  }
 
   const classes = [...new Set(rows.map((r) => r.student.className))].sort();
   const filtered = rows.filter((r) => {
@@ -140,6 +340,19 @@ export function FeeCollection() {
         </div>
       )}
 
+      {canGenerate && summary && summary.notGenerated > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+          <Zap className="h-4 w-4 text-amber-600 flex-shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+            {summary.notGenerated} student{summary.notGenerated !== 1 ? "s" : ""} have no invoice for this term.
+          </p>
+          <Button size="sm" onClick={() => setShowGenerateConfirm(true)} disabled={generating}>
+            {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Zap className="h-3.5 w-3.5 mr-1" />}
+            Generate Invoices
+          </Button>
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap">
         <select
           className="border border-secondary-300 dark:border-secondary-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white"
@@ -188,13 +401,21 @@ export function FeeCollection() {
                     <TableHead className="text-right">Paid</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead>Status</TableHead>
+                    {canCollect && <TableHead className="text-right">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((r) => (
                     <TableRow key={r.student.id}>
                       <TableCell>
-                        <div className="font-medium">{r.student.firstName} {r.student.lastName}</div>
+                        <div className="font-medium flex items-center gap-1.5">
+                          {r.student.firstName} {r.student.lastName}
+                          {r.invoices.some((inv) => inv.scheduleAmount != null && inv.total < inv.scheduleAmount) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                              <Gift className="h-3 w-3" />Scholarship
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-secondary-400 font-mono">{r.student.studentCode}</div>
                       </TableCell>
                       <TableCell>{r.student.className}</TableCell>
@@ -212,6 +433,15 @@ export function FeeCollection() {
                           {STATUS_LABEL[r.paymentStatus]}
                         </span>
                       </TableCell>
+                      {canCollect && (
+                        <TableCell className="text-right">
+                          {(r.paymentStatus === "unpaid" || r.paymentStatus === "partial") && (
+                            <Button size="sm" variant="ghost" onClick={() => openCollect(r)} title="Collect fee">
+                              <CreditCard className="w-4 h-4 text-primary-600" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -220,6 +450,210 @@ export function FeeCollection() {
           )}
         </CardContent>
       </Card>
+
+      {/* Generate Invoices Confirmation */}
+      <Modal
+        isOpen={showGenerateConfirm}
+        onClose={() => setShowGenerateConfirm(false)}
+        title="Generate Fee Invoices"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-secondary-600 dark:text-secondary-400">
+            This will create invoices for all students who don't have one yet for the selected term.
+            Students who already have invoices will be skipped. This action is safe to run multiple times.
+          </p>
+          {summary && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-sm">
+              <span className="font-semibold text-amber-800 dark:text-amber-300">{summary.notGenerated}</span>
+              <span className="text-amber-700 dark:text-amber-400"> student{summary.notGenerated !== 1 ? "s" : ""} will receive invoices.</span>
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowGenerateConfirm(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleGenerate} disabled={generating}>
+              {generating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+              Generate
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Waiver Modal */}
+      <Modal
+        isOpen={!!waiveTarget}
+        onClose={() => setWaiveTarget(null)}
+        title={`Apply Waiver — ${waiveTarget?.student.firstName} ${waiveTarget?.student.lastName}`}
+      >
+        {waiveTarget && (
+          <div className="space-y-4">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-300">
+              <div className="font-medium mb-1">Invoice balance</div>
+              <div className="font-mono text-lg">{fmt(waiveTarget.invoice.total - waiveTarget.invoice.amountPaid)}</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Waiver Amount (GHS) *</label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={waiveAmount}
+                onChange={(e) => setWaiveAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Reason (optional)</label>
+              <Input
+                value={waiveReason}
+                onChange={(e) => setWaiveReason(e.target.value)}
+                placeholder="e.g. Staff child, scholarship, hardship"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setWaiveTarget(null)}>Cancel</Button>
+              <Button onClick={handleWaive} disabled={waiving} className="bg-amber-600 hover:bg-amber-700 text-white">
+                {waiving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Gift className="w-4 h-4 mr-1" />}
+                Apply Waiver
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Collect Fee Modal */}
+      <Modal
+        isOpen={!!collectTarget}
+        onClose={() => { setCollectTarget(null); setReceipt(null); }}
+        title={receipt ? "Payment Receipt" : `Collect Fee — ${collectTarget?.student.firstName} ${collectTarget?.student.lastName}`}
+      >
+        {receipt ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="w-6 h-6" />
+              <span className="font-semibold text-lg">Payment Recorded</span>
+            </div>
+            <div className="bg-secondary-50 dark:bg-secondary-800 rounded-lg p-4 space-y-2 text-sm font-mono">
+              <div className="text-center font-semibold text-base text-secondary-900 dark:text-white mb-1">{receipt.schoolName}</div>
+              <div className="flex justify-between text-xs text-secondary-400">
+                <span>{receipt.receiptRef}</span>
+                <span>{receipt.issuedAt}</span>
+              </div>
+              <div className="border-t border-dashed border-secondary-300 dark:border-secondary-600 my-1" />
+              <div className="flex justify-between">
+                <span className="text-secondary-500">Student</span>
+                <span className="font-medium text-right">{receipt.studentName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-secondary-500">ID / Class</span>
+                <span className="text-xs">{receipt.studentCode} · {receipt.className}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-secondary-500">Guardian</span>
+                <span>{receipt.guardianName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-secondary-500">Term</span>
+                <span>{receipt.termName}</span>
+              </div>
+              <div className="border-t border-dashed border-secondary-300 dark:border-secondary-600 my-1" />
+              <div className="flex justify-between">
+                <span className="text-secondary-500">Mode</span>
+                <span>{PAYMENT_MODES.find((m) => m.value === receipt.paymentMode)?.label ?? receipt.paymentMode}</span>
+              </div>
+              <div className="flex justify-between text-base font-bold">
+                <span>Amount Paid</span>
+                <span className="text-emerald-600 dark:text-emerald-400">{fmt(receipt.totalPaid)}</span>
+              </div>
+              {receipt.change > 0 && (
+                <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                  <span>Change</span>
+                  <span>{fmt(receipt.change)}</span>
+                </div>
+              )}
+              <div className="border-t border-dashed border-secondary-300 dark:border-secondary-600 my-1" />
+              <div className="text-xs text-secondary-400 text-center">Cashier: {receipt.cashierName}</div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => { setCollectTarget(null); setReceipt(null); }}>Close</Button>
+              <Button onClick={() => printReceipt(receipt)}>
+                <Printer className="w-4 h-4 mr-1" />Print Receipt
+              </Button>
+            </div>
+          </div>
+        ) : collectTarget && (
+          <div className="space-y-4">
+            {/* Invoice breakdown */}
+            {collectTarget.invoices.filter((inv) => inv.status !== "PAID" && inv.status !== "VOIDED").length > 0 && (
+              <div className="bg-secondary-50 dark:bg-secondary-800 rounded-lg p-3 space-y-1.5 text-sm">
+                <div className="text-xs font-medium text-secondary-500 uppercase tracking-wide mb-2">Outstanding Invoices</div>
+                {collectTarget.invoices
+                  .filter((inv) => inv.status !== "PAID" && inv.status !== "VOIDED")
+                  .map((inv) => (
+                    <div key={inv.id} className="flex items-center justify-between gap-2">
+                      <span className="text-secondary-600 dark:text-secondary-400 flex items-center gap-1.5 flex-wrap">
+                        Invoice <span className="font-mono text-xs">{inv.id.slice(-6).toUpperCase()}</span>
+                        {inv.scheduleAmount != null && inv.total < inv.scheduleAmount && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                            <Gift className="h-3 w-3" />Scholarship
+                          </span>
+                        )}
+                        {inv.dueDate && <span className="text-xs text-secondary-400">due {new Date(inv.dueDate).toLocaleDateString("en-GB")}</span>}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-red-600 dark:text-red-400">{fmt(inv.total - inv.amountPaid)}</span>
+                        {canWaive && collectTarget && (
+                          <button
+                            className="text-xs text-amber-600 hover:underline whitespace-nowrap"
+                            onClick={() => { setCollectTarget(null); openWaive(collectTarget, inv); }}
+                          >
+                            Waive
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                <div className="border-t border-secondary-200 dark:border-secondary-700 pt-1 flex justify-between font-semibold">
+                  <span>Total Balance</span>
+                  <span className="font-mono">{fmt(collectTarget.balance)}</span>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Amount Received (GHS) *</label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={collectAmount}
+                onChange={(e) => setCollectAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Payment Mode</label>
+              <select
+                className="w-full border border-secondary-300 dark:border-secondary-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white"
+                value={paymentMode}
+                onChange={(e) => setPaymentMode(e.target.value)}
+              >
+                {PAYMENT_MODES.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCollectTarget(null)}>Cancel</Button>
+              <Button onClick={handleCollect} disabled={collecting}>
+                {collecting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CreditCard className="w-4 h-4 mr-1" />}
+                Collect Payment
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
