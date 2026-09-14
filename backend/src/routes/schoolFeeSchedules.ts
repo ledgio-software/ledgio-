@@ -119,18 +119,18 @@ router.post('/:id/generate-invoices', requireRole('Admin'), async (req: Request,
       return;
     }
 
-    // Unique invoice note prefix to detect existing invoices for this schedule
-    const notePrefix = `[SCHOOL-FEE:${schedule.id}]`;
+    // clientTxnId format: SF:{scheduleId}:{studentId}
+    const clientTxnIdPrefix = `SF:${schedule.id}:`;
 
     // Find invoices already generated for this schedule
     const existingInvoices = await prisma.invoice.findMany({
-      where: { tenantId, notes: { contains: notePrefix } },
-      select: { notes: true },
+      where: { tenantId, clientTxnId: { startsWith: clientTxnIdPrefix } },
+      select: { clientTxnId: true },
     });
     const existingStudentIds = new Set(
       existingInvoices
         .map((inv) => {
-          const m = inv.notes?.match(/STUDENT:([a-z0-9-]+)/i);
+          const m = inv.clientTxnId?.match(/^SF:[a-z0-9-]+:([a-z0-9-]+)$/i);
           return m ? m[1] : null;
         })
         .filter(Boolean) as string[]
@@ -140,12 +140,6 @@ router.post('/:id/generate-invoices', requireRole('Admin'), async (req: Request,
     let created = 0;
     let skipped = 0;
     const errors: string[] = [];
-
-    // Get a default GL account (Income) for fee line items — use the first income account
-    const incomeAccount = await prisma.account.findFirst({
-      where: { tenantId, type: 'INCOME', isActive: true },
-      orderBy: { code: 'asc' },
-    });
 
     for (const student of students) {
       if (existingStudentIds.has(student.id)) {
@@ -173,12 +167,12 @@ router.post('/:id/generate-invoices', requireRole('Admin'), async (req: Request,
         const invoiceNumber = `SF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
         const amount = Number(schedule.amount);
         const dueDate = schedule.dueDate ?? schedule.term.endDate;
-        const notes = `${notePrefix} STUDENT:${student.id} — ${student.firstName} ${student.lastName} (${student.className}) — ${schedule.feeName} | ${schedule.term.name}`;
 
         await prisma.invoice.create({
           data: {
             tenantId,
             invoiceNumber,
+            clientTxnId: `SF:${schedule.id}:${student.id}`,
             customerId: customer.id,
             issueDate: new Date(),
             dueDate,
@@ -189,15 +183,13 @@ router.post('/:id/generate-invoices', requireRole('Admin'), async (req: Request,
             total: amount,
             amountPaid: 0,
             status: 'SENT',
-            notes,
             items: {
               create: [{
                 tenantId,
                 description: `${schedule.feeName} — ${student.firstName} ${student.lastName} (${student.className})`,
                 quantity: 1,
                 unitPrice: amount,
-                lineTotal: amount,
-                ...(incomeAccount ? { accountId: incomeAccount.id } : {}),
+                amount,
               }],
             },
           },

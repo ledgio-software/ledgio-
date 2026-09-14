@@ -38,27 +38,27 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       prisma.feeSchedule.findMany({
         where: { tenantId, termId: resolvedTermId },
       }),
-      // All school-fee invoices for this term
+      // All school-fee invoices for this term (clientTxnId starts with 'SF:')
       prisma.invoice.findMany({
         where: {
           tenantId,
-          notes: { contains: `[SCHOOL-FEE:` },
+          clientTxnId: { startsWith: 'SF:' },
           status: { not: 'VOIDED' },
         },
-        select: { id: true, notes: true, status: true, total: true, amountPaid: true, dueDate: true },
+        select: { id: true, clientTxnId: true, status: true, total: true, amountPaid: true, dueDate: true },
       }),
     ]);
 
     // Index invoices by studentId
     const invoicesByStudent = new Map<string, typeof termInvoices>();
     for (const inv of termInvoices) {
-      // Filter to this term's schedules only
-      const scheduleIdMatch = inv.notes?.match(/\[SCHOOL-FEE:([a-z0-9-]+)\]/i);
+      // clientTxnId format: SF:{scheduleId}:{studentId}
+      const scheduleIdMatch = inv.clientTxnId?.match(/^SF:([a-z0-9-]+):/i);
       if (!scheduleIdMatch) continue;
       const scheduleId = scheduleIdMatch[1];
       if (!schedules.find((s) => s.id === scheduleId)) continue;
 
-      const studentIdMatch = inv.notes?.match(/STUDENT:([a-z0-9-]+)/i);
+      const studentIdMatch = inv.clientTxnId?.match(/^SF:[a-z0-9-]+:([a-z0-9-]+)$/i);
       if (!studentIdMatch) continue;
       const sid = studentIdMatch[1];
       if (!invoicesByStudent.has(sid)) invoicesByStudent.set(sid, []);
