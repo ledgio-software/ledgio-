@@ -67,14 +67,18 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       }),
     ]);
 
-    // Index invoices by studentId
+    // Index invoices by studentId; also build a map from clientTxnId → schedule amount
+    // so the frontend can detect scholarship-discounted invoices (invoice.total < scheduleAmount)
+    const scheduleAmountByClientTxnId = new Map<string, number>();
     const invoicesByStudent = new Map<string, typeof termInvoices>();
     for (const inv of termInvoices) {
       // clientTxnId format: SF:{scheduleId}:{studentId}
       const scheduleIdMatch = inv.clientTxnId?.match(/^SF:([a-z0-9-]+):/i);
       if (!scheduleIdMatch) continue;
       const scheduleId = scheduleIdMatch[1];
-      if (!schedules.find((s) => s.id === scheduleId)) continue;
+      const schedule = schedules.find((s) => s.id === scheduleId);
+      if (!schedule) continue;
+      scheduleAmountByClientTxnId.set(inv.clientTxnId!, Number(schedule.amount));
 
       const studentIdMatch = inv.clientTxnId?.match(/^SF:[a-z0-9-]+:([a-z0-9-]+)$/i);
       if (!studentIdMatch) continue;
@@ -129,6 +133,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
           total: Number(inv.total),
           amountPaid: Number(inv.amountPaid),
           dueDate: inv.dueDate,
+          scheduleAmount: scheduleAmountByClientTxnId.get(inv.clientTxnId!) ?? Number(inv.total),
         })),
       };
     });
@@ -302,6 +307,22 @@ router.post('/generate-invoices', requireRole('Accountant', 'Admin'), async (req
       prisma.student.findMany({ where: { tenantId, isActive: true } }),
     ]);
 
+    // Fetch scholarships that apply to this term (termId matches or null = all terms)
+    const allScholarships = await prisma.scholarship.findMany({
+      where: {
+        tenantId,
+        studentId: { in: students.map((s) => s.id) },
+        OR: [{ termId }, { termId: null }],
+      },
+    });
+    // Index scholarships by studentId — first one wins per student
+    const scholarshipByStudent = new Map<string, (typeof allScholarships)[0]>();
+    for (const sc of allScholarships) {
+      if (!scholarshipByStudent.has(sc.studentId)) {
+        scholarshipByStudent.set(sc.studentId, sc);
+      }
+    }
+
     if (!term) {
       res.status(404).json({ success: false, error: 'Term not found.' });
       return;
@@ -338,17 +359,35 @@ router.post('/generate-invoices', requireRole('Accountant', 'Admin'), async (req
 
     let generated = 0;
     let skipped = 0;
+    let discountedCount = 0;
     const dueDate = term.endDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     for (const student of students) {
       const eligibleSchedules = schedules.filter((s) => !s.className || s.className === student.className);
+      const scholarship = scholarshipByStudent.get(student.id);
+
       for (const schedule of eligibleSchedules) {
         const clientTxnId = `SF:${schedule.id}:${student.id}`;
         if (existingClientTxnIds.has(clientTxnId)) {
           skipped++;
           continue;
         }
-        const amount = Number(schedule.amount);
+        const originalAmount = Number(schedule.amount);
+
+        // Apply scholarship discount
+        let finalAmount = originalAmount;
+        if (scholarship) {
+          if (scholarship.discountType === 'PERCENT') {
+            finalAmount = Math.round(originalAmount * (1 - Number(scholarship.discountValue) / 100) * 100) / 100;
+          } else {
+            // FIXED_AMOUNT
+            finalAmount = Math.round((originalAmount - Number(scholarship.discountValue)) * 100) / 100;
+          }
+          finalAmount = Math.max(0, finalAmount);
+        }
+        const scholarshipApplied = scholarship !== undefined && finalAmount < originalAmount;
+        if (scholarshipApplied) discountedCount++;
+
         await prisma.invoice.create({
           data: {
             tenantId,
@@ -357,10 +396,10 @@ router.post('/generate-invoices', requireRole('Accountant', 'Admin'), async (req
             dueDate,
             currency: 'GHS',
             exchangeRate: 1.0,
-            subtotal: amount,
+            subtotal: finalAmount,
             tax: 0,
-            total: amount,
-            baseCurrencyAmount: amount,
+            total: finalAmount,
+            baseCurrencyAmount: finalAmount,
             status: 'SENT',
             clientTxnId,
           },
@@ -369,10 +408,11 @@ router.post('/generate-invoices', requireRole('Accountant', 'Admin'), async (req
       }
     }
 
+    const scholarshipMsg = discountedCount > 0 ? ` (${discountedCount} with scholarship discounts applied)` : '';
     res.json({
       success: true,
-      data: { generated, skipped, termId, termName: term.name },
-      message: `Generated ${generated} invoice${generated !== 1 ? 's' : ''} (${skipped} already existed).`,
+      data: { generated, skipped, discountedCount, termId, termName: term.name },
+      message: `Generated ${generated} invoice${generated !== 1 ? 's' : ''}${scholarshipMsg} (${skipped} already existed).`,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

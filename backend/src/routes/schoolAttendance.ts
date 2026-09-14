@@ -67,6 +67,76 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// GET /api/v1/school/attendance/summary?termId=&className=
+// Returns per-student attendance totals for the term (for the summary report).
+router.get('/summary', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { termId, className } = req.query as { termId?: string; className?: string };
+
+    if (!termId) {
+      res.status(400).json({ success: false, error: 'termId is required' });
+      return;
+    }
+
+    const students = await prisma.student.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        ...(className ? { className } : {}),
+      },
+      orderBy: [{ className: 'asc' }, { lastName: 'asc' }, { firstName: 'asc' }],
+    });
+
+    if (students.length === 0) {
+      res.json({ success: true, data: { rows: [] } });
+      return;
+    }
+
+    const attendanceRecords = await prisma.schoolAttendance.findMany({
+      where: {
+        tenantId,
+        termId,
+        studentId: { in: students.map((s) => s.id) },
+      },
+      select: { studentId: true, status: true },
+    });
+
+    // Aggregate per student
+    const counts = new Map<string, { present: number; absent: number; late: number; excused: number }>();
+    for (const r of attendanceRecords) {
+      const entry = counts.get(r.studentId) ?? { present: 0, absent: 0, late: 0, excused: 0 };
+      if (r.status === 'PRESENT') entry.present++;
+      else if (r.status === 'ABSENT') entry.absent++;
+      else if (r.status === 'LATE') entry.late++;
+      else if (r.status === 'EXCUSED') entry.excused++;
+      counts.set(r.studentId, entry);
+    }
+
+    const rows = students.map((s) => {
+      const c = counts.get(s.id) ?? { present: 0, absent: 0, late: 0, excused: 0 };
+      const total = c.present + c.absent + c.late + c.excused;
+      const attendanceRate = total > 0 ? Math.round((c.present / total) * 1000) / 10 : 0;
+      return {
+        studentId: s.id,
+        studentName: `${s.firstName} ${s.lastName}`,
+        studentCode: s.studentCode,
+        className: s.className,
+        present: c.present,
+        absent: c.absent,
+        late: c.late,
+        excused: c.excused,
+        total,
+        attendanceRate,
+      };
+    });
+
+    res.json({ success: true, data: { rows } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/v1/school/attendance/bulk
 router.post('/bulk', requireRole('Accountant'), async (req: Request, res: Response): Promise<void> => {
   try {

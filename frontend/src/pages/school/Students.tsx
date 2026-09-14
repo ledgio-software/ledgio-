@@ -8,7 +8,7 @@ import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { confirm } from "../../components/ui/AlertDialog";
-import { Plus, Edit2, Trash2, GraduationCap, Phone, Search, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, GraduationCap, Phone, Search, Loader2, ArrowUpCircle } from "lucide-react";
 
 interface Student {
   id: string;
@@ -42,7 +42,16 @@ export function Students() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
+  // Promote class modal state
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const [promoteFrom, setPromoteFrom] = useState("");
+  const [promoteTo, setPromoteTo] = useState("");
+  const [promoteStudentIds, setPromoteStudentIds] = useState<string[]>([]);
+  const [promoteAll, setPromoteAll] = useState(true);
+  const [promoting, setPromoting] = useState(false);
+
   const isReadOnly = WRITE_ROLES.has((user?.role ?? "").toLowerCase());
+  const isAdmin = (user?.role ?? "").toLowerCase() === "admin";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,7 +109,56 @@ export function Students() {
     }
   }
 
-  const classes = [...new Set(students.map((s) => s.className))].sort();
+  // Promote helpers
+  const classes = [...new Set(students.filter((s) => s.isActive).map((s) => s.className))].sort();
+
+  function openPromote() {
+    setPromoteFrom(classes[0] ?? "");
+    setPromoteTo("");
+    setPromoteAll(true);
+    setPromoteStudentIds([]);
+    setPromoteOpen(true);
+  }
+
+  const fromClassStudents = students.filter((s) => s.isActive && s.className === promoteFrom);
+
+  function togglePromoteStudent(id: string) {
+    setPromoteStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  async function handlePromote() {
+    if (!promoteFrom || !promoteTo) {
+      showToast("Select both From Class and To Class.", "error");
+      return;
+    }
+    if (promoteFrom === promoteTo) {
+      showToast("From Class and To Class must be different.", "error");
+      return;
+    }
+    const ids = promoteAll ? undefined : promoteStudentIds;
+    if (!promoteAll && (!ids || ids.length === 0)) {
+      showToast("Select at least one student to promote.", "error");
+      return;
+    }
+    setPromoting(true);
+    try {
+      const res = await api.post("/school/students/promote", {
+        fromClass: promoteFrom,
+        toClass: promoteTo,
+        studentIds: ids,
+      });
+      showToast(res.data.message ?? "Students promoted.", "success");
+      setPromoteOpen(false);
+      load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Failed to promote students.", "error");
+    } finally {
+      setPromoting(false);
+    }
+  }
+
   const filtered = students.filter((s) => {
     const q = search.toLowerCase();
     const matchSearch = !q || `${s.firstName} ${s.lastName} ${s.studentCode}`.toLowerCase().includes(q) || s.guardianPhone.includes(q);
@@ -116,11 +174,18 @@ export function Students() {
           <h1 className="text-xl font-semibold text-secondary-900 dark:text-white">Students</h1>
           <span className="text-sm text-secondary-500">({students.length})</span>
         </div>
-        {!isReadOnly && (
-          <Button size="sm" onClick={openAdd}>
-            <Plus className="w-4 h-4 mr-1" /> Add Student
-          </Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && (
+            <Button size="sm" variant="outline" onClick={openPromote}>
+              <ArrowUpCircle className="w-4 h-4 mr-1" /> Promote Class
+            </Button>
+          )}
+          {!isReadOnly && (
+            <Button size="sm" onClick={openAdd}>
+              <Plus className="w-4 h-4 mr-1" /> Add Student
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -195,6 +260,7 @@ export function Students() {
         </CardContent>
       </Card>
 
+      {/* Add/Edit Student Modal */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Edit Student" : "Add Student"}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -230,6 +296,95 @@ export function Students() {
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               {editing ? "Save Changes" : "Add Student"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Promote Class Modal */}
+      <Modal isOpen={promoteOpen} onClose={() => setPromoteOpen(false)} title="Promote Class">
+        <div className="space-y-4">
+          <p className="text-sm text-secondary-600 dark:text-secondary-400">
+            Move active students from one class to another. This updates their class assignment immediately.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">From Class *</label>
+              <select
+                className="w-full border border-secondary-300 dark:border-secondary-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white"
+                value={promoteFrom}
+                onChange={(e) => { setPromoteFrom(e.target.value); setPromoteStudentIds([]); setPromoteAll(true); }}
+              >
+                <option value="">— Select —</option>
+                {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">To Class *</label>
+              <select
+                className="w-full border border-secondary-300 dark:border-secondary-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white"
+                value={promoteTo}
+                onChange={(e) => setPromoteTo(e.target.value)}
+              >
+                <option value="">— Select —</option>
+                {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+                {/* allow typing a new class name not in existing list */}
+              </select>
+              <Input
+                className="mt-1"
+                placeholder="Or type a new class name…"
+                value={promoteTo}
+                onChange={(e) => setPromoteTo(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {promoteFrom && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Students in {promoteFrom} ({fromClassStudents.length})</span>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={promoteAll}
+                    onChange={(e) => { setPromoteAll(e.target.checked); setPromoteStudentIds([]); }}
+                    className="rounded"
+                  />
+                  Select All
+                </label>
+              </div>
+              {!promoteAll && (
+                <div className="max-h-48 overflow-y-auto border border-secondary-200 dark:border-secondary-700 rounded-md divide-y divide-secondary-100 dark:divide-secondary-800">
+                  {fromClassStudents.map((s) => (
+                    <label key={s.id} className="flex items-center gap-3 px-3 py-2 hover:bg-secondary-50 dark:hover:bg-secondary-800 cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={promoteStudentIds.includes(s.id)}
+                        onChange={() => togglePromoteStudent(s.id)}
+                        className="rounded"
+                      />
+                      <span>{s.firstName} {s.lastName}</span>
+                      <span className="text-xs text-secondary-400 font-mono ml-auto">{s.studentCode}</span>
+                    </label>
+                  ))}
+                  {fromClassStudents.length === 0 && (
+                    <div className="text-center py-4 text-sm text-secondary-400">No active students in this class.</div>
+                  )}
+                </div>
+              )}
+              {promoteAll && fromClassStudents.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-300">
+                  All {fromClassStudents.length} active student{fromClassStudents.length !== 1 ? "s" : ""} in <strong>{promoteFrom}</strong> will be moved to <strong>{promoteTo || "…"}</strong>.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setPromoteOpen(false)}>Cancel</Button>
+            <Button onClick={handlePromote} disabled={promoting || !promoteFrom || !promoteTo}>
+              {promoting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ArrowUpCircle className="w-4 h-4 mr-1" />}
+              Confirm Promotion
             </Button>
           </div>
         </div>

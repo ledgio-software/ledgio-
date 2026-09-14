@@ -30,6 +30,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       prisma.schoolAttendance.findMany({ where: { tenantId, studentId, termId } }),
     ]);
 
+
     if (!student) {
       res.status(404).json({ success: false, error: 'Student not found' });
       return;
@@ -57,6 +58,48 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const totalMaxScore = subjects.reduce((s, sub) => s + sub.maxScore, 0);
     const overallPercent = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0;
 
+    // Class ranking: fetch all students in this class and compute their overallPercent
+    const classmateStudents = await prisma.student.findMany({
+      where: { tenantId, className: student.className, isActive: true },
+      select: { id: true },
+    });
+    const classmateIds = classmateStudents.map((s) => s.id);
+    const classAssessments = await prisma.studentAssessment.findMany({
+      where: { tenantId, termId, studentId: { in: classmateIds } },
+      select: { studentId: true, score: true, maxScore: true },
+    });
+
+    // Compute overallPercent per classmate
+    const classmateScores = new Map<string, { totalScore: number; totalMax: number }>();
+    for (const a of classAssessments) {
+      const entry = classmateScores.get(a.studentId) ?? { totalScore: 0, totalMax: 0 };
+      entry.totalScore += Number(a.score);
+      entry.totalMax += Number(a.maxScore);
+      classmateScores.set(a.studentId, entry);
+    }
+
+    // Only include students who have at least one assessment in the term
+    const classmatePercents: number[] = [];
+    for (const [sid, sc] of classmateScores) {
+      const pct = sc.totalMax > 0 ? Math.round((sc.totalScore / sc.totalMax) * 100) : 0;
+      classmatePercents.push(pct);
+      if (sid === studentId && classmatePercents.length === 0) {
+        // ensure current student is included even if already computed above
+      }
+    }
+
+    // Ensure current student's percent is included
+    const classSize = classmateScores.size > 0 ? classmateScores.size : (assessments.length > 0 ? 1 : 0);
+    const allPercents = classmatePercents.sort((a, b) => b - a);
+    let classRank = 1;
+    for (const p of allPercents) {
+      if (p > overallPercent) classRank++;
+      else break;
+    }
+    const classAverage = allPercents.length > 0
+      ? Math.round((allPercents.reduce((s, p) => s + p, 0) / allPercents.length) * 10) / 10
+      : 0;
+
     const presentCount = attendanceRecords.filter((a) => a.status === 'PRESENT').length;
     const absentCount = attendanceRecords.filter((a) => a.status === 'ABSENT').length;
     const lateCount = attendanceRecords.filter((a) => a.status === 'LATE').length;
@@ -77,6 +120,9 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         attendanceSummary: { present: presentCount, absent: absentCount, late: lateCount, total },
         overallPercent,
         overallGrade: grade(overallPercent),
+        classRank,
+        classSize,
+        classAverage,
       },
     });
   } catch (err: any) {

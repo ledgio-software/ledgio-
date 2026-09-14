@@ -22,6 +22,7 @@ interface InvoiceSummary {
   total: number;
   amountPaid: number;
   dueDate: string | null;
+  scheduleAmount: number;
 }
 
 interface StudentRow {
@@ -250,7 +251,9 @@ ${r.change > 0 ? `<div class="row"><span>Change:</span><span>${fmtGhs(r.change)}
     setShowGenerateConfirm(false);
     try {
       const res = await api.post("/school/fee-collection/generate-invoices", { termId: selectedTermId });
-      showToast(res.data.message, "success");
+      const { generated, discountedCount } = res.data.data ?? {};
+      const discountMsg = discountedCount > 0 ? ` (${discountedCount} with scholarship discounts applied)` : "";
+      showToast(`Generated ${generated ?? 0} invoice${generated !== 1 ? "s" : ""}${discountMsg}.`, "success");
       load();
     } catch (e: any) {
       showToast(e?.response?.data?.error ?? "Failed to generate invoices.", "error");
@@ -405,7 +408,14 @@ ${r.change > 0 ? `<div class="row"><span>Change:</span><span>${fmtGhs(r.change)}
                   {filtered.map((r) => (
                     <TableRow key={r.student.id}>
                       <TableCell>
-                        <div className="font-medium">{r.student.firstName} {r.student.lastName}</div>
+                        <div className="font-medium flex items-center gap-1.5">
+                          {r.student.firstName} {r.student.lastName}
+                          {r.invoices.some((inv) => inv.scheduleAmount != null && inv.total < inv.scheduleAmount) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                              <Gift className="h-3 w-3" />Scholarship
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-secondary-400 font-mono">{r.student.studentCode}</div>
                       </TableCell>
                       <TableCell>{r.student.className}</TableCell>
@@ -580,9 +590,14 @@ ${r.change > 0 ? `<div class="row"><span>Change:</span><span>${fmtGhs(r.change)}
                   .filter((inv) => inv.status !== "PAID" && inv.status !== "VOIDED")
                   .map((inv) => (
                     <div key={inv.id} className="flex items-center justify-between gap-2">
-                      <span className="text-secondary-600 dark:text-secondary-400">
+                      <span className="text-secondary-600 dark:text-secondary-400 flex items-center gap-1.5 flex-wrap">
                         Invoice <span className="font-mono text-xs">{inv.id.slice(-6).toUpperCase()}</span>
-                        {inv.dueDate && <span className="ml-2 text-xs text-secondary-400">due {new Date(inv.dueDate).toLocaleDateString("en-GB")}</span>}
+                        {inv.scheduleAmount != null && inv.total < inv.scheduleAmount && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                            <Gift className="h-3 w-3" />Scholarship
+                          </span>
+                        )}
+                        {inv.dueDate && <span className="text-xs text-secondary-400">due {new Date(inv.dueDate).toLocaleDateString("en-GB")}</span>}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-red-600 dark:text-red-400">{fmt(inv.total - inv.amountPaid)}</span>

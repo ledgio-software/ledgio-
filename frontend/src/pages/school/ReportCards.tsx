@@ -16,6 +16,9 @@ interface ReportCard {
   attendanceSummary: { present: number; absent: number; late: number; total: number };
   overallPercent: number;
   overallGrade: string;
+  classRank?: number;
+  classSize?: number;
+  classAverage?: number;
 }
 
 function gradeColor(g: string) {
@@ -54,7 +57,7 @@ export function ReportCards() {
 
   function print() {
     if (!reportCard) return;
-    const { student, term, subjects, attendanceSummary, overallPercent, overallGrade } = reportCard;
+    const { student, term, subjects, attendanceSummary, overallPercent, overallGrade, classRank, classSize, classAverage } = reportCard;
     const html = `<!DOCTYPE html>
 <html>
 <head><title>Report Card</title>
@@ -80,6 +83,7 @@ export function ReportCards() {
   <div><strong>Student ID:</strong> ${student.studentCode}</div>
   <div><strong>Class:</strong> ${student.className}</div>
   <div><strong>Overall:</strong> <span class="grade">${overallPercent}% — ${overallGrade}</span></div>
+  ${classRank != null && classSize != null ? `<div><strong>Class Rank:</strong> ${classRank} / ${classSize}${classAverage != null ? ` &nbsp;·&nbsp; Class Avg: ${classAverage}%` : ""}</div>` : ""}
 </div>
 <table>
   <thead><tr><th>Subject</th><th>Exam Type</th><th>Score</th><th>Max</th><th>%</th><th>Grade</th></tr></thead>
@@ -136,6 +140,14 @@ export function ReportCards() {
               <p className="mt-1 text-sm">
                 Overall: <span className="font-bold">{reportCard.overallPercent}%</span> —{" "}
                 <span className="font-bold" style={{ color: gradeColor(reportCard.overallGrade) }}>{reportCard.overallGrade}</span>
+                {reportCard.classRank != null && reportCard.classSize != null && (
+                  <span className="ml-3 text-muted-foreground">
+                    Rank: <span className="font-bold text-foreground">{reportCard.classRank}</span> / {reportCard.classSize}
+                    {reportCard.classAverage != null && (
+                      <> · Class Avg: <span className="font-bold text-foreground">{reportCard.classAverage}%</span></>
+                    )}
+                  </span>
+                )}
               </p>
             </div>
             <div className="overflow-x-auto">
