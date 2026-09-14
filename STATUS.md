@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-14] - School Module: SMS Fee Reminders for Defaulters
+
+**What/Why:**
+Added one-click bulk SMS fee reminders so accountants can notify all defaulting guardians without manually calling each one.
+
+**Backend — `schoolFeeCollection.ts`:**
+- New `POST /api/v1/school/fee-collection/send-reminders` (Accountant + Admin roles)
+- Resolves defaulters using the same invoice/schedule logic as the defaulters report
+- Sends a personalised SMS per guardian via `SmsService` (Arkesel → mNotify → Android Gateway fallback chain)
+- SMS message includes school name, student name, class, outstanding balance, and term name
+- Guardians without a phone number are counted as `skipped`; returns `{ sent, failed, skipped }`
+
+**Frontend — `FeeDefaulters.tsx`:**
+- "SMS Reminders" button in toolbar (visible to Admin and Accountant when defaulters list is non-empty)
+- Confirmation modal shows the count of students to be messaged before sending
+- Loading spinner while request is in-flight; toast reports sent / failed / skipped breakdown on completion
+
+**Files changed:** `backend/src/routes/schoolFeeCollection.ts`, `frontend/src/pages/school/FeeDefaulters.tsx`
+
 ## [Date: 2026-09-12] - AGOD Admin Console: 7 new diagnostic panels + Job Retry UI
 
 **What/Why:**
