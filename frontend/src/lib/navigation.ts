@@ -135,6 +135,8 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/purchase-orders', '/payment-matching',
     // No interest charges or product price lists
     '/reports/interest-charges', '/settings/price-lists',
+    // WHT is a GRA obligation for commercial entities; schools are typically exempt
+    '/settings/wht-rates',
     // Advanced accounting features not used in school context
     '/settings/scenarios', '/settings/voucher-classes', '/pdc',
     // Reports irrelevant to schools
