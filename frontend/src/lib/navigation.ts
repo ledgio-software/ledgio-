@@ -129,12 +129,26 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     // No manufacturing or job costing
     '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
     '/cost-categories',
-    // No interest or price lists (schools don't charge interest or maintain product price lists)
+    // Schools use Fee Collection for income — not generic AR invoicing
+    '/invoices',
+    // Schools rarely raise formal purchase orders; no payment matching workflow
+    '/purchase-orders', '/payment-matching',
+    // No interest charges or product price lists
     '/reports/interest-charges', '/settings/price-lists',
+    // Advanced accounting features not used in school context
+    '/settings/scenarios', '/settings/voucher-classes', '/pdc',
     // Reports irrelevant to schools
     '/reports/monthly-sales-ledger', '/reports/sales-channel',
     '/reports/landed-costs', '/reports/stock-movement',
     '/reports/stock-aging', '/reports/registers',
+    // Multi-campus comparison not relevant (single-campus schools)
+    '/reports/branch-comparison',
+    // Schools typically VAT-exempt on educational services
+    '/reports/vat-return',
+    // Analytics Dashboard replaced by MIS Dashboard in School section
+    '/reports/analytics',
+    // Too specialised for school finance team
+    '/reports/benford-analysis',
     // No customer CRM (schools use Students module)
     '/customers',
   ]),
