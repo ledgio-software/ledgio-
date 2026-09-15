@@ -10,15 +10,17 @@ const router = Router();
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
 
-// GET /api/v1/school/students?search=&limit=
+// GET /api/v1/school/students?search=&limit=&className=
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { search, limit } = req.query as { search?: string; limit?: string };
+    const { search, limit, className } = req.query as { search?: string; limit?: string; className?: string };
     const take = limit ? Math.min(200, parseInt(limit, 10)) : undefined;
     const students = await prisma.student.findMany({
       where: {
         tenantId,
+        isActive: true,
+        ...(className ? { className } : {}),
         ...(search
           ? {
               OR: [
