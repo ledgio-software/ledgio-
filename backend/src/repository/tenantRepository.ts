@@ -50,6 +50,7 @@ export interface CreateTenantData {
   orgType?: string;
   subscriptionStatus?: string;
   trialEndsAt?: Date | null;
+  referralCode?: string;
 }
 
 /**
@@ -78,6 +79,7 @@ export async function createTenant(prisma: PrismaClient, data: CreateTenantData)
       ...(data.orgType ? { orgType: data.orgType } : {}),
       ...(data.subscriptionStatus ? { subscriptionStatus: data.subscriptionStatus } : {}),
       ...(data.trialEndsAt !== undefined ? { trialEndsAt: data.trialEndsAt } : {}),
+      ...(data.referralCode ? { referralCode: data.referralCode } : {}),
     },
   });
 

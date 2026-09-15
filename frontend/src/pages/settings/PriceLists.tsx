@@ -4,6 +4,7 @@ import {
   AlertCircle, CheckCircle, RefreshCw,
 } from "lucide-react";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface PriceListEntry {
   id: string;
@@ -98,7 +99,7 @@ export function PriceLists() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this price list? Customers assigned to it will lose their price assignment.")) return;
+    if (!await confirm({ title: "Delete this price list?", description: "Customers assigned to it will lose their price assignment.", confirmLabel: "Delete" })) return;
     try {
       await api.delete(`/price-lists/${id}`);
       flash("Deleted.");

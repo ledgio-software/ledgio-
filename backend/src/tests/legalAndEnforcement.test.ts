@@ -106,56 +106,7 @@ describe('Legal Policy & Customization Enforcement API', () => {
     });
   });
 
-  describe('2. GET /api/legal/:policyName retrieve endpoints', () => {
-    it('should fetch Terms and Conditions Markdown successfully', async () => {
-      const res = await request(app).get('/api/legal/terms-and-conditions');
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.policyName).toBe('terms-and-conditions');
-      expect(res.body.title).toBe('Terms and Conditions');
-      expect(res.body.content).toContain('# Terms and Conditions');
-    });
-
-    it('should fetch Privacy Policy Markdown successfully', async () => {
-      const res = await request(app).get('/api/legal/privacy-policy');
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.policyName).toBe('privacy-policy');
-      expect(res.body.title).toBe('Privacy Policy');
-      expect(res.body.content).toContain('# Privacy Policy');
-    });
-
-    it('should fetch SLA Markdown successfully', async () => {
-      const res = await request(app).get('/api/v1/legal/sla');
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.policyName).toBe('sla');
-      expect(res.body.title).toBe('Service Level Agreement (SLA)');
-      expect(res.body.content).toContain('# Service Level Agreement');
-    });
-
-    it('should fetch Customization Policy Markdown successfully', async () => {
-      const res = await request(app).get('/api/legal/customization-policy');
-
-      expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.policyName).toBe('customization-policy');
-      expect(res.body.title).toBe('Customization Policy');
-      expect(res.body.content).toContain('# Customization Policy');
-    });
-
-    it('should return 404 for an invalid policy name', async () => {
-      const res = await request(app).get('/api/legal/invalid-policy-name');
-
-      expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Policy Not Found');
-    });
-  });
-
-  describe('3. Customization Tier Enforcement Middleware', () => {
+  describe('2. Customization Tier Enforcement Middleware', () => {
     let tier1Token: string;
     let tier3Token: string;
 

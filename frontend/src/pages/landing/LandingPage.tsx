@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -38,7 +38,7 @@ const FAQ_ITEMS: { question: string; answer: string }[] = [
   {
     question: "How do the SMS shortage alerts work?",
     answer:
-      "When a shop till closes with a cash shortage, an instant SMS alert is sent to your registered owner mobile number via our Android SMS Gateway. Available on all plans.",
+      "When a shop till closes with a cash shortage, an instant SMS alert is sent to your registered owner mobile number. Available on all plans.",
   },
   {
     question: "What's included in the weekly email reports?",
@@ -153,19 +153,31 @@ export function LandingPage() {
   const { isInstallable, isInstalled, promptInstall } = useInstallPrompt();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
+  // Load landing-page-only fonts (Syne + DM Sans) lazily so the app shell
+  // doesn't download them for authenticated users who never visit this page.
+  useEffect(() => {
+    const id = 'landing-fonts';
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap';
+    document.head.appendChild(link);
+  }, []);
+
   return (
     <div className="min-h-screen bg-secondary-950 text-secondary-100 font-sans selection:bg-emerald-500 selection:text-white">
       <PublicHeader />
 
       {/* Hero */}
       <section className="relative pt-24 pb-32 overflow-hidden bg-secondary-950">
-        {/* Subtle radial glow */}
+        {/* Subtle radial glow — CSS gradient, no GPU blur filter */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 flex items-start justify-center"
-        >
-          <div className="w-[800px] h-[500px] bg-emerald-600/10 rounded-full blur-3xl -translate-y-1/3" />
-        </div>
+          className="pointer-events-none absolute inset-0"
+          style={{ background: 'radial-gradient(ellipse 800px 500px at 50% -10%, rgba(5,150,105,0.10) 0%, transparent 70%)' }}
+        />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-8">
@@ -174,7 +186,8 @@ export function LandingPage() {
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.05]">
-            Stop Guessing<br />
+            Stop Guessing{' '}
+            <br />
             <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-blue-400 bg-clip-text text-transparent">
               Where the Money Went.
             </span>
@@ -204,11 +217,11 @@ export function LandingPage() {
 
           <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-secondary-400">
             <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-            Free trial • No credit card • Workspace provisioned instantly
+            90-day free trial • No credit card • Workspace provisioned instantly
           </p>
 
           {/* Stat strip */}
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 divide-x divide-secondary-800 border border-secondary-800 rounded-2xl overflow-hidden bg-secondary-900/50 backdrop-blur-sm">
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 divide-x divide-secondary-800 border border-secondary-800 rounded-2xl overflow-hidden bg-secondary-900">
             {[
               { value: "Instant SMS", label: "Till shortage alerts" },
               { value: "Mon 8 AM", label: "Weekly P&L email delivery" },
@@ -228,7 +241,7 @@ export function LandingPage() {
       <section id="gallery" className="py-20 border-t border-secondary-800/60 bg-secondary-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Real People. Real Businesses.</h2>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Built for Businesses Like Yours.</h2>
             <p className="mt-3 text-secondary-400 text-sm">Built for owners who want total visibility, not more spreadsheets.</p>
           </div>
           <ImageCarousel />
@@ -362,7 +375,7 @@ export function LandingPage() {
                 step: "02",
                 icon: Zap,
                 title: "Dual-Lock Verification",
-                body: "Click the link sent to your email and enter the 4-digit SMS code dispatched via our Android SMS Gateway. Takes under 60 seconds.",
+                body: "Click the link sent to your email and enter the 4-digit SMS code sent to your phone. Takes under 60 seconds.",
               },
               {
                 step: "03",

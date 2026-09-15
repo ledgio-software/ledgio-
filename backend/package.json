@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "npx prisma migrate deploy && node dist/index.js",
     "test": "jest --runInBand",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
@@ -48,6 +48,7 @@
     "ioredis": "^5.4.1",
     "node-cron": "^4.6.0",
     "nodemailer": "^9.0.5",
+    "otplib": "^13.5.0",
     "pdfkit": "^0.19.1",
     "prisma": "^5.18.0",
     "prom-client": "^15.1.2",

@@ -6,24 +6,24 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../lib/api";
-import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill } from "lucide-react";
+import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill, HardHat } from "lucide-react";
 import { AuthSplitLayout } from "../../components/layout/AuthSplitLayout";
 
 const BUSINESS_PROFILES = [
   {
-    value: "BUSINESS" as const,
+    value: "RETAIL" as const,
     label: "Retail Shop / Boutique",
     sub: "Physical store, kiosk, market stall",
     icon: ShoppingBag,
   },
   {
-    value: "BUSINESS" as const,
+    value: "WHOLESALE" as const,
     label: "Wholesale / Distributor",
     sub: "Bulk sales, invoices, credit terms",
     icon: Package,
   },
   {
-    value: "BUSINESS" as const,
+    value: "SERVICE" as const,
     label: "Service Business",
     sub: "Agency, freelancer, professional firm",
     icon: Briefcase,
@@ -33,6 +33,12 @@ const BUSINESS_PROFILES = [
     label: "NGO / School / Church",
     sub: "Fund accounting, donor tracking",
     icon: Heart,
+  },
+  {
+    value: "CONSTRUCTION" as const,
+    label: "Construction / Contractor",
+    sub: "Job costing, materials, site payroll",
+    icon: HardHat,
   },
   {
     value: "BUSINESS" as const,
@@ -58,11 +64,11 @@ export function Register() {
     tenantName: "",
     tenantSlug: "",
     baseCurrency: "GHS",
-    orgType: "BUSINESS",
+    orgType: "RETAIL",
+    referralCode: "",
   });
-  // Tracks which profile card is highlighted — multiple cards share orgType=BUSINESS
-  // so we can't use orgType alone to identify the selected card.
-  const [selectedProfile, setSelectedProfile] = useState<string>("Retail Shop / Boutique");
+  const [referralStatus, setReferralStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle");
+  const [referralPartnerName, setReferralPartnerName] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [activeLegalDoc, setActiveLegalDoc] = useState<"terms-and-conditions" | "privacy-policy">("terms-and-conditions");
@@ -98,11 +104,38 @@ export function Register() {
     }
   };
 
+  const validateReferralCode = async (code: string) => {
+    if (!code.trim()) {
+      setReferralStatus("idle");
+      setReferralPartnerName("");
+      return;
+    }
+    setReferralStatus("checking");
+    try {
+      const res = await api.post("/admin/referrals/verify", { code: code.trim().toUpperCase() });
+      const payload = res.data?.data ?? res.data;
+      if (payload?.valid) {
+        setReferralStatus("valid");
+        setReferralPartnerName(payload.partnerName || "");
+      } else {
+        setReferralStatus("invalid");
+        setReferralPartnerName("");
+      }
+    } catch {
+      setReferralStatus("invalid");
+      setReferralPartnerName("");
+    }
+  };
+
   const handleAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!formData.email || !formData.password || !formData.adminName || !formData.phone || !formData.tenantName) {
       setError("Please fill in all required fields.");
+      return;
+    }
+    if (referralStatus === "invalid") {
+      setError("The referral code you entered is invalid. Please remove it or enter a valid one.");
       return;
     }
     setStep("tenant");
@@ -132,6 +165,7 @@ export function Register() {
         orgType: formData.orgType,
         termsAccepted: true,
         acceptedTermsVersion: "v1.0",
+        ...(formData.referralCode.trim() ? { referralCode: formData.referralCode.trim().toUpperCase() } : {}),
       });
 
       if (response.data.success) {
@@ -265,6 +299,40 @@ export function Register() {
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label htmlFor="referralCode" className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">
+                    Referral Code <span className="text-secondary-400 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Input
+                      id="referralCode"
+                      type="text"
+                      placeholder="e.g. PARTNER-ABC123"
+                      value={formData.referralCode}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        setFormData({ ...formData, referralCode: val });
+                        if (!val.trim()) { setReferralStatus("idle"); setReferralPartnerName(""); }
+                      }}
+                      onBlur={() => validateReferralCode(formData.referralCode)}
+                      className={
+                        referralStatus === "valid" ? "border-green-500 focus:ring-green-500" :
+                        referralStatus === "invalid" ? "border-red-400 focus:ring-red-400" : ""
+                      }
+                    />
+                  </div>
+                  {referralStatus === "checking" && (
+                    <p className="text-[11px] text-secondary-400 mt-1">Checking code...</p>
+                  )}
+                  {referralStatus === "valid" && (
+                    <p className="text-[11px] text-green-600 dark:text-green-400 mt-1">
+                      ✓ Valid referral from {referralPartnerName}
+                    </p>
+                  )}
+                  {referralStatus === "invalid" && (
+                    <p className="text-[11px] text-red-500 mt-1">Invalid or inactive referral code.</p>
+                  )}
+                </div>
                 <Button type="submit" className="w-full">
                   Continue
                 </Button>
@@ -295,12 +363,12 @@ export function Register() {
                   <div className="grid grid-cols-1 gap-2">
                     {BUSINESS_PROFILES.map((opt) => {
                       const Icon = opt.icon;
-                      const isSelected = selectedProfile === opt.label;
+                      const isSelected = formData.orgType === opt.value;
                       return (
                         <button
                           key={opt.label}
                           type="button"
-                          onClick={() => { setSelectedProfile(opt.label); setFormData({ ...formData, orgType: opt.value }); }}
+                          onClick={() => setFormData({ ...formData, orgType: opt.value })}
                           className={`flex items-center gap-3 text-left px-3 py-2.5 rounded-lg border-2 transition-colors ${
                             isSelected
                               ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"

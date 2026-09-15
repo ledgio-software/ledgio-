@@ -4,7 +4,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
-import { ClipboardList, Plus, Search, CheckCircle2, Clock } from "lucide-react";
+import { ClipboardList, Plus, Search, CheckCircle2, Clock, AlertTriangle, Bell, ShieldAlert, Scan, QrCode, Loader2 } from "lucide-react";
 
 interface PrescriptionLine {
   id: string;
@@ -13,6 +13,15 @@ interface PrescriptionLine {
   dispensedQty: number;
   notes?: string;
   item: { id: string; name: string; sku: string };
+}
+
+interface PharmacyPatient {
+  id: string;
+  name: string;
+  phone?: string;
+  nhisCardNumber?: string;
+  allergies: string[];
+  chronicConditions?: string;
 }
 
 interface Prescription {
@@ -27,8 +36,45 @@ interface Prescription {
   dispensedByName?: string;
   cashSaleId?: string;
   notes?: string;
+  billingType: string;
+  evatInvoiceRef?: string;
+  neppCode?: string;
+  patient?: PharmacyPatient;
   lines: PrescriptionLine[];
   createdAt: string;
+}
+
+// Common drug interaction pairs relevant to Ghana's pharmacy context
+const DRUG_INTERACTIONS: Array<{ drugs: [string, string]; severity: "HIGH" | "MODERATE"; message: string }> = [
+  { drugs: ["metronidazole", "alcohol"], severity: "HIGH", message: "Metronidazole + Alcohol: severe nausea/vomiting, disulfiram-like reaction." },
+  { drugs: ["warfarin", "aspirin"], severity: "HIGH", message: "Warfarin + Aspirin: major bleeding risk." },
+  { drugs: ["warfarin", "co-trimoxazole"], severity: "HIGH", message: "Warfarin + Co-trimoxazole: significantly increased INR, bleeding risk." },
+  { drugs: ["warfarin", "metronidazole"], severity: "HIGH", message: "Warfarin + Metronidazole: significantly increased INR." },
+  { drugs: ["warfarin", "paracetamol"], severity: "MODERATE", message: "Warfarin + Paracetamol (>2 g/day): may potentiate anticoagulant effect." },
+  { drugs: ["warfarin", "amoxicillin"], severity: "MODERATE", message: "Warfarin + Amoxicillin: may potentiate anticoagulant effect." },
+  { drugs: ["ciprofloxacin", "antacid"], severity: "MODERATE", message: "Ciprofloxacin + Antacids: reduced absorption — take 2 hours apart." },
+  { drugs: ["chloroquine", "amiodarone"], severity: "HIGH", message: "Chloroquine + Amiodarone: risk of fatal cardiac arrhythmia (QT prolongation)." },
+  { drugs: ["chloroquine", "artemether"], severity: "HIGH", message: "Chloroquine + Artemether-Lumefantrine: QT prolongation risk." },
+  { drugs: ["atenolol", "verapamil"], severity: "HIGH", message: "Beta-blocker + Verapamil: risk of heart block and severe bradycardia." },
+  { drugs: ["lisinopril", "spironolactone"], severity: "HIGH", message: "ACE inhibitor + Spironolactone: dangerous hyperkalemia." },
+  { drugs: ["carbamazepine", "contraceptive"], severity: "HIGH", message: "Carbamazepine + Oral Contraceptives: reduced contraceptive efficacy." },
+  { drugs: ["codeine", "tramadol"], severity: "HIGH", message: "Codeine + Tramadol: increased risk of opioid toxicity and seizures." },
+  { drugs: ["amlodipine", "simvastatin"], severity: "MODERATE", message: "Amlodipine + Simvastatin >20 mg: increased myopathy risk." },
+  { drugs: ["ibuprofen", "aspirin"], severity: "MODERATE", message: "Ibuprofen + Aspirin: increased GI bleeding risk." },
+  { drugs: ["nsaid", "aspirin"], severity: "MODERATE", message: "NSAID + Aspirin: increased GI bleeding risk." },
+  { drugs: ["phenytoin", "folic acid"], severity: "MODERATE", message: "Phenytoin + Folic Acid: may reduce seizure control — monitor levels." },
+];
+
+function checkInteractions(drugNames: string[]) {
+  const lower = drugNames.map((n) => n.toLowerCase());
+  return DRUG_INTERACTIONS.filter(({ drugs: [a, b] }) =>
+    lower.some((n) => n.includes(a)) && lower.some((n) => n.includes(b))
+  );
+}
+
+function checkAllergies(drugNames: string[], allergies: string[]) {
+  const lower = drugNames.map((n) => n.toLowerCase());
+  return allergies.filter((allergy) => lower.some((n) => n.includes(allergy.toLowerCase())));
 }
 
 export function PrescriptionRegister() {
@@ -39,16 +85,40 @@ export function PrescriptionRegister() {
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<Prescription | null>(null);
   const [items, setItems] = useState<{ id: string; name: string; sku: string }[]>([]);
+  const [patients, setPatients] = useState<PharmacyPatient[]>([]);
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
-  const [form, setForm] = useState({
+  // NEPP verification state
+  const [neppLoading, setNeppLoading] = useState(false);
+  const [neppVerified, setNeppVerified] = useState(false);
+
+  // Barcode verification modal
+  const [barcodeTarget, setBarcodeTarget] = useState<Prescription | null>(null);
+  const [barcodeInputs, setBarcodeInputs] = useState<Record<string, string>>({});
+  const [dispensing, setDispensing] = useState(false);
+
+  const emptyForm = {
     patientName: "",
     patientAge: "",
     patientPhone: "",
+    patientId: "",
     prescribingDoctor: "",
     prescriptionDate: new Date().toISOString().slice(0, 10),
+    billingType: "CASH" as "CASH" | "NHIS" | "INSURANCE",
     notes: "",
+    neppCode: "",
     lines: [{ itemId: "", prescribedQty: 1 }],
-  });
+  };
+
+  const [form, setForm] = useState(emptyForm);
+
+  const selectedPatient = patients.find((p) => p.id === form.patientId) || null;
+  const selectedDrugNames = form.lines
+    .map((l) => items.find((it) => it.id === l.itemId)?.name || "")
+    .filter(Boolean);
+
+  const allergyWarnings = selectedPatient ? checkAllergies(selectedDrugNames, selectedPatient.allergies) : [];
+  const interactionWarnings = checkInteractions(selectedDrugNames);
 
   async function load(q?: string) {
     setLoading(true);
@@ -69,7 +139,25 @@ export function PrescriptionRegister() {
     } catch {}
   }
 
-  useEffect(() => { load(); loadItems(); }, []);
+  async function loadPatients() {
+    try {
+      const res = await api.get("/pharmacy/patients");
+      setPatients(res.data.data.patients);
+    } catch {}
+  }
+
+  useEffect(() => { load(); loadItems(); loadPatients(); }, []);
+
+  // When a patient is selected, pre-fill name and phone
+  function handlePatientSelect(patientId: string) {
+    const patient = patients.find((p) => p.id === patientId);
+    setForm((f) => ({
+      ...f,
+      patientId,
+      patientName: patient?.name || f.patientName,
+      patientPhone: patient?.phone || f.patientPhone,
+    }));
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -78,37 +166,92 @@ export function PrescriptionRegister() {
         patientName: form.patientName,
         patientAge: form.patientAge ? Number(form.patientAge) : null,
         patientPhone: form.patientPhone || null,
+        patientId: form.patientId || null,
         prescribingDoctor: form.prescribingDoctor,
         prescriptionDate: new Date(form.prescriptionDate).toISOString(),
+        billingType: form.billingType,
         notes: form.notes || null,
+        neppCode: form.neppCode || null,
         lines: form.lines.map((l) => ({ itemId: l.itemId, prescribedQty: Number(l.prescribedQty) })),
       });
       showToast("Prescription created.", "success");
       setShowNew(false);
-      setForm({ patientName: "", patientAge: "", patientPhone: "", prescribingDoctor: "", prescriptionDate: new Date().toISOString().slice(0, 10), notes: "", lines: [{ itemId: "", prescribedQty: 1 }] });
+      setForm(emptyForm);
+      setNeppVerified(false);
       load();
     } catch (err: any) {
       showToast(err.response?.data?.error || "Failed to create prescription.", "error");
     }
   }
 
-  async function handleDispense(id: string) {
+  async function handleVerifyNepp() {
+    const code = form.neppCode.trim();
+    if (!code) return;
+    setNeppLoading(true);
     try {
-      await api.patch(`/pharmacy/prescriptions/${id}/dispense`, { dispensedByName: undefined });
-      showToast("Prescription marked as dispensed.", "success");
-      load();
-      setSelected(null);
+      const res = await api.post("/pharmacy/verify-nepp", { neppCode: code });
+      const d = res.data.data;
+      setForm((f) => ({
+        ...f,
+        patientName: d.patientName || f.patientName,
+        patientPhone: d.patientPhone || f.patientPhone,
+      }));
+      setNeppVerified(true);
+      if (d.isStub) showToast("NEPP stub mode — using demo data.", "info");
+      else showToast("NEPP prescription verified.", "success");
     } catch (err: any) {
-      showToast(err.response?.data?.error || "Failed to dispense.", "error");
+      showToast(err.response?.data?.error || "NEPP verification failed.", "error");
+    } finally {
+      setNeppLoading(false);
     }
   }
 
-  const filtered = prescriptions.filter((p) =>
-    !search || p.patientName.toLowerCase().includes(search.toLowerCase()) || p.rxNumber.toLowerCase().includes(search.toLowerCase())
+  function openBarcodeModal(prescription: Prescription) {
+    setBarcodeTarget(prescription);
+    setBarcodeInputs({});
+  }
+
+  async function handleConfirmDispense() {
+    if (!barcodeTarget) return;
+    setDispensing(true);
+    try {
+      await api.patch(`/pharmacy/prescriptions/${barcodeTarget.id}/dispense`, {});
+      showToast("Prescription dispensed. GRA E-VAT receipt issued.", "success");
+      load();
+      setBarcodeTarget(null);
+      setSelected(null);
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to dispense.", "error");
+    } finally {
+      setDispensing(false);
+    }
+  }
+
+  function allBarcodesVerified() {
+    if (!barcodeTarget) return false;
+    return barcodeTarget.lines.every((l) =>
+      (barcodeInputs[l.id] ?? "").trim().toLowerCase() === l.item.sku.toLowerCase()
+    );
+  }
+
+  async function handleSendRefillReminder(id: string) {
+    setSendingReminder(id);
+    try {
+      await api.post(`/pharmacy/prescriptions/${id}/send-refill-reminder`);
+      showToast("Refill reminder sent via SMS.", "success");
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to send reminder.", "error");
+    } finally {
+      setSendingReminder(null);
+    }
+  }
+
+  const filtered = prescriptions.filter(
+    (p) => !search || p.patientName.toLowerCase().includes(search.toLowerCase()) || p.rxNumber.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <ClipboardList className="w-6 h-6 text-blue-600" />
@@ -142,6 +285,7 @@ export function PrescriptionRegister() {
                 <th className="px-4 py-3 text-left">Patient</th>
                 <th className="px-4 py-3 text-left">Doctor</th>
                 <th className="px-4 py-3 text-left">Date</th>
+                <th className="px-4 py-3 text-left">Billing</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Actions</th>
               </tr>
@@ -150,9 +294,19 @@ export function PrescriptionRegister() {
               {filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onClick={() => setSelected(p)}>
                   <td className="px-4 py-3 font-mono font-medium text-blue-600">{p.rxNumber}</td>
-                  <td className="px-4 py-3 text-gray-900 dark:text-white">{p.patientName}</td>
+                  <td className="px-4 py-3 text-gray-900 dark:text-white">
+                    {p.patientName}
+                    {p.patient?.allergies?.length ? (
+                      <span className="ml-1 text-red-500 text-xs" title={`Allergies: ${p.patient.allergies.join(", ")}`}>⚠</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{p.prescribingDoctor}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{new Date(p.prescriptionDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${p.billingType === "NHIS" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" : p.billingType === "INSURANCE" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"}`}>
+                      {p.billingType}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">
                     {p.dispensedAt ? (
                       <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium"><CheckCircle2 className="w-3 h-3" /> Dispensed</span>
@@ -160,9 +314,27 @@ export function PrescriptionRegister() {
                       <span className="inline-flex items-center gap-1 text-amber-600 text-xs font-medium"><Clock className="w-3 h-3" /> Pending</span>
                     )}
                   </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     {!p.dispensedAt && (
-                      <Button variant="outline" size="sm" onClick={() => handleDispense(p.id)}>Dispense</Button>
+                      <Button variant="outline" size="sm" onClick={() => openBarcodeModal(p)}>
+                        <Scan className="w-3 h-3 mr-1" />Dispense
+                      </Button>
+                    )}
+                    {p.evatInvoiceRef && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" title={`E-VAT: ${p.evatInvoiceRef}`}>
+                        <QrCode className="w-2.5 h-2.5" />E-VAT
+                      </span>
+                    )}
+                    {p.dispensedAt && p.patientPhone && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSendRefillReminder(p.id)}
+                        disabled={sendingReminder === p.id}
+                        title="Send SMS refill reminder"
+                      >
+                        <Bell className="w-3 h-3" />
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -172,9 +344,105 @@ export function PrescriptionRegister() {
         </div>
       )}
 
+      {/* Barcode Verification Modal */}
+      {barcodeTarget && (
+        <Modal isOpen={!!barcodeTarget} onClose={() => setBarcodeTarget(null)} title="Verify Barcodes Before Dispensing">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Scan or type each drug's barcode/SKU to confirm the correct product before dispensing.
+            </p>
+            <div className="space-y-3">
+              {barcodeTarget.lines.map((line) => {
+                const entered = (barcodeInputs[line.id] ?? "").trim();
+                const verified = entered.toLowerCase() === line.item.sku.toLowerCase();
+                return (
+                  <div key={line.id} className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{line.item.name}</div>
+                      <div className="text-xs text-gray-500">Expected SKU: <span className="font-mono">{line.item.sku}</span> · Qty: {line.prescribedQty}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Scan SKU…"
+                        value={barcodeInputs[line.id] ?? ""}
+                        onChange={(e) => setBarcodeInputs((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                        className={`w-36 border rounded-lg px-2 py-1.5 text-sm font-mono ${verified ? "border-green-500 bg-green-50 dark:bg-green-900/20" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"} dark:text-white`}
+                      />
+                      {verified && <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setBarcodeTarget(null)}>Cancel</Button>
+              <Button
+                type="button"
+                disabled={!allBarcodesVerified() || dispensing}
+                onClick={handleConfirmDispense}
+              >
+                {dispensing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
+                Confirm Dispense
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* New Prescription Modal */}
-      <Modal isOpen={showNew} onClose={() => setShowNew(false)} title="New Prescription">
+      <Modal isOpen={showNew} onClose={() => { setShowNew(false); setForm(emptyForm); setNeppVerified(false); }} title="New Prescription">
         <form onSubmit={handleCreate} className="space-y-4">
+
+          {/* NEPP code verification */}
+          <div>
+            <label className="block text-sm font-medium mb-1">NEPP Prescription Code (optional)</label>
+            <div className="flex gap-2">
+              <Input
+                value={form.neppCode}
+                onChange={(e) => { setForm({ ...form, neppCode: e.target.value }); setNeppVerified(false); }}
+                placeholder="e.g. NEPP-2026-XXXXX"
+                className="flex-1 font-mono"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!form.neppCode.trim() || neppLoading}
+                onClick={handleVerifyNepp}
+              >
+                {neppLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Verify"}
+              </Button>
+            </div>
+            {neppVerified && <p className="mt-1 text-xs text-green-600">✓ NEPP verified — patient fields pre-filled</p>}
+          </div>
+
+          {/* Patient selector */}
+          {patients.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Registered Patient (optional)</label>
+              <select
+                value={form.patientId}
+                onChange={(e) => handlePatientSelect(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              >
+                <option value="">— walk-in / unregistered —</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.phone ? ` (${p.phone})` : ""}{p.nhisCardNumber ? ` · NHIS: ${p.nhisCardNumber}` : ""}
+                  </option>
+                ))}
+              </select>
+              {selectedPatient?.allergies?.length ? (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <ShieldAlert className="w-3 h-3" /> Known allergies: {selectedPatient.allergies.join(", ")}
+                </p>
+              ) : null}
+              {selectedPatient?.chronicConditions && (
+                <p className="mt-0.5 text-xs text-amber-600">Chronic conditions: {selectedPatient.chronicConditions}</p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Patient Name *</label>
@@ -197,6 +465,18 @@ export function PrescriptionRegister() {
               <Input type="date" required value={form.prescriptionDate} onChange={(e) => setForm({ ...form, prescriptionDate: e.target.value })} />
             </div>
             <div>
+              <label className="block text-sm font-medium mb-1">Billing Type</label>
+              <select
+                value={form.billingType}
+                onChange={(e) => setForm({ ...form, billingType: e.target.value as any })}
+                className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+              >
+                <option value="CASH">Cash</option>
+                <option value="NHIS">NHIS (National Health Insurance)</option>
+                <option value="INSURANCE">Private Insurance</option>
+              </select>
+            </div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium mb-1">Notes</label>
               <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </div>
@@ -241,8 +521,36 @@ export function PrescriptionRegister() {
             </button>
           </div>
 
+          {/* Allergy warnings */}
+          {allergyWarnings.length > 0 && (
+            <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950 dark:border-red-700 p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldAlert className="w-4 h-4 text-red-600" />
+                <span className="text-sm font-semibold text-red-700 dark:text-red-400">Allergy Alert</span>
+              </div>
+              {allergyWarnings.map((a, i) => (
+                <p key={i} className="text-xs text-red-700 dark:text-red-300">Patient has a documented allergy to <strong>{a}</strong>.</p>
+              ))}
+            </div>
+          )}
+
+          {/* Drug interaction warnings */}
+          {interactionWarnings.length > 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Drug Interaction Warnings</span>
+              </div>
+              {interactionWarnings.map((w, i) => (
+                <p key={i} className={`text-xs mt-0.5 ${w.severity === "HIGH" ? "text-red-700 dark:text-red-300 font-medium" : "text-amber-700 dark:text-amber-300"}`}>
+                  {w.severity === "HIGH" ? "⚠ HIGH: " : "• "}{w.message}
+                </p>
+              ))}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { setShowNew(false); setForm(emptyForm); }}>Cancel</Button>
             <Button type="submit">Save Prescription</Button>
           </div>
         </form>
@@ -252,13 +560,33 @@ export function PrescriptionRegister() {
       {selected && (
         <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={`Prescription — ${selected.rxNumber}`}>
           <div className="space-y-3 text-sm">
+            {selected.patient?.allergies?.length ? (
+              <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950 px-3 py-2 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+                <span className="text-xs text-red-700 dark:text-red-300">Allergies on file: <strong>{selected.patient.allergies.join(", ")}</strong></span>
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-2">
               <div><span className="text-gray-500">Patient:</span> <span className="font-medium">{selected.patientName}</span></div>
               <div><span className="text-gray-500">Age:</span> {selected.patientAge ?? "—"}</div>
               <div><span className="text-gray-500">Phone:</span> {selected.patientPhone ?? "—"}</div>
               <div><span className="text-gray-500">Doctor:</span> {selected.prescribingDoctor}</div>
               <div><span className="text-gray-500">Date:</span> {new Date(selected.prescriptionDate).toLocaleDateString()}</div>
-              <div><span className="text-gray-500">Status:</span> {selected.dispensedAt ? <span className="text-green-600 font-medium">Dispensed {new Date(selected.dispensedAt).toLocaleDateString()}</span> : <span className="text-amber-600 font-medium">Pending</span>}</div>
+              <div><span className="text-gray-500">Billing:</span> <span className={`font-medium ${selected.billingType === "NHIS" ? "text-green-600" : ""}`}>{selected.billingType}</span></div>
+              {selected.patient?.nhisCardNumber && (
+                <div className="col-span-2"><span className="text-gray-500">NHIS Card:</span> <span className="font-mono font-medium">{selected.patient.nhisCardNumber}</span></div>
+              )}
+              <div className="col-span-2"><span className="text-gray-500">Status:</span> {selected.dispensedAt ? <span className="text-green-600 font-medium">Dispensed {new Date(selected.dispensedAt).toLocaleDateString()}</span> : <span className="text-amber-600 font-medium">Pending</span>}</div>
+              {selected.evatInvoiceRef && (
+                <div className="col-span-2 flex items-center gap-1">
+                  <QrCode className="w-3 h-3 text-green-600" />
+                  <span className="text-gray-500">E-VAT Ref:</span>
+                  <span className="font-mono text-xs text-green-700 dark:text-green-400">{selected.evatInvoiceRef}</span>
+                </div>
+              )}
+              {selected.neppCode && (
+                <div className="col-span-2"><span className="text-gray-500">NEPP Code:</span> <span className="font-mono text-xs">{selected.neppCode}</span></div>
+              )}
             </div>
             {selected.notes && <p className="text-gray-600 italic">"{selected.notes}"</p>}
             <table className="w-full mt-2 border-t dark:border-gray-700 pt-2">
@@ -273,11 +601,18 @@ export function PrescriptionRegister() {
                 ))}
               </tbody>
             </table>
-            {!selected.dispensedAt && (
-              <div className="flex justify-end pt-2">
-                <Button onClick={() => handleDispense(selected.id)}>Mark as Dispensed</Button>
-              </div>
-            )}
+            <div className="flex justify-end gap-2 pt-2">
+              {selected.patientPhone && selected.dispensedAt && (
+                <Button variant="outline" onClick={() => handleSendRefillReminder(selected.id)} disabled={sendingReminder === selected.id}>
+                  <Bell className="w-3 h-3 mr-1" /> Send Refill Reminder
+                </Button>
+              )}
+              {!selected.dispensedAt && (
+                <Button onClick={() => { openBarcodeModal(selected); }}>
+                  <Scan className="w-3 h-3 mr-1" />Dispense
+                </Button>
+              )}
+            </div>
           </div>
         </Modal>
       )}

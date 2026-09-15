@@ -2,15 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldAlert,
-  Lock,
   Radio,
   Activity,
   Database,
   History,
-  Send,
   CheckCircle2,
-  AlertOctagon,
-  Sparkles,
   Loader2,
   ArrowLeft,
   Server,
@@ -33,6 +29,12 @@ import {
   ChevronDown,
   ChevronRight,
   HandCoins,
+  HeartPulse,
+  TrendingDown,
+  ClipboardList,
+  TrendingUp,
+  DollarSign,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -40,6 +42,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../..
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
+import { BroadcastConsolePanel } from "./BroadcastConsolePanel";
 
 const EMPTY_AUDIT_FILTERS = {
   action: "",
@@ -58,12 +61,19 @@ export function AdminCoreEngine() {
 
   // Master Lock State
   const [passcode, setPasscode] = useState("");
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Two-step auth: 'passcode' → 'totp' → unlocked
+  const [authStep, setAuthStep] = useState<'passcode' | 'totp'>('passcode');
+  const [totpCode, setTotpCode] = useState('');
+  const [showSetupQr, setShowSetupQr] = useState(false);
+  const [setupQrData, setSetupQrData] = useState<{ qrDataUrl: string; secret: string; configured: boolean; note: string } | null>(null);
+  const [isLoadingSetup, setIsLoadingSetup] = useState(false);
 
   // Active Hub Tab
-  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral">("broadcast");
+  const [activeTab, setActiveTab] = useState<"broadcast" | "health" | "performance" | "jobs" | "integrations" | "schemas" | "audit" | "onboard" | "feedback" | "analytics" | "errors" | "safety" | "referral" | "clienthealth" | "churnrisk" | "onboarding" | "revenue" | "debuglogs" | "team">("broadcast");
 
   // Platform-wide Feedback state
   const [feedbackItems, setFeedbackItems] = useState<{
@@ -136,7 +146,7 @@ export function AdminCoreEngine() {
   const fetchMetrics = useCallback(() => {
     setIsLoadingMetrics(true);
     setMetricsError(null);
-    const headers = { 'x-admin-passcode': passcode };
+    const headers = adminHeaders;
     return Promise.all([
       api.get("/admin/metrics", { headers }),
       api.get("/admin/error-logs/grouped", { headers }),
@@ -161,7 +171,7 @@ export function AdminCoreEngine() {
     setIsLoadingJobs(true);
     setJobsError(null);
     return api
-      .get("/admin/jobs", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/jobs", { headers: adminHeaders })
       .then((res) => setJobsData(res.data.data.jobs))
       .catch(() => setJobsError("Failed to load cron jobs."))
       .finally(() => setIsLoadingJobs(false));
@@ -178,7 +188,7 @@ export function AdminCoreEngine() {
   const handleTriggerJob = async (jobName: string) => {
     setTriggeringJob(jobName);
     try {
-      await api.post(`/admin/jobs/${encodeURIComponent(jobName)}/trigger`, {}, { headers: { 'x-admin-passcode': passcode } });
+      await api.post(`/admin/jobs/${encodeURIComponent(jobName)}/trigger`, {}, { headers: adminHeaders });
       showToast(`Job "${jobName}" triggered successfully.`, "success");
       setTimeout(fetchJobs, 1500);
     } catch (err: any) {
@@ -192,8 +202,8 @@ export function AdminCoreEngine() {
     setIsLoadingErrors(true);
     setErrorsError(null);
     return Promise.all([
-      api.get("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } }),
-      api.get("/admin/error-logs/grouped", { headers: { 'x-admin-passcode': passcode } }),
+      api.get("/admin/error-logs", { headers: adminHeaders }),
+      api.get("/admin/error-logs/grouped", { headers: adminHeaders }),
     ])
       .then(([indRes, grpRes]) => {
         setErrorsData(indRes.data.data.errors);
@@ -213,7 +223,7 @@ export function AdminCoreEngine() {
   const handleClearErrors = async () => {
     setIsClearingErrors(true);
     try {
-      await api.delete("/admin/error-logs", { headers: { 'x-admin-passcode': passcode } });
+      await api.delete("/admin/error-logs", { headers: adminHeaders });
       setErrorsData([]);
       showToast("Error log cleared.", "success");
     } catch {
@@ -239,7 +249,7 @@ export function AdminCoreEngine() {
   const handleToggleUserActive = async (userId: string, tenantId: string, activate: boolean) => {
     setTogglingUserId(userId);
     try {
-      await api.patch(`/admin/users/${userId}/${activate ? "activate" : "deactivate"}`, {}, { headers: { 'x-admin-passcode': passcode } });
+      await api.patch(`/admin/users/${userId}/${activate ? "activate" : "deactivate"}`, {}, { headers: adminHeaders });
       showToast(`User ${activate ? "activated" : "deactivated"}.`, "success");
       setTenantUsers((prev) => ({
         ...prev,
@@ -393,16 +403,7 @@ export function AdminCoreEngine() {
   const [auditActionOptions, setAuditActionOptions] = useState<string[]>([]);
   const [auditEntityOptions, setAuditEntityOptions] = useState<string[]>([]);
 
-  // Broadcast Form State
-  const [subject, setSubject] = useState("System Maintenance & Upgrade Notice");
-  const [message, setMessage] = useState(
-    "Ledgio ERP will undergo a scheduled system upgrade on Sunday at 2:00 AM UTC. Expect approximately 15 minutes of downtime. Thank you for your patience!"
-  );
-  const [channel, setChannel] = useState<"EMAIL" | "SMS" | "BOTH">("BOTH");
-  const [targetTier, setTargetTier] = useState<string>("ALL");
-  const [isSending, setIsSending] = useState(false);
-  const [broadcastResult, setBroadcastResult] = useState<any>(null);
-  const [confirmStep, setConfirmStep] = useState(false);
+  // Broadcast state is now managed inside BroadcastConsolePanel
 
   // Onboard Contracted Client state
   const [onboardCompanyName, setOnboardCompanyName] = useState("");
@@ -413,15 +414,28 @@ export function AdminCoreEngine() {
   const [onboardAdminPassword, setOnboardAdminPassword] = useState("");
   const [onboardBaseCurrency, setOnboardBaseCurrency] = useState("GHS");
   const [onboardOrgType, setOnboardOrgType] = useState("BUSINESS");
+  const [onboardTier, setOnboardTier] = useState(3);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardError, setOnboardError] = useState<string | null>(null);
   const [onboardResult, setOnboardResult] = useState<{ tenant: { name: string; slug: string }; admin: { email: string } } | null>(null);
 
+  // Derived admin request headers — prefer session token; fall back to raw passcode
+  const adminHeaders: Record<string, string> = sessionToken
+    ? { 'x-admin-session': sessionToken }
+    : { 'x-admin-passcode': passcode };
+
   // Auto-check if already unlocked in session
   useEffect(() => {
-    const savedToken = sessionStorage.getItem("accountgo_admin_engine_passcode");
-    if (savedToken) {
-      setPasscode(savedToken);
+    const savedSession = sessionStorage.getItem("accountgo_admin_engine_session");
+    if (savedSession) {
+      setSessionToken(savedSession);
+      setIsUnlocked(true);
+      return;
+    }
+    // Backward-compat: upgrade old passcode-only sessions on first load
+    const savedPasscode = sessionStorage.getItem("accountgo_admin_engine_passcode");
+    if (savedPasscode) {
+      setPasscode(savedPasscode);
       setIsUnlocked(true);
     }
   }, []);
@@ -476,7 +490,7 @@ export function AdminCoreEngine() {
     setIsLoadingIntegrations(true);
     setIntegrationsError(null);
     return api
-      .get("/admin/integrations", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/integrations", { headers: adminHeaders })
       .then((res) => setIntegrationsData(res.data.data))
       .catch(() => setIntegrationsError("Failed to load integrations status."))
       .finally(() => setIsLoadingIntegrations(false));
@@ -495,7 +509,7 @@ export function AdminCoreEngine() {
     setIsLoadingTenants(true);
     setTenantsError(null);
     return api
-      .get("/tenants", { headers: { 'x-admin-passcode': passcode } })
+      .get("/tenants", { headers: adminHeaders })
       .then((res) => {
         setTenants(res.data.data.tenants);
         setTierDrafts(Object.fromEntries(res.data.data.tenants.map((t: any) => [t.id, t.tier])));
@@ -520,7 +534,7 @@ export function AdminCoreEngine() {
     const tier = tierDrafts[tenantId];
     setSavingTierId(tenantId);
     try {
-      const res = await api.put(`/tenants/${tenantId}/tier`, { tier }, { headers: { 'x-admin-passcode': passcode } });
+      const res = await api.put(`/tenants/${tenantId}/tier`, { tier }, { headers: adminHeaders });
       if (res.data.success) {
         showToast(`Plan updated to ${res.data.data.tenant.tier === 1 ? "Shop" : res.data.data.tenant.tier === 2 ? "Business" : "Enterprise"}.`, "success");
         fetchTenants();
@@ -536,7 +550,7 @@ export function AdminCoreEngine() {
     if (!deletingTenant || deleteConfirmSlug !== deletingTenant.slug) return;
     setIsDeletingTenant(true);
     try {
-      await api.delete(`/tenants/${deletingTenant.id}`, { headers: { 'x-admin-passcode': passcode } });
+      await api.delete(`/tenants/${deletingTenant.id}`, { headers: adminHeaders });
       showToast(`Tenant "${deletingTenant.name}" permanently deleted.`, "success");
       setDeletingTenant(null);
       setDeleteConfirmSlug("");
@@ -592,7 +606,7 @@ export function AdminCoreEngine() {
   useEffect(() => {
     if (!isUnlocked) return;
     api
-      .get("/admin/audit-logs/meta/values", { headers: { 'x-admin-passcode': passcode } })
+      .get("/admin/audit-logs/meta/values", { headers: adminHeaders })
       .then((res) => {
         if (res.data.success) {
           setAuditActionOptions(res.data.data.actions || []);
@@ -658,7 +672,7 @@ export function AdminCoreEngine() {
   const fetchReferralData = useCallback(() => {
     setIsLoadingReferral(true);
     setReferralError(null);
-    const headers = { 'x-admin-passcode': passcode };
+    const headers = adminHeaders;
     return Promise.all([
       api.get("/admin/referrals/partners", { headers }),
       api.get("/admin/referrals/stats", { headers }),
@@ -686,7 +700,7 @@ export function AdminCoreEngine() {
         code: newPartnerCode.trim().toUpperCase(),
         commissionRate: parseFloat(newPartnerRate),
         contacts: newPartnerContacts.trim() || undefined,
-      }, { headers: { 'x-admin-passcode': passcode } });
+      }, { headers: adminHeaders });
       setShowNewPartnerForm(false);
       setNewPartnerName("");
       setNewPartnerCode("");
@@ -703,7 +717,7 @@ export function AdminCoreEngine() {
   const handleTogglePartner = async (id: string, isActive: boolean) => {
     setTogglingPartnerId(id);
     try {
-      await api.patch(`/admin/referrals/partners/${id}`, { isActive: !isActive }, { headers: { 'x-admin-passcode': passcode } });
+      await api.patch(`/admin/referrals/partners/${id}`, { isActive: !isActive }, { headers: adminHeaders });
       setReferralPartners((prev) => prev?.map((p) => p.id === id ? { ...p, isActive: !isActive } : p) ?? null);
     } catch {
       setReferralError("Failed to update partner.");
@@ -712,17 +726,279 @@ export function AdminCoreEngine() {
     }
   };
 
+  // Client Health Dashboard state
+  const [clientHealthData, setClientHealthData] = useState<{
+    summary: {
+      totalTenants: number;
+      activeTenants: number;
+      trialTenants: number;
+      expiredTenants: number;
+      dormantTenants: number;
+      highRiskTenants: number;
+      mediumRiskTenants: number;
+      trialsExpiringIn7Days: number;
+    };
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      trialEndsAt: string | null;
+      subscriptionPaidUntil: string | null;
+      createdAt: string;
+      isLive: boolean;
+      userCount: number;
+      lastActivityAt: string | null;
+      daysSinceActivity: number | null;
+      trialDaysLeft: number | null;
+      paidDaysLeft: number | null;
+      churnRisk: 'high' | 'medium' | 'low' | 'none';
+    }[];
+  } | null>(null);
+  const [clientHealthError, setClientHealthError] = useState<string | null>(null);
+  const [isLoadingClientHealth, setIsLoadingClientHealth] = useState(false);
+  const [clientHealthSort, setClientHealthSort] = useState<'risk' | 'dormant' | 'recent'>('risk');
+  const [clientHealthFilter, setClientHealthFilter] = useState<'all' | 'high' | 'medium' | 'trial' | 'active' | 'expired'>('all');
+
+  const fetchClientHealth = useCallback(() => {
+    setIsLoadingClientHealth(true);
+    setClientHealthError(null);
+    return api
+      .get("/admin/client-health", { headers: adminHeaders })
+      .then((res) => setClientHealthData(res.data.data))
+      .catch(() => setClientHealthError("Failed to load client health data."))
+      .finally(() => setIsLoadingClientHealth(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "clienthealth") return;
+    fetchClientHealth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // Churn Risk Tracker state
+  const [churnData, setChurnData] = useState<{
+    summary: {
+      total: number;
+      expired: number;
+      trialCritical: number;
+      trialSoon: number;
+      trialWatch: number;
+      renewalSoon: number;
+      dormant: number;
+      notEmbedded: number;
+    };
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      trialEndsAt: string | null;
+      subscriptionPaidUntil: string | null;
+      createdAt: string;
+      isLive: boolean;
+      userCount: number;
+      lastActivityAt: string | null;
+      daysSinceActivity: number | null;
+      trialDaysLeft: number | null;
+      paidDaysLeft: number | null;
+      adoptionScore: number;
+      adoptionDetail: { invoicing: boolean; bookkeeping: boolean; inventory: boolean; sales: boolean; banking: boolean };
+      bucket: 'expired' | 'trial_critical' | 'trial_soon' | 'trial_watch' | 'renewal_soon' | 'dormant';
+    }[];
+  } | null>(null);
+  const [churnError, setChurnError] = useState<string | null>(null);
+  const [isLoadingChurn, setIsLoadingChurn] = useState(false);
+
+  const fetchChurnRisk = useCallback(() => {
+    setIsLoadingChurn(true);
+    setChurnError(null);
+    return api
+      .get("/admin/churn-risk", { headers: adminHeaders })
+      .then((res) => setChurnData(res.data.data))
+      .catch(() => setChurnError("Failed to load churn risk data."))
+      .finally(() => setIsLoadingChurn(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "churnrisk") return;
+    fetchChurnRisk();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // Onboarding Completion Tracker state
+  const [onboardingData, setOnboardingData] = useState<{
+    summary: {
+      total: number;
+      fullyOnboarded: number;
+      halfOrMore: number;
+      barelyStarted: number;
+      stuck: number;
+      avgCompletionPct: number;
+    };
+    totalSteps: number;
+    tenants: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: number;
+      subscriptionStatus: string;
+      isLive: boolean;
+      createdAt: string;
+      userCount: number;
+      daysSinceSignup: number;
+      completionScore: number;
+      completionPct: number;
+      isStuck: boolean;
+      milestoneDetail: {
+        teamMemberAdded: boolean;
+        firstJournalPosted: boolean;
+        firstInvoiceSent: boolean;
+        firstSaleRecorded: boolean;
+        firstInventoryItem: boolean;
+        bankConnected: boolean;
+        firstReconciliation: boolean;
+      };
+    }[];
+  } | null>(null);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [isLoadingOnboarding, setIsLoadingOnboarding] = useState(false);
+  const [onboardingFilter, setOnboardingFilter] = useState<'all' | 'stuck' | 'complete' | 'started' | 'bare'>('all');
+
+  const fetchOnboarding = useCallback(() => {
+    setIsLoadingOnboarding(true);
+    setOnboardingError(null);
+    return api
+      .get("/admin/onboarding", { headers: adminHeaders })
+      .then((res) => setOnboardingData(res.data.data))
+      .catch(() => setOnboardingError("Failed to load onboarding data."))
+      .finally(() => setIsLoadingOnboarding(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "onboarding") return;
+    fetchOnboarding();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // Revenue & MRR Dashboard state
+  const [revenueData, setRevenueData] = useState<{
+    summary: {
+      totalTenants: number;
+      activePaid: number;
+      trial: number;
+      expired: number;
+      mrr: number;
+      arr: number;
+      trialPipelineValue: number;
+      revenueAtRisk: number;
+      renewalsDueIn30Days: number;
+      avgRevenuePerTenant: number;
+      trialConversionRate: number;
+    };
+    tierBreakdown: { tier: number; name: string; priceGhs: number; activeCount: number; tierMrr: number }[];
+    renewalsDue: {
+      id: string; name: string; slug: string; tier: number; tierName: string; priceGhs: number;
+      subscriptionStatus: string; subscriptionPaidUntil: string | null; renewalDaysLeft: number | null;
+    }[];
+    monthlyActivations: { month: string; count: number; mrr: number }[];
+    allTenants: {
+      id: string; name: string; slug: string; tier: number; tierName: string; priceGhs: number;
+      subscriptionStatus: string; trialEndsAt: string | null; subscriptionPaidUntil: string | null;
+      createdAt: string; isLive: boolean; trialDaysLeft: number | null;
+      renewalDaysLeft: number | null; isRevenueAtRisk: boolean;
+    }[];
+  } | null>(null);
+  const [revenueError, setRevenueError] = useState<string | null>(null);
+  const [isLoadingRevenue, setIsLoadingRevenue] = useState(false);
+  const [revenueView, setRevenueView] = useState<'overview' | 'renewals' | 'all'>('overview');
+
+  const fetchRevenue = useCallback(() => {
+    setIsLoadingRevenue(true);
+    setRevenueError(null);
+    return api
+      .get("/admin/revenue", { headers: adminHeaders })
+      .then((res) => setRevenueData(res.data.data))
+      .catch(() => setRevenueError("Failed to load revenue data."))
+      .finally(() => setIsLoadingRevenue(false));
+  }, [passcode]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "revenue") return;
+    fetchRevenue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUnlocked, activeTab]);
+
+  // ── Debug Logs ────────────────────────────────────────────────────────────────
+  interface DebugLogEntry {
+    id: string;
+    ts: string;
+    method: string;
+    path: string;
+    status: number;
+    durationMs: number;
+    level: 'ok' | 'warn' | 'error';
+    tenantId?: string;
+    userId?: string;
+    userEmail?: string;
+    ip?: string;
+    errorMessage?: string;
+    errorSource?: string;
+    bodyKeys?: string[];
+  }
+  interface DebugStats { total: number; ok: number; warn: number; error: number }
+
+  const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([]);
+  const [debugTotal, setDebugTotal] = useState(0);
+  const [debugStats, setDebugStats] = useState<DebugStats | null>(null);
+  const [isLoadingDebug, setIsLoadingDebug] = useState(false);
+  const [debugError, setDebugError] = useState<string | null>(null);
+  const [debugLevelFilter, setDebugLevelFilter] = useState<'' | 'ok' | 'warn' | 'error'>('');
+  const [debugSearch, setDebugSearch] = useState('');
+  const [debugOffset, setDebugOffset] = useState(0);
+  const DEBUG_PAGE = 50;
+
+  const fetchDebugLogs = useCallback(() => {
+    setIsLoadingDebug(true);
+    setDebugError(null);
+    const params = new URLSearchParams({ limit: String(DEBUG_PAGE), offset: String(debugOffset) });
+    if (debugLevelFilter) params.set('level', debugLevelFilter);
+    if (debugSearch.trim()) params.set('search', debugSearch.trim());
+    return api
+      .get(`/admin/debug/logs?${params}`, { headers: adminHeaders })
+      .then((res) => {
+        setDebugLogs(res.data.data.entries);
+        setDebugTotal(res.data.data.total);
+        setDebugStats(res.data.data.stats);
+      })
+      .catch(() => setDebugError("Failed to load debug logs."))
+      .finally(() => setIsLoadingDebug(false));
+  }, [passcode, sessionToken, debugLevelFilter, debugSearch, debugOffset]);
+
+  useEffect(() => {
+    if (!isUnlocked || activeTab !== "debuglogs") return;
+    fetchDebugLogs();
+  }, [isUnlocked, activeTab, debugLevelFilter, debugSearch, debugOffset]);
+
+  const clearDebugLogs = async () => {
+    await api.delete("/admin/debug/logs", { headers: adminHeaders });
+    setDebugLogs([]);
+    setDebugTotal(0);
+    setDebugStats(null);
+  };
+
+  // Step 1: verify the master passcode; advance to TOTP step on success.
   const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsVerifying(true);
     setAuthError(null);
 
     try {
-      const res = await api.post("/admin/broadcast/verify-passcode", {}, { headers: { 'x-admin-passcode': passcode } });
-      if (res.data.success) {
-        setIsUnlocked(true);
-        sessionStorage.setItem("accountgo_admin_engine_passcode", passcode);
-      }
+      await api.post("/admin/broadcast/verify-passcode", {}, { headers: { 'x-admin-passcode': passcode } });
+      setAuthStep('totp');
+      setTotpCode('');
     } catch (err: any) {
       setAuthError(err.response?.data?.error || "Invalid master passcode. Access denied.");
     } finally {
@@ -730,50 +1006,50 @@ export function AdminCoreEngine() {
     }
   };
 
+  // Step 2: verify the TOTP code and exchange for a session token.
+  const handleVerifyTotp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    setAuthError(null);
+
+    try {
+      const res = await api.post("/admin/totp/verify", { totpCode }, { headers: { 'x-admin-passcode': passcode } });
+      const token: string = res.data.data.sessionToken;
+      setSessionToken(token);
+      setIsUnlocked(true);
+      sessionStorage.setItem("accountgo_admin_engine_session", token);
+      sessionStorage.removeItem("accountgo_admin_engine_passcode");
+    } catch (err: any) {
+      // 503 = TOTP not yet configured on this server → fall back to passcode-only
+      if (err.response?.status === 503) {
+        setIsUnlocked(true);
+        sessionStorage.setItem("accountgo_admin_engine_passcode", passcode);
+      } else {
+        setAuthError(err.response?.data?.error || "Invalid authenticator code. Codes expire every 30 seconds — try again.");
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Fetch QR code setup data (requires passcode; shown on the TOTP step).
+  const handleShowSetup = async () => {
+    setIsLoadingSetup(true);
+    setShowSetupQr(true);
+    setSetupQrData(null);
+    try {
+      const res = await api.get("/admin/totp/setup", { headers: { 'x-admin-passcode': passcode } });
+      setSetupQrData(res.data.data);
+    } catch {
+      setAuthError("Failed to load authenticator setup. Check your passcode and try again.");
+      setShowSetupQr(false);
+    } finally {
+      setIsLoadingSetup(false);
+    }
+  };
+
   // Deliberately plain, low-hype subject/message copy - emoji and
   // exclamation-heavy "announcement" language reads as promotional/spam to
-  // Gmail's filters (confirmed live via a real broadcast landing in spam -
-  // see broadcastService.ts's header comment and STATUS.md).
-  const applyTemplate = (type: "UPGRADE" | "MAINTENANCE" | "NEWS") => {
-    if (type === "UPGRADE") {
-      setSubject("System upgrade deployed (v2.5)");
-      setMessage(
-        "We've deployed performance upgrades to Ledgio. This includes faster POS till closeouts, real-time inventory re-allocation, and quicker SMS alerts."
-      );
-    } else if (type === "MAINTENANCE") {
-      setSubject("Scheduled maintenance this Sunday");
-      setMessage(
-        "Ledgio will undergo routine server maintenance this Sunday between 02:00 AM and 02:15 AM UTC. Database connections will be briefly paused during this window."
-      );
-    } else if (type === "NEWS") {
-      setSubject("New feature: automated weekly email reports");
-      setMessage(
-        "You can now configure automated Monday 8:00 AM Profit & Loss PDF reports sent to your email. Configure this in Settings."
-      );
-    }
-  };
-
-  const handleExecuteBroadcast = async () => {
-    setIsSending(true);
-    setBroadcastResult(null);
-    try {
-      const res = await api.post("/admin/broadcast/send", {
-        subject,
-        message,
-        channel,
-        targetTier: targetTier === "ALL" ? undefined : Number(targetTier),
-      }, { headers: { 'x-admin-passcode': passcode } });
-
-      if (res.data.success) {
-        setBroadcastResult(res.data.data);
-        setConfirmStep(false);
-      }
-    } catch (err: any) {
-      setAuthError(err.response?.data?.error || "Broadcast execution failed.");
-    } finally {
-      setIsSending(false);
-    }
-  };
 
   const handleOnboardClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -790,7 +1066,8 @@ export function AdminCoreEngine() {
         phone: onboardAdminPhone || undefined,
         baseCurrency: onboardBaseCurrency,
         orgType: onboardOrgType,
-      }, { headers: { 'x-admin-passcode': passcode } });
+        tier: onboardTier,
+      }, { headers: adminHeaders });
       if (res.data.success) {
         setOnboardResult(res.data.data);
         setOnboardCompanyName("");
@@ -800,6 +1077,7 @@ export function AdminCoreEngine() {
         setOnboardAdminPhone("");
         setOnboardAdminPassword("");
         setOnboardOrgType("BUSINESS");
+        setOnboardTier(3);
         showToast(`${res.data.data.tenant.name} onboarded and pre-verified.`, "success");
       }
     } catch (err: any) {
@@ -822,24 +1100,24 @@ export function AdminCoreEngine() {
               <div>
                 <h3 className="text-base font-bold text-white">Permanently Delete Tenant</h3>
                 <p className="text-xs text-secondary-400 mt-1">
-                  This will drop the PostgreSQL schema <span className="font-mono text-rose-300">{deletingTenant.slug}</span>, delete all its users, and remove it from the platform roster. <strong className="text-white">This cannot be undone.</strong>
+                  This will drop the PostgreSQL schema <span className="font-jetbrains text-rose-300">{deletingTenant.slug}</span>, delete all its users, and remove it from the platform roster. <strong className="text-white">This cannot be undone.</strong>
                 </p>
               </div>
             </div>
             <div className="p-3 bg-rose-950/40 border border-rose-900 rounded-lg text-xs text-rose-300 space-y-1">
               <div><span className="text-secondary-400">Tenant:</span> <span className="font-semibold text-white">{deletingTenant.name}</span></div>
-              <div><span className="text-secondary-400">Slug:</span> <span className="font-mono">{deletingTenant.slug}</span></div>
+              <div><span className="text-secondary-400">Slug:</span> <span className="font-jetbrains">{deletingTenant.slug}</span></div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-secondary-300">
-                Type the slug <span className="font-mono text-rose-300">{deletingTenant.slug}</span> to confirm:
+                Type the slug <span className="font-jetbrains text-rose-300">{deletingTenant.slug}</span> to confirm:
               </label>
               <input
                 type="text"
                 value={deleteConfirmSlug}
                 onChange={(e) => setDeleteConfirmSlug(e.target.value)}
                 placeholder={deletingTenant.slug}
-                className="w-full h-9 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs font-mono focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                className="w-full h-9 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs font-jetbrains focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
                 autoFocus
               />
             </div>
@@ -877,13 +1155,20 @@ export function AdminCoreEngine() {
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500 border border-amber-500/20">
-                <ShieldAlert className="h-5 w-5" />
+            <div className="flex items-center space-x-2.5">
+              {/* Hexagonal AGOD brand mark */}
+              <div
+                className="flex items-center justify-center w-9 h-9 bg-amber-500 text-secondary-950 font-extrabold text-base shrink-0"
+                style={{ clipPath: 'polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)', fontFamily: "'Syne', sans-serif" }}
+              >
+                A
               </div>
-              <h1 className="text-lg font-extrabold tracking-tight">
-                Ledgio <span className="text-amber-400">Core Control Engine</span>
-              </h1>
+              <div className="flex flex-col leading-none gap-0.5">
+                <h1 className="text-base font-extrabold tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  AGOD <span className="text-amber-400">Control Engine</span>
+                </h1>
+                <span className="text-[10px] text-secondary-500 tracking-widest uppercase" style={{ fontFamily: "'DM Sans', sans-serif" }}>Software Solution · Admin</span>
+              </div>
             </div>
           </div>
 
@@ -895,7 +1180,11 @@ export function AdminCoreEngine() {
               </span>
               <button
                 onClick={() => {
+                  sessionStorage.removeItem("accountgo_admin_engine_session");
                   sessionStorage.removeItem("accountgo_admin_engine_passcode");
+                  setSessionToken(null);
+                  setPasscode('');
+                  setAuthStep('passcode');
                   setIsUnlocked(false);
                 }}
                 className="text-secondary-400 hover:text-rose-400 transition-colors"
@@ -914,44 +1203,134 @@ export function AdminCoreEngine() {
           <div className="max-w-md mx-auto py-16">
             <Card className="bg-secondary-900 border-secondary-800 text-white shadow-2xl text-center">
               <CardHeader>
-                <div className="inline-flex p-4 bg-amber-500/10 rounded-full border border-amber-500/20 text-amber-400 mb-3 mx-auto">
-                  <Lock className="h-10 w-10" />
+                <div
+                  className="inline-flex items-center justify-center w-16 h-16 bg-amber-500 text-secondary-950 font-extrabold text-2xl mb-4 mx-auto"
+                  style={{ clipPath: 'polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)', fontFamily: "'Syne', sans-serif" }}
+                >
+                  A
                 </div>
-                <CardTitle className="text-2xl font-bold">Ledgio Core Engine Gate</CardTitle>
-                <CardDescription className="text-secondary-400 text-xs mt-1">
+                <CardTitle className="text-2xl font-extrabold" style={{ fontFamily: "'Syne', sans-serif" }}>AGOD Control Engine</CardTitle>
+                <p className="text-secondary-500 text-[10px] tracking-widest uppercase mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>Software Solution · Admin Gate</p>
+                <CardDescription className="text-secondary-400 text-xs mt-2">
                   Enter your master passcode to access platform-wide system upgrade broadcasts, tenant schema inspectors, and engine health controls.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleVerifyPasscode} className="space-y-4">
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-xs font-semibold text-secondary-300">Master Security Passcode</label>
-                    <Input
-                      type="password"
-                      value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      placeholder="Enter Master Security Passcode"
-                      required
-                      className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-mono text-base"
-                    />
-                  </div>
-
-                  {authError && (
-                    <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
-                      {authError}
+                {authStep === 'passcode' ? (
+                  <form onSubmit={handleVerifyPasscode} className="space-y-4">
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-xs font-semibold text-secondary-300">Master Security Passcode</label>
+                      <Input
+                        type="password"
+                        value={passcode}
+                        onChange={(e) => setPasscode(e.target.value)}
+                        placeholder="Enter Master Security Passcode"
+                        required
+                        className="bg-secondary-950 border-secondary-700 text-white text-center tracking-widest font-jetbrains text-base"
+                      />
                     </div>
-                  )}
 
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
-                    disabled={isVerifying}
-                  >
-                    {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Authenticate Core Engine
-                  </Button>
-                </form>
+                    {authError && (
+                      <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                        {authError}
+                      </div>
+                    )}
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
+                      disabled={isVerifying}
+                    >
+                      {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Continue
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-secondary-300">Authenticator Code</span>
+                      <button
+                        type="button"
+                        onClick={() => { setAuthStep('passcode'); setAuthError(null); setShowSetupQr(false); setSetupQrData(null); }}
+                        className="text-xs text-secondary-500 hover:text-amber-400 transition-colors"
+                      >
+                        ← Back
+                      </button>
+                    </div>
+
+                    {!showSetupQr ? (
+                      <form onSubmit={handleVerifyTotp} className="space-y-4">
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]{6}"
+                          maxLength={6}
+                          value={totpCode}
+                          onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="6-digit code from authenticator"
+                          required
+                          autoFocus
+                          className="bg-secondary-950 border-secondary-700 text-white text-center tracking-[0.4em] font-jetbrains text-xl"
+                        />
+
+                        {authError && (
+                          <div className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-lg border border-rose-900">
+                            {authError}
+                          </div>
+                        )}
+
+                        <Button
+                          type="submit"
+                          variant="primary"
+                          className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 font-bold"
+                          disabled={isVerifying || totpCode.length !== 6}
+                        >
+                          {isVerifying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Verify &amp; Unlock
+                        </Button>
+
+                        <button
+                          type="button"
+                          onClick={handleShowSetup}
+                          disabled={isLoadingSetup}
+                          className="w-full text-xs text-secondary-500 hover:text-amber-400 transition-colors pt-1"
+                        >
+                          {isLoadingSetup ? 'Loading...' : 'Set up authenticator app →'}
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="space-y-4">
+                        {setupQrData ? (
+                          <>
+                            <p className="text-xs text-secondary-400 text-left">{setupQrData.note}</p>
+                            <div className="flex justify-center">
+                              <img src={setupQrData.qrDataUrl} alt="TOTP QR Code" className="w-44 h-44 rounded-lg bg-white p-1" />
+                            </div>
+                            <div className="bg-secondary-950 border border-secondary-700 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-secondary-500 mb-1 text-left">Manual entry key</p>
+                              <p className="font-jetbrains text-xs text-amber-400 break-all text-center select-all">{setupQrData.secret}</p>
+                            </div>
+                            <p className="text-[10px] text-secondary-500 text-left">
+                              Scan with Google Authenticator, Authy, or any TOTP app. Then enter the 6-digit code above.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowSetupQr(false)}
+                              className="w-full text-xs text-amber-400 hover:text-amber-300 transition-colors font-semibold"
+                            >
+                              Done — enter my code
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex justify-center py-6">
+                            <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1024,10 +1403,10 @@ export function AdminCoreEngine() {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex border-b border-secondary-800 space-x-6 text-sm font-semibold">
+            <div className="flex border-b border-secondary-800 gap-6 text-sm font-semibold overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-px">
               <button
                 onClick={() => setActiveTab("broadcast")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "broadcast" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1036,7 +1415,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("health")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "health" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1045,7 +1424,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("integrations")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "integrations" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1054,7 +1433,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("schemas")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "schemas" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1063,7 +1442,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("audit")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "audit" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1072,7 +1451,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("onboard")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "onboard" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1081,7 +1460,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("feedback")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "feedback" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1090,7 +1469,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("analytics")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "analytics" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1099,7 +1478,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("performance")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "performance" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1108,7 +1487,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("jobs")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "jobs" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1117,7 +1496,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("errors")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "errors" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1133,7 +1512,7 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("safety")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "safety" ? "border-red-500 text-red-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
@@ -1142,12 +1521,101 @@ export function AdminCoreEngine() {
               </button>
               <button
                 onClick={() => setActiveTab("referral")}
-                className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors ${
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
                   activeTab === "referral" ? "border-amber-400 text-amber-400" : "border-transparent text-secondary-400 hover:text-white"
                 }`}
               >
                 <HandCoins className="h-4 w-4" />
                 <span>Referrals</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("clienthealth")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "clienthealth" ? "border-emerald-400 text-emerald-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <HeartPulse className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Client Health
+                  {clientHealthData && clientHealthData.summary.highRiskTenants > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {clientHealthData.summary.highRiskTenants}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("churnrisk")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "churnrisk" ? "border-rose-400 text-rose-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <TrendingDown className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Churn Risk
+                  {churnData && (churnData.summary.trialCritical + churnData.summary.expired) > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {churnData.summary.trialCritical + churnData.summary.expired}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("onboarding")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "onboarding" ? "border-violet-400 text-violet-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Onboarding
+                  {onboardingData && onboardingData.summary.stuck > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-violet-600 text-white text-[10px] font-bold leading-none">
+                      {onboardingData.summary.stuck}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("revenue")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "revenue" ? "border-cyan-400 text-cyan-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Revenue
+                  {revenueData && revenueData.summary.revenueAtRisk > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-amber-600 text-white text-[10px] font-bold leading-none">
+                      !
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("debuglogs")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "debuglogs" ? "border-violet-400 text-violet-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <Activity className="h-4 w-4" />
+                <span className="flex items-center gap-1.5">
+                  Debug Logs
+                  {debugStats && debugStats.error > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-none">
+                      {debugStats.error}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("team")}
+                className={`pb-3 flex items-center space-x-2 shrink-0 border-b-2 transition-colors ${
+                  activeTab === "team" ? "border-emerald-400 text-emerald-400" : "border-transparent text-secondary-400 hover:text-white"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                <span>Team</span>
               </button>
             </div>
 
@@ -1155,7 +1623,7 @@ export function AdminCoreEngine() {
             {activeTab === "broadcast" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold flex items-center" style={{ fontFamily: "'Syne', sans-serif" }}>
                     <Radio className="h-5 w-5 mr-2 text-amber-400" />
                     System-Wide Email & SMS Upgrade Broadcast Console
                   </CardTitle>
@@ -1164,148 +1632,7 @@ export function AdminCoreEngine() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Template Switchers */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-secondary-300 flex items-center">
-                      <Sparkles className="h-4 w-4 mr-1 text-amber-400" />
-                      Quick Load Announcement Templates
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => applyTemplate("UPGRADE")}
-                        className="px-3.5 py-2 bg-secondary-800 hover:bg-secondary-700 rounded-lg text-xs font-medium border border-secondary-700 transition-colors"
-                      >
-                        🚀 System Upgrade Announcement
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyTemplate("MAINTENANCE")}
-                        className="px-3.5 py-2 bg-secondary-800 hover:bg-secondary-700 rounded-lg text-xs font-medium border border-secondary-700 transition-colors"
-                      >
-                        🛠 Scheduled Maintenance Alert
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyTemplate("NEWS")}
-                        className="px-3.5 py-2 bg-secondary-800 hover:bg-secondary-700 rounded-lg text-xs font-medium border border-secondary-700 transition-colors"
-                      >
-                        🎁 Feature Release Announcement
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Controls Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-secondary-300">Target Audience</label>
-                      <select
-                        value={targetTier}
-                        onChange={(e: any) => setTargetTier(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs"
-                      >
-                        <option value="ALL">All Business Owners (All Tenants)</option>
-                        <option value="1">Tier 1 Starter Tenants</option>
-                        <option value="2">Tier 2 Professional Tenants</option>
-                        <option value="3">Tier 3 Enterprise Tenants</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-secondary-300">Announcement Subject</label>
-                      <Input
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        className="bg-secondary-950 border-secondary-700 text-white text-xs"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-secondary-300">Dispatch Channels</label>
-                      <select
-                        value={channel}
-                        onChange={(e: any) => setChannel(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs"
-                      >
-                        <option value="BOTH">Email (Gmail SMTP) & SMS (Android Gateway)</option>
-                        <option value="EMAIL">Email Only (Gmail SMTP)</option>
-                        <option value="SMS">SMS Only (Android Gateway)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Message Body */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-secondary-300">Broadcast Message Body</label>
-                    <textarea
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      rows={5}
-                      className="w-full p-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs focus:ring-2 focus:ring-amber-500 font-sans"
-                    />
-                  </div>
-
-                  {/* Broadcast Execution Results */}
-                  {broadcastResult && (
-                    <div className="p-4 bg-emerald-950/60 border border-emerald-800 text-emerald-200 rounded-lg text-xs space-y-2">
-                      <div className="flex items-center font-bold text-emerald-400 text-sm">
-                        <CheckCircle2 className="h-5 w-5 mr-2" />
-                        System Broadcast Dispatched Successfully!
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-center font-mono">
-                        <div className="p-2 bg-emerald-900/40 rounded">Total Targeted: <strong>{broadcastResult.totalTargeted}</strong></div>
-                        <div className="p-2 bg-emerald-900/40 rounded">Emails Sent: <strong>{broadcastResult.emailSentCount}</strong></div>
-                        <div className="p-2 bg-emerald-900/40 rounded">SMS Sent: <strong>{broadcastResult.smsSentCount}</strong></div>
-                        <div className="p-2 bg-emerald-900/40 rounded">Failures: <strong>{broadcastResult.failedCount}</strong></div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Execution Actions */}
-                  {confirmStep ? (
-                    <div className="p-4 bg-amber-950/60 border border-amber-800 rounded-lg space-y-3">
-                      <div className="flex items-center text-amber-300 font-bold text-xs">
-                        <AlertOctagon className="h-5 w-5 mr-2 text-amber-500" />
-                        Confirm System-Wide Upgrade Broadcast Dispatch?
-                      </div>
-                      <p className="text-[11px] text-secondary-300">
-                        This action will immediately send an Email & SMS notification to all registered business owners across tenant schemas.
-                      </p>
-                      <div className="flex space-x-3">
-                        <Button
-                          type="button"
-                          variant="primary"
-                          className="bg-amber-600 hover:bg-amber-500 text-white text-xs py-2.5 px-5"
-                          onClick={handleExecuteBroadcast}
-                          disabled={isSending}
-                        >
-                          {isSending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          Yes, Execute Broadcast Now
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-secondary-700 text-secondary-300 hover:bg-secondary-800 text-xs"
-                          onClick={() => setConfirmStep(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-center pt-4 border-t border-secondary-800">
-                      <span className="text-[11px] text-secondary-400">Batch-processed in 15-user chunks with 500ms safety delay</span>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        className="bg-amber-600 hover:bg-amber-500 text-white text-xs flex items-center py-2.5 px-5"
-                        onClick={() => setConfirmStep(true)}
-                      >
-                        <Send className="mr-2 h-4 w-4" />
-                        Broadcast System Announcement
-                      </Button>
-                    </div>
-                  )}
+                  <BroadcastConsolePanel adminHeaders={adminHeaders} />
                 </CardContent>
               </Card>
             )}
@@ -1314,7 +1641,7 @@ export function AdminCoreEngine() {
             {activeTab === "health" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold">Platform Diagnostics & Service Uptime</CardTitle>
+                  <CardTitle className="text-xl font-extrabold font-syne">Platform Diagnostics & Service Uptime</CardTitle>
                   <CardDescription className="text-secondary-400 text-xs">
                     Live status from the backend's /health endpoint.
                   </CardDescription>
@@ -1380,7 +1707,7 @@ export function AdminCoreEngine() {
             {activeTab === "integrations" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                     <Plug className="h-5 w-5 mr-2 text-amber-400" />
                     Third-Party Integrations
                   </CardTitle>
@@ -1471,7 +1798,7 @@ export function AdminCoreEngine() {
             {activeTab === "schemas" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold">Tenant Schemas & Tier Management</CardTitle>
+                  <CardTitle className="text-xl font-extrabold font-syne">Tenant Schemas & Tier Management</CardTitle>
                   <CardDescription className="text-secondary-400 text-xs">
                     Inspect schema-isolated business environments and subscription tiers.
                   </CardDescription>
@@ -1531,8 +1858,8 @@ export function AdminCoreEngine() {
                                     {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-secondary-400" /> : <ChevronRight className="h-3.5 w-3.5 text-secondary-400" />}
                                   </TableCell>
                                   <TableCell className="font-semibold text-white">{t.name}</TableCell>
-                                  <TableCell className="font-mono text-secondary-300">{t.slug}</TableCell>
-                                  <TableCell className="font-mono text-secondary-300">{t.schema}</TableCell>
+                                  <TableCell className="font-jetbrains text-secondary-300">{t.slug}</TableCell>
+                                  <TableCell className="font-jetbrains text-secondary-300">{t.schema}</TableCell>
                                   <TableCell className="text-secondary-300" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-2">
                                       <select
@@ -1568,7 +1895,7 @@ export function AdminCoreEngine() {
                                       <div className="text-[10px] text-secondary-500 mt-0.5">until {new Date(t.subscriptionPaidUntil).toLocaleDateString()}</div>
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-secondary-300 font-mono text-center">{t.userCount ?? "—"}</TableCell>
+                                  <TableCell className="text-secondary-300 font-jetbrains text-center">{t.userCount ?? "—"}</TableCell>
                                   <TableCell className="text-secondary-300">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                     <button
@@ -1611,7 +1938,7 @@ export function AdminCoreEngine() {
                                                 {users.map((u) => (
                                                   <tr key={u.id} className="border-b border-secondary-800/50 last:border-0">
                                                     <td className="py-1.5 pr-4 text-secondary-200">{u.name}</td>
-                                                    <td className="py-1.5 pr-4 font-mono text-secondary-300">{u.email}</td>
+                                                    <td className="py-1.5 pr-4 font-jetbrains text-secondary-300">{u.email}</td>
                                                     <td className="py-1.5 pr-4 text-secondary-400">{u.role}</td>
                                                     <td className="py-1.5 pr-4">
                                                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${u.isActive ? "bg-emerald-500/10 text-emerald-400 border-emerald-700" : "bg-rose-500/10 text-rose-400 border-rose-700"}`}>
@@ -1668,7 +1995,7 @@ export function AdminCoreEngine() {
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold">System Audit Logs</CardTitle>
+                    <CardTitle className="text-xl font-extrabold font-syne">System Audit Logs</CardTitle>
                     <CardDescription className="text-secondary-400 text-xs">
                       Platform-wide activity across every tenant - administrative broadcasts, system configuration events, and tenant-level actions.
                     </CardDescription>
@@ -1823,12 +2150,12 @@ export function AdminCoreEngine() {
                                   {log.action}
                                 </span>
                               </TableCell>
-                              <TableCell className="font-mono text-secondary-400">
+                              <TableCell className="font-jetbrains text-secondary-400">
                                 {log.entity}
                                 {log.entityId && <span className="text-secondary-600">:{log.entityId.slice(0, 8)}</span>}
                               </TableCell>
                               <TableCell className="text-secondary-300">{log.userEmail || log.userId || "System"}</TableCell>
-                              <TableCell className="text-secondary-400 font-mono max-w-xs truncate" title={log.details || ""}>
+                              <TableCell className="text-secondary-400 font-jetbrains max-w-xs truncate" title={log.details || ""}>
                                 {log.details || "-"}
                               </TableCell>
                               <TableCell className="text-secondary-400">
@@ -1867,7 +2194,7 @@ export function AdminCoreEngine() {
             {activeTab === "onboard" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                     <Building2 className="h-5 w-5 mr-2 text-amber-400" />
                     Onboard a Contracted Client
                   </CardTitle>
@@ -1976,6 +2303,18 @@ export function AdminCoreEngine() {
                         >
                           <option value="BUSINESS">Business</option>
                           <option value="NONPROFIT">Nonprofit / Church / NGO / School</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-secondary-300">Plan Tier</label>
+                        <select
+                          value={onboardTier}
+                          onChange={(e) => setOnboardTier(Number(e.target.value))}
+                          className="w-full h-10 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs"
+                        >
+                          <option value={1}>1 — Shop (basic)</option>
+                          <option value={2}>2 — Business</option>
+                          <option value={3}>3 — Enterprise</option>
                         </select>
                       </div>
                     </div>
@@ -2113,7 +2452,7 @@ export function AdminCoreEngine() {
                               <div key={i}>
                                 <div className="flex justify-between items-center text-xs mb-0.5">
                                   <span className="text-secondary-300 truncate max-w-[180px]" title={p.page}>{p.page || '/'}</span>
-                                  <span className="text-secondary-400 font-mono ml-2 flex-shrink-0">{p.views.toLocaleString()}</span>
+                                  <span className="text-secondary-400 font-jetbrains ml-2 flex-shrink-0">{p.views.toLocaleString()}</span>
                                 </div>
                                 <div className="w-full bg-secondary-800 h-1 rounded-full overflow-hidden">
                                   <div className="h-full bg-amber-400" style={{ width: `${(p.views / max) * 100}%` }} />
@@ -2142,7 +2481,7 @@ export function AdminCoreEngine() {
                               <div key={i}>
                                 <div className="flex justify-between items-center text-xs mb-0.5">
                                   <span className="text-secondary-300">{c.country}</span>
-                                  <span className="text-secondary-400 font-mono">{c.users.toLocaleString()}</span>
+                                  <span className="text-secondary-400 font-jetbrains">{c.users.toLocaleString()}</span>
                                 </div>
                                 <div className="w-full bg-secondary-800 h-1 rounded-full overflow-hidden">
                                   <div className="h-full bg-blue-400" style={{ width: `${(c.users / max) * 100}%` }} />
@@ -2175,7 +2514,7 @@ export function AdminCoreEngine() {
                                   <div className="w-20 bg-secondary-800 h-1.5 rounded-full overflow-hidden">
                                     <div className="h-full bg-purple-400" style={{ width: `${pct}%` }} />
                                   </div>
-                                  <span className="text-secondary-400 font-mono w-8 text-right">{pct}%</span>
+                                  <span className="text-secondary-400 font-jetbrains w-8 text-right">{pct}%</span>
                                 </div>
                               </div>
                             );
@@ -2233,7 +2572,7 @@ export function AdminCoreEngine() {
                         <Card key={label} className="bg-secondary-900 border-secondary-800 text-white">
                           <CardContent className="p-4">
                             <div className="text-[11px] text-secondary-400 mb-1">{label}</div>
-                            <div className={`text-2xl font-extrabold font-mono ${color}`}>{value}</div>
+                            <div className={`text-2xl font-extrabold font-jetbrains ${color}`}>{value}</div>
                           </CardContent>
                         </Card>
                       ))}
@@ -2268,7 +2607,7 @@ export function AdminCoreEngine() {
                                   <span className={`inline-block w-2.5 h-2.5 rounded-sm ${bar.color}`} />
                                   <div>
                                     <div className="text-[10px] text-secondary-400">{bar.label}</div>
-                                    <div className={`font-mono font-bold text-sm ${bar.text}`}>{bar.count.toLocaleString()}</div>
+                                    <div className={`font-jetbrains font-bold text-sm ${bar.text}`}>{bar.count.toLocaleString()}</div>
                                     <div className="text-[10px] text-secondary-500">{(bar.count / total * 100).toFixed(1)}%</div>
                                   </div>
                                 </div>
@@ -2369,15 +2708,15 @@ export function AdminCoreEngine() {
                               <tbody>
                                 {metricsData.topRoutesByTraffic.map((r) => (
                                   <tr key={r.route} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
-                                    <td className="py-2 pr-4 font-mono text-[11px] text-secondary-300 max-w-[260px] truncate">{r.route}</td>
-                                    <td className="py-2 pr-4 text-right font-mono text-blue-300">{r.requests.toLocaleString()}</td>
-                                    <td className="py-2 pr-4 text-right font-mono">{r.errors > 0 ? <span className="text-rose-400">{r.errors}</span> : <span className="text-secondary-500">0</span>}</td>
-                                    <td className="py-2 pr-4 text-right font-mono">
+                                    <td className="py-2 pr-4 font-jetbrains text-[11px] text-secondary-300 max-w-[260px] truncate">{r.route}</td>
+                                    <td className="py-2 pr-4 text-right font-jetbrains text-blue-300">{r.requests.toLocaleString()}</td>
+                                    <td className="py-2 pr-4 text-right font-jetbrains">{r.errors > 0 ? <span className="text-rose-400">{r.errors}</span> : <span className="text-secondary-500">0</span>}</td>
+                                    <td className="py-2 pr-4 text-right font-jetbrains">
                                       <span className={r.errorRate > 10 ? "text-rose-400" : r.errorRate > 1 ? "text-amber-400" : "text-emerald-400"}>
                                         {r.errorRate.toFixed(1)}%
                                       </span>
                                     </td>
-                                    <td className="py-2 text-right font-mono">
+                                    <td className="py-2 text-right font-jetbrains">
                                       <span className={r.avgMs > 500 ? "text-rose-400" : r.avgMs > 200 ? "text-amber-400" : "text-secondary-300"}>
                                         {r.avgMs} ms
                                       </span>
@@ -2416,11 +2755,11 @@ export function AdminCoreEngine() {
                               <tbody>
                                 {errorGroups.slice(0, 10).map((g) => (
                                   <tr key={g.key} className="border-b border-secondary-800/50 hover:bg-secondary-800/30">
-                                    <td className="py-2 pr-3 font-mono text-[10px] text-secondary-300 max-w-[180px] truncate">
+                                    <td className="py-2 pr-3 font-jetbrains text-[10px] text-secondary-300 max-w-[180px] truncate">
                                       <span className="text-secondary-500 mr-1">{g.method}</span>{g.sample?.path ?? '—'}
                                     </td>
                                     <td className="py-2 pr-3 text-rose-300 max-w-[200px] truncate" title={g.error}>{g.error}</td>
-                                    <td className="py-2 pr-3 font-mono text-[10px] text-violet-300 max-w-[160px] truncate" title={g.source}>
+                                    <td className="py-2 pr-3 font-jetbrains text-[10px] text-violet-300 max-w-[160px] truncate" title={g.source}>
                                       {g.fn ? `${g.fn} ` : ''}{g.source ?? '—'}
                                     </td>
                                     <td className="py-2 pr-3 text-right">
@@ -2428,7 +2767,7 @@ export function AdminCoreEngine() {
                                         {g.status}
                                       </span>
                                     </td>
-                                    <td className="py-2 text-right font-mono font-bold text-rose-400">{g.count}</td>
+                                    <td className="py-2 text-right font-jetbrains font-bold text-rose-400">{g.count}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -2453,7 +2792,7 @@ export function AdminCoreEngine() {
                       ].map(({ label, value }) => (
                         <div key={label} className="p-4 bg-secondary-900 border border-secondary-800 rounded-lg">
                           <div className="text-secondary-400 mb-1">{label}</div>
-                          <div className="font-mono text-white">{value}</div>
+                          <div className="font-jetbrains text-white">{value}</div>
                         </div>
                       ))}
                     </div>
@@ -2467,7 +2806,7 @@ export function AdminCoreEngine() {
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <CardTitle className="text-xl font-extrabold font-syne flex items-center gap-2">
                       <Clock className="h-5 w-5 text-amber-400" />
                       Cron Job Monitor
                     </CardTitle>
@@ -2520,11 +2859,11 @@ export function AdminCoreEngine() {
                                   <div className="font-semibold text-white text-xs">{job.name}</div>
                                   {job.description && <div className="text-[10px] text-secondary-500 mt-0.5">{job.description}</div>}
                                 </TableCell>
-                                <TableCell className="font-mono text-secondary-400 text-xs">{job.schedule}</TableCell>
+                                <TableCell className="font-jetbrains text-secondary-400 text-xs">{job.schedule}</TableCell>
                                 <TableCell className="text-secondary-400 text-xs whitespace-nowrap">
                                   {lr ? new Date(lr.startedAt).toLocaleString() : "—"}
                                 </TableCell>
-                                <TableCell className="font-mono text-secondary-400 text-xs">
+                                <TableCell className="font-jetbrains text-secondary-400 text-xs">
                                   {lr ? `${(lr.durationMs / 1000).toFixed(1)}s` : "—"}
                                 </TableCell>
                                 <TableCell>
@@ -2568,16 +2907,16 @@ export function AdminCoreEngine() {
                   <div className={`flex items-start justify-between gap-4 p-5 border-b ${selectedTicket.status >= 500 ? 'border-rose-900/60 bg-rose-950/20' : 'border-amber-900/60 bg-amber-950/20'}`}>
                     <div className="flex items-start gap-3 min-w-0">
                       <div className={`shrink-0 mt-0.5 flex flex-col items-center gap-1.5`}>
-                        <span className={`text-xs font-black px-2.5 py-1 rounded-lg font-mono tracking-wider ${selectedTicket.status >= 500 ? 'bg-rose-900 text-rose-200' : 'bg-amber-900 text-amber-200'}`}>
+                        <span className={`text-xs font-black px-2.5 py-1 rounded-lg font-jetbrains tracking-wider ${selectedTicket.status >= 500 ? 'bg-rose-900 text-rose-200' : 'bg-amber-900 text-amber-200'}`}>
                           {selectedTicket.status >= 500 ? 'CRITICAL' : 'ERROR'}
                         </span>
-                        <span className="text-[10px] font-bold font-mono text-secondary-400 px-1.5 py-0.5 rounded bg-secondary-800">{selectedTicket.status}</span>
+                        <span className="text-[10px] font-bold font-jetbrains text-secondary-400 px-1.5 py-0.5 rounded bg-secondary-800">{selectedTicket.status}</span>
                       </div>
                       <div className="min-w-0">
                         <p className={`text-base font-semibold leading-snug ${selectedTicket.status >= 500 ? 'text-rose-200' : 'text-amber-200'}`}>{selectedTicket.error}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${selectedTicket.method === 'GET' ? 'bg-blue-900/60 text-blue-300' : selectedTicket.method === 'POST' ? 'bg-emerald-900/60 text-emerald-300' : selectedTicket.method === 'DELETE' ? 'bg-rose-900/60 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{selectedTicket.method}</span>
-                          <span className="font-mono text-xs text-secondary-300 break-all">{selectedTicket.path}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${selectedTicket.method === 'GET' ? 'bg-blue-900/60 text-blue-300' : selectedTicket.method === 'POST' ? 'bg-emerald-900/60 text-emerald-300' : selectedTicket.method === 'DELETE' ? 'bg-rose-900/60 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{selectedTicket.method}</span>
+                          <span className="font-jetbrains text-xs text-secondary-300 break-all">{selectedTicket.path}</span>
                         </div>
                       </div>
                     </div>
@@ -2591,19 +2930,19 @@ export function AdminCoreEngine() {
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-xs">
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">First Seen</p>
-                        <p className="text-secondary-200 font-mono">{new Date(selectedTicket.ts).toLocaleString()}</p>
+                        <p className="text-secondary-200 font-jetbrains">{new Date(selectedTicket.ts).toLocaleString()}</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Last Seen</p>
-                        <p className="text-secondary-200 font-mono">{new Date(selectedTicket.lastSeen).toLocaleString()}</p>
+                        <p className="text-secondary-200 font-jetbrains">{new Date(selectedTicket.lastSeen).toLocaleString()}</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Occurrences</p>
-                        <p className={`font-mono font-bold ${selectedTicket.count >= 10 ? 'text-rose-400' : selectedTicket.count >= 3 ? 'text-amber-400' : 'text-secondary-200'}`}>{selectedTicket.count}×</p>
+                        <p className={`font-jetbrains font-bold ${selectedTicket.count >= 10 ? 'text-rose-400' : selectedTicket.count >= 3 ? 'text-amber-400' : 'text-secondary-200'}`}>{selectedTicket.count}×</p>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold">Ticket ID</p>
-                        <p className="text-secondary-400 font-mono text-[10px] break-all">{selectedTicket.id}</p>
+                        <p className="text-secondary-400 font-jetbrains text-[10px] break-all">{selectedTicket.id}</p>
                       </div>
                     </div>
 
@@ -2612,7 +2951,7 @@ export function AdminCoreEngine() {
                       <div className="rounded-xl bg-rose-950/20 border border-rose-900/40 p-4 space-y-1">
                         <p className="text-rose-400 uppercase tracking-widest text-[9px] font-bold mb-2">📍 Source Location</p>
                         {selectedTicket.fn && <p className="text-white text-sm font-semibold">{selectedTicket.fn}<span className="text-secondary-500">()</span></p>}
-                        {selectedTicket.source && <p className="text-rose-300 font-mono text-xs break-all">{selectedTicket.source}</p>}
+                        {selectedTicket.source && <p className="text-rose-300 font-jetbrains text-xs break-all">{selectedTicket.source}</p>}
                       </div>
                     )}
 
@@ -2621,12 +2960,12 @@ export function AdminCoreEngine() {
                       <div className="rounded-xl bg-secondary-900 border border-secondary-800 p-4 space-y-2">
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold mb-3">🔗 Request Context</p>
                         <div className="space-y-1.5 text-xs">
-                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Method</span><span className={`font-mono font-bold ${selectedTicket.method === 'GET' ? 'text-blue-400' : selectedTicket.method === 'POST' ? 'text-emerald-400' : selectedTicket.method === 'DELETE' ? 'text-rose-400' : 'text-secondary-300'}`}>{selectedTicket.method}</span></div>
-                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Path</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.path}</span></div>
-                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Status</span><span className={`font-mono font-bold ${selectedTicket.status >= 500 ? 'text-rose-400' : 'text-amber-400'}`}>{selectedTicket.status}</span></div>
-                          {selectedTicket.ip && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">IP</span><span className="font-mono text-secondary-200">{selectedTicket.ip}</span></div>}
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Method</span><span className={`font-jetbrains font-bold ${selectedTicket.method === 'GET' ? 'text-blue-400' : selectedTicket.method === 'POST' ? 'text-emerald-400' : selectedTicket.method === 'DELETE' ? 'text-rose-400' : 'text-secondary-300'}`}>{selectedTicket.method}</span></div>
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Path</span><span className="font-jetbrains text-secondary-200 break-all">{selectedTicket.path}</span></div>
+                          <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Status</span><span className={`font-jetbrains font-bold ${selectedTicket.status >= 500 ? 'text-rose-400' : 'text-amber-400'}`}>{selectedTicket.status}</span></div>
+                          {selectedTicket.ip && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">IP</span><span className="font-jetbrains text-secondary-200">{selectedTicket.ip}</span></div>}
                           {selectedTicket.bodyKeys && selectedTicket.bodyKeys.length > 0 && (
-                            <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Body</span><span className="font-mono text-secondary-300">{selectedTicket.bodyKeys.join(', ')}</span></div>
+                            <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Body</span><span className="font-jetbrains text-secondary-300">{selectedTicket.bodyKeys.join(', ')}</span></div>
                           )}
                         </div>
                       </div>
@@ -2634,10 +2973,10 @@ export function AdminCoreEngine() {
                         <p className="text-secondary-500 uppercase tracking-widest text-[9px] font-bold mb-3">🏢 Identity</p>
                         <div className="space-y-1.5 text-xs">
                           {selectedTicket.tenantId
-                            ? <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Tenant</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.tenantId}</span></div>
+                            ? <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">Tenant</span><span className="font-jetbrains text-secondary-200 break-all">{selectedTicket.tenantId}</span></div>
                             : <p className="text-secondary-600 italic text-xs">No tenant context (platform-level)</p>
                           }
-                          {selectedTicket.userId && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">User</span><span className="font-mono text-secondary-200 break-all">{selectedTicket.userId}</span></div>}
+                          {selectedTicket.userId && <div className="flex gap-2"><span className="text-secondary-500 w-14 shrink-0">User</span><span className="font-jetbrains text-secondary-200 break-all">{selectedTicket.userId}</span></div>}
                           {selectedTicket.userAgent && (
                             <div className="flex gap-2">
                               <span className="text-secondary-500 w-14 shrink-0">UA</span>
@@ -2659,7 +2998,7 @@ export function AdminCoreEngine() {
                           >Copy stack</button>
                         </div>
                         <div className="rounded-xl bg-black/60 border border-secondary-800 overflow-x-auto max-h-72 overflow-y-auto">
-                          <pre className="p-4 text-[11px] font-mono leading-relaxed">
+                          <pre className="p-4 text-[11px] font-jetbrains leading-relaxed">
                             {selectedTicket.stack.split('\n').map((line, i) => {
                               const isAppLine = line.includes('/src/') && !line.includes('node_modules');
                               const isAt = line.trim().startsWith('at ');
@@ -2689,11 +3028,11 @@ export function AdminCoreEngine() {
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <CardTitle className="text-xl font-extrabold font-syne flex items-center gap-2">
                       <XCircle className="h-5 w-5 text-rose-400" />
                       Server Error Log
                       {errorsData && errorsData.length > 0 && (
-                        <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-900/50 text-rose-300 text-xs font-mono font-bold">
+                        <span className="ml-1 px-2 py-0.5 rounded-full bg-rose-900/50 text-rose-300 text-xs font-jetbrains font-bold">
                           {errorsData.reduce((s, e) => s + e.count, 0)} total
                         </span>
                       )}
@@ -2778,20 +3117,20 @@ export function AdminCoreEngine() {
                                 >
                                   {/* Count badge */}
                                   <div className="shrink-0 mt-0.5">
-                                    <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-md text-xs font-bold font-mono ${g.count >= 10 ? 'bg-rose-900/60 text-rose-300' : g.count >= 3 ? 'bg-amber-900/50 text-amber-300' : 'bg-secondary-800 text-secondary-300'}`}>
+                                    <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-md text-xs font-bold font-jetbrains ${g.count >= 10 ? 'bg-rose-900/60 text-rose-300' : g.count >= 3 ? 'bg-amber-900/50 text-amber-300' : 'bg-secondary-800 text-secondary-300'}`}>
                                       {g.count}×
                                     </span>
                                   </div>
                                   {/* Status + method */}
                                   <div className="shrink-0 flex flex-col gap-1 mt-0.5">
-                                    <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${g.status >= 500 ? 'bg-rose-900/40 text-rose-400' : g.status >= 400 ? 'bg-amber-900/40 text-amber-400' : 'bg-secondary-800 text-secondary-400'}`}>{g.status}</span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${g.method === 'GET' ? 'bg-blue-900/40 text-blue-400' : g.method === 'POST' ? 'bg-emerald-900/40 text-emerald-400' : g.method === 'DELETE' ? 'bg-rose-900/40 text-rose-400' : 'bg-secondary-800 text-secondary-300'}`}>{g.method}</span>
+                                    <span className={`text-[10px] font-bold font-jetbrains px-1.5 py-0.5 rounded ${g.status >= 500 ? 'bg-rose-900/40 text-rose-400' : g.status >= 400 ? 'bg-amber-900/40 text-amber-400' : 'bg-secondary-800 text-secondary-400'}`}>{g.status}</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${g.method === 'GET' ? 'bg-blue-900/40 text-blue-400' : g.method === 'POST' ? 'bg-emerald-900/40 text-emerald-400' : g.method === 'DELETE' ? 'bg-rose-900/40 text-rose-400' : 'bg-secondary-800 text-secondary-300'}`}>{g.method}</span>
                                   </div>
                                   {/* Error + source */}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm text-white font-medium truncate">{g.error}</p>
                                     {g.source && (
-                                      <p className="text-[11px] text-rose-400/80 font-mono mt-0.5 truncate">
+                                      <p className="text-[11px] text-rose-400/80 font-jetbrains mt-0.5 truncate">
                                         📍 {g.fn ? `${g.fn} @ ` : ''}{g.source}
                                       </p>
                                     )}
@@ -2809,12 +3148,12 @@ export function AdminCoreEngine() {
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                       <div className="space-y-1">
                                         <p className="text-secondary-500 uppercase tracking-wide text-[10px] font-semibold">Sample Request</p>
-                                        <p className="font-mono text-secondary-300 break-all">{g.sample.path}</p>
-                                        {g.sample.ip && <p className="text-secondary-500">IP: <span className="text-secondary-300 font-mono">{g.sample.ip}</span></p>}
-                                        {g.sample.tenantId && <p className="text-secondary-500">Tenant: <span className="text-secondary-300 font-mono">{g.sample.tenantId}</span></p>}
-                                        {g.sample.userId && <p className="text-secondary-500">User: <span className="text-secondary-300 font-mono">{g.sample.userId}</span></p>}
+                                        <p className="font-jetbrains text-secondary-300 break-all">{g.sample.path}</p>
+                                        {g.sample.ip && <p className="text-secondary-500">IP: <span className="text-secondary-300 font-jetbrains">{g.sample.ip}</span></p>}
+                                        {g.sample.tenantId && <p className="text-secondary-500">Tenant: <span className="text-secondary-300 font-jetbrains">{g.sample.tenantId}</span></p>}
+                                        {g.sample.userId && <p className="text-secondary-500">User: <span className="text-secondary-300 font-jetbrains">{g.sample.userId}</span></p>}
                                         {g.sample.bodyKeys && g.sample.bodyKeys.length > 0 && (
-                                          <p className="text-secondary-500">Body keys: <span className="text-secondary-300 font-mono">{g.sample.bodyKeys.join(', ')}</span></p>
+                                          <p className="text-secondary-500">Body keys: <span className="text-secondary-300 font-jetbrains">{g.sample.bodyKeys.join(', ')}</span></p>
                                         )}
                                         {g.sample.userAgent && <p className="text-secondary-500 break-all">UA: <span className="text-secondary-400">{g.sample.userAgent.slice(0, 80)}{g.sample.userAgent.length > 80 ? '…' : ''}</span></p>}
                                       </div>
@@ -2822,8 +3161,8 @@ export function AdminCoreEngine() {
                                         <p className="text-secondary-500 uppercase tracking-wide text-[10px] font-semibold">Source Location</p>
                                         {g.source ? (
                                           <>
-                                            <p className="font-mono text-rose-400 break-all">{g.source}</p>
-                                            {g.fn && <p className="text-secondary-400">Function: <span className="font-mono text-white">{g.fn}</span></p>}
+                                            <p className="font-jetbrains text-rose-400 break-all">{g.source}</p>
+                                            {g.fn && <p className="text-secondary-400">Function: <span className="font-jetbrains text-white">{g.fn}</span></p>}
                                           </>
                                         ) : (
                                           <p className="text-secondary-600 italic">No source frame (external or built-in error)</p>
@@ -2843,7 +3182,7 @@ export function AdminCoreEngine() {
                                           </button>
                                         </div>
                                         <div className="rounded-lg bg-black/40 border border-secondary-800 overflow-x-auto max-h-64 overflow-y-auto">
-                                          <pre className="p-3 text-[10px] font-mono leading-relaxed">
+                                          <pre className="p-3 text-[10px] font-jetbrains leading-relaxed">
                                             {g.sample.stack.split('\n').map((line, i) => {
                                               const isAppLine = line.includes('/src/') && !line.includes('node_modules');
                                               return (
@@ -2897,9 +3236,9 @@ export function AdminCoreEngine() {
                                       <span className={`text-[9px] font-black px-2 py-1 rounded-md tracking-widest ${isCritical ? 'bg-rose-900/70 text-rose-200' : 'bg-amber-900/60 text-amber-200'}`}>
                                         {isCritical ? 'CRITICAL' : 'ERROR'}
                                       </span>
-                                      <span className={`text-[11px] font-bold font-mono px-1.5 py-0.5 rounded ${isCritical ? 'bg-rose-900/40 text-rose-400' : 'bg-amber-900/40 text-amber-400'}`}>{err.status}</span>
+                                      <span className={`text-[11px] font-bold font-jetbrains px-1.5 py-0.5 rounded ${isCritical ? 'bg-rose-900/40 text-rose-400' : 'bg-amber-900/40 text-amber-400'}`}>{err.status}</span>
                                       {err.count > 1 && (
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${err.count >= 10 ? 'bg-rose-900/50 text-rose-300' : 'bg-amber-900/40 text-amber-300'}`}>{err.count}×</span>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${err.count >= 10 ? 'bg-rose-900/50 text-rose-300' : 'bg-amber-900/40 text-amber-300'}`}>{err.count}×</span>
                                       )}
                                     </div>
 
@@ -2910,24 +3249,24 @@ export function AdminCoreEngine() {
 
                                       {/* Method + path */}
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${err.method === 'GET' ? 'bg-blue-900/50 text-blue-300' : err.method === 'POST' ? 'bg-emerald-900/50 text-emerald-300' : err.method === 'DELETE' ? 'bg-rose-900/50 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{err.method}</span>
-                                        <span className="font-mono text-xs text-secondary-300 truncate max-w-xs" title={err.path}>{err.path}</span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-jetbrains ${err.method === 'GET' ? 'bg-blue-900/50 text-blue-300' : err.method === 'POST' ? 'bg-emerald-900/50 text-emerald-300' : err.method === 'DELETE' ? 'bg-rose-900/50 text-rose-300' : 'bg-secondary-800 text-secondary-300'}`}>{err.method}</span>
+                                        <span className="font-jetbrains text-xs text-secondary-300 truncate max-w-xs" title={err.path}>{err.path}</span>
                                       </div>
 
                                       {/* Source location — the key detail */}
                                       {err.source && (
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                           <span className="text-[9px] text-secondary-500 uppercase tracking-widest font-bold">📍 Source</span>
-                                          <span className="font-mono text-[11px] text-rose-400">{err.fn ? `${err.fn} @ ` : ''}{err.source}</span>
+                                          <span className="font-jetbrains text-[11px] text-rose-400">{err.fn ? `${err.fn} @ ` : ''}{err.source}</span>
                                         </div>
                                       )}
 
                                       {/* Context chips */}
                                       <div className="flex items-center gap-2 flex-wrap text-[10px]">
-                                        <span className="text-secondary-500 font-mono">{new Date(err.ts).toLocaleString()}</span>
-                                        {err.ip && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono">{err.ip}</span>}
-                                        {err.tenantId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono" title={err.tenantId}>T:{err.tenantId.slice(0, 8)}</span>}
-                                        {err.userId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-mono" title={err.userId}>U:{err.userId.slice(0, 8)}</span>}
+                                        <span className="text-secondary-500 font-jetbrains">{new Date(err.ts).toLocaleString()}</span>
+                                        {err.ip && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-jetbrains">{err.ip}</span>}
+                                        {err.tenantId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-jetbrains" title={err.tenantId}>T:{err.tenantId.slice(0, 8)}</span>}
+                                        {err.userId && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400 font-jetbrains" title={err.userId}>U:{err.userId.slice(0, 8)}</span>}
                                         {err.bodyKeys && err.bodyKeys.length > 0 && <span className="px-1.5 py-0.5 rounded bg-secondary-800 text-secondary-400">body: {err.bodyKeys.join(', ')}</span>}
                                       </div>
                                     </div>
@@ -2963,7 +3302,7 @@ export function AdminCoreEngine() {
                                       >Copy</button>
                                     </div>
                                     <div className="rounded-lg bg-black/50 border border-secondary-800 overflow-x-auto max-h-52 overflow-y-auto">
-                                      <pre className="p-3 text-[10px] font-mono leading-relaxed">
+                                      <pre className="p-3 text-[10px] font-jetbrains leading-relaxed">
                                         {err.stack.split('\n').map((line, i) => {
                                           const isAppLine = line.includes('/src/') && !line.includes('node_modules');
                                           return (
@@ -2991,7 +3330,7 @@ export function AdminCoreEngine() {
             {activeTab === "feedback" && (
               <Card className="bg-secondary-900 border-secondary-800 text-white">
                 <CardHeader>
-                  <CardTitle className="text-xl font-bold flex items-center">
+                  <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                     <MessageSquare className="h-5 w-5 mr-2 text-amber-400" />
                     Tenant Feedback Inbox
                   </CardTitle>
@@ -3118,7 +3457,7 @@ export function AdminCoreEngine() {
 
             {/* Tab: Safety — Emergency Stop */}
             {activeTab === "safety" && (
-              <EmergencyStopPanel passcode={passcode} />
+              <EmergencyStopPanel passcode={passcode} sessionToken={sessionToken} />
             )}
 
             {/* Tab: Referral Partners */}
@@ -3127,7 +3466,7 @@ export function AdminCoreEngine() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle className="text-xl font-bold flex items-center">
+                      <CardTitle className="text-xl font-extrabold font-syne flex items-center">
                         <HandCoins className="h-5 w-5 mr-2 text-amber-400" />
                         Referral Partner Management
                       </CardTitle>
@@ -3159,8 +3498,8 @@ export function AdminCoreEngine() {
                         { label: "Total Partners", value: referralStats.totalPartners },
                         { label: "Active", value: referralStats.activePartners },
                         { label: "Tenants Referred", value: referralStats.totalTenants },
-                        { label: "Total MRR", value: `$${referralStats.totalMrr.toFixed(2)}` },
-                        { label: "Commission Due", value: `$${referralStats.totalCommissionDue.toFixed(2)}` },
+                        { label: "Total MRR", value: `GH₵${referralStats.totalMrr.toFixed(2)}` },
+                        { label: "Commission Due", value: `GH₵${referralStats.totalCommissionDue.toFixed(2)}` },
                       ].map((s) => (
                         <div key={s.label} className="bg-secondary-800 rounded-lg p-3 border border-secondary-700">
                           <p className="text-[10px] text-secondary-400 uppercase tracking-wide">{s.label}</p>
@@ -3190,7 +3529,7 @@ export function AdminCoreEngine() {
                             value={newPartnerCode}
                             onChange={(e) => setNewPartnerCode(e.target.value.toUpperCase())}
                             placeholder="ACME2026"
-                            className="h-8 text-xs bg-secondary-900 border-secondary-700 text-white font-mono"
+                            className="h-8 text-xs bg-secondary-900 border-secondary-700 text-white font-jetbrains"
                           />
                         </div>
                         <div>
@@ -3266,12 +3605,12 @@ export function AdminCoreEngine() {
                           <TableBody>
                             {referralPartners.map((p) => (
                               <TableRow key={p.id} className="border-secondary-800 hover:bg-secondary-800/40">
-                                <TableCell className="font-mono text-xs text-amber-400 font-semibold">{p.code}</TableCell>
+                                <TableCell className="font-jetbrains text-xs text-amber-400 font-semibold">{p.code}</TableCell>
                                 <TableCell className="text-xs text-secondary-200">{p.name}</TableCell>
                                 <TableCell className="text-xs text-secondary-300 text-right">{p.commissionRate}%</TableCell>
                                 <TableCell className="text-xs text-secondary-300 text-right">{p.tenantCount}</TableCell>
-                                <TableCell className="text-xs text-secondary-300 text-right">${p.totalMrr.toFixed(2)}</TableCell>
-                                <TableCell className="text-xs text-emerald-400 text-right font-semibold">${p.commissionDue.toFixed(2)}</TableCell>
+                                <TableCell className="text-xs text-secondary-300 text-right">GH₵{p.totalMrr.toFixed(2)}</TableCell>
+                                <TableCell className="text-xs text-emerald-400 text-right font-semibold">GH₵{p.commissionDue.toFixed(2)}</TableCell>
                                 <TableCell className="text-center">
                                   <button
                                     onClick={() => handleTogglePartner(p.id, p.isActive)}
@@ -3297,12 +3636,1246 @@ export function AdminCoreEngine() {
             )}
           </div>
         )}
+            {/* Tab: Churn Risk Tracker */}
+            {activeTab === "churnrisk" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <TrendingDown className="h-5 w-5 text-rose-400" />
+                      Churn Risk Tracker
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      At-risk tenants sorted by urgency + feature adoption — who to call and what to say.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchChurnRisk}
+                    disabled={isLoadingChurn}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingChurn ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {churnError && (
+                  <div className="rounded-lg border border-rose-800 bg-rose-950/30 p-4 text-rose-400 text-sm">{churnError}</div>
+                )}
+
+                {isLoadingChurn && !churnData && (
+                  <div className="flex items-center gap-3 text-secondary-400 text-sm py-8">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Analysing churn risk signals…
+                  </div>
+                )}
+
+                {churnData && (
+                  <>
+                    {/* Summary strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: "Total at risk", value: churnData.summary.total, color: "text-white" },
+                        { label: "Trial ≤3 days", value: churnData.summary.trialCritical, color: "text-rose-400" },
+                        { label: "Expired", value: churnData.summary.expired, color: "text-rose-400" },
+                        { label: "Not yet embedded", value: churnData.summary.notEmbedded, color: "text-amber-400", note: "score 0–1 features" },
+                      ].map((s) => (
+                        <Card key={s.label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-xs">{s.label}</p>
+                            <p className={`text-3xl font-black mt-1 ${s.color}`}>{s.value}</p>
+                            {s.note && <p className="text-secondary-600 text-[10px] mt-0.5">{s.note}</p>}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {churnData.tenants.length === 0 ? (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <CardContent className="py-12 text-center text-secondary-500 text-sm">
+                          No at-risk tenants right now.
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      (() => {
+                        const BUCKETS: { key: typeof churnData.tenants[0]['bucket']; label: string; urgency: string; color: string }[] = [
+                          { key: 'expired',        label: 'Expired — already churned',         urgency: 'Re-engage now',         color: 'border-rose-800 bg-rose-950/20' },
+                          { key: 'trial_critical', label: 'Trial ends in ≤3 days',             urgency: 'Call today',            color: 'border-rose-800 bg-rose-950/20' },
+                          { key: 'trial_soon',     label: 'Trial ends in 4–7 days',            urgency: 'Reach out this week',   color: 'border-amber-800 bg-amber-950/20' },
+                          { key: 'renewal_soon',   label: 'Renewal due in ≤14 days',           urgency: 'Confirm renewal',       color: 'border-amber-800 bg-amber-950/20' },
+                          { key: 'dormant',        label: 'Dormant 14+ days',                  urgency: 'Check-in needed',       color: 'border-secondary-700 bg-secondary-900' },
+                          { key: 'trial_watch',    label: 'Trial ends in 8–30 days',           urgency: 'Monitor closely',       color: 'border-secondary-700 bg-secondary-900' },
+                        ];
+
+                        const FEATURES: { key: keyof typeof churnData.tenants[0]['adoptionDetail']; label: string }[] = [
+                          { key: 'invoicing',    label: 'Invoicing' },
+                          { key: 'bookkeeping',  label: 'Books' },
+                          { key: 'inventory',    label: 'Inventory' },
+                          { key: 'sales',        label: 'Sales' },
+                          { key: 'banking',      label: 'Banking' },
+                        ];
+
+                        return (
+                          <div className="space-y-5">
+                            {BUCKETS.map(({ key, label, urgency, color }) => {
+                              const rows = churnData.tenants.filter((t) => t.bucket === key);
+                              if (rows.length === 0) return null;
+                              return (
+                                <div key={key} className={`rounded-xl border ${color} overflow-hidden`}>
+                                  <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-white text-sm font-bold">{label}</span>
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-300">{rows.length}</span>
+                                    </div>
+                                    <span className="text-xs text-secondary-400 italic">{urgency}</span>
+                                  </div>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="border-white/5 hover:bg-transparent">
+                                        <TableHead className="text-secondary-400 text-xs pl-5">Client</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Tier</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Deadline</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Last active</TableHead>
+                                        <TableHead className="text-secondary-400 text-xs">Score</TableHead>
+                                        {FEATURES.map((f) => (
+                                          <TableHead key={f.key} className="text-secondary-400 text-xs text-center">{f.label}</TableHead>
+                                        ))}
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {rows.map((t) => {
+                                        const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `T${t.tier}`;
+                                        const deadlineLabel = (() => {
+                                          if (t.bucket === 'expired') return <span className="text-rose-400 text-xs font-bold">EXPIRED</span>;
+                                          if (t.bucket === 'trial_critical' || t.bucket === 'trial_soon' || t.bucket === 'trial_watch') {
+                                            if (t.trialDaysLeft !== null && t.trialDaysLeft <= 0) return <span className="text-rose-400 text-xs font-bold">TODAY</span>;
+                                            return <span className={`text-xs ${(t.trialDaysLeft ?? 99) <= 3 ? 'text-rose-300 font-semibold' : (t.trialDaysLeft ?? 99) <= 7 ? 'text-amber-300' : 'text-secondary-300'}`}>Trial ends in {t.trialDaysLeft}d</span>;
+                                          }
+                                          if (t.bucket === 'renewal_soon') return <span className={`text-xs ${(t.paidDaysLeft ?? 99) <= 7 ? 'text-amber-300 font-semibold' : 'text-secondary-300'}`}>Renewal in {t.paidDaysLeft}d</span>;
+                                          return <span className="text-secondary-500 text-xs">—</span>;
+                                        })();
+                                        const activityLabel = t.daysSinceActivity === null
+                                          ? <span className="text-secondary-600 text-xs italic">never</span>
+                                          : t.daysSinceActivity === 0
+                                          ? <span className="text-emerald-400 text-xs">today</span>
+                                          : <span className={`text-xs ${t.daysSinceActivity >= 14 ? 'text-rose-400 font-semibold' : t.daysSinceActivity >= 7 ? 'text-amber-300' : 'text-secondary-300'}`}>{t.daysSinceActivity}d ago</span>;
+                                        const scoreColor = t.adoptionScore === 0 ? 'text-rose-400' : t.adoptionScore <= 2 ? 'text-amber-400' : t.adoptionScore <= 3 ? 'text-secondary-200' : 'text-emerald-400';
+
+                                        return (
+                                          <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
+                                            <TableCell className="pl-5">
+                                              <div>
+                                                <p className="text-white text-sm font-semibold">{t.name}</p>
+                                                <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="text-secondary-400 text-xs">{tierLabel}</TableCell>
+                                            <TableCell>{deadlineLabel}</TableCell>
+                                            <TableCell>{activityLabel}</TableCell>
+                                            <TableCell>
+                                              <span className={`text-sm font-bold ${scoreColor}`}>{t.adoptionScore}<span className="text-secondary-600 text-xs">/5</span></span>
+                                            </TableCell>
+                                            {FEATURES.map((f) => (
+                                              <TableCell key={f.key} className="text-center">
+                                                {t.adoptionDetail[f.key]
+                                                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mx-auto" />
+                                                  : <XCircle className="h-3.5 w-3.5 text-secondary-700 mx-auto" />}
+                                              </TableCell>
+                                            ))}
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()
+                    )}
+
+                    {/* Adoption legend */}
+                    <div className="flex flex-wrap gap-4 text-xs text-secondary-500 pt-2 border-t border-secondary-800">
+                      <span className="font-semibold text-secondary-300">Feature adoption legend:</span>
+                      <span><span className="text-emerald-400">●</span> Used at least once in audit log</span>
+                      <span><span className="text-secondary-600">●</span> No audit record (never used or pre-audit)</span>
+                      <span>Score 0-1 = not yet embedded, at very high churn risk regardless of trial status</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Client Health Dashboard */}
+            {activeTab === "clienthealth" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <HeartPulse className="h-5 w-5 text-emerald-400" />
+                      Client Health Dashboard
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Real-time tenant activity, subscription health, and churn risk — last activity derived from audit logs.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchClientHealth}
+                    disabled={isLoadingClientHealth}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingClientHealth ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {clientHealthError && (
+                  <div className="rounded-lg border border-rose-800 bg-rose-950/30 p-4 text-rose-400 text-sm">{clientHealthError}</div>
+                )}
+
+                {isLoadingClientHealth && !clientHealthData && (
+                  <div className="flex items-center gap-3 text-secondary-400 text-sm py-8">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Loading client health data…
+                  </div>
+                )}
+
+                {clientHealthData && (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: "Total Clients", value: clientHealthData.summary.totalTenants, color: "text-white" },
+                        { label: "Active Paid", value: clientHealthData.summary.activeTenants, color: "text-emerald-400" },
+                        { label: "On Trial", value: clientHealthData.summary.trialTenants, color: "text-amber-400" },
+                        { label: "Expired", value: clientHealthData.summary.expiredTenants, color: "text-rose-400" },
+                      ].map((stat) => (
+                        <Card key={stat.label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-xs">{stat.label}</p>
+                            <p className={`text-3xl font-black mt-1 ${stat.color}`}>{stat.value}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Churn Risk Summary */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Card className="bg-rose-950/20 border-rose-900">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <TrendingDown className="h-8 w-8 text-rose-400 shrink-0" />
+                          <div>
+                            <p className="text-rose-300 text-xs font-semibold">HIGH RISK</p>
+                            <p className="text-3xl font-black text-rose-400">{clientHealthData.summary.highRiskTenants}</p>
+                            <p className="text-rose-500 text-[10px]">dormant 14d+ or expired</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-amber-950/20 border-amber-900">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <AlertTriangle className="h-8 w-8 text-amber-400 shrink-0" />
+                          <div>
+                            <p className="text-amber-300 text-xs font-semibold">MEDIUM RISK</p>
+                            <p className="text-3xl font-black text-amber-400">{clientHealthData.summary.mediumRiskTenants}</p>
+                            <p className="text-amber-600 text-[10px]">dormant 7-13d or expiring soon</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <CardContent className="p-4 flex items-center gap-3">
+                          <Clock className="h-8 w-8 text-amber-400 shrink-0" />
+                          <div>
+                            <p className="text-secondary-300 text-xs font-semibold">TRIALS EXPIRING ≤7 DAYS</p>
+                            <p className="text-3xl font-black text-amber-400">{clientHealthData.summary.trialsExpiringIn7Days}</p>
+                            <p className="text-secondary-500 text-[10px]">need conversion outreach now</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Filters & Sort */}
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-secondary-400 text-xs font-semibold">FILTER:</span>
+                      {(["all", "high", "medium", "trial", "active", "expired"] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setClientHealthFilter(f)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            clientHealthFilter === f
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {f === "all" ? "All" : f === "high" ? "High Risk" : f === "medium" ? "Medium Risk" : f.charAt(0).toUpperCase() + f.slice(1)}
+                        </button>
+                      ))}
+                      <span className="ml-4 text-secondary-400 text-xs font-semibold">SORT:</span>
+                      {(["risk", "dormant", "recent"] as const).map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setClientHealthSort(s)}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            clientHealthSort === s
+                              ? "bg-emerald-600 border-emerald-600 text-white"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {s === "risk" ? "By Risk" : s === "dormant" ? "Most Dormant" : "Most Recent"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tenant Table */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800 hover:bg-transparent">
+                              <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Tier</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Risk</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Users</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Last Activity</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Expiry / Deadline</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              const RISK_ORDER = { high: 0, medium: 1, low: 2, none: 3 };
+                              let rows = [...clientHealthData.tenants];
+
+                              // filter
+                              if (clientHealthFilter === "high") rows = rows.filter((r) => r.churnRisk === "high");
+                              else if (clientHealthFilter === "medium") rows = rows.filter((r) => r.churnRisk === "medium");
+                              else if (clientHealthFilter === "trial") rows = rows.filter((r) => r.subscriptionStatus === "TRIAL");
+                              else if (clientHealthFilter === "active") rows = rows.filter((r) => r.subscriptionStatus === "ACTIVE");
+                              else if (clientHealthFilter === "expired") rows = rows.filter((r) => r.subscriptionStatus === "EXPIRED");
+
+                              // sort
+                              if (clientHealthSort === "risk") rows.sort((a, b) => RISK_ORDER[a.churnRisk] - RISK_ORDER[b.churnRisk]);
+                              else if (clientHealthSort === "dormant") rows.sort((a, b) => (b.daysSinceActivity ?? -1) - (a.daysSinceActivity ?? -1));
+                              else rows.sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+
+                              if (rows.length === 0) {
+                                return (
+                                  <TableRow>
+                                    <TableCell colSpan={7} className="text-center text-secondary-500 text-sm py-8">
+                                      No clients match this filter.
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+
+                              return rows.map((t) => {
+                                const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `Tier ${t.tier}`;
+                                const statusColor =
+                                  t.subscriptionStatus === "ACTIVE" ? "text-emerald-400" :
+                                  t.subscriptionStatus === "TRIAL" ? "text-amber-400" :
+                                  t.subscriptionStatus === "EXPIRED" ? "text-rose-400" : "text-secondary-400";
+                                const riskBadge = {
+                                  high: <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-800"><TrendingDown className="h-2.5 w-2.5" />HIGH</span>,
+                                  medium: <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800"><AlertTriangle className="h-2.5 w-2.5" />MEDIUM</span>,
+                                  low: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-400">LOW</span>,
+                                  none: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-500 border border-emerald-900">OK</span>,
+                                }[t.churnRisk];
+
+                                const activityLabel = t.daysSinceActivity === null
+                                  ? <span className="text-secondary-500 text-xs italic">No audit records</span>
+                                  : t.daysSinceActivity === 0
+                                  ? <span className="text-emerald-400 text-xs">Today</span>
+                                  : t.daysSinceActivity === 1
+                                  ? <span className="text-emerald-300 text-xs">Yesterday</span>
+                                  : t.daysSinceActivity <= 6
+                                  ? <span className="text-secondary-200 text-xs">{t.daysSinceActivity}d ago</span>
+                                  : t.daysSinceActivity <= 13
+                                  ? <span className="text-amber-300 text-xs">{t.daysSinceActivity}d ago</span>
+                                  : <span className="text-rose-400 text-xs font-semibold">{t.daysSinceActivity}d ago</span>;
+
+                                const expiryLabel = (() => {
+                                  if (t.subscriptionStatus === "TRIAL" && t.trialDaysLeft !== null) {
+                                    if (t.trialDaysLeft < 0) return <span className="text-rose-400 text-xs">Trial expired {Math.abs(t.trialDaysLeft)}d ago</span>;
+                                    if (t.trialDaysLeft === 0) return <span className="text-rose-400 text-xs font-bold">Trial ends TODAY</span>;
+                                    return <span className={`text-xs ${t.trialDaysLeft <= 7 ? "text-rose-300 font-semibold" : t.trialDaysLeft <= 14 ? "text-amber-300" : "text-secondary-300"}`}>Trial ends in {t.trialDaysLeft}d</span>;
+                                  }
+                                  if (t.subscriptionStatus === "ACTIVE" && t.paidDaysLeft !== null) {
+                                    if (t.paidDaysLeft < 0) return <span className="text-rose-400 text-xs">Overdue {Math.abs(t.paidDaysLeft)}d</span>;
+                                    return <span className={`text-xs ${t.paidDaysLeft <= 7 ? "text-amber-300 font-semibold" : "text-secondary-400"}`}>Renews in {t.paidDaysLeft}d</span>;
+                                  }
+                                  if (t.subscriptionStatus === "EXPIRED") return <span className="text-rose-400 text-xs font-bold">EXPIRED</span>;
+                                  return <span className="text-secondary-500 text-xs">—</span>;
+                                })();
+
+                                return (
+                                  <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-800/40">
+                                    <TableCell>
+                                      <div>
+                                        <p className="text-white text-sm font-semibold">{t.name}</p>
+                                        <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{tierLabel}</TableCell>
+                                    <TableCell className={`text-xs font-semibold ${statusColor}`}>{t.subscriptionStatus}</TableCell>
+                                    <TableCell>{riskBadge}</TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.userCount}</TableCell>
+                                    <TableCell>{activityLabel}</TableCell>
+                                    <TableCell>{expiryLabel}</TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Onboarding Completion Tracker */}
+            {activeTab === "onboarding" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <ClipboardList className="h-5 w-5 text-violet-400" />
+                      Onboarding Completion Tracker
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Per-tenant setup progress across 8 milestones. Stuck clients ({">"} 7 days, {"<"} 4 steps) need outreach.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchOnboarding}
+                    disabled={isLoadingOnboarding}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingOnboarding ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {onboardingError && (
+                  <div className="rounded-lg bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 text-sm">
+                    {onboardingError}
+                  </div>
+                )}
+
+                {isLoadingOnboarding && !onboardingData && (
+                  <div className="flex items-center gap-2 text-secondary-400 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading onboarding data…
+                  </div>
+                )}
+
+                {onboardingData && (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {[
+                        { label: "Total Tenants", value: onboardingData.summary.total, color: "text-white" },
+                        { label: "Fully Onboarded", value: onboardingData.summary.fullyOnboarded, color: "text-emerald-400" },
+                        { label: "Half or More", value: onboardingData.summary.halfOrMore, color: "text-amber-400" },
+                        { label: "Barely Started", value: onboardingData.summary.barelyStarted, color: "text-orange-400" },
+                        { label: "Stuck (need call)", value: onboardingData.summary.stuck, color: "text-rose-400" },
+                        { label: "Avg Completion", value: `${onboardingData.summary.avgCompletionPct}%`, color: "text-violet-400" },
+                      ].map(({ label, value, color }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-[10px] uppercase tracking-wide mb-1">{label}</p>
+                            <p className={`text-2xl font-extrabold ${color}`} style={{ fontFamily: "'Syne', sans-serif" }}>{value}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Filter Row */}
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {(['all', 'stuck', 'complete', 'started', 'bare'] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setOnboardingFilter(f)}
+                          className={`px-3 py-1 rounded-full border transition-colors ${
+                            onboardingFilter === f
+                              ? "border-violet-500 bg-violet-900/30 text-violet-300"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {f === 'all' ? 'All Tenants' : f === 'stuck' ? 'Stuck Only' : f === 'complete' ? 'Fully Onboarded' : f === 'started' ? 'In Progress' : 'Barely Started'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tenant Milestone Table */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-secondary-800 hover:bg-transparent">
+                              <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Score</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Wizard</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Team</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Journal</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Invoice</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Sale</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Inventory</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Bank</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Reconcile</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Days</TableHead>
+                              <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              let rows = [...onboardingData.tenants];
+                              if (onboardingFilter === 'stuck') rows = rows.filter((r) => r.isStuck);
+                              else if (onboardingFilter === 'complete') rows = rows.filter((r) => r.completionScore === onboardingData.totalSteps);
+                              else if (onboardingFilter === 'started') rows = rows.filter((r) => r.completionScore >= 2 && r.completionScore < onboardingData.totalSteps);
+                              else if (onboardingFilter === 'bare') rows = rows.filter((r) => r.completionScore < 2);
+                              rows.sort((a, b) => {
+                                if (a.isStuck !== b.isStuck) return a.isStuck ? -1 : 1;
+                                return a.completionScore - b.completionScore;
+                              });
+                              if (rows.length === 0) {
+                                return (
+                                  <TableRow>
+                                    <TableCell colSpan={12} className="text-center text-secondary-500 text-sm py-8">
+                                      No clients match this filter.
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+                              return rows.map((t) => {
+                                const tierLabel = t.tier === 1 ? "Shop" : t.tier === 2 ? "Business" : t.tier === 3 ? "Enterprise" : `T${t.tier}`;
+                                const pctColor = t.completionPct >= 75 ? "text-emerald-400" : t.completionPct >= 50 ? "text-amber-400" : t.completionPct >= 25 ? "text-orange-400" : "text-rose-400";
+                                const check = (val: boolean) => val
+                                  ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mx-auto" />
+                                  : <XCircle className="h-3.5 w-3.5 text-secondary-700 mx-auto" />;
+                                return (
+                                  <TableRow key={t.id} className={`border-secondary-800 hover:bg-secondary-800/50 ${t.isStuck ? 'bg-rose-900/10' : ''}`}>
+                                    <TableCell>
+                                      <div>
+                                        <p className="text-white text-sm font-semibold">{t.name}</p>
+                                        <p className="text-secondary-500 text-[10px]">{t.slug} · {tierLabel} · {t.subscriptionStatus}</p>
+                                        <p className="text-secondary-600 text-[10px]">{t.userCount} user{t.userCount !== 1 ? 's' : ''}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <span className={`font-bold text-sm ${pctColor}`}>{t.completionScore}/{onboardingData.totalSteps}</span>
+                                      <div className="w-16 h-1 bg-secondary-700 rounded-full mt-1">
+                                        <div className={`h-1 rounded-full ${t.completionPct >= 75 ? 'bg-emerald-400' : t.completionPct >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} style={{ width: `${t.completionPct}%` }} />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">{check(t.isLive)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.teamMemberAdded)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstJournalPosted)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstInvoiceSent)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstSaleRecorded)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstInventoryItem)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.bankConnected)}</TableCell>
+                                    <TableCell className="text-center">{check(t.milestoneDetail.firstReconciliation)}</TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">{t.daysSinceSignup}d</TableCell>
+                                    <TableCell>
+                                      {t.isStuck ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-900/40 text-rose-300 text-[10px] font-bold border border-rose-700">
+                                          STUCK
+                                        </span>
+                                      ) : t.completionScore === onboardingData.totalSteps ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 text-[10px] font-bold border border-emerald-700">
+                                          COMPLETE
+                                        </span>
+                                      ) : t.completionScore >= Math.ceil(onboardingData.totalSteps / 2) ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 text-[10px] font-bold border border-amber-700">
+                                          IN PROGRESS
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-800 text-secondary-400 text-[10px] font-bold border border-secondary-700">
+                                          STARTED
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+
+                    {/* Legend */}
+                    <div className="flex flex-wrap gap-4 text-xs text-secondary-500 pt-2 border-t border-secondary-800">
+                      <span className="font-semibold text-secondary-300">Step guide:</span>
+                      <span><span className="text-emerald-400">✓</span> = done (detected in audit log or isLive flag)</span>
+                      <span><span className="text-secondary-600">✗</span> = not yet completed</span>
+                      <span><span className="text-rose-400">STUCK</span> = signed up {">"}7 days ago, {"<"} 4 of 8 steps done — call them</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab: Revenue & MRR Dashboard */}
+            {activeTab === "revenue" && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <TrendingUp className="h-5 w-5 text-cyan-400" />
+                      Revenue & MRR Dashboard
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Monthly recurring revenue, tier breakdown, trial pipeline, and upcoming renewals.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchRevenue}
+                    disabled={isLoadingRevenue}
+                    className="border-secondary-700 text-secondary-300 hover:text-white gap-2"
+                  >
+                    {isLoadingRevenue ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                  </Button>
+                </div>
+
+                {revenueError && (
+                  <div className="rounded-lg bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 text-sm">
+                    {revenueError}
+                  </div>
+                )}
+
+                {isLoadingRevenue && !revenueData && (
+                  <div className="flex items-center gap-2 text-secondary-400 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading revenue data…
+                  </div>
+                )}
+
+                {revenueData && (
+                  <>
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {[
+                        { label: "MRR", value: `GHS ${revenueData.summary.mrr.toLocaleString()}`, sub: "active paid tenants", color: "text-cyan-400" },
+                        { label: "ARR (Projected)", value: `GHS ${revenueData.summary.arr.toLocaleString()}`, sub: "MRR × 12", color: "text-emerald-400" },
+                        { label: "Trial Pipeline", value: `GHS ${revenueData.summary.trialPipelineValue.toLocaleString()}`, sub: `${revenueData.summary.trial} active trials`, color: "text-amber-400" },
+                        { label: "Revenue at Risk", value: `GHS ${revenueData.summary.revenueAtRisk.toLocaleString()}`, sub: `${revenueData.summary.renewalsDueIn30Days} renewals + expired`, color: revenueData.summary.revenueAtRisk > 0 ? "text-rose-400" : "text-secondary-400" },
+                        { label: "Active Paid", value: String(revenueData.summary.activePaid), sub: "of " + revenueData.summary.totalTenants + " total", color: "text-white" },
+                        { label: "Trial Conversion", value: `${revenueData.summary.trialConversionRate}%`, sub: "paid / total tenants", color: "text-violet-400" },
+                        { label: "Avg Rev / Tenant", value: `GHS ${revenueData.summary.avgRevenuePerTenant}`, sub: "active paid only", color: "text-secondary-300" },
+                        { label: "Renewals in 30d", value: String(revenueData.summary.renewalsDueIn30Days), sub: "need retention action", color: revenueData.summary.renewalsDueIn30Days > 0 ? "text-orange-400" : "text-secondary-400" },
+                      ].map(({ label, value, sub, color }) => (
+                        <Card key={label} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <p className="text-secondary-400 text-[10px] uppercase tracking-wide mb-1">{label}</p>
+                            <p className={`text-xl font-extrabold ${color}`} style={{ fontFamily: "'Syne', sans-serif" }}>{value}</p>
+                            <p className="text-secondary-600 text-[10px] mt-0.5">{sub}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Tier Breakdown */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {revenueData.tierBreakdown.map((t) => (
+                        <Card key={t.tier} className="bg-secondary-900 border-secondary-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="text-white font-bold text-sm">{t.name} Plan</p>
+                                <p className="text-secondary-400 text-xs">GHS {t.priceGhs}/mo per tenant</p>
+                              </div>
+                              <DollarSign className="h-5 w-5 text-cyan-600" />
+                            </div>
+                            <p className="text-2xl font-extrabold text-cyan-400" style={{ fontFamily: "'Syne', sans-serif" }}>
+                              GHS {t.tierMrr.toLocaleString()}
+                            </p>
+                            <p className="text-secondary-500 text-xs mt-1">{t.activeCount} active tenant{t.activeCount !== 1 ? 's' : ''}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Monthly Activations Sparkline */}
+                    <Card className="bg-secondary-900 border-secondary-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm text-secondary-300">New Paid Activations — Last 12 Months</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-end gap-1 h-20">
+                          {(() => {
+                            const maxCount = Math.max(...revenueData.monthlyActivations.map((m) => m.count), 1);
+                            return revenueData.monthlyActivations.map((m) => (
+                              <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                                <div
+                                  className="w-full bg-cyan-500/70 rounded-t"
+                                  style={{ height: `${Math.max(4, Math.round((m.count / maxCount) * 64))}px` }}
+                                  title={`${m.month}: ${m.count} new paid, GHS ${m.mrr}`}
+                                />
+                                <span className="text-[8px] text-secondary-600 leading-none">{m.month}</span>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                        <p className="text-secondary-600 text-[10px] mt-2">Bucketed by sign-up month for active paid tenants.</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Sub-views */}
+                    <div className="flex gap-2 text-xs">
+                      {(['overview', 'renewals', 'all'] as const).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setRevenueView(v)}
+                          className={`px-3 py-1 rounded-full border transition-colors ${
+                            revenueView === v
+                              ? "border-cyan-500 bg-cyan-900/30 text-cyan-300"
+                              : "border-secondary-700 text-secondary-400 hover:text-white"
+                          }`}
+                        >
+                          {v === 'overview' ? 'Overview' : v === 'renewals' ? `Renewals Due (${revenueData.summary.renewalsDueIn30Days})` : 'All Tenants'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Renewals Due Table */}
+                    {revenueView === 'renewals' && (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-secondary-800 hover:bg-transparent">
+                                <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Plan</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Monthly Value</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Renews In</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Renewal Date</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {revenueData.renewalsDue.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="text-center text-secondary-500 text-sm py-8">
+                                    No renewals due in the next 30 days.
+                                  </TableCell>
+                                </TableRow>
+                              ) : revenueData.renewalsDue.map((t) => {
+                                const urgencyColor = (t.renewalDaysLeft ?? 99) <= 7 ? "text-rose-400" : (t.renewalDaysLeft ?? 99) <= 14 ? "text-orange-400" : "text-amber-400";
+                                return (
+                                  <TableRow key={t.id} className="border-secondary-800 hover:bg-secondary-800/50">
+                                    <TableCell>
+                                      <p className="text-white text-sm font-semibold">{t.name}</p>
+                                      <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.tierName}</TableCell>
+                                    <TableCell className="text-cyan-400 text-sm font-bold">GHS {t.priceGhs}</TableCell>
+                                    <TableCell className={`font-bold text-sm ${urgencyColor}`}>
+                                      {t.renewalDaysLeft}d
+                                    </TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">
+                                      {t.subscriptionPaidUntil ? new Date(t.subscriptionPaidUntil).toLocaleDateString('en-GB') : '—'}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* All Tenants Revenue Table */}
+                    {revenueView === 'all' && (
+                      <Card className="bg-secondary-900 border-secondary-800">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-secondary-800 hover:bg-transparent">
+                                <TableHead className="text-secondary-400 text-xs">Client</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Plan</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Status</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Monthly Value</TableHead>
+                                <TableHead className="text-secondary-400 text-xs">Paid Until / Trial Ends</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {revenueData.allTenants.map((t) => {
+                                const statusColor = t.subscriptionStatus === 'ACTIVE' ? 'text-emerald-400' : t.subscriptionStatus === 'TRIAL' ? 'text-amber-400' : 'text-rose-400';
+                                const dateLabel = t.subscriptionStatus === 'ACTIVE' && t.subscriptionPaidUntil
+                                  ? new Date(t.subscriptionPaidUntil).toLocaleDateString('en-GB')
+                                  : t.subscriptionStatus === 'TRIAL' && t.trialEndsAt
+                                  ? `Trial ends ${new Date(t.trialEndsAt).toLocaleDateString('en-GB')}`
+                                  : '—';
+                                return (
+                                  <TableRow key={t.id} className={`border-secondary-800 hover:bg-secondary-800/50 ${t.isRevenueAtRisk ? 'bg-rose-900/10' : ''}`}>
+                                    <TableCell>
+                                      <p className="text-white text-sm font-semibold">{t.name}</p>
+                                      <p className="text-secondary-500 text-[10px]">{t.slug}</p>
+                                    </TableCell>
+                                    <TableCell className="text-secondary-300 text-xs">{t.tierName}</TableCell>
+                                    <TableCell className={`text-xs font-semibold ${statusColor}`}>{t.subscriptionStatus}</TableCell>
+                                    <TableCell className={`font-bold text-sm ${t.subscriptionStatus === 'ACTIVE' ? 'text-cyan-400' : t.subscriptionStatus === 'TRIAL' ? 'text-amber-300/60' : 'text-rose-400/60'}`}>
+                                      GHS {t.priceGhs}
+                                    </TableCell>
+                                    <TableCell className="text-secondary-400 text-xs">{dateLabel}</TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </Card>
+                    )}
+
+                    {revenueView === 'overview' && (
+                      <div className="text-secondary-500 text-xs pt-2 border-t border-secondary-800">
+                        MRR counts only ACTIVE paid tenants at their tier price. Trial pipeline value shows potential MRR if all active trials convert. Revenue at risk = expired tenants + renewals due in ≤30 days.
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Debug Logs Tab */}
+            {activeTab === "debuglogs" && (
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+                      <Activity className="h-5 w-5 text-violet-400" />
+                      Debug Request Log
+                    </h2>
+                    <p className="text-secondary-400 text-xs mt-0.5">
+                      Last 500 requests — searchable by debugId, path, tenant, or error. Entries older than 24h are pruned automatically.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={fetchDebugLogs} disabled={isLoadingDebug}
+                      className="border-secondary-700 text-secondary-300 hover:text-white gap-2">
+                      {isLoadingDebug ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      Refresh
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={clearDebugLogs}
+                      className="border-rose-700 text-rose-400 hover:text-white gap-2">
+                      Clear Buffer
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Stats tiles */}
+                {debugStats && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: "Total", value: debugStats.total, color: "text-white" },
+                      { label: "OK (2xx)", value: debugStats.ok, color: "text-emerald-400" },
+                      { label: "Warn (4xx)", value: debugStats.warn, color: "text-amber-400" },
+                      { label: "Error (5xx)", value: debugStats.error, color: "text-rose-400" },
+                    ].map((s) => (
+                      <div key={s.label} className="bg-secondary-800 rounded-lg p-3 text-center">
+                        <div className={`text-2xl font-extrabold ${s.color}`}>{s.value}</div>
+                        <div className="text-secondary-400 text-xs mt-0.5">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  <select
+                    value={debugLevelFilter}
+                    onChange={(e) => { setDebugLevelFilter(e.target.value as '' | 'ok' | 'warn' | 'error'); setDebugOffset(0); }}
+                    className="bg-secondary-800 border border-secondary-700 rounded px-2 py-1.5 text-xs text-white"
+                  >
+                    <option value="">All levels</option>
+                    <option value="ok">OK (2xx)</option>
+                    <option value="warn">Warn (4xx)</option>
+                    <option value="error">Error (5xx)</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Search debugId, path, tenant, error…"
+                    value={debugSearch}
+                    onChange={(e) => { setDebugSearch(e.target.value); setDebugOffset(0); }}
+                    className="bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-xs text-white placeholder-secondary-500 w-64"
+                  />
+                  <span className="text-secondary-500 text-xs ml-auto">{debugTotal} matching</span>
+                </div>
+
+                {debugError && <div className="text-rose-400 text-sm">{debugError}</div>}
+
+                {/* Table */}
+                {debugLogs.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-secondary-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-secondary-900 text-secondary-400 uppercase tracking-wider">
+                        <tr>
+                          <th className="px-3 py-2">DebugId</th>
+                          <th className="px-3 py-2">Time</th>
+                          <th className="px-3 py-2">Method</th>
+                          <th className="px-3 py-2">Path</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">ms</th>
+                          <th className="px-3 py-2">Tenant</th>
+                          <th className="px-3 py-2">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-secondary-800">
+                        {debugLogs.map((log) => (
+                          <tr key={log.id} className={`hover:bg-secondary-800/50 ${log.level === 'error' ? 'bg-rose-950/20' : log.level === 'warn' ? 'bg-amber-950/20' : ''}`}>
+                            <td className="px-3 py-2 font-mono text-violet-300">{log.id}</td>
+                            <td className="px-3 py-2 text-secondary-400 whitespace-nowrap">{new Date(log.ts).toLocaleTimeString()}</td>
+                            <td className="px-3 py-2">
+                              <span className={`font-bold ${log.method === 'GET' ? 'text-sky-400' : log.method === 'POST' ? 'text-emerald-400' : log.method === 'DELETE' ? 'text-rose-400' : 'text-amber-400'}`}>
+                                {log.method}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-secondary-300 max-w-[200px] truncate" title={log.path}>{log.path}</td>
+                            <td className="px-3 py-2">
+                              <span className={`font-bold ${log.status >= 500 ? 'text-rose-400' : log.status >= 400 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {log.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-secondary-300">{log.durationMs}</td>
+                            <td className="px-3 py-2 text-secondary-400 font-mono text-[10px] truncate max-w-[80px]" title={log.tenantId}>{log.tenantId ? log.tenantId.slice(0, 8) : '—'}</td>
+                            <td className="px-3 py-2 text-rose-300 max-w-[160px] truncate" title={log.errorMessage}>{log.errorMessage ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  !isLoadingDebug && (
+                    <div className="text-center text-secondary-500 py-12 text-sm">
+                      {debugLevelFilter || debugSearch ? 'No logs match your filter.' : 'No requests captured yet. Make some API calls and refresh.'}
+                    </div>
+                  )
+                )}
+
+                {/* Pagination */}
+                {debugTotal > DEBUG_PAGE && (
+                  <div className="flex items-center justify-between pt-2">
+                    <Button variant="outline" size="sm" onClick={() => setDebugOffset(Math.max(0, debugOffset - DEBUG_PAGE))}
+                      disabled={debugOffset === 0} className="border-secondary-700 text-secondary-300 hover:text-white">
+                      Previous
+                    </Button>
+                    <span className="text-secondary-400 text-xs">
+                      {debugOffset + 1}–{Math.min(debugOffset + DEBUG_PAGE, debugTotal)} of {debugTotal}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setDebugOffset(debugOffset + DEBUG_PAGE)}
+                      disabled={debugOffset + DEBUG_PAGE >= debugTotal} className="border-secondary-700 text-secondary-300 hover:text-white">
+                      Next
+                    </Button>
+                  </div>
+                )}
+
+                <div className="text-secondary-600 text-xs pt-2 border-t border-secondary-800">
+                  Each row has a unique <span className="font-mono text-violet-400">x-debug-id</span> header on the response — search by it to trace a specific request end-to-end. Buffer is in-process memory; it resets on server restart.
+                </div>
+              </div>
+            )}
+
+            {activeTab === "team" && (
+              <TeamManagementPanel adminHeaders={adminHeaders as unknown as Record<string, string>} />
+            )}
+
       </main>
     </div>
   );
 }
 
-function EmergencyStopPanel({ passcode }: { passcode: string }) {
+// ── Team Management Panel ─────────────────────────────────────────────────────
+
+const VALID_COLORS = ['blue', 'cyan', 'emerald', 'rose', 'violet', 'amber', 'indigo', 'slate'] as const;
+const ALL_TABS = [
+  'broadcast', 'health', 'performance', 'jobs', 'integrations',
+  'schemas', 'audit', 'onboard', 'feedback', 'analytics', 'errors',
+  'safety', 'referral', 'clienthealth', 'churnrisk', 'onboarding',
+  'revenue', 'debuglogs',
+] as const;
+
+interface TeamMemberRow {
+  id: string; name: string; role: string; color: string;
+  assignedTabs: string[]; isActive: boolean;
+}
+
+const COLOR_DOT: Record<string, string> = {
+  blue: 'bg-blue-500', cyan: 'bg-cyan-500', emerald: 'bg-emerald-500',
+  rose: 'bg-rose-500', violet: 'bg-violet-500', amber: 'bg-amber-500',
+  indigo: 'bg-indigo-500', slate: 'bg-slate-400',
+};
+
+function TeamManagementPanel({ adminHeaders }: { adminHeaders: Record<string, string> }) {
+  const [members, setMembers] = useState<TeamMemberRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [editing, setEditing] = useState<TeamMemberRow | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newMember, setNewMember] = useState({ id: '', name: '', role: '', color: 'slate', assignedTabs: [] as string[] });
+  const [actionLoading, setActionLoading] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr('');
+    try {
+      const res = await api.get('/admin/team/members/all', { headers: adminHeaders });
+      setMembers(res.data.data);
+    } catch {
+      setErr('Failed to load team members.');
+    } finally { setLoading(false); }
+  }, [adminHeaders]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function flash(text: string) { setMsg(text); setTimeout(() => setMsg(''), 3000); }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+    setActionLoading(id + '-del');
+    try {
+      await api.delete(`/admin/team/members/${id}`, { headers: adminHeaders });
+      flash(`${name} deleted.`);
+      load();
+    } catch { flash('Delete failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleResetPin(id: string, name: string) {
+    if (!confirm(`Reset ${name}'s PIN to 0000?`)) return;
+    setActionLoading(id + '-pin');
+    try {
+      await api.post(`/admin/team/members/${id}/reset-pin`, {}, { headers: adminHeaders });
+      flash(`${name}'s PIN reset to 0000.`);
+    } catch { flash('Reset failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleToggleActive(member: TeamMemberRow) {
+    setActionLoading(member.id + '-active');
+    try {
+      await api.patch(`/admin/team/members/${member.id}`, { isActive: !member.isActive }, { headers: adminHeaders });
+      flash(`${member.name} ${member.isActive ? 'deactivated' : 'reactivated'}.`);
+      load();
+    } catch { flash('Update failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleSaveEdit() {
+    if (!editing) return;
+    setActionLoading('save');
+    try {
+      await api.patch(`/admin/team/members/${editing.id}`, {
+        name: editing.name, role: editing.role, color: editing.color, assignedTabs: editing.assignedTabs,
+      }, { headers: adminHeaders });
+      flash('Member updated.');
+      setEditing(null);
+      load();
+    } catch { flash('Update failed.'); }
+    setActionLoading('');
+  }
+
+  async function handleCreate() {
+    if (!newMember.id || !newMember.name || !newMember.role) return;
+    setActionLoading('create');
+    try {
+      await api.post('/admin/team/members', newMember, { headers: adminHeaders });
+      flash(`${newMember.name} added. Default PIN is 0000.`);
+      setShowAdd(false);
+      setNewMember({ id: '', name: '', role: '', color: 'slate', assignedTabs: [] });
+      load();
+    } catch (e: any) {
+      flash(e?.response?.data?.error ?? 'Create failed.');
+    }
+    setActionLoading('');
+  }
+
+  function toggleTab(tabs: string[], tab: string): string[] {
+    return tabs.includes(tab) ? tabs.filter((t) => t !== tab) : [...tabs, tab];
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold text-white flex items-center gap-2" style={{ fontFamily: "'Syne', sans-serif" }}>
+            <Users className="h-5 w-5 text-emerald-400" />
+            Team Members
+          </h2>
+          <p className="text-secondary-400 text-xs mt-0.5">Manage the AGOD team roster — add, edit, deactivate, or reset PINs.</p>
+        </div>
+        <div className="flex gap-2">
+          {msg && <span className="text-emerald-400 text-xs self-center">{msg}</span>}
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}
+            className="border-secondary-700 text-secondary-300 hover:text-white gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowAdd((v) => !v)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2">
+            <UserPlus className="h-4 w-4" />
+            Add Member
+          </Button>
+        </div>
+      </div>
+
+      {err && <p className="text-rose-400 text-sm">{err}</p>}
+
+      {/* Add member form */}
+      {showAdd && (
+        <div className="bg-secondary-900 border border-emerald-500/20 rounded-xl p-4 space-y-3">
+          <h3 className="text-white text-sm font-semibold">New Team Member</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">ID (slug)</label>
+              <input value={newMember.id} onChange={(e) => setNewMember((v) => ({ ...v, id: e.target.value.toLowerCase().replace(/\s/g, '-') }))}
+                placeholder="e.g. john" className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white placeholder-secondary-500" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Full Name</label>
+              <input value={newMember.name} onChange={(e) => setNewMember((v) => ({ ...v, name: e.target.value }))}
+                placeholder="e.g. John Doe" className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white placeholder-secondary-500" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Role</label>
+              <input value={newMember.role} onChange={(e) => setNewMember((v) => ({ ...v, role: e.target.value }))}
+                placeholder="e.g. Designer" className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white placeholder-secondary-500" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Avatar Color</label>
+              <select value={newMember.color} onChange={(e) => setNewMember((v) => ({ ...v, color: e.target.value }))}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white">
+                {VALID_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-secondary-400 block mb-1">Assigned Tabs</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_TABS.map((t) => (
+                <button key={t} onClick={() => setNewMember((v) => ({ ...v, assignedTabs: toggleTab(v.assignedTabs, t) }))}
+                  className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${newMember.assignedTabs.includes(t) ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-secondary-700 text-secondary-400 hover:border-secondary-500'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleCreate} disabled={actionLoading === 'create' || !newMember.id || !newMember.name || !newMember.role}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white">
+              {actionLoading === 'create' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAdd(false)}
+              className="border-secondary-700 text-secondary-400">Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit member form */}
+      {editing && (
+        <div className="bg-secondary-900 border border-violet-500/20 rounded-xl p-4 space-y-3">
+          <h3 className="text-white text-sm font-semibold">Edit — {editing.name}</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Name</label>
+              <input value={editing.name} onChange={(e) => setEditing((v) => v ? { ...v, name: e.target.value } : v)}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Role</label>
+              <input value={editing.role} onChange={(e) => setEditing((v) => v ? { ...v, role: e.target.value } : v)}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-400 block mb-1">Avatar Color</label>
+              <select value={editing.color} onChange={(e) => setEditing((v) => v ? { ...v, color: e.target.value } : v)}
+                className="w-full bg-secondary-800 border border-secondary-700 rounded px-3 py-1.5 text-sm text-white">
+                {VALID_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-secondary-400 block mb-1">Assigned Tabs</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_TABS.map((t) => (
+                <button key={t} onClick={() => setEditing((v) => v ? { ...v, assignedTabs: toggleTab(v.assignedTabs, t) } : v)}
+                  className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${editing.assignedTabs.includes(t) ? 'bg-violet-600 border-violet-500 text-white' : 'border-secondary-700 text-secondary-400 hover:border-secondary-500'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSaveEdit} disabled={actionLoading === 'save'}
+              className="bg-violet-600 hover:bg-violet-500 text-white">
+              {actionLoading === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(null)}
+              className="border-secondary-700 text-secondary-400">Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Members table */}
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 text-secondary-400 animate-spin" /></div>
+      ) : (
+        <div className="space-y-2">
+          {members.map((m) => (
+            <div key={m.id} className={`bg-secondary-900 border rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 ${m.isActive ? 'border-secondary-800' : 'border-secondary-800 opacity-50'}`}>
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${COLOR_DOT[m.color] ?? 'bg-slate-500'}`}>
+                <span className="text-white text-xs font-bold">{m.name.slice(0, 2).toUpperCase()}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-white text-sm font-semibold">{m.name}</span>
+                  {!m.isActive && <span className="text-[10px] bg-secondary-700 text-secondary-400 px-1.5 py-0.5 rounded">Inactive</span>}
+                </div>
+                <p className="text-secondary-400 text-xs">{m.role}</p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {m.assignedTabs.map((t) => (
+                    <span key={t} className="text-[10px] bg-secondary-800 border border-secondary-700 text-secondary-300 px-1.5 py-0.5 rounded">{t}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-1.5 flex-shrink-0">
+                <Button variant="outline" size="sm" onClick={() => setEditing(m)}
+                  className="border-secondary-700 text-secondary-300 hover:text-white h-7 px-2 text-xs">Edit</Button>
+                <Button variant="outline" size="sm" onClick={() => handleResetPin(m.id, m.name)} disabled={actionLoading === m.id + '-pin'}
+                  className="border-secondary-700 text-amber-400 hover:text-amber-300 h-7 px-2 text-xs">
+                  {actionLoading === m.id + '-pin' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Reset PIN'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleToggleActive(m)} disabled={actionLoading === m.id + '-active'}
+                  className={`border-secondary-700 h-7 px-2 text-xs ${m.isActive ? 'text-orange-400 hover:text-orange-300' : 'text-emerald-400 hover:text-emerald-300'}`}>
+                  {actionLoading === m.id + '-active' ? <Loader2 className="h-3 w-3 animate-spin" /> : m.isActive ? 'Deactivate' : 'Reactivate'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDelete(m.id, m.name)} disabled={actionLoading === m.id + '-del'}
+                  className="border-rose-800 text-rose-400 hover:text-rose-300 h-7 px-2 text-xs">
+                  {actionLoading === m.id + '-del' ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Delete'}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmergencyStopPanel({ passcode, sessionToken }: { passcode: string; sessionToken: string | null }) {
   const [state, setState] = useState<{ active: boolean; reason?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState("");
@@ -3311,7 +4884,9 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
   const [msg, setMsg] = useState<string | null>(null);
 
   const adminBase = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/admin/emergency-stop`;
-  const adminHeaders = { "x-admin-passcode": passcode, "Content-Type": "application/json" };
+  const adminHeaders: Record<string, string> = sessionToken
+    ? { "x-admin-session": sessionToken, "Content-Type": "application/json" }
+    : { "x-admin-passcode": passcode, "Content-Type": "application/json" };
 
   async function adminFetch(url: string, init?: RequestInit) {
     const res = await fetch(url, { ...init, headers: { ...adminHeaders, ...init?.headers } });
@@ -3373,7 +4948,7 @@ function EmergencyStopPanel({ passcode }: { passcode: string }) {
   return (
     <Card className="bg-secondary-900 border-secondary-800 text-white">
       <CardHeader>
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
+        <CardTitle className="text-xl font-extrabold font-syne flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-red-500" />
           Emergency Stop
         </CardTitle>

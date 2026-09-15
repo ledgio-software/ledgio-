@@ -135,6 +135,7 @@ router.post('/:id/cost-lines', requireRole('Accountant'), async (req, res) => {
 
     // Attempt to post a journal: Dr Job WIP / Cr the specified or default GL account
     let journalId: string | null = null;
+    let journalWarning: string | null = null;
     try {
       const accounts = await listAccounts(prisma as any);
       const wipAccount = resolveDefaultAccount(accounts, 'JOB_WIP');
@@ -153,9 +154,11 @@ router.post('/:id/cost-lines', requireRole('Accountant'), async (req, res) => {
           status: 'POSTED',
         });
         journalId = (journal as any).id || null;
+      } else {
+        journalWarning = 'GL not updated — WIP or cost account not configured. Set up JOB_WIP and JOB_EXPENSE accounts in your chart of accounts.';
       }
-    } catch {
-      // Journal posting failure is non-blocking — cost line is still recorded
+    } catch (journalErr: any) {
+      journalWarning = `GL entry failed: ${journalErr?.message || 'unknown error'}. Cost line was recorded.`;
     }
 
     const line = await (prisma as any).jobCostLine.create({
@@ -165,7 +168,7 @@ router.post('/:id/cost-lines', requireRole('Accountant'), async (req, res) => {
     if (job.status === 'OPEN') {
       await (prisma as any).job.update({ where: { id: req.params.id }, data: { status: 'IN_PROGRESS' } });
     }
-    res.status(201).json({ success: true, data: line });
+    res.status(201).json({ success: true, data: line, ...(journalWarning ? { journalWarning } : {}) });
   } catch (err: any) {
     if (err instanceof z.ZodError) return res.status(400).json({ success: false, error: err.issues });
     res.status(500).json({ success: false, error: err.message });
@@ -183,6 +186,7 @@ router.post('/:id/complete', requireRole('Accountant'), async (req, res) => {
     const totalCost = job.costLines.reduce((s: number, l: any) => s + Number(l.amount), 0);
 
     // Post final COGS journal: Dr COGS / Cr Job WIP
+    let completeJournalWarning: string | null = null;
     if (totalCost > 0) {
       try {
         const accounts = await listAccounts(prisma as any);
@@ -198,12 +202,16 @@ router.post('/:id/complete', requireRole('Accountant'), async (req, res) => {
             ],
             status: 'POSTED',
           });
+        } else {
+          completeJournalWarning = 'COGS journal not posted — COGS or JOB_WIP account not configured.';
         }
-      } catch { /* Non-blocking */ }
+      } catch (journalErr: any) {
+        completeJournalWarning = `COGS GL entry failed: ${journalErr?.message || 'unknown error'}.`;
+      }
     }
 
     await (prisma as any).job.update({ where: { id: req.params.id }, data: { status: 'COMPLETED', endDate: new Date() } });
-    res.json({ success: true, data: { totalCost } });
+    res.json({ success: true, data: { totalCost }, ...(completeJournalWarning ? { journalWarning: completeJournalWarning } : {}) });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

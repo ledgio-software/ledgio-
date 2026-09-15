@@ -24,6 +24,7 @@ const createItemSchema = z.object({
   costPrice: z.union([z.number().nonnegative('Cost price must be ≥ 0'), z.string().transform(Number)]),
   sellingPrice: z.union([z.number().nonnegative('Selling price must be ≥ 0'), z.string().transform(Number)]),
   wholesalePrice: z.union([z.number().nonnegative(), z.string().transform(Number)]).optional().nullable(),
+  floorPrice: z.union([z.number().nonnegative(), z.string().transform(Number)]).optional().nullable(),
   initialWarehouseId: z.string().uuid().optional().nullable(),
   initialQty: z.union([z.number().nonnegative(), z.string().transform(Number)]).default(0),
   reorderLevel: z.union([z.number().int().nonnegative(), z.string().transform(Number)]).default(10),
@@ -188,6 +189,41 @@ router.get('/warehouses/:id/stock-sheet.pdf', async (req: Request, res: Response
  * GET /api/v1/inventory/items
  * Lists all inventory items across warehouses.
  */
+
+/**
+ * GET /api/v1/inventory/negative-stock
+ * Returns all warehouse stock rows where quantityOnHand < 0.
+ */
+router.get('/negative-stock', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const rows = await withCurrentTenantDb(prisma, async (client) => {
+      return (client as any).warehouseStock.findMany({
+        where: { tenantId, quantityOnHand: { lt: 0 } },
+        include: {
+          item: { select: { id: true, name: true, sku: true, unitOfMeasure: true } },
+          warehouse: { select: { id: true, name: true } },
+        },
+        orderBy: { quantityOnHand: 'asc' },
+      });
+    });
+    res.json({
+      success: true,
+      data: rows.map((r: any) => ({
+        itemId: r.itemId,
+        itemName: r.item?.name,
+        sku: r.item?.sku,
+        unitOfMeasure: r.item?.unitOfMeasure,
+        warehouseId: r.warehouseId,
+        warehouseName: r.warehouse?.name,
+        quantityOnHand: Number(r.quantityOnHand),
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/items', async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
@@ -231,7 +267,7 @@ router.get('/items', async (req: Request, res: Response): Promise<void> => {
 router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Warehouse Manager'), validateBody(createItemSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { tenantId } = requireTenantContext();
-    const { name, sku, category = 'General', unitOfMeasure = 'pcs', secondaryUnitOfMeasure, conversionFactor, costPrice, sellingPrice, wholesalePrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
+    const { name, sku, category = 'General', unitOfMeasure = 'pcs', secondaryUnitOfMeasure, conversionFactor, costPrice, sellingPrice, wholesalePrice, floorPrice, initialWarehouseId, initialQty = 0, reorderLevel, preferredVendorId, regulatoryCategory, requiresBatchTracking } = req.body;
 
     if (!name || !costPrice || !sellingPrice) {
       res.status(400).json({ success: false, error: 'Item name, cost price, and selling price are required.' });
@@ -267,6 +303,7 @@ router.post('/items', requireRole('Accountant', 'Shop Manager', 'Cashier', 'Ware
           costPrice: Number(costPrice),
           sellingPrice: Number(sellingPrice),
           wholesalePrice: wholesalePrice !== undefined && wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null,
+          floorPrice: floorPrice !== undefined && floorPrice !== null && floorPrice !== '' ? Number(floorPrice) : null,
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           preferredVendorId: preferredVendorId || null,
           ...(regulatoryCategory !== undefined && { regulatoryCategory: String(regulatoryCategory) }),
@@ -321,7 +358,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
   try {
     const { tenantId } = requireTenantContext();
     const { id } = req.params;
-    const { name, costPrice, sellingPrice, wholesalePrice, reorderLevel, preferredVendorId, requiresBatchTracking, secondaryUnitOfMeasure, conversionFactor } = req.body;
+    const { name, costPrice, sellingPrice, wholesalePrice, floorPrice, reorderLevel, preferredVendorId, requiresBatchTracking, secondaryUnitOfMeasure, conversionFactor } = req.body;
 
     const updated = await withCurrentTenantDb(prisma, async (client) => {
       const existing = await (client as any).inventoryItem.findFirst({ where: { id, tenantId } });
@@ -341,6 +378,7 @@ router.put('/items/:id', requireRole('Accountant', 'Shop Manager', 'Warehouse Ma
           ...(costPrice !== undefined && { costPrice: Number(costPrice) }),
           ...(sellingPrice !== undefined && { sellingPrice: Number(sellingPrice) }),
           ...(wholesalePrice !== undefined && { wholesalePrice: wholesalePrice !== null && wholesalePrice !== '' ? Number(wholesalePrice) : null }),
+          ...(floorPrice !== undefined && { floorPrice: floorPrice !== null && floorPrice !== '' ? Number(floorPrice) : null }),
           ...(reorderLevel !== undefined && { reorderLevel: Number(reorderLevel) }),
           ...(preferredVendorId !== undefined && { preferredVendorId: preferredVendorId || null }),
           ...(requiresBatchTracking !== undefined && { requiresBatchTracking: Boolean(requiresBatchTracking) }),
@@ -402,6 +440,8 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
       sellingPrice: number;
       initialWarehouseId: string | null;
       initialQty: number;
+      batchNumber?: string;
+      expiryDate?: string;
     };
 
     const validRows: ValidRow[] = [];
@@ -411,7 +451,7 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
     for (let i = 0; i < items.length; i++) {
       const row = items[i] || {};
       try {
-        const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, initialWarehouseId, initialQty = 0 } = row;
+        const { name, sku, category = 'General', unitOfMeasure = 'pcs', costPrice, sellingPrice, initialWarehouseId, initialQty = 0, batchNumber, expiryDate } = row;
 
         if (!name || !String(name).trim()) throw new Error('Item name is required.');
         if (costPrice === undefined || costPrice === null || costPrice === '') throw new Error('Cost price is required.');
@@ -436,6 +476,8 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
           sellingPrice: Number(sellingPrice),
           initialWarehouseId: initialWarehouseId || null,
           initialQty: Number(initialQty) > 0 ? Number(initialQty) : 0,
+          batchNumber: batchNumber ? String(batchNumber).trim() : undefined,
+          expiryDate: expiryDate ? String(expiryDate) : undefined,
         });
       } catch (rowError: any) {
         failed.push({ index: i, name: row?.name, error: rowError.message || 'Failed to create this item.' });
@@ -511,6 +553,32 @@ router.post('/items/bulk', requireRole('Accountant', 'Shop Manager', 'Cashier', 
 
         if (stockData.length > 0) {
           await (client as any).warehouseStock.createMany({ data: stockData, skipDuplicates: true });
+        }
+
+        // InventoryBatch records for pharmacy rows that supplied batch/expiry data.
+        // warehouseId and costPrice are required by the model; skip rows that
+        // lack a warehouse (no batch can be location-tracked without one).
+        const batchData = okRows
+          .filter(r => r.batchNumber && r.initialWarehouseId && skuToItem.has(r.sku))
+          .map(r => ({
+            tenantId,
+            itemId: skuToItem.get(r.sku)!.id,
+            warehouseId: r.initialWarehouseId!,
+            batchNumber: r.batchNumber!,
+            expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
+            quantityOnHand: r.initialQty,
+            costPrice: r.costPrice,
+          }));
+
+        if (batchData.length > 0) {
+          await (client as any).inventoryBatch.createMany({ data: batchData, skipDuplicates: true });
+
+          // Mark these items as requiring batch tracking
+          const batchItemIds = batchData.map(b => b.itemId);
+          await (client as any).inventoryItem.updateMany({
+            where: { id: { in: batchItemIds }, tenantId },
+            data: { requiresBatchTracking: true },
+          });
         }
       });
     }

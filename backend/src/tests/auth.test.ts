@@ -197,7 +197,7 @@ describe('Auth & RBAC Service Tests', () => {
         where: { entity: 'User', userEmail: testAdminEmail, action: 'AUTH.LOGIN_FAILED' },
       });
       expect(auditRows.length).toBeGreaterThanOrEqual(1);
-      expect(auditRows[auditRows.length - 1].details).toContain('invalid password');
+      expect(auditRows[auditRows.length - 1].details).toContain('Failed login attempt');
     });
   });
 

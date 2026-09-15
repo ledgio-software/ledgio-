@@ -1,0 +1,662 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledgio Marketing Kit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ink:      #0d1b2a;
+    --ink-mid:  #334155;
+    --muted:    #64748b;
+    --ground:   #ffffff;
+    --surface:  #f8fafc;
+    --mint:     #f0fdf8;
+    --border:   #e2e8f0;
+    --emerald:  #059669;
+    --blue:     #2563eb;
+    --rule:     #e2e8f0;
+    --amber:    #d97706;
+    --red:      #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:     #f1f5f9;
+      --ink-mid: #cbd5e1;
+      --muted:   #94a3b8;
+      --ground:  #0f172a;
+      --surface: #1e293b;
+      --mint:    #0d2b22;
+      --border:  #334155;
+      --rule:    #1e293b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:     #f1f5f9;
+    --ink-mid: #cbd5e1;
+    --muted:   #94a3b8;
+    --ground:  #0f172a;
+    --surface: #1e293b;
+    --mint:    #0d2b22;
+    --border:  #334155;
+    --rule:    #1e293b;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    line-height: 1.6;
+    padding-inline: 24px;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #059669, #2563eb);
+    margin-inline: -24px;
+    padding: 28px 32px 22px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 36px; height: 36px; background: rgba(255,255,255,0.18);
+    border-radius: 9px; display: flex; align-items: flex-end;
+    gap: 3px; padding: 7px 8px;
+  }
+  .bar { background: #fff; border-radius: 2px; width: 5px; }
+  .b1{height:9px;} .b2{height:14px;} .b3{height:20px;opacity:.92;}
+  .brand-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; font-weight: 700; color: #fff;
+  }
+  .header-right { text-align: right; }
+  .header-right strong { display: block; color:#fff; font-size:13px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+  .header-right span { color:rgba(255,255,255,0.6); font-size:12px; }
+
+  /* ── Notice band ── */
+  .notice {
+    background: rgba(217,119,6,0.08);
+    border-bottom: 1px solid rgba(217,119,6,0.2);
+    margin-inline: -24px;
+    padding: 12px 32px;
+    font-size: 13px; color: var(--amber);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .notice strong { font-weight: 600; }
+
+  /* ── Tabs ── */
+  .tabs {
+    position: sticky;
+    top: 0;
+    background: var(--ground);
+    border-bottom: 1px solid var(--rule);
+    margin-inline: -24px;
+    padding: 0 32px;
+    display: flex; gap: 0;
+    overflow-x: auto;
+    z-index: 10;
+  }
+  .tab {
+    padding: 13px 16px;
+    font-size: 13px; font-weight: 500;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    background: none; border-top: none; border-left: none; border-right: none;
+    font-family: 'Outfit', sans-serif;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--emerald); border-bottom-color: var(--emerald); }
+
+  /* ── Content ── */
+  .content { max-width: 820px; margin: 0 auto; padding-block: 36px; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── Section header ── */
+  .sec-head { margin-bottom: 24px; }
+  .sec-eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--emerald); margin-bottom: 6px;
+  }
+  .sec-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 26px; font-weight: 700; margin-bottom: 4px; text-wrap: balance;
+  }
+  .sec-desc { font-size: 14px; color: var(--muted); max-width: 560px; line-height: 1.6; }
+
+  /* ── Copy block ── */
+  .copy-block {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .copy-label {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+  }
+  .copy-label-text {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .copy-btn {
+    font-size: 11px; font-weight: 600; color: var(--emerald);
+    background: rgba(5,150,105,0.08);
+    border: 1px solid rgba(5,150,105,0.25);
+    border-radius: 5px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    transition: background .15s;
+  }
+  .copy-btn:hover { background: rgba(5,150,105,0.15); }
+  .copy-btn.copied { color: #fff; background: var(--emerald); border-color: var(--emerald); }
+  .copy-text {
+    padding: 16px;
+    font-size: 14px;
+    color: var(--ink-mid);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  /* ── Do / Don't ── */
+  .dos-donts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .do-card, .dont-card {
+    border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .do-head, .dont-head {
+    padding: 10px 16px;
+    font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    border-bottom: 1px solid var(--rule);
+  }
+  .do-head { background: rgba(5,150,105,0.08); color: var(--emerald); }
+  .dont-head { background: rgba(220,38,38,0.07); color: var(--red); }
+  .do-list, .dont-list {
+    list-style: none; padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .do-list li, .dont-list li {
+    font-size: 13px; color: var(--ink-mid);
+    padding-left: 18px; position: relative; line-height: 1.45;
+  }
+  .do-list li::before { content: '✓'; position: absolute; left:0; color: var(--emerald); font-weight: 700; font-size: 12px; }
+  .dont-list li::before { content: '✗'; position: absolute; left:0; color: var(--red); font-weight: 700; font-size: 12px; }
+
+  /* ── Tag row ── */
+  .tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .tag {
+    font-size: 12px; font-weight: 500; padding: 4px 11px;
+    border-radius: 20px; background: var(--surface); border: 1px solid var(--border);
+    color: var(--ink-mid);
+  }
+
+  /* ── Divider ── */
+  .divider { border: none; border-top: 1px solid var(--rule); margin: 28px 0; }
+
+  /* ── Key stats row ── */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 28px;
+  }
+  .stat-tile {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 12px; text-align: center;
+  }
+  .stat-val {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 26px; font-weight: 700; color: var(--emerald); line-height: 1;
+  }
+  .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 3px; font-weight: 500; }
+
+  /* ── Footer ── */
+  .footer {
+    background: var(--ink); margin-inline: -24px;
+    padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  .footer span { font-size: 12px; color: rgba(255,255,255,0.45); }
+  .footer a { color: #6ee7b7; text-decoration: none; font-size: 12px; font-weight: 500; }
+
+  @media (max-width: 600px) {
+    .header { padding: 20px 20px 18px; }
+    .header-right { display: none; }
+    .notice { padding: 10px 20px; }
+    .tabs { padding: 0 20px; }
+    .dos-donts { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(3,1fr); }
+    .footer { padding: 14px 20px; }
+  }
+</style>
+
+<!-- Header -->
+<div class="header">
+  <div class="brand">
+    <div class="brand-icon">
+      <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div>
+    </div>
+    <span class="brand-name">Ledgio</span>
+  </div>
+  <div class="header-right">
+    <strong>Partner Marketing Kit</strong>
+    <span>For Hapa Solutions · Approved 2026</span>
+  </div>
+</div>
+
+<!-- Notice -->
+<div class="notice">
+  <strong>Partner use only.</strong> All copy on this page is approved for Hapa Solutions to use in their own marketing. Do not modify key claims or pricing without prior approval from Ledgio.
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('messages')">Key Messages</button>
+  <button class="tab" onclick="showTab('social')">Social &amp; WhatsApp</button>
+  <button class="tab" onclick="showTab('email')">Email Templates</button>
+  <button class="tab" onclick="showTab('print')">Print &amp; Flyer Copy</button>
+  <button class="tab" onclick="showTab('guidelines')">Dos &amp; Don'ts</button>
+</div>
+
+<div class="content">
+
+  <!-- KEY MESSAGES -->
+  <div class="section active" id="sec-messages">
+    <div class="sec-head">
+      <div class="sec-eyebrow">Approved copy</div>
+      <h2 class="sec-title">Key Messages</h2>
+      <p class="sec-desc">Use these approved descriptions in any channel — pick the length that fits. Do not rephrase the core claims.</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-tile"><div class="stat-val">12</div><div class="stat-lbl">Modules</div></div>
+      <div class="stat-tile"><div class="stat-val">60+</div><div class="stat-lbl">Features</div></div>
+      <div class="stat-tile"><div class="stat-val">4</div><div class="stat-lbl">User Roles</div></div>
+      <div class="stat-tile"><div class="stat-val">∞</div><div class="stat-lbl">Branches</div></div>
+      <div class="stat-tile"><div class="stat-val">PWA</div><div class="stat-lbl">Any Device</div></div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Tagline (short)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">One platform. Every number. Every shop.</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">One-liner (25 words)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Ledgio is business management software that connects your till, stock, and accounts in one system — installed on any device, no app store required.</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Short description (50 words)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Ledgio is cloud software for growing businesses. It combines Point of Sale, inventory management, invoicing, and full accounting into one system. Install it on any device — Windows PC, Mac, Android, or iPhone — with no app store and no IT department. Every sale updates your books automatically.</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Full description (100 words)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Ledgio is cloud-based business management software built for companies that buy and sell. It connects your Point of Sale tills, inventory across multiple branches, supplier purchases, customer invoicing, and full double-entry accounting into one seamless system.
+
+Every sale at the till instantly updates your stock levels and posts to your accounts — no manual re-entry, no reconciliation headache. Built-in anti-fraud controls protect every transaction. Manage unlimited branches and tills from one dashboard.
+
+Ledgio installs on any device — Windows PC, Mac, Android, or iPhone — in seconds, with no app store and no IT setup required. Contact Hapa Solutions to get started.</div>
+    </div>
+
+    <hr class="divider">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;">Approved hashtags</p>
+    <div class="tag-row">
+      <span class="tag">#Ledgio</span>
+      <span class="tag">#BusinessSoftware</span>
+      <span class="tag">#CloudSoftware</span>
+      <span class="tag">#POS</span>
+      <span class="tag">#SmallBusiness</span>
+      <span class="tag">#AccountingSoftware</span>
+      <span class="tag">#HapaSolutions</span>
+      <span class="tag">#BusinessManagement</span>
+      <span class="tag">#Inventory</span>
+      <span class="tag">#AfricanBusiness</span>
+    </div>
+  </div>
+
+  <!-- SOCIAL -->
+  <div class="section" id="sec-social">
+    <div class="sec-head">
+      <div class="sec-eyebrow">Ready to post</div>
+      <h2 class="sec-title">Social Media &amp; WhatsApp</h2>
+      <p class="sec-desc">Copy and paste these into WhatsApp Business, Facebook, Instagram, or LinkedIn. Customise your business name where indicated in [brackets].</p>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">WhatsApp Business announcement</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">🚀 Big news from [Your Business Name]!
+
+We're now running on *Ledgio* — business management software that connects our till, stock, and accounts all in one place.
+
+✅ Faster checkouts
+✅ Real-time stock tracking
+✅ Automatic bookkeeping
+
+Questions? We're always here to help. 👇</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Facebook / Instagram — awareness post</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Are you still managing your business on spreadsheets? 📊
+
+There's a better way.
+
+Ledgio is cloud software that connects your POS, inventory, and accounting into one system — and installs on any device in seconds.
+
+No app store. No IT department. No complicated setup.
+
+📩 DM us or contact Hapa Solutions to see it in action.
+
+#Ledgio #BusinessSoftware #SmallBusiness #HapaSolutions</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Facebook / Instagram — problem/solution post</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">3 signs your business needs Ledgio 👇
+
+1️⃣ Your cashier and your accountant are using different systems that don't talk to each other
+2️⃣ You don't know your real stock levels without counting by hand
+3️⃣ You only find out your profit at the end of the month — or later
+
+Ledgio fixes all three. One system. Real-time. On any device.
+
+📩 Contact Hapa Solutions to get started.
+
+#Ledgio #BusinessSoftware #POS #Inventory #AccountingSoftware</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">LinkedIn — professional post</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Most growing businesses hit the same wall: their POS, their stock system, and their accounting software are three separate tools that don't talk to each other.
+
+That means manual re-entry. Reconciliation errors. A profit figure that's always two weeks behind reality.
+
+Ledgio solves this by connecting all three in one cloud software platform. Every sale at the till posts directly to the accounts and deducts from stock — automatically, in real time.
+
+It installs on any device — Windows, Mac, Android, iPhone — with no app store and no IT department.
+
+We're proud to be an authorised Ledgio partner through Hapa Solutions. Reach out if you'd like to see a live demo.
+
+#Ledgio #BusinessManagement #CloudSoftware #POS #AfricanBusiness</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Short promo — schools / institutions</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Schools, colleges, and institutions — Ledgio has everything you need to manage fees, canteen sales, stock, and accounts in one system. 🏫
+
+✅ Multi-branch (multiple campuses)
+✅ Role-based access for bursar, accountant, and cashier
+✅ Full audit trail on every transaction
+
+Contact Hapa Solutions for a demo.
+
+#Ledgio #SchoolManagement #BusinessSoftware #HapaSolutions</div>
+    </div>
+  </div>
+
+  <!-- EMAIL -->
+  <div class="section" id="sec-email">
+    <div class="sec-head">
+      <div class="sec-eyebrow">Email templates</div>
+      <h2 class="sec-title">Email Templates</h2>
+      <p class="sec-desc">Replace all [placeholders] with the real details before sending. Keep the structure and approved claims intact.</p>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Cold introduction email</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Subject: Manage your entire business in one place — Ledgio
+
+Hi [First Name],
+
+I'm reaching out from Hapa Solutions. We work with businesses across [your region] to help them move from manual spreadsheets to proper business software.
+
+I wanted to introduce you to Ledgio — cloud software that combines your Point of Sale, inventory management, and accounting in one system.
+
+Here's what that means in practice:
+• Every sale at your till automatically updates your stock and posts to your accounts
+• You can manage multiple branches and tills from one dashboard
+• Your cashier, accountant, and manager each see only what they need
+• It installs on any device — Windows PC, Mac, Android, iPhone — in seconds
+
+I'd love to show you a quick walkthrough. Would you have 20 minutes this week for a demo?
+
+Best regards,
+[Your Name]
+Hapa Solutions
+[Your phone number]</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Follow-up email (after no reply)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Subject: Re: Ledgio — quick follow-up
+
+Hi [First Name],
+
+Just following up on my email from [date]. I know things get busy.
+
+One thing I didn't mention: Ledgio is currently offering a free Starter plan — you can get your POS and basic inventory running at no cost, and upgrade when you're ready for the full accounting suite.
+
+If you'd like to see it in action, I can have a 15-minute walkthrough ready for you at any time that works.
+
+Best,
+[Your Name]
+Hapa Solutions
+[Your phone number]</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Post-demo follow-up</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Subject: Next steps — Ledgio for [Their Business Name]
+
+Hi [First Name],
+
+Thank you for your time today. It was great to show you Ledgio in action.
+
+As discussed, here's what the next step looks like:
+1. We set up your business workspace (takes about 30 minutes)
+2. We load your products and configure your tills
+3. We train your team — cashiers, manager, and accountant
+4. You go live — usually within 1–2 days of starting setup
+
+I've attached our feature list and onboarding guide for your reference.
+
+If you'd like to proceed, just reply to this email or call me on [your number] and we'll get started.
+
+Best regards,
+[Your Name]
+Hapa Solutions</div>
+    </div>
+  </div>
+
+  <!-- PRINT -->
+  <div class="section" id="sec-print">
+    <div class="sec-head">
+      <div class="sec-eyebrow">Print &amp; flyer copy</div>
+      <h2 class="sec-title">Print &amp; Flyer Copy</h2>
+      <p class="sec-desc">Approved text blocks for physical flyers, banners, and printed materials. Use your own design or ask your designer to typeset these.</p>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">A5 flyer — headline &amp; body</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">HEADLINE:
+Run your entire business from one system.
+
+SUBHEADLINE:
+Ledgio connects your till, your stock, and your accounts — in real time, on any device.
+
+BODY:
+Stop juggling spreadsheets and disconnected apps. Ledgio is business management software that does it all:
+
+• Point of Sale with receipt control
+• Inventory across multiple branches
+• Full accounting and financial reports
+• Invoicing and supplier management
+• Role-based access for your whole team
+
+Installs on Windows, Mac, Android, and iPhone. No app store. No IT department.
+
+CTA:
+Contact Hapa Solutions for a free demo
+[Your phone] · [Your email]</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Banner / pull-up stand (short)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Ledgio
+Business Management Software
+
+✓ Point of Sale
+✓ Inventory
+✓ Accounting
+✓ Multi-Branch
+
+One system. Any device.
+
+Ask us for a demo.
+Hapa Solutions — [your contact]</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Business card back panel</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Authorised Ledgio Partner
+
+Business software for:
+POS · Inventory · Accounting
+Invoicing · Multi-Branch
+
+Contact us for a free setup demo.</div>
+    </div>
+  </div>
+
+  <!-- GUIDELINES -->
+  <div class="section" id="sec-guidelines">
+    <div class="sec-head">
+      <div class="sec-eyebrow">Partner guidelines</div>
+      <h2 class="sec-title">Dos &amp; Don'ts</h2>
+      <p class="sec-desc">Follow these guidelines in all marketing. Hapa Solutions is authorised to promote and sell Ledgio — these rules protect both the partner and the brand.</p>
+    </div>
+
+    <div class="dos-donts">
+      <div class="do-card">
+        <div class="do-head">✓ Do</div>
+        <ul class="do-list">
+          <li>Call Ledgio "business management software" or "cloud software"</li>
+          <li>Say Ledgio installs on any device via PWA</li>
+          <li>Say there is a free Starter plan during early access</li>
+          <li>Say Ledgio connects POS, inventory, and accounting</li>
+          <li>Say Ledgio works on Windows, Mac, Android, and iPhone</li>
+          <li>Identify yourself as an "Authorised Ledgio Partner" or "Hapa Solutions — Ledgio Partner"</li>
+          <li>Use all copy on this page verbatim or with minor personalisation</li>
+          <li>Include your own contact details alongside Ledgio's email</li>
+        </ul>
+      </div>
+      <div class="dont-card">
+        <div class="dont-head">✗ Don't</div>
+        <ul class="dont-list">
+          <li>Call Ledgio a "website" or "web app"</li>
+          <li>Promise specific uptime percentages or SLA terms not in writing</li>
+          <li>Quote pricing other than what is in the approved materials</li>
+          <li>Claim features that have not been confirmed as live in the software</li>
+          <li>Use Ledgio's name or logo in a way that implies Ledgio and Hapa Solutions are the same company</li>
+          <li>Make comparisons to named competitors without prior approval</li>
+          <li>Offer discounts or pricing modifications without authorisation</li>
+          <li>Share this marketing kit with parties outside your sales team</li>
+        </ul>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Approved partner identifier (use in all materials)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Hapa Solutions — Authorised Ledgio Partner</div>
+    </div>
+
+    <div class="copy-block">
+      <div class="copy-label">
+        <span class="copy-label-text">Approved disclaimer (for printed materials)</span>
+        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+      </div>
+      <div class="copy-text">Ledgio is a product of Ledgio Software. Distributed in this region by Hapa Solutions. Features and pricing subject to change. Contact ledgioapp@gmail.com for the latest information.</div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<div class="footer">
+  <span>Ledgio Partner Marketing Kit · Hapa Solutions · Approved 2026</span>
+  <a href="mailto:ledgioapp@gmail.com">ledgioapp@gmail.com</a>
+</div>
+
+<script>
+  function showTab(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('sec-' + id).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  function copyText(btn) {
+    const text = btn.closest('.copy-block').querySelector('.copy-text').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+</script>

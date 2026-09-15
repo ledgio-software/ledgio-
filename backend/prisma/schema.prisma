@@ -76,6 +76,13 @@ model Tenant {
   subscriptionStatus      String    @default("TRIAL") @map("subscription_status")
   trialEndsAt             DateTime? @map("trial_ends_at")
   subscriptionPaidUntil   DateTime? @map("subscription_paid_until")
+  // Auto-renewal: Paystack reusable authorization code captured after first
+  // payment. When set, the auto-renew cron charges this card/MoMo daily
+  // before the subscription expires so the tenant never loses access.
+  paystackAuthCode        String?   @map("paystack_auth_code")
+  paystackAuthChannel     String?   @map("paystack_auth_channel") // "card" | "mobile_money"
+  paystackAuthSummary     String?   @map("paystack_auth_summary") // "Visa **** 4082" | "MTN MoMo **** 0234"
+  autoRenewEnabled        Boolean   @default(true) @map("auto_renew_enabled")
   // Owner/manager phone number that automated SMS alerts (till-close
   // summaries, cash shortage warnings) go to. Optional - alerts are skipped
   // (not sent to a shared/hardcoded fallback) when unset for this tenant.
@@ -85,6 +92,15 @@ model Tenant {
   // When true, stock is allowed to go negative and quantityOnHand may become
   // negative. Useful for businesses that fulfil before receiving stock.
   allowNegativeStock      Boolean   @default(false) @map("allow_negative_stock")
+  // When false, the POS nav item and /pos route are hidden for this tenant.
+  // Defaults to true (POS visible). NONPROFIT tenants already hide POS via
+  // orgType gating; this toggle lets a BUSINESS tenant (e.g. a law firm, a
+  // consulting practice) also turn it off without changing their orgType.
+  posEnabled              Boolean   @default(true) @map("pos_enabled")
+  // Referral code used when this tenant signed up (links to ReferralPartner.code).
+  referralCode            String?   @map("referral_code")
+  // School module config stored as JSON string. Currently: { lateFine: { enabled, ratePerDay, graceDays } }
+  schoolConfig            String?   @map("school_config")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
@@ -93,6 +109,7 @@ model Tenant {
   apiKeys     ApiKey[]
 
   @@index([acceptedTermsVersion, termsAcceptedAt])
+  @@index([referralCode])
   @@map("tenants")
 }
 
@@ -988,6 +1005,10 @@ model InventoryItem {
   // WHOLESALE customer is selected on an invoice or POS sale the unit price
   // auto-fills from this field; the user can still override per-line.
   wholesalePrice    Decimal? @map("wholesale_price") @db.Decimal(15, 2)
+  // Minimum price floor: attendants can negotiate above this but the POS
+  // blocks any sale recorded below it. Null = no floor enforced (fixed-price
+  // shops set floor = sellingPrice implicitly via UI convention).
+  floorPrice        Decimal? @map("floor_price") @db.Decimal(15, 2)
   reorderLevel      Int      @default(10) @map("reorder_level")
   // Guards against repeat low-stock notifications within 24 hours for the same
   // item (see lowStockAlertService.ts). Null = never alerted.
@@ -1123,6 +1144,25 @@ model ProductionOrder {
 }
 
 // Pharmacy prescription register - required by Ghana FDA for licensed pharmacies.
+model PharmacyPatient {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  name              String
+  phone             String?
+  dateOfBirth       DateTime? @map("date_of_birth")
+  nhisCardNumber    String?   @map("nhis_card_number")
+  allergies         String[]  @default([])
+  chronicConditions String?   @map("chronic_conditions")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  prescriptions Prescription[]
+
+  @@index([tenantId])
+  @@index([tenantId, phone])
+  @@map("pharmacy_patients")
+}
+
 model Prescription {
   id                String    @id @default(uuid())
   tenantId          String    @map("tenant_id")
@@ -1136,12 +1176,18 @@ model Prescription {
   dispensedByName   String?   @map("dispensed_by_name")
   cashSaleId        String?   @map("cash_sale_id")
   notes             String?
+  billingType       String    @default("CASH") @map("billing_type")
+  patientId         String?   @map("patient_id")
+  evatInvoiceRef    String?   @map("evat_invoice_ref")
+  neppCode          String?   @map("nepp_code")
   createdAt         DateTime  @default(now()) @map("created_at")
 
-  lines PrescriptionLine[]
+  lines   PrescriptionLine[]
+  patient PharmacyPatient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, rxNumber])
   @@index([tenantId])
+  @@index([tenantId, billingType])
   @@map("prescriptions")
 }
 
@@ -2405,4 +2451,500 @@ model MonthClose {
   @@unique([tenantId, year, month])
   @@index([tenantId])
   @@map("month_closes")
+}
+
+model ReferralPartner {
+  id             String   @id @default(uuid())
+  name           String
+  code           String   @unique
+  commissionRate Decimal  @default(10) @map("commission_rate") @db.Decimal(5, 2)
+  contacts       String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("referral_partners")
+}
+
+model TeamMember {
+  id           String   @id
+  name         String
+  role         String
+  color        String   @default("slate")
+  assignedTabs String[] @map("assigned_tabs")
+  pinHash      String   @map("pin_hash")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("team_members")
+}
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  status      String   @default("OPEN")
+  priority    String   @default("MEDIUM")
+  assignedTo  String?  @map("assigned_to")
+  tenantId    String?  @map("tenant_id")
+  tenantName  String?  @map("tenant_name")
+  errorLogRef String?  @map("error_log_ref")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([assignedTo])
+  @@index([tenantId])
+  @@map("support_tickets")
+}
+
+// ─── School Module ───────────────────────────────────────────────────────────
+
+model SchoolClass {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String   // e.g. "Primary 3A", "JHS 1B", "KG 2"
+  level     String   // CRECHE | NURSERY | KG | PRIMARY | JHS
+  capacity  Int      @default(30)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("school_classes")
+}
+
+model Student {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  studentCode   String    @map("student_code")
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  className     String    @map("class_name")
+  guardianName  String    @map("guardian_name")
+  guardianPhone String    @map("guardian_phone")
+  guardianEmail String?   @map("guardian_email")
+  dateOfBirth   DateTime? @map("date_of_birth")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, studentCode])
+  @@index([tenantId])
+  @@index([tenantId, className])
+  @@map("students")
+}
+
+model AcademicTerm {
+  id           String        @id @default(uuid())
+  tenantId     String        @map("tenant_id")
+  name         String
+  academicYear String        @map("academic_year")
+  startDate    DateTime      @map("start_date")
+  endDate      DateTime      @map("end_date")
+  isCurrent    Boolean       @default(false) @map("is_current")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  feeSchedules FeeSchedule[]
+
+  @@index([tenantId])
+  @@map("academic_terms")
+}
+
+model FeeSchedule {
+  id        String       @id @default(uuid())
+  tenantId  String       @map("tenant_id")
+  termId    String       @map("term_id")
+  term      AcademicTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  feeName   String       @map("fee_name")
+  className String?      @map("class_name")
+  amount    Decimal      @db.Decimal(15, 2)
+  dueDate   DateTime?    @map("due_date")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, termId])
+  @@map("fee_schedules")
+}
+
+// ─── School ERP Extension ────────────────────────────────────────────────────
+
+model SchoolAttendance {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  studentId String   @map("student_id")
+  termId    String   @map("term_id")
+  date      DateTime @db.Date
+  status    String   @default("PRESENT") // PRESENT | ABSENT | LATE | EXCUSED
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, studentId, date])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, termId])
+  @@map("school_attendance")
+}
+
+model StudentAssessment {
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+  studentId   String  @map("student_id")
+  termId      String  @map("term_id")
+  subjectName String  @map("subject_name")
+  examType    String  @map("exam_type") // MIDTERM | ENDTERM | QUIZ | PROJECT | OTHER
+  score       Decimal @db.Decimal(8, 2)
+  maxScore    Decimal @map("max_score") @db.Decimal(8, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, termId])
+  @@index([tenantId, studentId])
+  @@map("student_assessments")
+}
+
+model Admission {
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  applicationNumber  String   @map("application_number")
+  applicantFirstName String   @map("applicant_first_name")
+  applicantLastName  String   @map("applicant_last_name")
+  dateOfBirth        DateTime? @map("date_of_birth")
+  applyingClass      String   @map("applying_class")
+  parentName         String   @map("parent_name")
+  parentPhone        String   @map("parent_phone")
+  parentEmail        String?  @map("parent_email")
+  status             String   @default("PENDING") // PENDING | REVIEWING | ACCEPTED | REJECTED | ENROLLED
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, applicationNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("admissions")
+}
+
+model TimetableSlot {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  className   String   @map("class_name")
+  dayOfWeek   String   @map("day_of_week") // MON | TUE | WED | THU | FRI | SAT
+  startTime   String   @map("start_time") // e.g. "08:00"
+  endTime     String   @map("end_time")   // e.g. "09:00"
+  subjectName String   @map("subject_name")
+  teacherName String?  @map("teacher_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, className])
+  @@map("timetable_slots")
+}
+
+model SchoolCertificate {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  studentId       String   @map("student_id")
+  certificateType String   @map("certificate_type") // LEAVING | COMPLETION | CONDUCT | TRANSFER | SCHOLARSHIP
+  issuedDate      DateTime @map("issued_date")
+  issuedBy        String   @map("issued_by")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@map("school_certificates")
+}
+
+model Scholarship {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  studentId      String   @map("student_id")
+  termId         String?  @map("term_id")
+  scholarshipName String  @map("scholarship_name")
+  discountType   String   @map("discount_type") // PERCENT | FIXED_AMOUNT
+  discountValue  Decimal  @map("discount_value") @db.Decimal(15, 2)
+  reason         String?
+  awardedDate    DateTime @map("awarded_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@map("scholarships")
+}
+
+model StudentHealth {
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  studentId          String   @map("student_id")
+  bloodGroup         String?  @map("blood_group")
+  allergies          String   @default("") // comma-separated
+  medicalConditions  String   @default("") @map("medical_conditions") // comma-separated
+  emergencyContact   String?  @map("emergency_contact")
+  emergencyPhone     String?  @map("emergency_phone")
+  vaccinationNotes   String?  @map("vaccination_notes")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, studentId])
+  @@index([tenantId])
+  @@map("student_health")
+}
+
+model SchoolEvent {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  title       String
+  description String?
+  eventDate   DateTime @map("event_date")
+  endDate     DateTime? @map("end_date")
+  eventType   String   @map("event_type") // ACADEMIC | SPORTS | CULTURAL | HOLIDAY | EXAM | MEETING | OTHER
+  location    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, eventDate])
+  @@map("school_events")
+}
+
+model Teacher {
+  id            String        @id @default(uuid())
+  tenantId      String        @map("tenant_id")
+  staffId       String?       @map("staff_id")
+  firstName     String        @map("first_name")
+  lastName      String        @map("last_name")
+  email         String?
+  phone         String?
+  subject       String?
+  className     String?       @map("class_name")
+  ntcLicenseNo  String?       @map("ntc_license_no")
+  ntcIssueDate  DateTime?     @map("ntc_issue_date")
+  ntcExpiryDate DateTime?     @map("ntc_expiry_date")
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  cpdActivities CpdActivity[]
+
+  @@unique([tenantId, staffId])
+  @@index([tenantId])
+  @@map("teachers")
+}
+
+model CpdActivity {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  teacherId   String   @map("teacher_id")
+  title       String
+  category    String
+  date        DateTime
+  hours       Decimal  @db.Decimal(5, 1)
+  provider    String?
+  certificate String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  teacher     Teacher  @relation(fields: [teacherId], references: [id])
+
+  @@index([tenantId, teacherId])
+  @@map("cpd_activities")
+}
+
+model NasiaAssessment {
+  id        String        @id @default(uuid())
+  tenantId  String        @map("tenant_id")
+  title     String
+  date      DateTime
+  status    String        @default("draft") // draft | completed
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  ratings   NasiaRating[]
+
+  @@index([tenantId])
+  @@map("nasia_assessments")
+}
+
+model NasiaRating {
+  id            String          @id @default(uuid())
+  assessmentId  String          @map("assessment_id")
+  indicatorCode String          @map("indicator_code")
+  score         Int
+  notes         String?
+  assessment    NasiaAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, indicatorCode])
+  @@map("nasia_ratings")
+}
+
+model FeePaymentPlan {
+  id           String            @id @default(uuid())
+  tenantId     String            @map("tenant_id")
+  studentId    String            @map("student_id")
+  termId       String            @map("term_id")
+  scheduleId   String            @map("schedule_id")
+  totalAmount  Decimal           @map("total_amount") @db.Decimal(15, 2)
+  notes        String?
+  status       String            @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  installments FeeInstallment[]
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, termId])
+  @@map("fee_payment_plans")
+}
+
+model FeeInstallment {
+  id         String         @id @default(uuid())
+  planId     String         @map("plan_id")
+  plan       FeePaymentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dueDate    DateTime       @map("due_date")
+  amount     Decimal        @db.Decimal(15, 2)
+  amountPaid Decimal        @default(0) @map("amount_paid") @db.Decimal(15, 2)
+  status     String         @default("PENDING") // PENDING | PARTIAL | PAID | OVERDUE
+  paidAt     DateTime?      @map("paid_at")
+  paymentMode String?       @map("payment_mode") // CASH | MOBILE_MONEY | CHEQUE | BANK_TRANSFER | WAIVER
+  notes      String?
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  @@index([planId])
+  @@map("fee_installments")
+}
+
+// ─── Transport Management ─────────────────────────────────────────────────────
+
+model TransportVehicle {
+  id               String             @id @default(uuid())
+  tenantId         String             @map("tenant_id")
+  regNumber        String             @map("reg_number")
+  make             String?
+  model            String?
+  capacity         Int?
+  fuelType         String?            @map("fuel_type") // PETROL | DIESEL | LPG
+  status           String             @default("ACTIVE") // ACTIVE | MAINTENANCE | RETIRED
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  routes           TransportRoute[]
+  fuelLogs         TransportFuelLog[]
+  maintenanceLogs  TransportMaintLog[]
+
+  @@unique([tenantId, regNumber])
+  @@index([tenantId])
+  @@map("transport_vehicles")
+}
+
+model TransportDriver {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  firstName   String           @map("first_name")
+  lastName    String           @map("last_name")
+  phone       String?
+  licenseNo   String?          @map("license_no")
+  licenseExp  DateTime?        @map("license_exp")
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  routes      TransportRoute[]
+
+  @@index([tenantId])
+  @@map("transport_drivers")
+}
+
+model TransportRoute {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  name        String
+  description String?
+  vehicleId   String?          @map("vehicle_id")
+  vehicle     TransportVehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driverId    String?          @map("driver_id")
+  driver      TransportDriver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  morningDep  String?          @map("morning_dep")  // "06:30"
+  afternoonDep String?         @map("afternoon_dep") // "15:00"
+  fee         Decimal?         @db.Decimal(15, 2)
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  stops       TransportStop[]
+
+  @@index([tenantId])
+  @@map("transport_routes")
+}
+
+model TransportStop {
+  id        String         @id @default(uuid())
+  routeId   String         @map("route_id")
+  route     TransportRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int
+  landmark  String?
+
+  @@index([routeId])
+  @@map("transport_stops")
+}
+
+model TransportFuelLog {
+  id         String           @id @default(uuid())
+  tenantId   String           @map("tenant_id")
+  vehicleId  String           @map("vehicle_id")
+  vehicle    TransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  date       DateTime
+  litres     Decimal          @db.Decimal(8, 2)
+  costPerLitre Decimal        @map("cost_per_litre") @db.Decimal(10, 4)
+  totalCost  Decimal          @map("total_cost") @db.Decimal(15, 2)
+  odometer   Int?
+  station    String?
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, vehicleId])
+  @@map("transport_fuel_logs")
+}
+
+model TransportMaintLog {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  vehicleId   String           @map("vehicle_id")
+  vehicle     TransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  date        DateTime
+  type        String           // OIL_CHANGE | TYRE | BRAKE | SERVICE | REPAIR | OTHER
+  description String
+  cost        Decimal          @db.Decimal(15, 2)
+  workshop    String?
+  nextDueDate DateTime?        @map("next_due_date")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, vehicleId])
+  @@map("transport_maint_logs")
+}
+
+// ── Parent Communication Portal ──────────────────────────────────────────────
+
+model ParentMessage {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  studentId   String   @map("student_id")
+  type        String   // FEE_REMINDER | ATTENDANCE | RESULTS | GENERAL
+  channel     String   // SMS | EMAIL | WHATSAPP
+  recipient   String   // phone or email address
+  message     String   @db.Text
+  status      String   @default("SENT") // SENT | FAILED | PENDING
+  sentAt      DateTime @default(now()) @map("sent_at")
+  sentBy      String?  @map("sent_by")
+  referenceId String?  @map("reference_id") // termId, date, installmentId, etc.
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, type])
+  @@map("parent_messages")
 }

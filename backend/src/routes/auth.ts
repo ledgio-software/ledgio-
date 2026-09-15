@@ -9,7 +9,15 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { authRateLimiter } from '../middleware/rateLimiterMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { recordAuditLog, recordAuditLogTx } from '../services/auditLogService';
-import { revokeToken } from '../services/tokenRevocationService';
+import { revokeToken, getCredentialVersion } from '../services/tokenRevocationService';
+import {
+  preLoginCheck,
+  recordFailedLogin as anomalyRecordFailed,
+  analyzeSuccessfulLogin,
+  isAccountLocked,
+} from '../services/loginAnomalyService';
+import { checkHoneypotLogin } from '../services/honeypotService';
+import { analyzeBotFingerprint } from '../services/botFingerprintService';
 import {
   generateTotpSecret,
   buildOtpAuthUrl,
@@ -326,6 +334,10 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
     ? await prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { orgType: true, isLive: true } })
     : null;
 
+  // Embed the current credential version so that future password resets,
+  // role changes, or member deletions can immediately invalidate this token.
+  const credentialVersion = await getCredentialVersion(user.id);
+
   const tokenPayload = {
     id: user.id,
     email: user.email,
@@ -335,16 +347,29 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
     orgType: loginTenant?.orgType,
     isLive: loginTenant?.isLive ?? false,
     isMfaEnabled: user.isMfaEnabled || false,
+    credentialVersion,
     ...(mfaVerifiedNow ? { lastMfaAt: Math.floor(Date.now() / 1000) } : {}),
   };
   const token = generateJwtToken(tokenPayload);
+
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+
+  // Anomaly analysis (new-IP, impossible velocity). Never blocks the login —
+  // result is informational and written to the audit log internally.
+  await analyzeSuccessfulLogin({
+    userId: user.id,
+    email: user.email,
+    tenantId: user.tenantId || null,
+    ip,
+    userAgent: req.headers['user-agent'],
+  });
 
   await recordAuditLog({
     action: 'AUTH.LOGIN_SUCCESS',
     entity: 'User',
     entityId: user.id,
     tenantId: user.tenantId || null,
-    actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
+    actor: { userId: user.id, userEmail: user.email, ipAddress: ip },
   });
 
   res.status(200).json({
@@ -373,7 +398,7 @@ async function completeLogin(user: UserRecord, req: Request, res: Response, mfaV
  */
 router.post('/login', authRateLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { email, password, _bf } = req.body;
 
     if (!email || !password) {
       res.status(400).json({
@@ -383,12 +408,50 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
       return;
     }
 
+    const loginIp = req.ip || req.socket?.remoteAddress || 'unknown';
+
+    // Honeypot credential check — must run BEFORE the DB lookup so we never
+    // waste a query on a known fake address and never reveal whether it exists.
+    const isHoneypot = await checkHoneypotLogin(email, {
+      ip: loginIp,
+      userAgent: req.headers['user-agent'],
+    });
+    if (isHoneypot) {
+      // Indistinguishable from a real failed login — no indication a trap fired.
+      res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password.' });
+      return;
+    }
+
+    // Bot fingerprint analysis — fire-and-forget, never blocks the login.
+    // Logs SECURITY.BOT_SIGNAL to the audit trail when suspicious signals fire.
+    if (_bf) {
+      analyzeBotFingerprint({
+        fingerprint: _bf,
+        email,
+        ip: loginIp,
+        userAgent: req.headers['user-agent'],
+      }).catch(() => {/* already logged inside service */});
+    }
+
     const user = await findUserByEmail(prisma, email);
+
+    // Pre-login anomaly check: IP burst guard + per-account lockout.
+    // Run after the user lookup so we can pass userId (needed for lockout key),
+    // but before password verification to avoid timing oracles on locked accounts.
+    const preCheck = await preLoginCheck(email, user?.id, loginIp);
+    if (preCheck.blocked) {
+      res.status(429).json({
+        error: 'Too Many Requests',
+        message: preCheck.reason || 'Too many login attempts. Please try again later.',
+      });
+      return;
+    }
+
     if (!user || !user.password) {
       await recordAuditLog({
         action: 'AUTH.LOGIN_FAILED',
         entity: 'User',
-        actor: { userEmail: email, ipAddress: req.ip || req.socket?.remoteAddress || null },
+        actor: { userEmail: email, ipAddress: loginIp },
         details: `Login failed for "${email}": no matching account.`,
       });
       res.status(401).json({
@@ -404,7 +467,7 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
         entity: 'User',
         entityId: user.id,
         tenantId: user.tenantId || null,
-        actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
+        actor: { userId: user.id, userEmail: user.email, ipAddress: loginIp },
         details: `Login failed for "${email}": account deactivated.`,
       });
       res.status(401).json({
@@ -416,13 +479,13 @@ router.post('/login', authRateLimiter, async (req: Request, res: Response): Prom
 
     const isPasswordValid = verifyPassword(password, user.password);
     if (!isPasswordValid) {
-      await recordAuditLog({
-        action: 'AUTH.LOGIN_FAILED',
-        entity: 'User',
-        entityId: user.id,
-        tenantId: user.tenantId || null,
-        actor: { userId: user.id, userEmail: user.email, ipAddress: req.ip || req.socket?.remoteAddress || null },
-        details: `Login failed for "${email}": invalid password.`,
+      // Anomaly service tracks consecutive failures and locks the account
+      // after MAX_FAILED_ATTEMPTS — it writes its own audit log entry.
+      await anomalyRecordFailed({
+        userId: user.id,
+        email: user.email,
+        tenantId: user.tenantId ?? null,
+        ip: loginIp,
       });
       res.status(401).json({
         error: 'Unauthorized',

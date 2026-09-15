@@ -376,16 +376,37 @@ router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async 
           }
         }
 
-        const effectivePriceFor = (item: any): number => {
+        const effectivePriceFor = (item: any, line: any): number => {
+          // If a custom price was negotiated and sent from the POS, use it
+          // (already validated against floorPrice below).
+          if (line.customPrice !== undefined && line.customPrice !== null) {
+            return Number(line.customPrice);
+          }
           if (resolvedSaleType === 'WHOLESALE' && item.wholesalePrice !== null && item.wholesalePrice !== undefined) {
             return Number(item.wholesalePrice);
           }
           return Number(item.sellingPrice);
         };
 
+        // Floor price validation: reject any line whose negotiated price
+        // is below the item's configured floor, protecting the boss from
+        // attendants under-recording a sale price.
+        for (const line of items) {
+          if (line.customPrice === undefined || line.customPrice === null) continue;
+          const item = itemsById.get(line.itemId) as any;
+          if (item.floorPrice !== null && item.floorPrice !== undefined) {
+            const floor = Number(item.floorPrice);
+            if (Number(line.customPrice) < floor) {
+              throw new Error(
+                `Sale price for ${item.name} (GH₵ ${Number(line.customPrice).toFixed(2)}) is below the floor price of GH₵ ${floor.toFixed(2)}.`
+              );
+            }
+          }
+        }
+
         const totalAmount = items.reduce((sum: number, line: any) => {
           const item = itemsById.get(line.itemId) as any;
-          return sum + effectivePriceFor(item) * line.quantity;
+          return sum + effectivePriceFor(item, line) * line.quantity;
         }, 0);
 
         // For non-CASH payments, cashGiven = amount (exact, no change)
@@ -489,7 +510,7 @@ router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async 
 
         const lines = items.map((line: any) => {
           const item = itemsById.get(line.itemId) as any;
-          const price = effectivePriceFor(item);
+          const price = effectivePriceFor(item, line);
           return {
             itemId: line.itemId,
             itemName: item.name as string,
@@ -567,29 +588,35 @@ router.post('/sales', checkEmergencyStop, validateBody(createSaleSchema), async 
       if (journalId) result.sale.journalId = journalId;
     }
 
-    // Fire-and-forget WhatsApp receipt if customer phone was provided
+    // Send WhatsApp receipt if customer phone was provided; await with a
+    // hard 10s ceiling so the response is never held indefinitely.
     const phone = result.sale.customerPhone || customerPhone;
+    let whatsappSent = false;
     if (phone && !result.replayed) {
       const { tenantName } = requireTenantContext();
-      sendWhatsAppReceipt(String(phone), {
-        receiptNo: result.sale.receiptNo,
-        businessName: tenantName || 'Store',
-        items: result.lines.map((l: any) => ({
-          name: l.itemName,
-          quantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice),
-          lineTotal: Number(l.lineTotal),
-        })),
-        totalAmount: result.totalAmount,
-        cashGiven: Number(cashGiven),
-        changeGiven: result.changeGiven,
-        dateTime: new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra' }),
-      });
+      const waTimeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10000));
+      whatsappSent = await Promise.race([
+        sendWhatsAppReceipt(String(phone), {
+          receiptNo: result.sale.receiptNo,
+          businessName: tenantName || 'Store',
+          items: result.lines.map((l: any) => ({
+            name: l.itemName,
+            quantity: Number(l.quantity),
+            unitPrice: Number(l.unitPrice),
+            lineTotal: Number(l.lineTotal),
+          })),
+          totalAmount: result.totalAmount,
+          cashGiven: Number(cashGiven),
+          changeGiven: result.changeGiven,
+          dateTime: new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra' }),
+        }),
+        waTimeout,
+      ]);
     }
 
     const { tenantId: saleTenantId } = requireTenantContext();
     invalidateCachedList(saleTenantId, 'inventory-items').catch(() => {});
-    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: { ...result, warnings: (result as any).warnings || [] } });
+    res.status(result.replayed ? 200 : 201).json({ success: true, message: 'Cash sale recorded successfully', data: { ...result, warnings: (result as any).warnings || [], whatsappSent } });
   } catch (error: any) {
     console.error('[CashTill] Error recording cash sale:', error);
     if (error instanceof WarehouseAccessError) {
@@ -919,23 +946,37 @@ router.get('/sales/:id/receipt.pdf', async (req: Request, res: Response): Promis
     // Divider
     doc.moveDown(0.3).moveTo(MARGIN, doc.y).lineTo(W - MARGIN, doc.y).lineWidth(0.5).stroke().moveDown(0.3);
 
-    // Line items
+    // Line items — use explicit X coordinates so long item names don't
+    // displace the Qty/Price/Total columns via PDFKit's continued chain.
     doc.fontSize(7).font('Helvetica-Bold');
     const QW = 22, PW = 38, TW = 38;
-    const DW = COL - QW - PW - TW;
+    const DW = COL - QW - PW - TW;   // ~104pt for item name
     const x0 = MARGIN;
-    doc.text('Item', x0, doc.y, { width: DW, continued: true });
-    doc.text('Qty', { width: QW, align: 'right', continued: true });
-    doc.text('Price', { width: PW, align: 'right', continued: true });
-    doc.text('Total', { width: TW, align: 'right' });
+    const x1 = x0 + DW;              // Qty column
+    const x2 = x1 + QW;              // Price column
+    const x3 = x2 + PW;              // Total column
 
+    const printRow = (name: string, qty: string, price: string, total: string) => {
+      const y = doc.y;
+      // Truncate name to fit the column width (avoid wrapping)
+      const maxChars = 20;
+      const label = name.length > maxChars ? name.substring(0, maxChars - 1) + '…' : name;
+      doc.text(label, x0, y, { width: DW, lineBreak: false });
+      doc.text(qty,   x1, y, { width: QW, align: 'right', lineBreak: false });
+      doc.text(price, x2, y, { width: PW, align: 'right', lineBreak: false });
+      doc.text(total, x3, y, { width: TW, align: 'right', lineBreak: false });
+      doc.moveDown(0.9);
+    };
+
+    printRow('Item', 'Qty', 'Price', 'Total');
     doc.font('Helvetica');
     for (const l of lines) {
-      const y = doc.y;
-      doc.text(l.itemName, x0, y, { width: DW, continued: true });
-      doc.text(String(l.quantity), { width: QW, align: 'right', continued: true });
-      doc.text(fmt(Number(l.unitPrice)), { width: PW, align: 'right', continued: true });
-      doc.text(fmt(Number(l.lineTotal)), { width: TW, align: 'right' });
+      printRow(
+        l.itemName,
+        String(l.quantity),
+        fmt(Number(l.unitPrice)),
+        fmt(Number(l.lineTotal)),
+      );
     }
 
     // Divider
@@ -1253,5 +1294,62 @@ router.get('/closeouts', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+/**
+ * GET /api/v1/tills/receipts
+ * Admin/Accountant-only: paginated receipt audit log across all shops.
+ * Query params: page (default 1), limit (default 50, max 200),
+ *               from (ISO date), to (ISO date), warehouseId, cashierId
+ */
+router.get('/receipts', requireRole('Admin', 'Accountant'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10));
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10)));
+    const skip = (page - 1) * limit;
+    const { from, to, warehouseId, cashierId } = req.query as Record<string, string | undefined>;
+
+    const receipts = await withCurrentTenantDb(prisma, async (client) => {
+      const where: any = {
+        tenantId,
+        status: 'COMPLETED',
+      };
+      if (from) where.createdAt = { ...(where.createdAt ?? {}), gte: new Date(from) };
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        where.createdAt = { ...(where.createdAt ?? {}), lte: toDate };
+      }
+      if (warehouseId) where.till = { warehouseId };
+      if (cashierId) where.createdByUserId = cashierId;
+
+      const [total, items] = await Promise.all([
+        (client as any).cashSale.count({ where }),
+        (client as any).cashSale.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            lines: true,
+            till: { include: { warehouse: { select: { name: true } } } },
+          },
+        }),
+      ]);
+
+      return { total, items };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        receipts: receipts.items,
+        pagination: { page, limit, total: receipts.total, pages: Math.ceil(receipts.total / limit) },
+      },
+    });
+  } catch (error: any) {
+    console.error('[CashTill] Error fetching receipt log:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch receipt log.' });
+  }
+});
 
 export default router;

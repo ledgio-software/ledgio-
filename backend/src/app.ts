@@ -21,9 +21,10 @@ import journalEntriesRouter from './routes/journalEntries';
 import ledgersRouter from './routes/ledgers';
 import reportsRouter from './routes/reports';
 import { requestLoggerMiddleware } from './middleware/requestLoggerMiddleware';
+import { adminPasscodeMiddleware } from './middleware/adminPasscodeMiddleware';
+import { idorAuditMiddleware } from './middleware/idorGuard';
 import { metricsMiddleware } from './middleware/metricsMiddleware';
-import { apiRateLimiter } from './middleware/rateLimiterMiddleware';
-import legalRouter from './routes/legal';
+import { apiRateLimiter, adminRateLimiter } from './middleware/rateLimiterMiddleware';
 import customFieldsRouter from './routes/customFields';
 import auditLogsRouter from './routes/auditLogs';
 import importRouter from './routes/import';
@@ -54,6 +55,21 @@ import adminJobsRouter from './routes/adminJobs';
 import adminErrorLogsRouter from './routes/adminErrorLogs';
 import adminUsersRouter from './routes/adminUsers';
 import adminEmergencyStopRouter from './routes/adminEmergencyStop';
+import adminReferralsRouter from './routes/adminReferrals';
+import adminClientHealthRouter from './routes/adminClientHealth';
+import adminChurnRiskRouter from './routes/adminChurnRisk';
+import adminOnboardingRouter from './routes/adminOnboarding';
+import adminRevenueRouter from './routes/adminRevenue';
+import adminTotpRouter from './routes/adminTotp';
+import adminDebugLogsRouter from './routes/adminDebugLogs';
+import adminTeamAuthRouter from './routes/adminTeamAuth';
+import adminTenantInspectorRouter from './routes/adminTenantInspector';
+import adminFailedPaymentsRouter from './routes/adminFailedPayments';
+import adminSupportQueueRouter from './routes/adminSupportQueue';
+import adminSlowQueriesRouter from './routes/adminSlowQueries';
+import adminCohortRouter from './routes/adminCohort';
+import adminSchemaDiffRouter from './routes/adminSchemaDiff';
+import { debugContextMiddleware } from './middleware/debugContextMiddleware';
 import { recordError } from './services/errorLogService';
 import expenseClaimsRouter from './routes/expenseClaims';
 import syncRouter from './routes/sync';
@@ -79,6 +95,28 @@ import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
+import schoolClassesRouter from './routes/schoolClasses';
+import schoolStudentsRouter from './routes/schoolStudents';
+import schoolTermsRouter from './routes/schoolTerms';
+import schoolFeeSchedulesRouter from './routes/schoolFeeSchedules';
+import schoolFeeCollectionRouter from './routes/schoolFeeCollection';
+import schoolReportsRouter from './routes/schoolReports';
+import schoolAttendanceRouter from './routes/schoolAttendance';
+import schoolAssessmentsRouter from './routes/schoolAssessments';
+import schoolReportCardsRouter from './routes/schoolReportCards';
+import schoolAdmissionsRouter from './routes/schoolAdmissions';
+import schoolTimetableRouter from './routes/schoolTimetable';
+import schoolCertificatesRouter from './routes/schoolCertificates';
+import schoolScholarshipsRouter from './routes/schoolScholarships';
+import schoolHealthRouter from './routes/schoolHealth';
+import schoolEventsRouter from './routes/schoolEvents';
+import schoolMISRouter from './routes/schoolMIS';
+import schoolTeachersRouter from './routes/schoolTeachers';
+import schoolNasiaRouter from './routes/schoolNasia';
+import schoolFeePaymentPlansRouter from './routes/schoolFeePaymentPlans';
+import schoolTransportRouter from './routes/schoolTransport';
+import schoolParentCommsRouter from './routes/schoolParentComms';
+import ssnitRouter from './routes/ssnit';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
 import scenariosRouter from './routes/scenarios';
@@ -89,6 +127,7 @@ import postDatedChequesRouter from './routes/postDatedCheques';
 import interestPolicyRouter from './routes/interestPolicy';
 import apiKeysRouter from './routes/apiKeys';
 import externalApiRouter from './routes/externalApi';
+import honeypotProbesRouter from './routes/honeypotProbes';
 
 dotenv.config();
 
@@ -147,14 +186,44 @@ app.use(express.json({ limit: '10mb' }));
 // ── Observability ──────────────────────────────────────────────────────────────
 // Inject X-Request-ID and structured HTTP request/latency logs on every request
 app.use(requestLoggerMiddleware);
+app.use(debugContextMiddleware);
 app.use(metricsMiddleware);
 
 // ── Traffic Protection ──────────────────────────────────────────────────────────
 // Global API rate limiter (100 req/min per tenant or IP)
 app.use('/api/', apiRateLimiter);
 
+// IDOR enumeration detection — logs when a session accesses an unusual number
+// of distinct resource IDs within a short window. Runs after rate limiting so
+// it only sees requests that cleared the rate gate.
+app.use('/api/v1/', idorAuditMiddleware);
+
+// TOTP auth routes — mounted BEFORE the rate limiter and passcode gate because
+// they are part of the login flow itself. The verify endpoint does its own
+// inline passcode check; the setup endpoint also checks the passcode inline.
+// The rate limiter is applied separately to this prefix below.
+app.use('/api/v1/admin/totp', adminRateLimiter, adminTotpRouter);
+
+// Team auth routes — mounted BEFORE the passcode gate because GET /members and
+// POST /login are public (used by the team login page). CRUD routes inside the
+// router self-protect via isMasterAdmin(), so no global gate is needed here.
+app.use('/api/v1/admin/team', adminRateLimiter, adminTeamAuthRouter);
+
+// Strict admin rate limiter (10 req/min per IP) — applied before any admin
+// handler so brute-forcing the master passcode is not feasible.
+app.use('/api/v1/admin/', adminRateLimiter);
+
+// Passcode / session token gate for all admin routes. Applied after the rate
+// limiter so failed guesses are counted before reaching the auth check.
+app.use('/api/v1/admin/', adminPasscodeMiddleware);
+
 // Metrics endpoint (no auth required for Prometheus scraping)
 app.use('/metrics', metricsRouter);
+
+// Honeypot probe endpoints — convincing-looking responses for paths attackers
+// enumerate (/.env, /admin, /wp-login.php, etc.). Mounted before all real routes
+// so the trap fires first. Every hit is logged and triggers an alert email.
+app.use(honeypotProbesRouter);
 
 // Root HEAD handler for uptime monitors that probe HEAD /
 app.head('/', (_req, res) => res.sendStatus(200));
@@ -214,6 +283,30 @@ app.use('/api/v1/tills', cashTillRouter);
 
 // Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
 app.use('/api/v1/pharmacy', pharmacyRouter);
+
+// School module (NONPROFIT/SCHOOL org-type tenants)
+app.use('/api/v1/school/classes', schoolClassesRouter);
+app.use('/api/v1/school/students', schoolStudentsRouter);
+app.use('/api/v1/school/terms', schoolTermsRouter);
+app.use('/api/v1/school/fee-schedules', schoolFeeSchedulesRouter);
+app.use('/api/v1/school/fee-collection', schoolFeeCollectionRouter);
+app.use('/api/v1/school/reports', schoolReportsRouter);
+app.use('/api/v1/school/attendance', schoolAttendanceRouter);
+app.use('/api/v1/school/assessments', schoolAssessmentsRouter);
+app.use('/api/v1/school/report-cards', schoolReportCardsRouter);
+app.use('/api/v1/school/admissions', schoolAdmissionsRouter);
+app.use('/api/v1/school/timetable', schoolTimetableRouter);
+app.use('/api/v1/school/certificates', schoolCertificatesRouter);
+app.use('/api/v1/school/scholarships', schoolScholarshipsRouter);
+app.use('/api/v1/school/health', schoolHealthRouter);
+app.use('/api/v1/school/events', schoolEventsRouter);
+app.use('/api/v1/school/mis', schoolMISRouter);
+app.use('/api/v1/school/teachers', schoolTeachersRouter);
+app.use('/api/v1/school/nasia', schoolNasiaRouter);
+app.use('/api/v1/school/fee-payment-plans', schoolFeePaymentPlansRouter);
+app.use('/api/v1/school/transport', schoolTransportRouter);
+app.use('/api/v1/school/parent-comms', schoolParentCommsRouter);
+app.use('/api/v1/ssnit', ssnitRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);
@@ -292,10 +385,6 @@ app.use('/api/external/v1', externalApiRouter);
 // Migration admin endpoints
 app.use('/api/v1/admin/migrations', migrationsRouter);
 
-// Legal documents endpoints
-app.use('/api/legal', legalRouter);
-app.use('/api/v1/legal', legalRouter);
-
 // Custom fields endpoints (Tier 2 Customization Enforcement Showcase)
 app.use('/api/v1/custom-fields', customFieldsRouter);
 
@@ -314,6 +403,19 @@ app.use('/api/v1/admin/jobs', adminJobsRouter);
 app.use('/api/v1/admin/error-logs', adminErrorLogsRouter);
 app.use('/api/v1/admin/users', adminUsersRouter);
 app.use('/api/v1/admin/emergency-stop', adminEmergencyStopRouter);
+app.use('/api/v1/admin/referrals', adminReferralsRouter);
+app.use('/api/v1/admin/client-health', adminClientHealthRouter);
+app.use('/api/v1/admin/churn-risk', adminChurnRiskRouter);
+app.use('/api/v1/admin/onboarding', adminOnboardingRouter);
+app.use('/api/v1/admin/revenue', adminRevenueRouter);
+app.use('/api/v1/admin/debug', adminDebugLogsRouter);
+app.use('/api/v1/admin/tenants', adminTenantInspectorRouter);
+app.use('/api/v1/admin/failed-payments', adminFailedPaymentsRouter);
+app.use('/api/v1/admin/support-queue', adminSupportQueueRouter);
+app.use('/api/v1/admin/slow-queries', adminSlowQueriesRouter);
+app.use('/api/v1/admin/cohort', adminCohortRouter);
+app.use('/api/v1/admin/schema-diff', adminSchemaDiffRouter);
+
 
 // Employee Expense Claims (submit/approve/reimburse) endpoints
 app.use('/api/v1/expense-claims', expenseClaimsRouter);
@@ -365,7 +467,10 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     path: req.originalUrl ?? req.path,
     status,
     error: err.message ?? 'Unknown error',
-    stack: err.stack,
+    // Strip stack traces in production: they expose internal file paths and
+    // library versions that make targeted CVE attacks easier. Keep them in
+    // non-production so developers can debug locally.
+    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
     tenantId: (req as any).tenantId ?? (req as any).user?.tenantId,
     userId: (req as any).user?.id,
     ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ?? req.socket?.remoteAddress,

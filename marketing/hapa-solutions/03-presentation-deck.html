@@ -1,0 +1,1025 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledgio Presentation</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Outfit:wght@300;400;500;600&display=swap">
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:    #0b1724;
+    --navy2:   #112236;
+    --navy3:   #1a3050;
+    --emerald: #059669;
+    --mint:    #6ee7b7;
+    --blue:    #3b82f6;
+    --sky:     #93c5fd;
+    --text:    #f1f5f9;
+    --muted:   #94a3b8;
+    --border:  rgba(255,255,255,0.10);
+    --amber:   #f59e0b;
+  }
+
+  html, body {
+    height: 100%;
+    background: #0d1b2a;
+    color: var(--text);
+    font-family: 'Outfit', system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── Deck shell ── */
+  #deck {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ── Slides ── */
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 48px 64px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s cubic-bezier(0.4,0,0.2,1),
+                transform 0.45s cubic-bezier(0.4,0,0.2,1);
+    transform: translateX(40px);
+    text-align: center;
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+  .slide.exit {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  .slide.left-align {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  /* ── Nav ── */
+  #nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 14px 32px;
+    background: rgba(11,23,36,0.85);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+  .nav-btn {
+    background: var(--navy3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .nav-btn:hover { background: var(--navy2); border-color: var(--mint); }
+  .nav-btn:disabled { opacity: 0.3; cursor: default; }
+  #slide-counter {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 60px;
+    text-align: center;
+  }
+  #progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--emerald), var(--blue));
+    transition: width 0.4s ease;
+    z-index: 100;
+  }
+
+  /* ── Type ── */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mint);
+    margin-bottom: 16px;
+  }
+  .display {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(36px, 6vw, 72px);
+    font-weight: 700;
+    line-height: 1.05;
+    text-wrap: balance;
+    letter-spacing: -0.5px;
+  }
+  .display em {
+    font-style: italic;
+    background: linear-gradient(135deg, var(--mint) 0%, var(--sky) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .heading {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(28px, 4vw, 48px);
+    font-weight: 700;
+    line-height: 1.1;
+    text-wrap: balance;
+    margin-bottom: 8px;
+  }
+  .subhead {
+    font-size: clamp(14px, 1.8vw, 18px);
+    color: var(--muted);
+    font-weight: 400;
+    max-width: 640px;
+    line-height: 1.6;
+    text-wrap: balance;
+  }
+  .lead {
+    font-size: clamp(15px, 2vw, 20px);
+    color: var(--muted);
+    max-width: 560px;
+    line-height: 1.7;
+    margin-top: 8px;
+  }
+
+  /* ── Logo mark ── */
+  .logomark {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 40px;
+    margin-bottom: 24px;
+  }
+  .lbar {
+    width: 9px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--mint) 0%, var(--sky) 100%);
+  }
+  .lb1 { height: 16px; }
+  .lb2 { height: 26px; opacity: 0.85; }
+  .lb3 { height: 38px; opacity: 0.75; }
+  .brand-text {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #fff 0%, var(--sky) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-left: 6px;
+    line-height: 1;
+    align-self: center;
+  }
+
+  /* ── Grid layouts ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 880px;
+    margin-top: 28px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 880px;
+    margin-top: 28px;
+  }
+  .grid-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 14px;
+    width: 100%;
+    max-width: 920px;
+    margin-top: 28px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 20px;
+    text-align: left;
+  }
+  .card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+  .card h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+  .card p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .card ul {
+    list-style: none;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .card ul li {
+    font-size: 12.5px;
+    color: var(--muted);
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.4;
+  }
+  .card ul li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--mint);
+    font-weight: 700;
+  }
+
+  /* ── Pain points ── */
+  .pain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 32px;
+    max-width: 680px;
+    text-align: left;
+  }
+  .pain {
+    display: flex;
+    gap: 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber);
+    border-radius: 8px;
+    padding: 14px 18px;
+    align-items: flex-start;
+  }
+  .pain-num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--amber);
+    opacity: 0.5;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .pain-body strong {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .pain-body span {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: flex;
+    gap: 32px;
+    margin-top: 36px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--mint), var(--sky));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .stat-lbl {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* ── Pillar cards ── */
+  .pillar-card {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .pillar-card .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin: 0 auto 14px;
+  }
+  .pillar-card h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 19px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .pillar-card p {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── Industry grid ── */
+  .ind-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    max-width: 880px;
+    margin-top: 28px;
+    width: 100%;
+  }
+  .ind {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.4;
+  }
+  .ind-icon { display: block; font-size: 20px; margin-bottom: 6px; }
+
+  /* ── Role cards ── */
+  .role-card {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 18px;
+    text-align: left;
+  }
+  .role-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+  }
+  .role-card h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .role-card ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .role-card ul li {
+    font-size: 12px;
+    color: var(--muted);
+    padding-left: 12px;
+    position: relative;
+  }
+  .role-card ul li::before {
+    content: '·';
+    position: absolute;
+    left: 0;
+    color: var(--mint);
+    font-weight: 700;
+  }
+
+  /* ── Pricing ── */
+  .price-card {
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 22px;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+  .price-card.featured {
+    border-color: var(--emerald);
+    background: rgba(5,150,105,0.08);
+  }
+  .price-card.featured::after {
+    content: 'Most Popular';
+    position: absolute;
+    top: 12px;
+    right: -22px;
+    background: var(--emerald);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 28px;
+    transform: rotate(35deg);
+  }
+  .price-tier {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mint);
+    margin-bottom: 8px;
+  }
+  .price-amount {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .price-period { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .price-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .price-list li {
+    font-size: 12.5px;
+    color: var(--muted);
+    padding-left: 16px;
+    position: relative;
+  }
+  .price-list li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--mint);
+    font-size: 11px;
+  }
+
+  /* ── Why Ledgio ── */
+  .why-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 760px;
+    margin-top: 28px;
+    width: 100%;
+  }
+  .why-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: var(--navy2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .why-check {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(5,150,105,0.2);
+    border: 1px solid var(--emerald);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--mint);
+    flex-shrink: 0;
+  }
+  .why-text strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .why-text span {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  /* ── CTA / Contact slide ── */
+  .cta-band {
+    width: 100%;
+    max-width: 680px;
+    background: linear-gradient(135deg, rgba(5,150,105,0.15) 0%, rgba(59,130,246,0.15) 100%);
+    border: 1px solid rgba(110,231,183,0.25);
+    border-radius: 16px;
+    padding: 36px 40px;
+    margin-top: 32px;
+  }
+  .cta-band p {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+  .contact-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .contact-item strong {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--mint);
+    margin-bottom: 3px;
+  }
+  .contact-item span {
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  /* Slide backgrounds */
+  .slide-cover     { background: radial-gradient(ellipse at 60% 40%, rgba(5,150,105,0.12) 0%, transparent 60%), #0d1b2a; }
+  .slide-problem   { background: radial-gradient(ellipse at 30% 60%, rgba(245,158,11,0.06) 0%, transparent 60%), #0d1b2a; }
+  .slide-meet      { background: radial-gradient(ellipse at 70% 30%, rgba(59,130,246,0.10) 0%, transparent 60%), #0d1b2a; }
+  .slide-pillars   { background: #0d1b2a; }
+  .slide-pos       { background: radial-gradient(ellipse at 20% 50%, rgba(5,150,105,0.10) 0%, transparent 60%), #0d1b2a; }
+  .slide-inv       { background: radial-gradient(ellipse at 80% 50%, rgba(124,58,237,0.10) 0%, transparent 60%), #0d1b2a; }
+  .slide-fin       { background: radial-gradient(ellipse at 50% 20%, rgba(59,130,246,0.10) 0%, transparent 60%), #0d1b2a; }
+  .slide-who       { background: #0d1b2a; }
+  .slide-roles     { background: #0d1b2a; }
+  .slide-pricing   { background: radial-gradient(ellipse at 50% 80%, rgba(5,150,105,0.08) 0%, transparent 60%), #0d1b2a; }
+  .slide-why       { background: #0d1b2a; }
+  .slide-cta       { background: radial-gradient(ellipse at 50% 50%, rgba(5,150,105,0.12) 0%, transparent 70%), #0d1b2a; }
+
+  @media (max-width: 640px) {
+    .slide { padding: 24px 20px 64px; justify-content: flex-start; overflow-y: auto; }
+    .grid-2, .grid-3, .grid-4, .ind-grid { grid-template-columns: 1fr 1fr; }
+    .why-row { grid-template-columns: 1fr; }
+    .display { font-size: 32px; }
+    .stats-row { gap: 20px; }
+  }
+  @media (max-width: 420px) {
+    .grid-4, .ind-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide { transition: none; }
+  }
+</style>
+
+<div id="progress"></div>
+
+<div id="deck">
+
+  <!-- Slide 1: Cover -->
+  <div class="slide slide-cover active" data-slide="0">
+    <div class="logomark">
+      <div class="lbar lb1"></div>
+      <div class="lbar lb2"></div>
+      <div class="lbar lb3"></div>
+      <span class="brand-text">Ledgio</span>
+    </div>
+    <p class="display">One platform.<br><em>Every number. Every shop.</em></p>
+    <p class="lead" style="margin-top:20px;">The complete cloud software for growing enterprises — accounting, POS, inventory, and reporting in one place. Installs on any device in seconds.</p>
+    <p style="margin-top:36px;font-size:12px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Presented by Hapa Solutions · 2026</p>
+  </div>
+
+  <!-- Slide 2: Problem -->
+  <div class="slide slide-problem" data-slide="1">
+    <div class="eyebrow">The Challenge</div>
+    <h2 class="heading">Most businesses are held back<br>by disconnected tools</h2>
+    <div class="pain-list">
+      <div class="pain">
+        <span class="pain-num">01</span>
+        <div class="pain-body">
+          <strong>Spreadsheets break under real-world pressure</strong>
+          <span>Manual books, formula errors, and lost files mean you never know your real profit.</span>
+        </div>
+      </div>
+      <div class="pain">
+        <span class="pain-num">02</span>
+        <div class="pain-body">
+          <strong>POS and accounts don't talk to each other</strong>
+          <span>Sales happen at the till, but the books only update days later — if at all.</span>
+        </div>
+      </div>
+      <div class="pain">
+        <span class="pain-num">03</span>
+        <div class="pain-body">
+          <strong>No visibility across branches</strong>
+          <span>Managing multiple shops means juggling multiple systems, no consolidated view.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 3: Introducing Ledgio -->
+  <div class="slide slide-meet" data-slide="2">
+    <div class="eyebrow">The Solution</div>
+    <h2 class="heading">Meet Ledgio</h2>
+    <p class="subhead">Cloud software that connects your POS, inventory, and accounting in real time — across every branch, from any device you install it on.</p>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-val">12</div><div class="stat-lbl">Modules</div></div>
+      <div class="stat"><div class="stat-val">60+</div><div class="stat-lbl">Features</div></div>
+      <div class="stat"><div class="stat-val">∞</div><div class="stat-lbl">Branches</div></div>
+      <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">User Roles</div></div>
+      <div class="stat"><div class="stat-val">PWA</div><div class="stat-lbl">Any Device</div></div>
+    </div>
+  </div>
+
+  <!-- Slide 4: Platform Pillars -->
+  <div class="slide slide-pillars" data-slide="3">
+    <div class="eyebrow">Platform Overview</div>
+    <h2 class="heading">Four pillars. One system.</h2>
+    <div class="grid-4" style="margin-top:28px;max-width:920px;">
+      <div class="pillar-card">
+        <div class="dot" style="background:#059669;"></div>
+        <h3>Financial Accounting</h3>
+        <p>Chart of accounts, bank reconciliation, P&amp;L, balance sheet, VAT reporting</p>
+      </div>
+      <div class="pillar-card">
+        <div class="dot" style="background:#3b82f6;"></div>
+        <h3>Sales &amp; Commerce</h3>
+        <p>Invoicing, POS, credit notes, tax calculations, customer statements</p>
+      </div>
+      <div class="pillar-card">
+        <div class="dot" style="background:#7c3aed;"></div>
+        <h3>Operations</h3>
+        <p>Multi-location inventory, purchase orders, supplier management, transfers</p>
+      </div>
+      <div class="pillar-card">
+        <div class="dot" style="background:#d97706;"></div>
+        <h3>Administration</h3>
+        <p>Role-based access, multi-branch management, dashboards, audit trails</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 5: POS -->
+  <div class="slide slide-pos" data-slide="4">
+    <div class="eyebrow">Point of Sale</div>
+    <h2 class="heading">A till built for trust</h2>
+    <p class="subhead">Fast checkout for retail and wholesale — with built-in controls that protect your revenue.</p>
+    <div class="grid-2" style="max-width:760px;">
+      <div class="card">
+        <div class="card-icon" style="background:rgba(5,150,105,0.15);">🧾</div>
+        <h3>Receipt Control</h3>
+        <ul>
+          <li>Auto-generated receipt number per sale</li>
+          <li>Force-print gate — cashier must open PDF before next sale</li>
+          <li>Admin receipt audit log with full line-item detail</li>
+          <li>Void / refund with mandatory reason logging</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:rgba(59,130,246,0.15);">🏪</div>
+        <h3>Multi-Shop POS</h3>
+        <ul>
+          <li>Unlimited tills per shop, unlimited shops</li>
+          <li>Retail and wholesale sale types</li>
+          <li>Cash, card, and mobile-money payments</li>
+          <li>Daily cash-up and till reconciliation</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 6: Inventory -->
+  <div class="slide slide-inv" data-slide="5">
+    <div class="eyebrow">Inventory &amp; Warehousing</div>
+    <h2 class="heading">Stock control across every location</h2>
+    <p class="subhead">Know exactly what you have, where it is, and when to reorder — in real time.</p>
+    <div class="grid-2" style="max-width:760px;">
+      <div class="card">
+        <div class="card-icon" style="background:rgba(124,58,237,0.15);">📦</div>
+        <h3>Multi-Location Stock</h3>
+        <ul>
+          <li>Separate stock levels per warehouse / shop</li>
+          <li>Inter-branch transfer tracking</li>
+          <li>SKU and barcode support</li>
+          <li>Item variants (size, colour, grade)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:rgba(124,58,237,0.15);">🔔</div>
+        <h3>Smart Alerts &amp; Costing</h3>
+        <ul>
+          <li>Low-stock threshold alerts</li>
+          <li>Stock adjustments and write-offs</li>
+          <li>COGS (cost of goods sold) tracking</li>
+          <li>Goods received notes matched to PO</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 7: Financial -->
+  <div class="slide slide-fin" data-slide="6">
+    <div class="eyebrow">Financial Accounting</div>
+    <h2 class="heading">Real books. Real numbers.</h2>
+    <p class="subhead">Full double-entry accounting — with statutory reports ready when you need them.</p>
+    <div class="grid-3" style="max-width:860px;">
+      <div class="card">
+        <div class="card-icon" style="background:rgba(59,130,246,0.15);">📒</div>
+        <h3>Chart of Accounts</h3>
+        <ul>
+          <li>Hierarchical account structure</li>
+          <li>Opening balances</li>
+          <li>Trial balance view</li>
+          <li>Locked period control</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:rgba(59,130,246,0.15);">🏦</div>
+        <h3>Banking</h3>
+        <ul>
+          <li>Multiple bank accounts</li>
+          <li>Bank reconciliation</li>
+          <li>Manual journal entries</li>
+          <li>Inter-account transfers</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:rgba(59,130,246,0.15);">📊</div>
+        <h3>Reports</h3>
+        <ul>
+          <li>Profit &amp; Loss statement</li>
+          <li>Balance Sheet</li>
+          <li>Cash Flow report</li>
+          <li>VAT / tax summary</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 8: Who uses it -->
+  <div class="slide slide-who" data-slide="7">
+    <div class="eyebrow">Industries</div>
+    <h2 class="heading">Built for any business that buys and sells</h2>
+    <div class="ind-grid">
+      <div class="ind"><span class="ind-icon">🏫</span>Schools &amp; Colleges</div>
+      <div class="ind"><span class="ind-icon">📱</span>Phone &amp; Electronics</div>
+      <div class="ind"><span class="ind-icon">🛒</span>Retail &amp; FMCG</div>
+      <div class="ind"><span class="ind-icon">🏥</span>Pharmacies &amp; Clinics</div>
+      <div class="ind"><span class="ind-icon">🍽️</span>Food &amp; Hospitality</div>
+      <div class="ind"><span class="ind-icon">🔧</span>Hardware &amp; Auto Parts</div>
+      <div class="ind"><span class="ind-icon">👗</span>Fashion &amp; Apparel</div>
+      <div class="ind"><span class="ind-icon">🏗️</span>Construction Supply</div>
+      <div class="ind"><span class="ind-icon">💊</span>Medical Supplies</div>
+      <div class="ind"><span class="ind-icon">📚</span>Bookshops &amp; Stationery</div>
+      <div class="ind"><span class="ind-icon">🐄</span>Agriculture &amp; Agro</div>
+      <div class="ind"><span class="ind-icon">🔌</span>Electrical &amp; Plumbing</div>
+    </div>
+  </div>
+
+  <!-- Slide 9: Roles -->
+  <div class="slide slide-roles" data-slide="8">
+    <div class="eyebrow">Access Control</div>
+    <h2 class="heading">The right access for every person</h2>
+    <div class="grid-4" style="margin-top:24px;max-width:920px;">
+      <div class="role-card">
+        <span class="role-badge" style="background:rgba(5,150,105,0.2);color:#6ee7b7;">Admin</span>
+        <h3>Business Owner</h3>
+        <ul>
+          <li>Full system access</li>
+          <li>All reports and audit logs</li>
+          <li>User and branch management</li>
+          <li>System configuration</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <span class="role-badge" style="background:rgba(59,130,246,0.2);color:#93c5fd;">Accountant</span>
+        <h3>Finance Team</h3>
+        <ul>
+          <li>Accounts and journals</li>
+          <li>Bank reconciliation</li>
+          <li>All financial reports</li>
+          <li>Receipt audit log</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <span class="role-badge" style="background:rgba(124,58,237,0.2);color:#c4b5fd;">Cashier</span>
+        <h3>Sales Staff</h3>
+        <ul>
+          <li>POS checkout</li>
+          <li>Receipt generation</li>
+          <li>Daily cash-up</li>
+          <li>Own sales history only</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <span class="role-badge" style="background:rgba(245,158,11,0.2);color:#fcd34d;">Viewer</span>
+        <h3>Read-Only</h3>
+        <ul>
+          <li>Dashboard overview</li>
+          <li>View reports</li>
+          <li>No editing access</li>
+          <li>Ideal for investors / auditors</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 10: Pricing -->
+  <div class="slide slide-pricing" data-slide="9">
+    <div class="eyebrow">Pricing</div>
+    <h2 class="heading">Simple, transparent pricing</h2>
+    <div class="grid-3" style="max-width:860px;">
+      <div class="price-card">
+        <div class="price-tier">Starter</div>
+        <div class="price-amount">Free</div>
+        <div class="price-period">During early access</div>
+        <ul class="price-list">
+          <li>1 branch / shop</li>
+          <li>Up to 3 users</li>
+          <li>POS &amp; basic inventory</li>
+          <li>Sales invoicing</li>
+          <li>Community support</li>
+        </ul>
+      </div>
+      <div class="price-card featured">
+        <div class="price-tier">Business</div>
+        <div class="price-amount">Contact us</div>
+        <div class="price-period">Per month, per business</div>
+        <ul class="price-list">
+          <li>Up to 5 branches</li>
+          <li>Unlimited users</li>
+          <li>Full accounting suite</li>
+          <li>Advanced reporting &amp; audit</li>
+          <li>Priority support</li>
+        </ul>
+      </div>
+      <div class="price-card">
+        <div class="price-tier">Enterprise</div>
+        <div class="price-amount">Custom</div>
+        <div class="price-period">Tailored for large organisations</div>
+        <ul class="price-list">
+          <li>Unlimited branches</li>
+          <li>Custom integrations</li>
+          <li>Dedicated onboarding</li>
+          <li>SLA &amp; uptime guarantee</li>
+          <li>Dedicated account manager</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 11: Why Ledgio -->
+  <div class="slide slide-why" data-slide="10">
+    <div class="eyebrow">Why Ledgio</div>
+    <h2 class="heading">What sets it apart</h2>
+    <div class="why-row">
+      <div class="why-item">
+        <div class="why-check">✓</div>
+        <div class="why-text">
+          <strong>Installs on every device — no app store</strong>
+          <span>Install Ledgio on Windows PC, Mac, Android, or iPhone in seconds. No app store. No IT department. No complicated setup.</span>
+        </div>
+      </div>
+      <div class="why-item">
+        <div class="why-check">✓</div>
+        <div class="why-text">
+          <strong>POS and accounts in one system</strong>
+          <span>Every till sale posts directly to the books. No manual re-entry, no reconciliation headache.</span>
+        </div>
+      </div>
+      <div class="why-item">
+        <div class="why-check">✓</div>
+        <div class="why-text">
+          <strong>Built-in anti-fraud controls</strong>
+          <span>Force-print receipt gate, void logging, and receipt audit log protect every transaction.</span>
+        </div>
+      </div>
+      <div class="why-item">
+        <div class="why-check">✓</div>
+        <div class="why-text">
+          <strong>Scales with your business</strong>
+          <span>Add branches, tills, and users without changing your setup. Multi-tenant by design.</span>
+        </div>
+      </div>
+      <div class="why-item">
+        <div class="why-check">✓</div>
+        <div class="why-text">
+          <strong>Strict data isolation</strong>
+          <span>Each business's data is completely separated. No cross-tenant leakage, ever.</span>
+        </div>
+      </div>
+      <div class="why-item">
+        <div class="why-check">✓</div>
+        <div class="why-text">
+          <strong>Designed for the African market</strong>
+          <span>Mobile money payments, local tax compliance, and multi-branch retail built in from day one.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 12: CTA -->
+  <div class="slide slide-cta" data-slide="11">
+    <div class="logomark" style="margin-bottom:16px;">
+      <div class="lbar lb1"></div>
+      <div class="lbar lb2"></div>
+      <div class="lbar lb3"></div>
+      <span class="brand-text" style="font-size:36px;">Ledgio</span>
+    </div>
+    <p class="display" style="font-size:clamp(28px,4vw,52px);">Ready to see it in action?</p>
+    <div class="cta-band">
+      <p>Hapa Solutions is an authorised Ledgio partner. We'll walk you through a live demo, set up your account, and have your business running on Ledgio within days.</p>
+      <div class="contact-row">
+        <div class="contact-item">
+          <strong>Email</strong>
+          <span>ledgioapp@gmail.com</span>
+        </div>
+        <div class="contact-item">
+          <strong>Platform</strong>
+          <span>Cloud-based · Any device · PWA</span>
+        </div>
+        <div class="contact-item">
+          <strong>Partner</strong>
+          <span>Hapa Solutions</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- Navigation -->
+<div id="nav">
+  <button class="nav-btn" id="prev-btn" disabled onclick="navigate(-1)">← Prev</button>
+  <span id="slide-counter">1 / 12</span>
+  <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next →</button>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  let current = 0;
+
+  function goTo(n) {
+    const prev = slides[current];
+    prev.classList.remove('active');
+    prev.classList.add('exit');
+    setTimeout(() => prev.classList.remove('exit'), 480);
+
+    current = Math.max(0, Math.min(total - 1, n));
+    slides[current].classList.add('active');
+
+    document.getElementById('slide-counter').textContent = (current + 1) + ' / ' + total;
+    document.getElementById('prev-btn').disabled = current === 0;
+    document.getElementById('next-btn').disabled = current === total - 1;
+    document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+  }
+
+  function navigate(dir) { goTo(current + dir); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   navigate(-1);
+  });
+
+  // Touch swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    const dx = tx - e.changedTouches[0].clientX;
+    if (Math.abs(dx) > 40) navigate(dx > 0 ? 1 : -1);
+  });
+
+  goTo(0);
+</script>

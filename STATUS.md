@@ -10,6 +10,1002 @@ Opening a receipt PDF worked correctly (new tab, PDF visible), but clicking Prin
 **Files Affected:**
 - `frontend/src/pages/pos/PointOfSale.tsx` — removed `URL.revokeObjectURL` call from `openReceipt`
 - `frontend/src/pages/reports/ReceiptLog.tsx` — removed `URL.revokeObjectURL` call from `openPdf`
+## [Date: 2026-09-15] - School-specific Chart of Accounts & P&L Labels (PR #62)
+
+**What/Why:**
+P&L report for NONPROFIT (school) tenants was displaying generic business labels ("Sales Revenue", "Cost of Goods Sold", "Net Profit"). Added a school-specific chart of accounts template and org-type-aware P&L section labels so school tenants see appropriate terminology. Business/shop tenants are completely unaffected.
+
+**Backend changes:**
+- `backend/src/data/ghanaSmeChartOfAccountsTemplate.ts` — added `GHANA_SCHOOL_CHART_OF_ACCOUNTS_TEMPLATE` (Tuition/Exam/PTA/Boarding Fee Income, School Fees Receivable, Fees Received in Advance, Teachers' Salaries, Sports & Activities, Library, Student Welfare, no VAT/NHIL/GETFund lines) and `getTemplateForOrgType()` dispatcher.
+- `backend/src/services/onboardingWizardService.ts` — `getChartOfAccountsTemplate()` now accepts and forwards `orgType`.
+- `backend/src/routes/onboardingWizard.ts` — `GET /api/v1/onboarding/chart-of-accounts-template` fetches tenant `orgType` and passes it to the service.
+
+**Frontend changes:**
+- `frontend/src/pages/reports/ProfitAndLoss.tsx` — reads `user.orgType` via `useAuth()`; for `NONPROFIT` tenants shows "Income & Expenditure Statement", "Fee Income", "Direct Educational Costs", "Gross Surplus", "Net Surplus"/"Net Deficit" in both single-period and compare-periods views.
+
+---
+
+## [Date: 2026-09-15] - Student Health Records: Name/Code Search (PR #61)
+
+**What/Why:**
+Student Health Records page had a class filter but no text search. Added a name/code search input with client-side `useMemo` filtering so staff can quickly locate individual students without scrolling.
+
+**Files affected:**
+- `frontend/src/pages/school/StudentHealth.tsx` — added `search` state, `displayed` useMemo filtering on student name and code, Search icon input in the header toolbar; table now renders `displayed` instead of `records`; empty state message distinguishes "no students" from "no match".
+
+---
+
+## [Date: 2026-09-15] - School Student Ledger: Class Filter + Backend isActive Fix (PR #60 merged)
+
+**What/Why:**
+User reported the class filter dropdown was missing from the Student Ledger page. Added a class filter to both backend and frontend so users can browse and search students by class without typing a search query.
+
+**Backend changes:**
+- `backend/src/routes/schoolStudents.ts` — `GET /school/students` now accepts optional `className` query param and applies it as a Prisma `where` filter; also added `isActive: true` so only enrolled students are returned.
+
+**Frontend changes:**
+- `frontend/src/pages/school/StudentLedger.tsx` — added `SchoolClass` interface, `classFilter`/`classes` state, `useEffect` loading `/school/classes` on mount, class filter dropdown rendered before the search input, `doSearch` updated with `overrideClass` param to avoid stale closure when called from `onChange`.
+
+---
+
+## [Date: 2026-09-15] - CI Fix: useMemo hooks-of-rules violation in PurchaseOrders
+
+**What/Why:**
+PR #59 (feature/search-filter-all-modules) had a failing CI check due to `react-hooks/rules-of-hooks` oxlint error. The `displayedPOs` useMemo was placed after a conditional early return (`UpgradeRequired` guard) in `PurchaseOrders.tsx`, causing oxlint to flag it as a conditionally-called hook.
+
+**Files affected:**
+- `frontend/src/pages/purchaseorders/PurchaseOrders.tsx` — moved `displayedPOs` useMemo to before the `UpgradeRequired` early return (alongside other state declarations), then removed the duplicate that remained after the guard. TypeScript (`tsc --noEmit`) and oxlint both pass clean.
+
+## [Date: 2026-09-14] - School Module: 5 ERP Gap Features (Complete)
+
+**What/Why:**
+Filled five capability gaps in the school ERP module to bring it closer to production-ready status: scholarship billing integration, class ranking on report cards, attendance summary report, class promotion workflow, and scholarship badge in bulk invoicing UI.
+
+**Backend changes:**
+- `schoolFeeCollection.ts` — `POST /generate-invoices` now applies PERCENT/FIXED_AMOUNT scholarship discounts per student; response includes `discountedCount`
+- `schoolReportCards.ts` — GET report card now computes `classRank`, `classSize`, `classAverage` by aggregating all active classmates' assessments in the same term
+- `schoolAttendance.ts` — new `GET /summary` route aggregates per-student attendance totals (present/absent/late/excused/rate) for a given term, with optional class filter
+- `schoolStudents.ts` — new `POST /promote` route (Admin only) bulk-moves active students from one class to another; accepts optional `studentIds` for selective promotion
+
+**Frontend changes:**
+- `FeeCollection.tsx` — scholarship badge (purple pill with Gift icon) on discounted invoice rows; `discountedCount` shown in generate toast message
+- `ReportCards.tsx` — class rank and class average displayed on report card view and in print output
+- `Attendance.tsx` — new Summary tab with per-student attendance table, class filter, color-coded rate column (green ≥80%, amber ≥50%, red <50%), Print button
+- `Students.tsx` — Promote Class button (Admin only) opens modal with From/To class dropdowns and confirmation warning
+
+---
+
+## [Date: 2026-09-14] - School Module: 10 New ERP Modules (Complete)
+
+**What/Why:**
+Expanded the school ERP from fee management only to a comprehensive school management system covering attendance, assessments, report cards, admissions, timetable, certificates, scholarships, health records, events calendar, and MIS dashboard — matching Vidyalaya-class ERP capabilities.
+
+**Backend (new route files):**
+- `schoolAttendance.ts` — daily bulk attendance per class (PRESENT/ABSENT/LATE/EXCUSED), with GET by class+date and POST bulk upsert
+- `schoolAssessments.ts` — student assessment scores (MIDTERM/ENDTERM/QUIZ/PROJECT/OTHER), full CRUD with grade calculation
+- `schoolReportCards.ts` — aggregates assessments + attendance per student per term into printable report card
+- `schoolAdmissions.ts` — admission application lifecycle (PENDING→REVIEWING→ACCEPTED/REJECTED→ENROLLED), auto-generates ADM-YYYY-NNNN codes
+- `schoolTimetable.ts` — class timetable slots (day, time, subject, teacher), CRUD per class
+- `schoolCertificates.ts` — issue LEAVING/COMPLETION/CONDUCT/TRANSFER/SCHOLARSHIP certificates with print endpoint
+- `schoolScholarships.ts` — award PERCENT or FIXED_AMOUNT discounts per student per term
+- `schoolHealth.ts` — upsert blood group, allergies, medical conditions, emergency contacts, vaccination notes per student
+- `schoolEvents.ts` — school calendar events (ACADEMIC/SPORTS/CULTURAL/HOLIDAY/EXAM/MEETING/OTHER) filtered by month/year
+- `schoolMIS.ts` — aggregated management dashboard: students by class, fee collection rate, attendance rate, avg assessment score, admissions summary, upcoming events
+- `app.ts` — all 10 new route prefixes registered under `/api/v1/school/`
+
+**Prisma schema — 8 new models:**
+- `SchoolAttendance`, `StudentAssessment`, `Admission`, `TimetableSlot`, `SchoolCertificate`, `Scholarship`, `StudentHealth`, `SchoolEvent`
+- Migration: `20260914120000_school_erp_modules`
+
+**Frontend (new pages in `frontend/src/pages/school/`):**
+- `Attendance.tsx` — class + date selector, per-student status picker, bulk save
+- `Assessments.tsx` — term + class filter, score table with grade letters, add/edit modal
+- `ReportCards.tsx` — student + term selector, printable card with subject grades + attendance summary
+- `Admissions.tsx` — kanban-style status management, auto-generated application numbers
+- `Timetable.tsx` — class timetable grid view, add/edit slots
+- `Certificates.tsx` — certificate issuance and print
+- `Scholarships.tsx` — award and manage student discounts
+- `StudentHealth.tsx` — health record per student (blood group, allergies, emergency contact, vaccinations)
+- `SchoolEvents.tsx` — monthly calendar view with event cards and type badges
+- `SchoolMIS.tsx` — KPI tiles, students-by-class bar chart, fee collection progress, admissions funnel, upcoming events
+- `App.tsx` — 10 new lazy-loaded routes added
+- `navigation.ts` — 10 new sidebar nav items under SCHOOL section (NONPROFIT org type only)
+
+**PR:** https://github.com/ledgio-software/ledgio-/pull/50
+
+---
+
+## [Date: 2026-09-14] - School Module: SMS Fee Reminders for Defaulters
+
+**What/Why:**
+Added one-click bulk SMS fee reminders so accountants can notify all defaulting guardians without manually calling each one.
+
+**Backend — `schoolFeeCollection.ts`:**
+- New `POST /api/v1/school/fee-collection/send-reminders` (Accountant + Admin roles)
+- Resolves defaulters using the same invoice/schedule logic as the defaulters report
+- Sends a personalised SMS per guardian via `SmsService` (Arkesel → mNotify → Android Gateway fallback chain)
+- SMS message includes school name, student name, class, outstanding balance, and term name
+- Guardians without a phone number are counted as `skipped`; returns `{ sent, failed, skipped }`
+
+**Frontend — `FeeDefaulters.tsx`:**
+- "SMS Reminders" button in toolbar (visible to Admin and Accountant when defaulters list is non-empty)
+- Confirmation modal shows the count of students to be messaged before sending
+- Loading spinner while request is in-flight; toast reports sent / failed / skipped breakdown on completion
+
+**Files changed:** `backend/src/routes/schoolFeeCollection.ts`, `frontend/src/pages/school/FeeDefaulters.tsx`
+
+## [Date: 2026-09-12] - AGOD Admin Console: 7 new diagnostic panels + Job Retry UI
+
+**What/Why:**
+Expanded the AGOD team console from a read-only dashboard into a fully interactive ops tool. Eight capabilities were requested by the team; seven are now fully wired end-to-end (the eighth — real-time error-rate alerting via email/SMS — requires external delivery infrastructure and is deferred).
+
+**New backend routes (all protected by `adminPasscodeMiddleware` / team tokens):**
+- `GET /api/v1/admin/tenants` — search tenants by name/slug; returns subscription status, tier, schema, last activity, active user count
+- `PATCH /api/v1/admin/tenants/:id` — master-admin-only suspend/reactivate (checks `x-admin-session` or `x-admin-passcode`)
+- `GET /api/v1/admin/failed-payments` — surfaces `FAILED` or stale-PENDING (>24 h) Paystack charges grouped by tenant
+- `POST /api/v1/admin/failed-payments/:id/retry` — resets a charge to PENDING so it can be retried
+- `GET /admin/support-queue`, `POST`, `PATCH/:id`, `DELETE/:id` — lightweight in-app ticket tracker linked to tenant + error log refs
+- `GET /api/v1/admin/slow-queries` — reads in-memory 200-entry ring buffer from `db.ts`; returns `top10ByDuration` and `recent`
+- `GET /api/v1/admin/cohort?days=7` — tenants created in last N days with derived `onboardingStep` (Registered → Invited team → Active → Live)
+- `GET /api/v1/admin/schema-diff` — reads `_prisma_migrations` table; shows applied/failed/in-progress counts + tenant schema mapping
+- `GET /api/v1/admin/jobs` — now returns `failedCount` + `failedJobs[]` alongside all jobs
+
+**New Prisma model:**
+- `SupportTicket` — `support_tickets` table with status, priority, assignedTo, tenantId, errorLogRef, notes; migration `20260912000002_add_support_tickets`
+
+**Frontend (AgodTeamConsole.tsx):**
+- Complete rewrite with 6 new bespoke panel components: `TenantInspectorPanel`, `FailedPaymentsPanel`, `SupportQueuePanel`, `SlowQueriesPanel`, `SchemaDiffPanel`, `CohortPanel`
+- **`JobRetryPanel`** replaces the `PlaceholderPanel` for the `jobs` tab: one-click "Run now" buttons per job, failed jobs highlighted in red with last error, `animate-spin` on trigger
+- Shared `useAdminFetch<T>` hook with 401 redirect and reload support
+- `PanelContent` router maps each tab to its dedicated component
+
+**teamMemberService.ts:**
+- Added 6 new `AdminTab` union types: `tenantinspector | failedpayments | supportqueue | slowqueries | schemadiff | cohort`
+- Updated `INITIAL_ROSTER` to assign new panels by role: Kingsley → `slowqueries`, `schemadiff`; Sandra → `tenantinspector`, `failedpayments`, `cohort`, `supportqueue`; George → `cohort`, `tenantinspector`; Daniel → `failedpayments`, `slowqueries`, `schemadiff`; PM → all new panels
+
+**Files Affected:**
+- `backend/prisma/schema.prisma` — `SupportTicket` model added
+- `backend/prisma/migrations/20260912000002_add_support_tickets/migration.sql` *(new)*
+- `backend/src/config/db.ts` — `slowQueryBuffer` ring buffer + `SlowQueryEntry` interface exported
+- `backend/src/routes/adminTenantInspector.ts` *(new)*
+- `backend/src/routes/adminFailedPayments.ts` *(new)*
+- `backend/src/routes/adminSupportQueue.ts` *(new)*
+- `backend/src/routes/adminSlowQueries.ts` *(new)*
+- `backend/src/routes/adminCohort.ts` *(new)*
+- `backend/src/routes/adminSchemaDiff.ts` *(new)*
+- `backend/src/routes/adminJobs.ts` — expose `failedJobs[]`
+- `backend/src/app.ts` — 6 new route mounts
+- `backend/src/services/teamMemberService.ts` — new tab types + roster assignments
+- `frontend/src/pages/admin/AgodTeamConsole.tsx` — complete rewrite with 7 dedicated panels
+
+---
+
+## [Date: 2026-09-12] - Security: TOTP two-factor authentication for AGOD admin console
+
+**What/Why:**
+Added authenticator-app (Google Authenticator / Authy) second factor to the AGOD admin console. The login flow is now two-step: master passcode → TOTP code → 8-hour session token. Existing deployments without `ADMIN_TOTP_SECRET` configured fall back to passcode-only automatically (backward compatible).
+
+**Auth flow:**
+1. Admin enters master passcode → frontend advances to TOTP step.
+2. Admin enters 6-digit code from authenticator app → `POST /api/v1/admin/totp/verify` validates both credentials, returns an 8-hour HMAC-SHA256 JWT session token.
+3. All subsequent admin API calls send `x-admin-session: <token>` header instead of the raw passcode.
+4. `GET /api/v1/admin/totp/setup` (passcode-gated) returns QR code data URL + plain secret for initial device enrollment.
+
+**Implementation details:**
+- RFC 6238 TOTP implemented from scratch using `node:crypto` (HMAC-SHA1, 30-second window, ±1 step tolerance) — no external TOTP library required.
+- Session tokens are plain `{ alg: HS256 }` JWTs signed with `BROADCAST_MASTER_SECRET`; no new env var needed.
+- TOTP secret stored in `ADMIN_TOTP_SECRET` env var; server returns 503 if not set, prompting setup.
+- Frontend stores session token in `sessionStorage` (key `accountgo_admin_engine_session`); clears old passcode key on upgrade.
+- All 15+ admin API call sites updated to prefer `x-admin-session` header over raw `x-admin-passcode`.
+
+**Files Affected:**
+- `backend/src/services/adminTotpService.ts` *(new)* — base32 codec, HOTP/TOTP core, session token issue/verify
+- `backend/src/routes/adminTotp.ts` *(new)* — `GET /setup`, `POST /verify` endpoints
+- `backend/src/middleware/adminPasscodeMiddleware.ts` — accepts `x-admin-session` (preferred) or `x-admin-passcode` (fallback); rejects both from query string
+- `backend/src/app.ts` — mounts TOTP routes before the passcode gate with their own rate limiter
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — two-step login UI, session token state, QR setup panel, global `adminHeaders` computed value
+
+---
+
+## [Date: 2026-09-12] - Security: Financial mutation anomaly detection
+
+**What/Why:**
+Added an accounting-specific fraud detection layer that fires fire-and-forget after every journal entry create and post operation. The service scores the mutation against six behavioral signals and writes a `SECURITY.FINANCIAL_ANOMALY` audit log entry when the total weight meets the threshold. High-confidence detections (score ≥5) also trigger an admin alert email. Never blocks the operation — purely observational.
+
+**Signals detected (with weights):**
+- `LARGE_AMOUNT` (weight 3) — entry total exceeds 10× the tenant's 30-day rolling average of posted entries
+- `OFF_HOURS` (weight 2) — mutation recorded between 01:00–05:00 UTC
+- `HIGH_VELOCITY` (weight 2) — user created >20 entries in a 10-minute rolling window (Redis-backed counter)
+- `ROUND_NUMBER_LARGE` (weight 1) — amount ≥10,000 with ≥3 trailing zeros (common fraud pattern)
+- `THRESHOLD_CREEP` (weight 2) — amount within 5% below a configured approval threshold (9 common breakpoints)
+- `BACKDATED_ENTRY` (weight 2) — entry date >30 days before today
+
+**Files Affected:**
+- `backend/src/services/financialMutationAnomalyService.ts` *(new)* — signal scoring, audit log, admin email alert
+- `backend/src/routes/journalEntries.ts` — imported service + `getTenantContext`; fire-and-forget call wired after successful `POST /` (create) and `POST /:id/post` operations
+
+---
+
+## [Date: 2026-09-12] - Security: IDOR prevention middleware (Prisma guard + Express enumeration detector)
+
+**What/Why:**
+Added a two-layer IDOR prevention system as defense-in-depth against cross-tenant data access. The IDOR audit confirmed no current vulnerabilities (the per-schema isolation + tenantId column filters already cover all routes), so this layer makes it impossible to introduce an IDOR in the future even when a developer forgets a tenantId filter.
+
+**Layer 1 — Prisma query interceptor (`backend/src/middleware/idorGuard.ts`, `buildIdorPrismaMiddleware()`):**
+Registered as a `$use` hook on the global prisma client. For all 80 tenant-scoped models:
+- `findUnique` / `findUniqueOrThrow` → action rewritten to `findFirst` / `findFirstOrThrow` and `tenantId` injected into the where clause (rewrite required because findUnique demands a unique-constraint where clause, which precludes adding tenantId without a composite unique index).
+- `findFirst`, `findMany`, `count`, `aggregate`, `groupBy`, `updateMany`, `deleteMany` → `tenantId` silently appended to the where clause when absent.
+- `update`, `delete`, `upsert` → cannot safely inject (unique-constraint requirement); emits a `logger.warn` security entry instead so the violation is visible in logs.
+- Fail-open: no tenant context active (admin routes, system tasks, test suites) → guard is a no-op.
+
+**Layer 2 — Express enumeration detector (`idorAuditMiddleware`):**
+Mounted at `/api/v1/*`. Tracks distinct UUID-shaped path segments accessed per authenticated session per minute. Fires `logger.warn` when a single session crosses 50 distinct resource IDs in a 60-second window — a signal of automated IDOR enumeration / scraping. In-process Map with stale-key pruning at 10k entries.
+
+**Files Affected:**
+- `backend/src/middleware/idorGuard.ts` *(new)*
+- `backend/src/config/db.ts` — imports `buildIdorPrismaMiddleware` and registers it as a `$use` hook after the existing query-timeout middleware
+- `backend/src/app.ts` — imports `idorAuditMiddleware` and mounts it at `/api/v1/`
+
+---
+
+## [Date: 2026-09-12] - Security: Client-side bot fingerprinting at login
+
+**What/Why:**
+Added passive browser signal collection on the login form to help detect automated/scripted login attempts. Signals are sent as `_bf` alongside credentials, analyzed server-side, and written to the audit trail when the score exceeds the threshold. Real users are never blocked — the output is entirely observational.
+
+**Frontend (`frontend/src/lib/botFingerprint.ts` — new):**
+Collects a compact fingerprint object at form-submit time:
+- `wd` — `navigator.webdriver` (true in Selenium/Playwright/Puppeteer)
+- `ags` — presence of known automation framework globals (`__webdriver_evaluate`, `_phantom`, etc.)
+- `ttk` — milliseconds from page load to first keystroke (null if fields were programmatically filled)
+- `mm` — whether the mouse moved before submit (false is a bot signal)
+- `hc` — `navigator.hardwareConcurrency`
+- `sw/sh` — screen dimensions (0×0 in headless)
+- `vw/vh` — viewport dimensions
+- `lang/plat` — navigator language and platform
+- `ce/ls` — cookie and localStorage availability
+- `age` — total milliseconds from page load to submit
+
+Listeners are registered once at module-import time (passive, not re-attached on re-renders). Touch support is also captured for mobile vs desktop context.
+
+**Backend (`backend/src/services/botFingerprintService.ts` — new):**
+- `analyzeBotFingerprint(ctx)` scores each signal by weight (1 = weak, 2 = moderate, 3 = strong)
+- Fires `SECURITY.BOT_SIGNAL` audit log entry when total weight ≥ 3
+- Sends admin alert email (`ADMIN_ALERT_EMAIL`) for very high confidence detections (score ≥ 5)
+- All signal scoring and I/O wrapped in try/catch — never throws into the caller
+
+**Wired into (`backend/src/routes/auth.ts`):**
+- `_bf` extracted from `req.body` in the login handler
+- `analyzeBotFingerprint(...)` called as fire-and-forget after the honeypot check, before the DB lookup — never delays the login response
+
+**Files Affected:**
+- `frontend/src/lib/botFingerprint.ts` *(new)*
+- `frontend/src/pages/auth/Login.tsx` — imports `collectBotFingerprint`, attaches `_bf` to the login POST
+- `backend/src/services/botFingerprintService.ts` *(new)*
+- `backend/src/routes/auth.ts` — extracts `_bf`, calls `analyzeBotFingerprint` fire-and-forget
+
+---
+
+## [Date: 2026-09-12] - Security: Suspicious bulk export anomaly detection
+
+**What/Why:**
+Added a non-blocking anomaly detection layer for full data exports (JSON and CSV). Every export is already gated behind Admin-only RBAC and a per-tenant 1-hour cooldown. This layer adds signal detection on top — it never blocks a legitimate export but records `SECURITY.EXPORT_ANOMALY` to the audit log and fires an admin alert email when any signal triggers.
+
+**Signals detected:**
+1. **High user velocity** — the same user downloads more than 2 exports in any rolling 24-hour window (across export kinds). Tracked with a Redis INCR counter (24h TTL).
+2. **Off-hours export** — export request between 01:00–05:00 UTC, covering dead-of-night for most operating timezones.
+3. **New export IP** — first time this user has triggered an export from a given source IP. Per-user Redis set, 30-day TTL (same model as login anomaly IP tracking).
+4. **Multi-user tenant burst** — two or more distinct admin accounts export from the same tenant within 15 minutes, suggesting coordinated exfiltration or a compromised admin roster. Tracked with a per-tenant Redis set with 15-min TTL.
+
+**Architecture:**
+- `analyzeExportRequest(ctx)` is called after `recordAuditLog` returns, as a fire-and-forget (`.catch()`), so it never delays the download stream.
+- All Redis helpers fail-open — if Redis is unavailable, all signals return zero and no anomaly is flagged rather than blocking the export.
+- Alert email fires to `ADMIN_ALERT_EMAIL` env var (async, skipped when unconfigured).
+
+**Files Affected:**
+- `backend/src/services/bulkExportAnomalyService.ts` *(new)*
+- `backend/src/routes/dataExport.ts` — `analyzeExportRequest` wired into `/json` and `/csv` handlers post-audit-log
+
+---
+
+## [Date: 2026-09-12] - Security: Honeypot deception layer (credentials, tenant slugs, probe endpoints)
+
+**What/Why:**
+Implemented a three-trap honeypot deception system to detect and log attackers before they can interact with real data. All traps return responses indistinguishable from real failures — the attacker gets no signal that they triggered a trap.
+
+**Traps:**
+
+1. **Honeypot login credentials** — 12 fake privileged email addresses (`admin@ledgio.io`, `root@ledgio.io`, etc.) that no real user would ever try. Any login attempt against them fires `SECURITY.HONEYPOT_LOGIN` to the audit log and triggers a platform alert email. The check runs *before* `findUserByEmail` so the database is never queried for these addresses.
+
+2. **Honeypot tenant slugs** — 16 fake org identifiers (`admin`, `superadmin`, `root`, `internal`, `ledgio`, etc.) that attackers probe when scanning for admin panels or default accounts. Any tenant context resolution against them fires `SECURITY.HONEYPOT_TENANT`. The check runs *before* the Redis cache or DB lookup, so real tenant data is never touched.
+
+3. **Honeypot probe endpoints** — ~25 raw paths attackers enumerate on any web server (`.env`, `/admin/login`, `/wp-config.php`, `/.git/config`, `/phpinfo.php`, etc.) return convincing-but-fake responses (realistic 200s, 403s, 404s) while logging `SECURITY.HONEYPOT_PROBE`. The router is mounted *before* all real API routes.
+
+**Security alert email:**
+All three traps fire a non-blocking alert email to `ADMIN_ALERT_EMAIL` (env var) via `EmailService.sendMail`, skipped when unconfigured.
+
+**Audit log actions added:**
+- `SECURITY.HONEYPOT_LOGIN` — honeypot email credential attempted
+- `SECURITY.HONEYPOT_TENANT` — honeypot tenant slug probed
+- `SECURITY.HONEYPOT_PROBE` — honeypot probe endpoint accessed
+
+**Files Affected:**
+- `backend/src/services/honeypotService.ts` *(new)*
+- `backend/src/routes/honeypotProbes.ts` *(new)*
+- `backend/src/routes/auth.ts` — `checkHoneypotLogin` wired in `/login` before DB lookup
+- `backend/src/middleware/tenantContextMiddleware.ts` — `checkHoneypotTenant` wired in before cache/DB lookup
+- `backend/src/app.ts` — `honeypotProbesRouter` mounted before all real routes
+
+---
+
+## [Date: 2026-09-12] - Security: Login anomaly detection engine
+
+**What/Why:**
+Implemented a multi-signal login anomaly detection engine to defend against credential stuffing, brute-force bots, account takeover, and impossible-velocity attacks. The system runs on every login attempt using Redis for all state — no extra database tables required.
+
+**Signals detected:**
+1. **IP burst guard** — if any single IP submits >20 login attempts within 60 seconds (a bot/stuffing pattern), every subsequent attempt from that IP is rejected with 429 for the remainder of the window.
+2. **Per-account lockout** — 5 consecutive wrong passwords within 15 minutes locks the account for 15 minutes. The lockout key is cleared automatically on the next successful login.
+3. **New IP detection** — each user's known IP set is stored in Redis (30-day TTL). First login from an unseen IP is flagged in the audit log as `SECURITY.LOGIN_ANOMALY`.
+4. **Impossible velocity** — if a user successfully logs in from IP-A and then logs in from a different IP-B within 10 minutes, it is flagged as a possible simultaneous session takeover.
+
+**Security email alerts:**
+Account lockout and anomaly signals both trigger a non-blocking security email to the account owner via `EmailService.sendMail` (skipped when email is unconfigured, e.g. test environments).
+
+**Audit log actions added:**
+- `AUTH.LOGIN_FAILED` — now includes consecutive-attempt count (`x/5`)
+- `SECURITY.ACCOUNT_LOCKED` — emitted when lockout threshold is reached
+- `SECURITY.LOGIN_ANOMALY` — emitted on new-IP or impossible-velocity signal
+
+**Architecture:**
+- Pre-login check (`preLoginCheck`) runs *before* password verification so locked accounts and burst IPs get 429 without leaking timing information about whether the password is correct.
+- Post-login analysis (`analyzeSuccessfulLogin`) runs *after* a confirmed successful login — anomaly signals are informational and never block a correct credential.
+- All state is Redis-only (TTL-governed keys); the service degrades gracefully if Redis is unavailable and never throws into the login path.
+
+**Files Affected:**
+- `backend/src/services/loginAnomalyService.ts` *(new)*
+- `backend/src/routes/auth.ts`
+
+---
+
+## [Date: 2026-09-12] - Fix: CI test failures after security hardening (adminPasscodeMiddleware + cross-tenant JWT check)
+
+**What/Why:**
+Four test suites failed in CI after the security changes shipped in the previous commit:
+
+1. **adminAuditLogs.test.ts** — used `passcode` as a query parameter. The new `adminPasscodeMiddleware` rejects query-string passcodes with 400, so all tests using `.query({ passcode: ... })` broke. Fixed by converting to `.set('x-admin-passcode', ...)` header throughout.
+
+2. **adminBroadcastEncrypted.test.ts** — the "verify passcode" and "batch broadcast" tests sent the passcode only in the request body. The middleware gate requires it in the `x-admin-passcode` header. Fixed by adding the header alongside the body field (the body field is still required by the route's own BroadcastService.verifyPasscode call).
+
+3. **migrations.test.ts** — migration endpoint tests didn't include `x-admin-passcode` at all. Added the header to all requests that expected 200 or 403 so they can reach the auth/role middleware.
+
+4. **tenantSchemaSwitching.test.ts** — the auto-migration provisioning test used `tenant1Token` (tenantId=tenant1) to request `tenant3Slug` (tenantId=tenant3), triggering the new cross-tenant JWT assertion (403). Fixed by generating a tenant3-scoped JWT with `generateJwtToken` for that one test case.
+
+**Files Affected:**
+- `backend/src/tests/adminAuditLogs.test.ts`
+- `backend/src/tests/adminBroadcastEncrypted.test.ts`
+- `backend/src/tests/migrations.test.ts`
+- `backend/src/tests/tenantSchemaSwitching.test.ts`
+
+---
+
+## [Date: 2026-09-12] - Security: JWT revocation via per-user credential versioning
+
+**What/Why:**
+Existing JWTs remained valid after a role change, admin password reset, or member deletion — there was no server-side way to instantly invalidate all sessions for a specific user. Implemented a per-user credential version in Redis that is embedded in tokens at issue time and checked on every request.
+
+**How it works:**
+- `getCredentialVersion(userId)` → fetches version from Redis (0 if not set)
+- At login, `completeLogin` fetches the current version and embeds it as `credentialVersion` in the JWT payload
+- `verifyJwtToken` checks `payload.credentialVersion` against the live Redis value; if stored version is higher, the token is rejected immediately
+- `revokeUserTokens(userId)` → `INCR`s the Redis version atomically, instantly invalidating all previous tokens
+
+**Triggers:**
+- `PUT /tenants/members/:id/role` — role change now invalidates active sessions immediately
+- `DELETE /tenants/members/:id` — deleted member's tokens revoked before 200 response
+- `POST /tenants/members/:id/reset-password` — password reset revokes active sessions
+
+**Backward compatibility:** Tokens without `credentialVersion` are treated as version 0, which always passes (no breaking change for existing sessions during rollout).
+
+**Files Affected:**
+- `backend/src/services/tokenRevocationService.ts` — added `getCredentialVersion`, `revokeUserTokens`
+- `backend/src/utils/jwt.ts` — added `credentialVersion` to `JwtPayload`; credential version check in `verifyJwtToken` on both cache-hit and cache-miss paths
+- `backend/src/routes/auth.ts` — `completeLogin` fetches and embeds credential version at login
+- `backend/src/routes/tenants.ts` — `revokeUserTokens` called on role change, member deletion, password reset
+
+---
+
+## [Date: 2026-09-12] - Security: Platform vulnerability audit fixes (7 issues)
+
+**What/Why:**
+Following a comprehensive security audit of the Ledgio platform, 7 vulnerabilities were identified and fixed across 3 severity levels: 3 critical, 2 high, 2 medium/low. All fixes are backward-compatible with no schema changes required.
+
+**Fixes Applied:**
+
+1. **Admin rate limiting (CRITICAL)** — Added `adminRateLimiter` (10 req/min per IP) to all `/api/v1/admin/*` routes. Created `adminPasscodeMiddleware` that centralises passcode auth for every admin route: rejects query-string passcodes (they leak into logs), logs every failed attempt with IP + path, returns 400 on query-param usage.
+
+2. **Cross-tenant JWT validation (CRITICAL)** — `tenantContextMiddleware` now asserts `req.user.tenantId === resolved tenant id`. A valid JWT for Tenant A can no longer access Tenant B's data by sending a different `X-Tenant-ID` header.
+
+3. **Data export cooldown (CRITICAL)** — Both `/data-export/json` and `/data-export/csv` enforce a 1-export-per-hour per-tenant Redis cooldown (atomic `SET NX EX`). Returns 429 with `Retry-After` when limit is hit. Fails open when Redis is down.
+
+4. **Paystack webhook replay protection (HIGH)** — Each processed webhook reference is stored in Redis for 90 days. Replayed webhooks are rejected with `{ ignored: true, reason: 'duplicate' }`.
+
+5. **Stack traces stripped in production (MEDIUM)** — `err.stack` is only stored in error logs when `NODE_ENV !== 'production'`, preventing internal paths/library versions from leaking via the admin error log dashboard.
+
+6. **OCR per-tenant daily limit (MEDIUM)** — 50 OCR requests per tenant per day via Redis `INCR` with daily TTL. Prevents cost amplification attacks from automated image uploads.
+
+7. **CORS + secret startup assertions (LOW)** — Production server refuses to start if `CORS_ALLOWED_ORIGINS` is unset or `*`, or if `BROADCAST_MASTER_SECRET` is unset.
+
+**Files Affected:**
+- `backend/src/middleware/adminPasscodeMiddleware.ts` — NEW: central passcode gate for all admin routes
+- `backend/src/middleware/rateLimiterMiddleware.ts` — added `adminRateLimiter` export
+- `backend/src/middleware/tenantContextMiddleware.ts` — added cross-tenant JWT assertion
+- `backend/src/app.ts` — applied `adminRateLimiter` + `adminPasscodeMiddleware` to `/api/v1/admin/*`; stripped production stack traces; imported new middleware
+- `backend/src/index.ts` — added CORS + secret startup assertions for production
+- `backend/src/routes/dataExport.ts` — per-tenant hourly export cooldown
+- `backend/src/routes/ocr.ts` — per-tenant daily OCR limit (50/day)
+- `backend/src/routes/subscription.ts` — Paystack webhook replay deduplication
+
+---
+
+## [Date: 2026-09-11] - Feature: Revenue & MRR Dashboard tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: after knowing who is at risk (Client Health), who to call (Churn Risk), and who is stuck (Onboarding), AGOD needs to see the financial picture — what revenue is currently locked in, what is in the pipeline from trials, and what is at risk from lapsing renewals. Added a 17th tab showing MRR, ARR, tier breakdown, trial pipeline value, revenue at risk, and upcoming renewals.
+
+**How it works:**
+- MRR = sum of tier prices for all ACTIVE paid tenants (tier 1 = GHS 105, tier 2 = GHS 305, tier 3 = GHS 510 per month)
+- Tier prices come from the existing `SUBSCRIPTION_PLANS` constant in `subscription.ts` — no duplication
+- Revenue at risk = EXPIRED tenants + ACTIVE tenants with renewal due in ≤30 days
+- Trial pipeline value = sum of tier prices for all TRIAL tenants (potential MRR if all convert)
+- Monthly activations chart: new ACTIVE paid tenants bucketed by `createdAt` month for last 12 months
+- Renewals Due sub-view: sorted by urgency (days left), with color coding (≤7d rose, ≤14d orange, ≤30d amber)
+- All Tenants sub-view: full revenue table with at-risk row highlighting
+- Cyan tab nav badge shows `!` when any revenue is at risk
+
+**Files Affected:**
+- `backend/src/routes/adminRevenue.ts` — NEW: GET /api/v1/admin/revenue endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "revenue" tab type, state, fetch, nav button (TrendingUp icon, cyan theme), and full tab panel JSX with KPI tiles, tier cards, activations bar chart, and Renewals Due/All Tenants sub-views
+
+## [Date: 2026-09-11] - Feature: Onboarding Completion Tracker tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: AGOD needs to see which tenants are progressing through setup milestones so they can identify "stuck" clients (signed up >7 days ago, completed <50% of steps) and initiate proactive outreach. Added a 16th tab to the admin console showing per-tenant completion of 8 onboarding milestones plus a stuck-client call list.
+
+**How it works:**
+- Step 0 = `Tenant.isLive` (onboarding wizard complete — opening balances validated)
+- Steps 1–7 = presence of specific audit log actions per tenant (team member added, first journal, first invoice, first sale, first inventory item, bank connected, first reconciliation)
+- `completionScore` (0–8), `completionPct`, and `isStuck` (>7 days old, score < 4) computed server-side
+- Summary cards: total tenants, fully onboarded, half-or-more, barely started, stuck count, avg completion %
+- Milestone table shows ✓/✗ per step per tenant with a mini progress bar; row highlighted red when stuck
+- Tab nav badge shows stuck-client count so AGOD sees the alert without opening the tab
+- Filters: All / Stuck Only / Fully Onboarded / In Progress / Barely Started
+
+**Files Affected:**
+- `backend/src/routes/adminOnboarding.ts` — NEW: GET /api/v1/admin/onboarding endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "onboarding" tab type, state, fetch, nav button (ClipboardList icon, violet theme), and full tab panel JSX
+
+## [Date: 2026-09-11] - Feature: Churn Risk Tracker tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 retention focus: the Client Health tab shows *who is dormant*; the Churn Risk Tracker shows *who needs a call right now and what to say*. Added a 15th tab that groups at-risk tenants by urgency bucket and overlays feature adoption signals so AGOD knows whether a tenant hasn't converted yet because they've never found the product's value (score 0-1) vs. are an active user who may just need a renewal nudge.
+
+**How it works:**
+- Backend derives at-risk tenants from subscription status + trial/renewal expiry dates
+- Feature adoption is detected from distinct `(tenantId, action)` pairs in AuditLog for 5 key feature areas: Invoicing, Bookkeeping, Inventory, Sales, Banking
+- Adoption score 0-5: score 0-1 = "not yet embedded" (very high churn risk regardless of trial status)
+- Urgency buckets (sorted most-urgent first): Expired, Trial ≤3d (critical), Trial 4-7d (soon), Renewal ≤14d, Dormant 14d+, Trial 8-30d (watch)
+- Tab badge shows critical count (expired + trial ≤3d) so it is visible without opening the tab
+- Feature columns (✓/✗ per area) give AGOD talking points for the outreach call
+
+**Files Affected:**
+- `backend/src/routes/adminChurnRisk.ts` — NEW: GET /api/v1/admin/churn-risk endpoint
+- `backend/src/app.ts` — registered the new route
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "churnrisk" tab type, state, fetch, nav button, and full tab panel JSX
+
+## [Date: 2026-09-11] - Feature: Client Health Dashboard tab in AGOD Control Engine
+
+**What/Why:**
+Phase 1 priority: retain early Ghanaian SME clients. The AGOD Control Engine lacked any visibility into which tenants are active vs. dormant and which are at risk of churning. Added a new "Client Health" tab (#14) to the admin console that surfaces per-tenant activity, subscription status, and churn risk signals in real time.
+
+**How it works:**
+- `lastActivityAt` is derived from each tenant's most-recent `AuditLog` row (audit logs are written on every user action — invoice posted, sale rung up, etc. — making this a reliable proxy for real usage without needing a new DB column or migration).
+- `churnRisk` is computed server-side: `high` if tenant is EXPIRED, dormant 14+ days, or trial ending in ≤7 days; `medium` if dormant 7–13 days or paid renewal in ≤7 days.
+- Summary cards show totals: all clients, active paid, on trial, expired, high-risk count, trials expiring in 7 days.
+- Table is filterable by risk level and subscription status, sortable by risk, most-dormant, or most-recent activity.
+- Tab badge shows the live high-risk count so it is visible without opening the tab.
+
+**Files Affected:**
+- `backend/src/routes/adminClientHealth.ts` — NEW: GET /api/v1/admin/client-health endpoint
+- `backend/src/app.ts` — registered the new route at /api/v1/admin/client-health
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added "clienthealth" tab type, state, fetchClientHealth callback, nav button, and full tab panel JSX
+
+## [Date: 2026-09-11] - Perf: Cross-device PWA compatibility and performance overhaul
+
+**What/Why:**
+To ensure the PWA runs acceptably on 2018-era budget Android phones, older iOS devices, and low-RAM computers, a full performance audit was performed and the following fixes were applied:
+
+1. **Vite build target** (`frontend/vite.config.ts`): Changed from default `es2020` to `['chrome72','firefox68','safari12.1','edge79']`. This ensures the bundled JS is syntactically compatible with 2018–2019 devices without modern JS syntax that those runtimes reject.
+
+2. **Workbox PWA caching** (`frontend/vite.config.ts`): Added `maximumFileSizeToCacheInBytes: 500*1024` to prevent SW from downloading the entire split-bundle set on a slow connection. Added `navigateFallbackDenylist` for `/api/` and `/partner/`. Added `runtimeCaching` for Google Fonts stylesheets (StaleWhileRevalidate, 1yr) and woff2 font files (CacheFirst, 1yr), so fonts load from cache after first visit.
+
+3. **Font payload reduction** (`frontend/index.html`): Removed 7 landing-page-only font variants (Syne, DM Sans) from the global font link. These were being downloaded by every authenticated user even though they only appear on the public landing page — wasted bandwidth on every login.
+
+4. **Lazy font injection** (`frontend/src/pages/landing/LandingPage.tsx`): Syne and DM Sans are now injected via `document.createElement('link')` inside a `useEffect` that runs only when the landing page mounts. Authenticated users who never visit the landing page never download these fonts.
+
+5. **GPU layer elimination** (`frontend/src/pages/landing/LandingPage.tsx`): Replaced `blur-3xl` decorative div (forces GPU compositing layer, expensive on Mali-G52 / Adreno 505 class GPUs) with a CSS `radial-gradient` that achieves the same visual with zero GPU overhead. Also removed `backdrop-blur-sm` from the stats strip.
+
+6. **List virtualisation** (`frontend/src/pages/inventory/WarehouseManagement.tsx`): The Global Product Search matrix previously rendered all matching items into the DOM simultaneously — on a 500-item inventory that meant 500+ complex `<tr>` nodes with nested warehouse badge maps each. Replaced with `@tanstack/react-virtual`'s `useVirtualizer` so only ~10 rows are in the DOM at any time. Scroll container is 520px tall; rows are measured dynamically; top/bottom padding rows maintain the scrollable height.
+
+7. **Image decoding** (`frontend/src/components/landing/ImageCarousel.tsx`, `frontend/src/components/layout/AuthSplitLayout.tsx`): Added `decoding="async"` to carousel and auth panel images so the browser's image decode does not block the main thread.
+
+**Files Affected:**
+- `frontend/vite.config.ts` — build target, Workbox caching
+- `frontend/index.html` — font payload reduction
+- `frontend/package.json` + `package-lock.json` — added `@tanstack/react-virtual`
+- `frontend/src/pages/landing/LandingPage.tsx` — lazy fonts, GPU blur elimination
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — list virtualisation
+- `frontend/src/components/landing/ImageCarousel.tsx` — decoding=async
+- `frontend/src/components/layout/AuthSplitLayout.tsx` — decoding=async
+
+---
+
+## [Date: 2026-09-11] - Docs: Ledgio Founding Partner Programme — proposal and referral letters
+
+**What/Why:**
+Created two formal business development documents for the Ledgio Founding Partner Programme, based entirely on the official Ledgio brochure and the signed HAPA referral pilot agreement (LDG-PA-001). These replace any placeholder/template letters and contain only verified, real details.
+
+1. **Partnership Proposal (LDG-PA-002)** — formal proposal addressed to business networks, consulting firms, and professional advisors. Covers Ledgio's full feature set, the Founding Partner opportunity (10% monthly commission for life), commission tables, roles/responsibilities, what Ledgio provides, pilot agreement structure, and next steps.
+
+2. **Referral Partner Invitation (LDG-FP-2026)** — accessible invitation letter for individuals or smaller networks. Explains the Founding Partner Programme in three key points, earnings table (per referral, over 2 years), 7-step process, commission rules, and contact details.
+
+**Source documents used:** Official Ledgio 4-panel brochure, HAPA Referral Partner Pilot Agreement signed 9 September 2026 (LDG-PA-001).
+
+**Files Affected:**
+- `docs/proposals/partnership-proposal.md` — new: full partnership proposal letter (LDG-PA-002)
+- `docs/proposals/referral-partner-invitation.md` — new: referral partner invitation letter (LDG-FP-2026)
+
+---
+
+## [Date: 2026-09-11] - Feature: Receipt enforcement (force print) + admin Receipt Audit Log
+
+**What/Why:**
+To prevent attendants from pocketing the gap between what they charge customers verbally and what they record in the system, two controls were added:
+
+1. **Force-print on POS**: After recording a sale, the cashier must click "Print Receipt" before the system allows a new sale to be started. The "Record Sale" button shows "Print previous receipt first" and stays disabled until the receipt PDF is opened. This closes the loophole where an attendant could skip printing and deny the customer proof of the actual price.
+
+2. **Receipt Audit Log** (Admin/Accountant-only): A new report page at `/reports/receipt-log` lists every completed POS sale with date, shop, cashier, payment method, and total. Clicking a row expands line-item detail. Any receipt PDF can be downloaded directly. Admins and accountants can filter by date range.
+
+**Files Affected:**
+- `backend/src/routes/cashTill.ts` — new `GET /api/v1/tills/receipts` endpoint (`requireRole('Admin','Accountant')`) returning paginated sales with lines, till, and warehouse
+- `frontend/src/pages/pos/PointOfSale.tsx` — `receiptPrinted` state; `openReceipt` accepts `markPrinted` flag; Record Sale button disabled when previous receipt unprinted; receipt banner turns amber until printed
+- `frontend/src/pages/reports/ReceiptLog.tsx` — new admin/accountant-only receipt log page with date filters, expandable line detail, and PDF download
+- `frontend/src/App.tsx` — lazy import and route for `/reports/receipt-log`
+- `frontend/src/lib/navigation.ts` — "Receipt Audit Log" nav item under REPORTS & ANALYTICS
+
+---
+
+## [Date: 2026-09-07] - Feature: Floor Price enforcement on POS
+
+**What/Why:**
+For flexible-price markets (e.g. phone accessories shops) where attendants negotiate with customers, a fixed selling price is not practical. However, without a minimum, attendants can record a sale at GHS 35, charge the customer GHS 80, and pocket the difference. The floor price feature solves this:
+
+- **Boss sets a floor price per item** — the absolute minimum that must be recorded in the system
+- **POS allows price negotiation above the floor** — attendant can type any price into the per-line input
+- **POS blocks any price below the floor** — red highlight, "Below floor price" label, and the Record Sale button is disabled
+- **Backend validates too** — if a tampered request arrives below the floor, the server rejects it with a clear error
+- **Fixed-price shops unaffected** — if no floor is set (null), the POS behaves exactly as before
+
+**Files Affected:**
+- `backend/prisma/schema.prisma` — added `floorPrice Decimal? @map("floor_price")` to `InventoryItem`
+- `backend/prisma/migrations/20260907000001_add_floor_price_to_inventory_item/migration.sql` — ALTER TABLE migration
+- `backend/src/routes/inventory.ts` — `floorPrice` in create/update Zod schema and handlers
+- `backend/src/routes/cashTill.ts` — `effectivePriceFor` now accepts optional `customPrice` per line; server-side floor price validation before recording sale
+- `frontend/src/pages/pos/PointOfSale.tsx` — `floorPrice` and `customPrice` added to interfaces; per-line editable price input with floor indicator; `floorViolations` blocks submit
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `floorPrice` state and form field; floor price shown in item table (amber label)
+
+---
+
+## [Date: 2026-09-06] - Fix: Dashboard KPI number overflow + Stock Movement tab in Inventory
+
+**What/Why:**
+
+1. **Dashboard KPI tiles clipping large numbers** — Total Revenue (GHS 3,121,917,765), Expenses, and Net Profit numbers were cut off because `text-2xl` at `lg:grid-cols-4` card width cannot fit 18-character currency strings. Added `fmtKpi()` compact formatter: numbers ≥1B show as "GHS 3.12B", ≥1M as "GHS 3.12M", ≥1K as "GHS 3.1K"; smaller numbers use the existing full formatter. Each tile shows the compact figure in bold and the full exact amount in a small grey line below, with `title` attribute for tooltip. Applied `truncate` to prevent any overflow.
+
+2. **Stock Movement tab in Inventory** — Added a two-tab bar at the top of the WarehouseManagement page: "Inventory & Warehouses" (existing view) and "Stock Movement (In / Out)" which embeds the existing `StockMovement` report component inline. Users can now see all stock-in and stock-out movements directly from the Inventory page without navigating away to Reports.
+
+**Files Affected:**
+- `frontend/src/App.tsx` — `fmtKpi()` helper, KPI tiles updated with compact format + full value subtitle
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `mainTab` state, tab bar, `StockMovement` import and conditional render
+
+---
+
+## [Date: 2026-09-06] - Fix: Invoice sync failure reason visible + Retry button
+
+**What/Why:**
+
+The "Needs attention" badge on failed invoices only showed its error reason as a tooltip (hover-only). Users had no idea *why* an invoice failed or what to do. Fixed by:
+
+1. **Visible error text** — When an invoice has `_failed=true`, a red info box appears below the invoice number showing the exact server rejection message (e.g. "Insufficient stock for item X").
+2. **Retry button** — A "Retry →" link inside the error box resets the outbox entry from `failed` → `pending` and triggers `flushOutbox` immediately, so the sync re-attempts without a page reload.
+3. **`retryFailedInvoice(invoiceId)`** exported from `syncEngine.ts` — handles both `CREATE_INVOICE` and `PAY_INVOICE` outbox entry kinds, clears `_failed`/`_failureReason` on the local record, and kicks off the outbox flush.
+
+**Files Affected:**
+- `frontend/src/lib/syncEngine.ts` — new `retryFailedInvoice` export
+- `frontend/src/pages/invoices/Invoices.tsx` — visible error reason box + Retry button
+
+---
+
+## [Date: 2026-09-06] - Fix: POS receipt PDF column alignment + WhatsApp delivery feedback
+
+**What/Why:**
+
+Two POS receipt bugs fixed:
+
+1. **PDF receipt column misalignment** — PDFKit's `continued: true` chain breaks whenever an item name wraps to a second line (e.g. "Alvaro Drink (24)"), pushing the Qty/Price/Total values down a line and making the receipt unreadable. Replaced the chain with explicit X-coordinate positioning (`x0`/`x1`/`x2`/`x3`) for every column, with a `lineBreak: false` constraint and a 20-char truncation on item names so nothing can overflow the thermal roll width.
+
+2. **WhatsApp receipt delivery — no feedback to cashier** — `sendWhatsAppReceipt` was fire-and-forget (`void`), with no axios timeout, and Ghana phone numbers starting with `0` weren't normalized to `+233`. Changed the service to return `Promise<boolean>`, added a `normalizePhone` helper (Ghana 0XXXXXXXXX → +233XXXXXXXXX), added an 8 s axios timeout, and awaited it in `cashTill.ts` behind a 10 s `Promise.race` ceiling. The response now includes `whatsappSent: boolean`. The POS frontend shows a success toast ("WhatsApp receipt sent ✓") or an error toast if delivery failed.
+
+**Files Affected:**
+- `backend/src/routes/cashTill.ts` — PDF column layout rewritten with explicit X coords; WhatsApp call awaited and `whatsappSent` included in response
+- `backend/src/services/whatsAppReceiptService.ts` — `normalizePhone`, 8 s axios timeout, returns `Promise<boolean>`
+- `frontend/src/pages/pos/PointOfSale.tsx` — shows WhatsApp success/failure toast after sale
+
+---
+
+## [Date: 2026-09-06] - Fix: Double-submit guards, job costing GL warnings, negative-stock warnings, negative-stock endpoint
+
+**What/Why:**
+
+Four data-integrity fixes across Job Costing, Invoices, and Inventory:
+
+1. **Job Costing frontend double-submit guard** — "Add Line" and "Complete" buttons could be clicked multiple times during a slow response, creating duplicate cost lines or double-posting COGS journals. Added `addingLineForJob` and `completingJobId` state; buttons are disabled and show "Adding…"/"Completing…" while the API call is in-flight.
+
+2. **Job Costing GL journal warnings visible** — When the WIP/COGS/JOB_EXPENSE accounts are not yet configured, the journal post silently did nothing; the cost line or completion appeared to succeed but no GL entry was made. Now returns `journalWarning` in the API response body. Frontend shows it as an error banner ("Cost line added — GL warning: …").
+
+3. **Invoice negative-stock warning** — When `allowNegativeStock=true`, invoices silently deducted below zero with no user feedback. Backend now collects per-line warnings (`stockWarnings[]`) and includes them in the 201 response. Sync engine attaches them to the local `LocalInvoice` record as `_stockWarnings`; `Invoices.tsx` watches via `useLiveQuery` and fires a toast for each, then clears the field.
+
+4. **`GET /inventory/negative-stock` endpoint** — New endpoint returning all `warehouseStock` rows where `quantityOnHand < 0`, joined with item name/SKU and warehouse name, so managers can audit negative-stock items at any time.
+
+**Files Affected:**
+- `frontend/src/pages/manufacturing/Jobs.tsx` — `addingLineForJob`, `completingJobId` state, button guards, GL warning banner
+- `backend/src/routes/jobs.ts` — `journalWarning` field in cost-line and complete responses
+- `backend/src/routes/invoices.ts` — `negativeStockWarnings[]` collected and returned in response
+- `frontend/src/lib/syncEngine.ts` — `_stockWarnings` on `LocalInvoice`, stored after server responds
+- `frontend/src/pages/invoices/Invoices.tsx` — `useEffect` watches for `_stockWarnings`, shows toast
+- `backend/src/routes/inventory.ts` — New `GET /inventory/negative-stock` endpoint
+
+---
+
+## [Date: 2026-09-06] - Fix: Quick-Add Table missing Batch # and Expiry Date columns for PHARMACY org type
+
+**What/Why:**
+
+The "Bulk Add Products" Quick-Add Table in Warehouse Management was missing Batch # and Expiry Date columns when accessed by a PHARMACY account. These are mandatory fields for tracking drug batches and expiry in a pharmacy context.
+
+**Changes:**
+
+- Extended `BulkRow` interface and `EMPTY_BULK_ROW` constant with `batchNumber` and `expiryDate` fields
+- Added conditional `<th>` headers (Batch # / Expiry Date) and `<td>` input cells shown only when `user?.orgType === "PHARMACY"`
+- CSV parser now maps `batchNumber` and `expiryDate` from CSV files (allows pharmacy CSV imports to include these fields too)
+- `handleBulkSubmit` now includes `batchNumber` and `expiryDate` in the per-item payload
+- Backend `/inventory/items/bulk` endpoint now:
+  - Accepts `batchNumber` and `expiryDate` on each item row
+  - After inserting stock, creates `InventoryBatch` records for rows with a batch number
+  - Sets `requiresBatchTracking: true` on items that had a batch number
+
+**Files Affected:**
+- `frontend/src/pages/inventory/WarehouseManagement.tsx` — `BulkRow`, `EMPTY_BULK_ROW`, table UI, CSV parser, `handleBulkSubmit`
+- `backend/src/routes/inventory.ts` — `ValidRow` type, row extraction, batch record creation after stock inserts
+
+---
+
+## [Date: 2026-09-06] - Feature: Pharmacy ERP gaps — GRA E-VAT, NEPP, barcode enforcement, ABC-FSN inventory matrix
+
+**What/Why:**
+
+Implemented four advanced pharmacy ERP features mandated by Ghana's regulatory environment and identified through market research:
+
+1. **GRA E-VAT receipt generation** — `EvatService` issues a GRA-compliant electronic invoice reference and QR data string on every prescription dispense. When `GRA_EVAT_ENDPOINT` + `GRA_EVAT_CLIENT_ID` env vars are set, sends a real-time submission to the Ghana Revenue Authority API; otherwise generates a deterministic SHA-256-derived stub receipt (suitable for dev/demo, clearly marked). `evatInvoiceRef` stored on the Prescription record and displayed as a green `QrCode` badge in the prescriptions list and detail modal.
+
+2. **NEPP prescription code verification** — `POST /pharmacy/verify-nepp` validates National Electronic Pharmacy Platform codes against the NEPP API (`NEPP_API_ENDPOINT` + `NEPP_API_KEY`) or falls back to a deterministic stub. When verified, auto-fills patient name and phone in the new prescription form. `neppCode` stored on the Prescription model.
+
+3. **Barcode scan enforcement** — Clicking "Dispense" on any prescription now opens a verification modal requiring the pharmacist to scan or type each line item's SKU before the "Confirm Dispense" button becomes enabled. This is a hard stop — the standard dispense call only fires after all barcodes are verified.
+
+4. **ABC-FSN dual-matrix inventory engine** — `GET /pharmacy/inventory-matrix` classifies all inventory items by cumulative stock value (A=top 70%, B=70–90%, C=bottom 10%) and by last-movement days (F=≤30d, S=31–90d, N=90d+). New `PharmacyInventoryMatrix` page with filter chips by ABC/FSN class, a full data table, and reorder guidance notes. Added to PHARMACY nav section.
+
+**Files Affected:**
+- `backend/src/services/evatService.ts` — new GRA E-VAT service (created)
+- `backend/src/routes/pharmacy.ts` — updated `PATCH /prescriptions/:id/dispense` to call EvatService; added `POST /pharmacy/verify-nepp` and `GET /pharmacy/inventory-matrix`; `neppCode` accepted on prescription creation
+- `backend/prisma/schema.prisma` — added `evatInvoiceRef` and `neppCode` to `Prescription` model
+- `backend/prisma/migrations/20260906000002_prescription_evat_nepp/migration.sql` — adds the two new columns
+- `frontend/src/pages/pharmacy/PrescriptionRegister.tsx` — NEPP code input + verify button, barcode verification modal, E-VAT ref display
+- `frontend/src/pages/pharmacy/PharmacyInventoryMatrix.tsx` — new ABC-FSN matrix page (created)
+- `frontend/src/lib/navigation.ts` — added "Inventory Matrix" to PHARMACY section
+- `frontend/src/App.tsx` — lazy import + route for `PharmacyInventoryMatrix`
+
+---
+
+## [Date: 2026-09-06] - Feature: Pharmacy pitch pack — patient registry, NHIS claims, drug interactions, SMS refill reminders
+
+**What/Why:**
+
+Built four pharmacy-specific features (PHARMACY org type only) to pitch the platform to pharmacy shops:
+
+1. **Drug interaction + allergy flags at point of fill** — `PrescriptionRegister.tsx` rewritten with client-side drug interaction checking (17 high-severity drug pairs relevant to Ghana pharmacies: warfarin combos, chloroquine/artemether, metronidazole/alcohol, etc.). When a patient is linked, known allergies are cross-checked against selected drugs and shown as a red `ShieldAlert` banner. Drug interactions show as amber/red `AlertTriangle` banners with HIGH/MODERATE severity. Both warnings appear in the form and in the detail modal.
+
+2. **NHIS claims processing** — New `GET /pharmacy/nhis-claims?from=&to=` endpoint returns all NHIS-billed prescriptions in a date range with patient NHIS card numbers and line items. New `NhisClaims.tsx` page shows summary cards (total Rxs, dispensed count, total claim value), a collapsible claims table, and one-click CSV export for submission to Ghana's NHIA.
+
+3. **SMS refill reminders** — New `POST /pharmacy/prescriptions/:id/send-refill-reminder` endpoint; uses existing `SmsService`. Bell icon button appears on dispensed prescriptions that have a patient phone number. Sends a formatted SMS listing prescribed drugs and the Rx number.
+
+4. **Patient registry with allergy profiles** — New `PharmacyPatient` Prisma model (phone, DOB, NHIS card number, allergies string[], chronic conditions). New `GET/POST /pharmacy/patients` and `PUT /pharmacy/patients/:id` endpoints. New `PharmacyPatients.tsx` page: live search by name/phone/NHIS, expandable allergy/condition view, modal form with common-allergy quick-toggles + custom entry. Prescriptions now link to patients (`patientId FK`), and `billingType` (CASH/NHIS/INSURANCE) is stored on each prescription.
+
+**Files Affected:**
+- `frontend/src/pages/pharmacy/PrescriptionRegister.tsx` — complete rewrite with DRUG_INTERACTIONS array, allergy/interaction banners, patient selector, billing type, SMS refill button
+- `frontend/src/pages/pharmacy/PharmacyPatients.tsx` — new patient registry page (created)
+- `frontend/src/pages/pharmacy/NhisClaims.tsx` — new NHIS claims report page (created)
+- `frontend/src/lib/navigation.ts` — added "Patient Registry" (`/pharmacy/patients`) and "NHIS Claims" (`/pharmacy/nhis-claims`) to PHARMACY nav section
+- `frontend/src/App.tsx` — added lazy imports + routes for `PharmacyPatients` and `NhisClaims`
+- `backend/src/routes/pharmacy.ts` — new patient CRUD, refill-reminder SMS, NHIS claims endpoints; updated prescription creation to accept billingType + patientId
+- `backend/prisma/schema.prisma` — new `PharmacyPatient` model; `billingType` + `patientId` FK added to `Prescription`
+- `backend/prisma/migrations/20260906000001_pharmacy_patient_registry/migration.sql` — creates `pharmacy_patients` table, adds columns to `prescriptions`
+
+---
+
+## [Date: 2026-09-06] - Fix: Pharmacy bulk import missing Batch # and Expiry Date columns
+
+**What/Why:**
+
+Pharmacy tenants importing opening stock via the Bulk Import Wizard saw no way to supply batch numbers or expiry dates — both mandatory for FEFO dispensing and Ghana FDA compliance. The `inventory-items` import config was generic (name, SKU, cost price, sell price, warehouse, qty only).
+
+Added pharmacy-aware config: when `orgType === "PHARMACY"`, the wizard switches to a pharmacy-specific inventory-items template that includes `batchNumber` and `expiryDate` columns, shows a pharmaceutical sample CSV (Amoxicillin, Paracetamol, Metronidazole), and sets the default unit to "tablet". The backend now accepts both fields, creates `InventoryBatch` records for rows that supply a batch number, and marks those items `requiresBatchTracking = true` so FEFO dispensing is enforced going forward.
+
+**Files Affected:**
+- `frontend/src/pages/import/BulkImportWizard.tsx` — `PHARMACY_INVENTORY_CONFIG` constant; `useTenantSettings` to detect org type; `configs` override when pharmacy; `handleTypeChange` uses `configs`
+- `backend/src/routes/import.ts` — `batchNumber` + `expiryDate` added to `ValidRow`; parsed from row; `requiresBatchTracking` set on item insert; `inventoryBatch.createMany` after warehouse stock
+
+---
+
+## [Date: 2026-09-06] - Merged: PR #20 — Per-org-type nav filtering
+
+PR `ledgio-software/ledgio-#20` merged to `main`. Feature is live.
+
+---
+
+## [Date: 2026-09-05] - Feature: Per-org-type nav filtering (RETAIL / WHOLESALE / SERVICE / CONSTRUCTION)
+
+**What/Why:**
+
+Every business used to register as generic `BUSINESS` and see the full nav — a construction firm saw POS, a service agency saw stock reports. Added five distinct org types (`RETAIL`, `WHOLESALE`, `SERVICE`, `CONSTRUCTION`, plus existing `NONPROFIT` / `PHARMACY` / `BUSINESS`). Each type gets its own nav profile: SERVICE hides the entire Inventory section and stock reports; WHOLESALE hides POS; CONSTRUCTION hides POS and manufacturing but keeps Job Costing; RETAIL and PHARMACY keep POS + Inventory but strip industrial manufacturing routes. The registration profile cards now map 1-to-1 to org types so selection is unambiguous.
+
+**Files Affected:**
+- `backend/src/services/tenantService.ts` — `VALID_ORG_TYPES` set accepts the four new types
+- `frontend/src/lib/navigation.ts` — `ORG_TYPE_HIDDEN` map + SERVICE section-level drop in `getVisibleNavGroups`
+- `frontend/src/pages/auth/Register.tsx` — profile cards now have unique org-type values; added Construction / Contractor card; removed `selectedProfile` state hack
+
+---
+
+## [Date: 2026-09-05] - Fix: Referral code always rejected as "invalid" during registration
+
+**What/Why:**
+
+`validateReferralCode` in `Register.tsx` read `res.data.valid` but the `/verify` endpoint wraps its response as `{ success, data: { valid, partnerName } }`. So `res.data.valid` was always `undefined` (falsy), sending every code to the `else` branch → `setReferralStatus("invalid")`. Fixed by normalising the response: `const payload = res.data?.data ?? res.data` before checking `payload.valid`. Valid codes (e.g. OK2026) now correctly show the green "✓ Valid referral from <partner>" message.
+
+**Files Affected:**
+- `frontend/src/pages/auth/Register.tsx` — unwrap nested `data` envelope before checking `valid`
+
+---
+
+## [Date: 2026-09-05] - Fix: HTTP timeouts on all external API calls (Paystack, Mono, SMS, FX)
+
+**What/Why:**
+
+System failure audit revealed that every `axios` call to external providers — Paystack (5 calls), Mono banking API (3 calls), Arkesel/mNotify SMS (2 calls), and ExchangeRate-API (1 call) — had no `timeout` configured. A hung external API would hold the worker indefinitely, eventually exhausting the server's connection pool and causing a full outage. Added explicit timeouts: 15 s for Paystack, 15–20 s for Mono (transactions need more), 10 s for SMS and FX rate fetches.
+
+**Files Affected:**
+- `backend/src/services/paystackService.ts` — `PAYSTACK_TIMEOUT_MS = 15_000` constant, applied to all 5 axios calls
+- `backend/src/services/monoService.ts` — 15 s on auth/account detail, 20 s on transactions
+- `backend/src/services/smsService.ts` — 10 s on Arkesel and mNotify posts
+- `backend/src/services/fxRateService.ts` — 10 s on ExchangeRate-API fetch
+
+---
+
+## [Date: 2026-09-05] - Move: Trust Center legal docs from backend API to frontend static files
+
+**What/Why:**
+
+The 4 policy documents (Terms & Conditions, Privacy Policy, SLA, Customization Policy) were served via a backend Express route (`GET /api/v1/legal/:policyName`) that read markdown files from `backend/docs/`. Moving them to `frontend/public/legal/` as static assets eliminates a backend round-trip for purely public, static content, simplifies the architecture (no API key or auth needed for legal docs), and makes the files instantly servable by the CDN/Vercel edge without touching the Node.js process.
+
+**Files Affected:**
+- `frontend/public/legal/terms-and-conditions.md` — moved from `backend/docs/`
+- `frontend/public/legal/privacy-policy.md` — moved from `backend/docs/`
+- `frontend/public/legal/sla.md` — moved from `backend/docs/`
+- `frontend/public/legal/customization-policy.md` — moved from `backend/docs/`
+- `frontend/src/pages/legal/LegalDocumentPage.tsx` — replaced `api.get()` with native `fetch('/legal/*.md')`
+- `frontend/src/lib/legalDocs.ts` — added `title` field to `LegalDocLink` interface
+- `backend/src/routes/legal.ts` — deleted
+- `backend/src/app.ts` — removed both `legalRouter` import and `app.use()` registrations
+- `backend/src/tests/allEndpoints.test.ts` — removed legal endpoint test case
+- `backend/src/tests/legalAndEnforcement.test.ts` — removed 5 legal API test cases
+
+---
+
+## [Date: 2026-09-05] - Fix: Policy documents returning "not found on server" (wrong path)
+
+**What/Why:**
+
+All 4 legal documents (Terms & Conditions, Privacy Policy, SLA, Customization Policy) were returning "The requested policy document could not be found on the server." `legal.ts` resolved the docs folder as `path.resolve(__dirname, '../../../docs')`. From the compiled `dist/routes/` directory, `../../../` goes up 3 levels — past `dist/`, past `backend/`, landing at the project root where no `docs/` folder exists. The actual files are in `backend/docs/`. Fixed to `'../../docs'` which correctly resolves to `backend/docs/` from both `dist/routes/` (production) and `src/routes/` (ts-node development).
+
+**Files Affected:**
+- `backend/src/routes/legal.ts` — path changed from `'../../../docs'` to `'../../docs'`
+
+---
+
+## [Date: 2026-09-05] - Feature: Keep-alive cron to prevent Render cold starts
+
+**What/Why:**
+
+Render's free/starter tier spins down the backend after ~15 minutes of inactivity. Cold starts take 30–60 seconds, which is long enough for Paystack USSD sessions (Mobile Money PIN prompts) to expire before the prompt arrives on the user's phone — causing "Connection problem or invalid MMI code" errors. Added a `KeepAliveCronService` that pings the server's own `/health` endpoint every 10 minutes to keep it warm. Uses the existing `BASE_URL` env var; falls back to localhost (no-op in test environments).
+
+**Files Affected:**
+- `backend/src/services/keepAliveCronService.ts` — new service, pings `/health` every 10 min via `node-cron`
+- `backend/src/index.ts` — registers and starts the keep-alive cron on server startup
+
+---
+
+## [Date: 2026-09-05] - Fix: Onboard Client form missing Plan Tier selector
+
+**What/Why:**
+
+The Admin Core Engine's "Onboard Client" form had no way to set the plan tier when creating a contracted tenant — every onboarded tenant defaulted to tier 1 (Shop), requiring a second trip to "Tenant Schemas & Tiers" to set the real plan. `onboardTenant` already accepted a `tier` field; the fix simply exposes it in the UI. Default is 3 (Enterprise) since contracted clients are typically on the full plan.
+
+**Files Affected:**
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — added `onboardTier` state (default 3), Plan Tier dropdown in the onboard form, passes `tier` in the API body, resets on success
+
+---
+
+## [Date: 2026-09-05] - Fix: Employees page silently swallowing tier-403 error
+
+**What/Why:**
+
+`Employees.tsx` `fetchEmployees` caught all errors with a generic "Failed to load employees." toast, hiding the backend's actionable message when a tenant's tier is too low for Payroll (`requireTier(2, 'Payroll')` returns `{ upgradeRequired: true, error: "Payroll requires the Business plan or higher..." }`). HR users had no way to self-diagnose. Fixed the catch block to surface the real backend message when `upgradeRequired: true`.
+
+**Files Affected:**
+- `frontend/src/pages/payroll/Employees.tsx` — catch block now checks `err.response.data.upgradeRequired` and shows the actual error message
+
+---
+
+## [Date: 2026-09-05] - Fix: Payroll run 500 (leave deduction SQL) + Reorder PO toast overflow
+
+**What/Why:**
+
+1. **Payroll run 500 error:** `computeUnpaidLeaveDeduction` in `leaveService.ts` had a SQL parameter binding bug — the function passed `[employeeId, null, periodStart, periodEnd]` as positional parameters but the SQL only referenced `$1`, `$3`, `$4` (skipping `$2`). Depending on the Prisma/pg driver version this causes a driver-level validation error when the parameter count doesn't match usage, surfacing as a generic 500 "Failed to create payroll run." during payroll run creation. Fixed by removing the stray `null` and renumbering: SQL now uses `$1`, `$2`, `$3` with all three referenced, params passed as `[employeeId, periodStart, periodEnd]`.
+
+2. **Reorder PO toast overflow:** The "Generate Reorder POs" handler in `PurchaseOrders.tsx` joined ALL skipped item names into a single toast string via `Array.join(", ")`. With 614 low-stock items having no preferred vendor, this produced a 6 000+ character unreadable message in the toast. Fixed to show the first 3 item names plus "and N more".
+
+**Files Affected:**
+- `backend/src/services/leaveService.ts` — `computeUnpaidLeaveDeduction` SQL renumbered ($3/$4 → $2/$3, `null` param removed)
+- `frontend/src/pages/purchaseorders/PurchaseOrders.tsx` — skipped-items toast truncated to 3 names + "and N more"
+
+---
+
+## [Date: 2026-09-05] - Feature: Per-tenant POS toggle
+
+**What/Why:**
+Businesses that never use a cash till (consultancies, law firms, accounting practices, NGOs billed by invoice) complained about the Point of Sale link cluttering their sidebar. Added a `posEnabled` boolean on the `Tenant` model (default `true`) so an Admin can hide POS in one click from Settings → Regional & Preferences. Hiding it removes the nav link from the sidebar, Cmd+K, and mobile bottom nav — but never deletes any till data.
+
+NONPROFIT tenants already had POS hidden via `orgType` gating; this toggle is for BUSINESS tenants that want the same result without changing their org type.
+
+**Files Affected:**
+- `backend/prisma/schema.prisma` — `posEnabled Boolean @default(true)`
+- `backend/prisma/migrations/20260905000001_add_pos_enabled/migration.sql`
+- `backend/src/routes/tenants.ts` — accept + persist `posEnabled` in `PUT /tenants/current`; returned automatically via `sanitizeTenantForResponse` spread
+- `frontend/src/types/tenant.ts` — `posEnabled: boolean` field
+- `frontend/src/contexts/TenantSettingsContext.tsx` — default + fetch mapping
+- `frontend/src/lib/navigation.ts` — `getVisibleNavGroups` accepts `posEnabled` param, filters `/pos` when false
+- `frontend/src/components/layout/Sidebar.tsx` — passes `settings.posEnabled`
+- `frontend/src/components/layout/MobileBottomNav.tsx` — imports `useTenantSettings`, passes `posEnabled`
+- `frontend/src/components/ui/CommandMenu.tsx` — passes `posEnabled`
+- `frontend/src/pages/settings/Settings.tsx` — "Point of Sale" toggle in Regional & Preferences
+
+---
+
+## [Date: 2026-09-05] - Fix: Paystack USSD popup-blocked + tier not refreshed after upgrade + UpgradeRequired CTA + Paystack channels
+
+**What/Why:**
+Three fixes shipped in one pass:
+
+1. **Paystack USSD/MoMo never triggered (PR #15):** `window.open(authorizationUrl, "_blank")` inside an `async` function (after `await`) is treated as an unauthorized popup by every major browser and silently blocked — the Paystack checkout page never loaded, so USSD/Mobile Money prompts never reached the user. Fixed by storing `authorizationUrl` in `paymentUrl` state and rendering a direct `<a href={paymentUrl}>` link that the user clicks themselves. User-initiated link clicks are never popup-blocked.
+
+2. **Tier not refreshed after subscription (PR #15):** `handleVerify` success only updated local `status` state, not `TenantSettingsContext.settings.tier`. All tier-gated pages (Analytics Dashboard = "earnings", Purchase Orders, Budgets, etc.) still showed `UpgradeRequired` until a hard page reload. Fixed by calling `await fetchSettings()` (from `useTenantSettings()`) in the verify success path so the global tier context updates immediately.
+
+3. **`UpgradeRequired` stale CTA:** Component still said "Contact support to upgrade your plan" — written before self-serve billing existed. Replaced with an "Upgrade plan" button that links to `/settings?tab=subscription` (Settings already reads `?tab` via `useSearchParams`).
+
+4. **Paystack channels:** `initializeTransaction` now explicitly passes `channels: ['mobile_money', 'card']` to Paystack's `/transaction/initialize`. Without this, Paystack defaults to all channels including bank transfer, which is rarely what a Ghanaian SME wants; being explicit makes MoMo (MTN/AirtelTigo/Telecel Cash) and card the prominent options on the Paystack checkout page.
+
+**Files Affected:**
+- `frontend/src/pages/settings/Settings.tsx` (items 1 & 2)
+- `frontend/src/components/UpgradeRequired.tsx` (item 3)
+- `backend/src/services/paystackService.ts` (item 4)
+
+---
+
+## [Date: 2026-09-04] - UI: Rebuild Modal.tsx on Radix UI Dialog primitives
+
+**What/Why:**
+Replaced the native `<dialog>`-based `Modal` component with one backed by `@radix-ui/react-dialog`. All 18 call sites across the app receive the upgrade automatically with no API changes. Benefits: proper portal rendering (avoids CSS stacking context / z-index bugs), automatic scroll-lock and focus-trap without manual `body.overflow` manipulation, keyboard navigation, and ARIA semantics (`aria-modal`, `aria-labelledby`, `aria-describedby`) supplied by the primitive. `preventEasyClose` behaviour is preserved: Escape and overlay-click are blocked via `onEscapeKeyDown`/`onInteractOutside` when set.
+
+**Files Affected:**
+- `frontend/package.json` / `frontend/package-lock.json` — added `@radix-ui/react-dialog@^1.1.23`
+- `frontend/src/components/ui/Modal.tsx` — rebuilt; same props interface (`isOpen`, `onClose`, `title`, `description`, `children`, `className`, `preventEasyClose`)
+
+---
+
+## [Date: 2026-09-04] - UX: Replace all window.confirm() calls with branded AlertDialog
+
+**What/Why:**
+The native browser `window.confirm()` dialog is unstyled, doesn't match the app theme, is blocked in some PWA/iframe contexts, and is inaccessible. Built a reusable `AlertDialog` component and an imperative `confirm()` function that drops in as a direct async replacement. Replaced all 23 native confirm calls across 15+ files.
+
+**Files Affected:**
+- `frontend/src/components/ui/AlertDialog.tsx` — new component using native `<dialog>` element; exports `AlertDialog` (declarative) and `confirm()` (imperative async function); variants: `danger` (red), `warning` (amber), `default`; backdrop click intentionally does not close (proper alert dialog UX); Cancel button gets initial focus; uses `role="alertdialog"` for accessibility
+- `frontend/src/pages/journals/JournalList.tsx` — replaced 2 confirms (post voucher, void entry)
+- `frontend/src/pages/payroll/PayrollRuns.tsx` — replaced 1 confirm (post payroll run)
+- `frontend/src/pages/manufacturing/Manufacturing.tsx` — replaced 1 confirm (cancel production order)
+- `frontend/src/pages/manufacturing/JobWorkOrders.tsx` — replaced 1 confirm (cancel work order)
+- `frontend/src/pages/manufacturing/Jobs.tsx` — replaced 2 confirms (complete job, cancel job)
+- `frontend/src/pages/salesorders/SalesOrders.tsx` — replaced 2 confirms (cancel order, convert to invoice)
+- `frontend/src/pages/costcentres/CostCategories.tsx` — replaced 1 confirm (delete category)
+- `frontend/src/pages/costcentres/CostCentres.tsx` — replaced 1 confirm (delete cost centre)
+- `frontend/src/pages/customers/Customers.tsx` — replaced 1 confirm (delete customer)
+- `frontend/src/pages/reports/InterestCharges.tsx` — replaced 1 confirm (void charge)
+- `frontend/src/pages/purchaseorders/PurchaseOrders.tsx` — replaced 1 confirm (cancel PO)
+- `frontend/src/pages/settings/PriceLists.tsx` — replaced 1 confirm (delete price list)
+- `frontend/src/pages/settings/VoucherClasses.tsx` — replaced 1 confirm (delete voucher class)
+- `frontend/src/pages/settings/ApiKeys.tsx` — replaced 1 confirm (revoke API key)
+- `frontend/src/pages/settings/Scenarios.tsx` — replaced 2 confirms (post all, delete scenario)
+- `frontend/src/pages/reports/MonthlySalesLedger.tsx` — replaced 1 confirm (save month-close snapshot)
+- `frontend/src/pages/team/TeamManagement.tsx` — replaced 2 confirms (reset password, remove member)
+
+---
+
+## [Date: 2026-09-04] - UX: Auto-reload on reconnect + PWA update prompt
+
+**What/Why:**
+Two UX improvements reported by users:
+1. After going offline and reconnecting, the app displayed stale data until the user manually refreshed. The `OfflineBanner` now detects reconnection (via `wasOfflineRef`) and auto-reloads after 1.5 s, showing a green "Back online — refreshing data…" banner with a spinner during the delay.
+2. Installed PWA users had to close and reopen the app to receive updates. Changed `registerType` from `'autoUpdate'` to `'prompt'` in vite.config.ts and created an `UpdatePrompt` component that surfaces a persistent banner ("A new version of Ledgio is available — Update now") whenever a new service worker is waiting; users can apply the update immediately or dismiss the banner.
+
+**Files Affected:**
+- `frontend/src/components/layout/OfflineBanner.tsx` — added `wasOfflineRef`, `reconnecting` state, green "Back online" banner, auto-reload on reconnect
+- `frontend/vite.config.ts` — changed `registerType: 'autoUpdate'` → `'prompt'`
+- `frontend/src/components/layout/UpdatePrompt.tsx` — new component; uses `useRegisterSW` from `virtual:pwa-register/react` to show update banner
+- `frontend/src/components/layout/MainLayout.tsx` — added `<UpdatePrompt />` above `<OfflineBanner />`
+
+---
+
+## [Date: 2026-09-04] - Design: Apply AGOD Software Solution branding to Admin Control Engine
+
+**What/Why:**
+Updated the Admin Control Engine page to reflect the "AGOD Software Solution" brand identity. The redesign applied the AGOD design language — hexagonal brand mark, Syne display typeface, DM Sans body, JetBrains Mono for data/codes, amber-gold accent, deep navy ground — to replace the generic "Ledgio Core Control Engine" identity. All changes are cosmetic/typographic; no logic or API surface was altered.
+
+**Files Affected:**
+- `frontend/index.html` — added Syne (600/700/800), DM Sans (300/400/500/600), and JetBrains Mono (400/500) font faces via Google Fonts link
+- `frontend/src/index.css` — added `--font-syne`, `--font-dm-sans`, and `--font-jetbrains` custom font families to `@theme` block (generates Tailwind utilities `font-syne`, `font-dm-sans`, `font-jetbrains`)
+- `frontend/src/pages/admin/AdminCoreEngine.tsx` — replaced header "Ledgio Core Control Engine" + ShieldAlert icon with hexagonal "A" mark + "AGOD Control Engine" / "Software Solution · Admin" wordmark; replaced lock screen "Ledgio Core Engine Gate" with "AGOD Control Engine" title + hex mark; applied `font-syne` to all `CardTitle` section headings; replaced `font-mono` with `font-jetbrains` on all data/code elements
+
+---
+
+## [Date: 2026-09-04] - Feature: Wire referral code into signup flow
+
+**What/Why:**
+Referral partners now get credit when a new business signs up using their referral code. The optional "Referral Code" field on the Register page validates the code on blur via `POST /api/v1/admin/referrals/verify` (no auth required), shows live feedback (valid/invalid), and blocks Continue if the code is present but invalid. On submit the code is passed to `POST /api/v1/tenants/onboard`, which validates the code server-side against the `referralPartner` table and writes it to the new tenant record.
+
+**Files Affected:**
+- `backend/src/services/tenantService.ts` — added `referralCode?: string` to `OnboardTenantDTO`; validate code against `referralPartner` table before tenant creation; pass it to `createTenant`
+- `backend/src/repository/tenantRepository.ts` — added `referralCode?: string` to `CreateTenantData`; included in `prisma.tenant.create` call
+- `frontend/src/pages/auth/Register.tsx` — added optional referral code input to step "account"; live validation on blur; blocks Continue if code is entered but invalid; included in onboard POST payload
 
 ---
 

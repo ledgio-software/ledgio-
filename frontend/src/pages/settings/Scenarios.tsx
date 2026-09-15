@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../../lib/api";
+import { confirm } from "../../components/ui/AlertDialog";
 
 interface Scenario {
   id: string;
@@ -64,7 +65,7 @@ export function Scenarios() {
   }
 
   async function handlePostAll(s: Scenario) {
-    if (!confirm(`Post all provisional entries in scenario "${s.name}" to the general ledger?`)) return;
+    if (!await confirm({ title: `Post all entries in "${s.name}"?`, description: "All provisional entries will be posted to the general ledger.", confirmLabel: "Post All", variant: "warning" })) return;
     setPostingAll(s.id);
     try {
       const res = await api.post(`/scenarios/${s.id}/post-all`);
@@ -79,7 +80,7 @@ export function Scenarios() {
   }
 
   async function handleDelete(s: Scenario) {
-    if (!confirm(`Delete scenario "${s.name}"?`)) return;
+    if (!await confirm({ title: `Delete scenario "${s.name}"?`, confirmLabel: "Delete" })) return;
     try {
       await api.delete(`/scenarios/${s.id}`);
       await load();

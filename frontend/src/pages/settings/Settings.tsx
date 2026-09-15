@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Building2, Globe, Mail, Smartphone, Send, CheckCircle2, Download, FileJson, FileArchive, ShieldCheck, Copy, Sparkles, Stamp, ExternalLink, Wallet, CreditCard, Check, Loader2, AlertTriangle } from "lucide-react";
+import { Building2, Globe, Mail, Smartphone, Send, CheckCircle2, Download, FileJson, FileArchive, ShieldCheck, Copy, Sparkles, Stamp, ExternalLink, Wallet, CreditCard, Check, Loader2, AlertTriangle, RefreshCw, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { Button } from "../../components/ui/Button";
@@ -23,23 +23,31 @@ const PLANS = [
 ];
 
 function SubscriptionTab() {
+  const { fetchSettings } = useTenantSettings();
   const [status, setStatus] = useState<{
     state: string; planName: string; tier: number; priceGhs: number;
     trialDaysRemaining: number | null; trialEndsAt: string | null; subscriptionPaidUntil: string | null;
+    savedPaymentMethod: { channel: string | null; summary: string } | null;
+    autoRenewEnabled: boolean;
   } | null>(null);
   const [selectedTier, setSelectedTier] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [pendingRef, setPendingRef] = useState<string | null>(null);
+  // Stored so the UI can render a direct link — window.open() inside async
+  // callbacks is treated as a popup and blocked by browsers, which prevents
+  // the Paystack checkout from loading and means USSD/MoMo is never triggered.
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState(false);
 
   useEffect(() => {
     api.get<any>("/subscription/status").then((r) => {
       setStatus(r.data);
       setSelectedTier(r.data.tier ?? 1);
-    }).catch(() => {});
+    }).catch(() => setStatusError(true));
   }, []);
 
   async function handlePay() {
@@ -47,7 +55,7 @@ function SubscriptionTab() {
     try {
       const { data } = await api.post<any>("/subscription/initialize", { planTier: selectedTier });
       setPendingRef(data.reference);
-      window.open(data.authorizationUrl, "_blank", "noopener,noreferrer");
+      setPaymentUrl(data.authorizationUrl);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to start payment.");
     } finally { setIsLoading(false); }
@@ -60,10 +68,39 @@ function SubscriptionTab() {
       const { data } = await api.post<any>("/subscription/verify", { reference: pendingRef, planTier: selectedTier });
       setSuccessMsg(data.message);
       setPendingRef(null);
+      setPaymentUrl(null);
+      // Refresh the global tenant context so tier-gated pages (Analytics
+      // Dashboard, Purchase Orders, etc.) reflect the new plan immediately
+      // without requiring a full page reload.
+      await fetchSettings();
       api.get<any>("/subscription/status").then((r) => setStatus(r.data)).catch(() => {});
     } catch (err: any) {
       setVerifyError(err.response?.data?.error || "Could not verify. Please wait a moment and try again.");
     } finally { setIsVerifying(false); }
+  }
+
+  const [removingMethod, setRemovingMethod] = useState(false);
+  const [togglingRenew, setTogglingRenew] = useState(false);
+
+  async function handleRemovePaymentMethod() {
+    if (!confirm("Remove saved payment method? Auto-renewal will be turned off.")) return;
+    setRemovingMethod(true);
+    try {
+      await api.delete("/subscription/payment-method");
+      setStatus((s) => s ? { ...s, savedPaymentMethod: null, autoRenewEnabled: false } : s);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Could not remove payment method.");
+    } finally { setRemovingMethod(false); }
+  }
+
+  async function handleToggleAutoRenew(enabled: boolean) {
+    setTogglingRenew(true);
+    try {
+      await api.patch("/subscription/auto-renew", { enabled });
+      setStatus((s) => s ? { ...s, autoRenewEnabled: enabled } : s);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Could not update auto-renewal setting.");
+    } finally { setTogglingRenew(false); }
   }
 
   const stateColor: Record<string, string> = {
@@ -75,6 +112,12 @@ function SubscriptionTab() {
 
   return (
     <div className="space-y-6">
+      {statusError && (
+        <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-red-800 dark:text-red-300 text-sm">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden />
+          <p>Could not load your subscription status. Please refresh the page or contact support if this continues.</p>
+        </div>
+      )}
       {/* Current plan summary */}
       {status && (
         <Card>
@@ -109,6 +152,60 @@ function SubscriptionTab() {
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Saved payment method / auto-renewal */}
+      {status && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-emerald-500" />
+              Auto-Renewal
+            </CardTitle>
+            <CardDescription>
+              When enabled, Ledgio charges your saved payment method automatically before your plan expires.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {status.savedPaymentMethod ? (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-3 flex-1 px-4 py-3 rounded-lg border border-secondary-200 dark:border-secondary-700 bg-secondary-50 dark:bg-secondary-900">
+                  <CreditCard className="h-4 w-4 text-secondary-500 flex-shrink-0" aria-hidden />
+                  <span className="text-sm font-medium">{status.savedPaymentMethod.summary}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleAutoRenew(!status.autoRenewEnabled)}
+                    disabled={togglingRenew}
+                    aria-label={status.autoRenewEnabled ? "Disable auto-renewal" : "Enable auto-renewal"}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-secondary-200 dark:border-secondary-700 text-sm font-medium transition-colors hover:bg-secondary-100 dark:hover:bg-secondary-800"
+                  >
+                    {togglingRenew ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    ) : status.autoRenewEnabled ? (
+                      <ToggleRight className="h-4 w-4 text-emerald-500" aria-hidden />
+                    ) : (
+                      <ToggleLeft className="h-4 w-4 text-secondary-400" aria-hidden />
+                    )}
+                    {status.autoRenewEnabled ? "Auto-renew on" : "Auto-renew off"}
+                  </button>
+                  <button
+                    onClick={handleRemovePaymentMethod}
+                    disabled={removingMethod}
+                    aria-label="Remove saved payment method"
+                    className="p-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    {removingMethod ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Trash2 className="h-4 w-4" aria-hidden />}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-secondary-500">
+                No payment method saved. Complete a payment below — your card or Mobile Money account will be saved automatically for future renewals.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -161,17 +258,41 @@ function SubscriptionTab() {
 
           {!pendingRef ? (
             <Button onClick={handlePay} disabled={isLoading}>
-              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Opening payment…</> : <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {PLANS.find((p) => p.tier === selectedTier)?.priceGhs}/month</>}
+              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Preparing payment…</> : <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {PLANS.find((p) => p.tier === selectedTier)?.priceGhs}/month</>}
             </Button>
           ) : (
-            <div className="space-y-2">
-              <p className="text-sm text-secondary-600 dark:text-secondary-400">Complete payment in the Paystack tab that opened, then click below.</p>
-              {verifyError && <p className="text-red-600 dark:text-red-400 text-sm">{verifyError}</p>}
+            <div className="space-y-3">
+              {paymentUrl && (
+                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-4 py-3">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Your payment session is ready.</p>
+                  <a
+                    href={paymentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4" aria-hidden />
+                    Open Paystack — Pay with Mobile Money or Card
+                  </a>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Supports MTN MoMo, AirtelTigo Cash, Telecel Cash, Visa &amp; Mastercard.</p>
+                </div>
+              )}
+              <p className="text-sm text-secondary-600 dark:text-secondary-400">After completing payment on Paystack, click below to activate your plan.</p>
+              {verifyError && (
+                <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-red-800 dark:text-red-300 text-sm">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden />
+                  <div>
+                    <p className="font-semibold">Payment verification failed</p>
+                    <p>{verifyError}</p>
+                    <p className="mt-1 text-xs opacity-75">If you were charged, contact <a href="mailto:ledgioapp@gmail.com" className="underline">ledgioapp@gmail.com</a> with your payment reference.</p>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={handleVerify} disabled={isVerifying}>
                   {isVerifying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Verifying…</> : "I've completed payment"}
                 </Button>
-                <Button variant="outline" onClick={() => setPendingRef(null)}>Start over</Button>
+                <Button variant="outline" onClick={() => { setPendingRef(null); setPaymentUrl(null); }}>Start over</Button>
               </div>
             </div>
           )}
@@ -197,6 +318,7 @@ export function Settings() {
     timezone: settings.timezone,
     stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
     allowNegativeStock: (settings as any).allowNegativeStock ?? false,
+    posEnabled: settings.posEnabled !== false,
   });
 
   const [smsData, setSmsData] = useState({
@@ -271,6 +393,7 @@ export function Settings() {
         timezone: settings.timezone,
         stockValuationMethod: (settings as any).stockValuationMethod || 'AVERAGE',
         allowNegativeStock: (settings as any).allowNegativeStock ?? false,
+        posEnabled: settings.posEnabled !== false,
       });
       setSmsData((prev) => ({ ...prev, bossPhone: settings.bossPhone || "" }));
       setGraData((prev) => ({
@@ -759,6 +882,24 @@ export function Settings() {
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">
                   When enabled, invoices and POS sales can fulfil orders even when on-hand quantity is insufficient.
                   Useful for businesses that ship before receiving stock. Disable to enforce strict stock availability.
+                </p>
+              </div>
+
+              {/* Point of Sale */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-secondary-700 dark:text-secondary-300">Point of Sale</label>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={(regionalData as any).posEnabled !== false}
+                    onChange={(e) => setRegionalData({ ...regionalData, posEnabled: e.target.checked } as any)}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Show Point of Sale in navigation</span>
+                </label>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Disable for businesses that do not use a cash till (e.g. consultancies, law firms, NGOs billed by invoice).
+                  Hides the POS link from the sidebar and Cmd+K. Your till data is not deleted.
                 </p>
               </div>
             </CardContent>

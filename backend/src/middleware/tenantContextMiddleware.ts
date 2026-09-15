@@ -5,6 +5,7 @@ import { sanitizeSchemaName } from '../database/tenantSchemaManager';
 import { ensureTenantSchemaMigrated } from '../database/tenantMigrationRunner';
 import { getTenantFromCache, setTenantInCache } from '../cache/tenantCache';
 import { computeSubscriptionState } from './subscriptionEnforcementMiddleware';
+import { checkHoneypotTenant } from '../services/honeypotService';
 
 // Extend Express Request type to include tenantContext
 declare global {
@@ -45,6 +46,21 @@ export function createTenantContextMiddleware(options: TenantMiddlewareOptions =
     }
 
     try {
+      // Honeypot tenant slug check — runs before cache/DB lookup so probing
+      // a known fake org never touches storage and reveals no real data.
+      const isTenantHoneypot = await checkHoneypotTenant(rawIdentifier, {
+        ip: req.ip || req.socket?.remoteAddress || 'unknown',
+        userAgent: req.headers['user-agent'] as string | undefined,
+      });
+      if (isTenantHoneypot) {
+        if (options.optional) return next();
+        res.status(404).json({
+          error: 'Tenant Not Found',
+          message: `Tenant with identifier "${rawIdentifier}" is not registered.`,
+        });
+        return;
+      }
+
       let sanitizedSchema: string | null = null;
       try {
         sanitizedSchema = sanitizeSchemaName(rawIdentifier);
@@ -85,15 +101,30 @@ export function createTenantContextMiddleware(options: TenantMiddlewareOptions =
         }
 
         tenant = dbTenant;
-        
+
         // Store in Redis cache (fire and forget)
         setTenantInCache(rawIdentifier, dbTenant);
       }
 
-      // 2. Automatic schema existence check & auto-migration provisioning
+      // 2. Validate that the authenticated user belongs to the resolved tenant.
+      //
+      // Without this check, a valid JWT for Tenant A + the header for Tenant B
+      // would grant cross-tenant data access — the JWT proves identity but not
+      // that this user has any relationship to the requested tenant. External API
+      // requests (API-key auth, no req.user) and routes with optional tenant
+      // context are exempt from this check.
+      if (req.user && req.user.tenantId && req.user.tenantId !== tenant.id) {
+        res.status(403).json({
+          success: false,
+          error: 'Forbidden: the authenticated user does not belong to the requested tenant.',
+        });
+        return;
+      }
+
+      // 3. Automatic schema existence check & auto-migration provisioning
       await ensureTenantSchemaMigrated(prisma, tenant.schema, tenant.id);
 
-      // 3. Construct strict tenant context object
+      // 4. Construct strict tenant context object
       const tenantContext: TenantContextData = {
         tenantId: tenant.id,
         tenantSchema: tenant.schema,
@@ -108,7 +139,7 @@ export function createTenantContextMiddleware(options: TenantMiddlewareOptions =
       // Attach context to request object
       req.tenantContext = tenantContext;
 
-      // 4. Enforce subscription state (TRIAL/ACTIVE → pass through; GRACE → read-only;
+      // 5. Enforce subscription state (TRIAL/ACTIVE → pass through; GRACE → read-only;
       // EXPIRED → block). Exempt /subscription routes so expired tenants can pay.
       if (!req.originalUrl.includes('/subscription')) {
         const subState = computeSubscriptionState(
@@ -140,7 +171,7 @@ export function createTenantContextMiddleware(options: TenantMiddlewareOptions =
         }
       }
 
-      // 5. Propagate context via AsyncLocalStorage for downstream service execution
+      // 6. Propagate context via AsyncLocalStorage for downstream service execution
       await runWithTenantContext(tenantContext, async () => {
         next();
       });

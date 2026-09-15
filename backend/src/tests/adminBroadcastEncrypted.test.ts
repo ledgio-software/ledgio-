@@ -42,6 +42,7 @@ describe('Encrypted Admin Broadcast Engine Suite', () => {
 
     const res = await request(app)
       .post('/api/v1/admin/broadcast/verify-passcode')
+      .set('x-admin-passcode', validPasscode)
       .send({ passcode: validPasscode });
 
     expect(res.status).toBe(200);
@@ -56,6 +57,7 @@ describe('Encrypted Admin Broadcast Engine Suite', () => {
 
     const res = await request(app)
       .post('/api/v1/admin/broadcast/send')
+      .set('x-admin-passcode', validPasscode)
       .send({
         passcode: validPasscode,
         subject: 'System Maintenance Notice v2.5',

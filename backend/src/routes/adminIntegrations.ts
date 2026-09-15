@@ -1,16 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { BroadcastService } from '../services/broadcastService';
 import { isMonoConfigured } from '../services/monoService';
 import { isHelpAssistantConfigured } from '../services/helpAssistantService';
 import { isFxConfigured } from '../services/fxRateService';
 
 const router = Router();
 
-function verifyAdminPasscode(req: Request): boolean {
-  const passcode = (req.query.passcode as string) || (req.headers['x-admin-passcode'] as string | undefined);
-  return !!passcode && BroadcastService.verifyPasscode(passcode);
-}
+// Auth is handled upstream by adminPasscodeMiddleware.
 
 /**
  * GET /api/v1/admin/integrations
@@ -24,11 +20,6 @@ function verifyAdminPasscode(req: Request): boolean {
  * one) - real adoption counts, not a single platform boolean.
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyAdminPasscode(req)) {
-    res.status(401).json({ success: false, error: 'Unauthorized: valid master passcode required.' });
-    return;
-  }
-
   try {
     const platformWide = [
       {

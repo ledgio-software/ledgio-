@@ -230,7 +230,7 @@ export async function computeUnpaidLeaveDeduction(
     (client as any).$queryRawUnsafe(
       `SELECT SUM(
          LEAST(r.days_requested,
-               (LEAST(r.end_date, $4::date) - GREATEST(r.start_date, $3::date) + 1)::numeric
+               (LEAST(r.end_date, $3::date) - GREATEST(r.start_date, $2::date) + 1)::numeric
          )
        ) AS unpaid_days
        FROM leave_requests r
@@ -238,9 +238,9 @@ export async function computeUnpaidLeaveDeduction(
        WHERE r.employee_id = $1::uuid
          AND r.status = 'APPROVED'
          AND lt.is_paid = false
-         AND r.start_date <= $4::date
-         AND r.end_date >= $3::date`,
-      employeeId, null, periodStart, periodEnd
+         AND r.start_date <= $3::date
+         AND r.end_date >= $2::date`,
+      employeeId, periodStart, periodEnd
     )
   ) as any[];
 

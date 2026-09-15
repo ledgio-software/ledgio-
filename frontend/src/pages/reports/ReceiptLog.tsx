@@ -81,7 +81,7 @@ export function ReceiptLog() {
       const res = await api.get(`/tills/sales/${id}/receipt.pdf`, { responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
       window.open(url, '_blank');
-      // Blob URL must not be revoked here — the PDF viewer re-reads it on print.
+      // Do not revoke the blob URL — the PDF viewer re-reads it when the user opens the print dialog.
     } catch {
       alert('Could not open receipt PDF.');
     }

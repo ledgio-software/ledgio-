@@ -1,10 +1,12 @@
-import { useState, useCallback, useEffect } from "react";
-import { Plus, RefreshCw, FileText, CheckCircle, XCircle, ArrowRight } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Plus, RefreshCw, FileText, CheckCircle, XCircle, ArrowRight, Search } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
+import { Input } from "../../components/ui/Input";
 import { api } from "../../lib/api";
+import { confirm as alertConfirm } from "../../components/ui/AlertDialog";
 
 interface SalesOrderLine {
   id: string;
@@ -48,6 +50,7 @@ export function SalesOrders() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [soSearch, setSoSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -146,7 +149,7 @@ export function SalesOrders() {
   };
 
   const cancel = async (id: string) => {
-    if (!window.confirm("Cancel this sales order?")) return;
+    if (!await alertConfirm({ title: "Cancel this sales order?", confirmLabel: "Cancel Order" })) return;
     setActionLoading(id + "-cancel");
     try {
       await api.put(`/sales-orders/${id}/cancel`, {});
@@ -159,7 +162,7 @@ export function SalesOrders() {
   };
 
   const convertToInvoice = async (id: string) => {
-    if (!window.confirm("Convert this sales order to an invoice?")) return;
+    if (!await alertConfirm({ title: "Convert to invoice?", description: "This sales order will be converted to a customer invoice.", confirmLabel: "Convert", variant: "warning" })) return;
     setActionLoading(id + "-convert");
     try {
       await api.post(`/sales-orders/${id}/convert-to-invoice`, {});
@@ -173,6 +176,12 @@ export function SalesOrders() {
 
   const totalByOrder = (o: SalesOrder) =>
     o.lines.reduce((s, l) => s + Number(l.amount), 0);
+
+  const displayedOrders = useMemo(() => {
+    const q = soSearch.toLowerCase().trim();
+    if (!q) return orders;
+    return orders.filter((o) => o.soNumber.toLowerCase().includes(q) || o.customer.name.toLowerCase().includes(q));
+  }, [orders, soSearch]);
 
   return (
     <div className="space-y-6">
@@ -195,8 +204,17 @@ export function SalesOrders() {
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
+      {/* Search + Filter */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+          <Input
+            placeholder="Search SO # or customer…"
+            className="pl-8"
+            value={soSearch}
+            onChange={(e) => setSoSearch(e.target.value)}
+          />
+        </div>
         {(["", "DRAFT", "CONFIRMED", "INVOICED", "CANCELLED"] as const).map((s) => (
           <Button
             key={s || "ALL"}
@@ -207,6 +225,7 @@ export function SalesOrders() {
             {s || "All"}
           </Button>
         ))}
+        {soSearch && <span className="text-xs text-secondary-500">{displayedOrders.length} of {orders.length}</span>}
       </div>
 
       {/* Create Form */}
@@ -350,15 +369,15 @@ export function SalesOrders() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.length === 0 && !loading && (
+              {displayedOrders.length === 0 && !loading && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    No sales orders found.
+                    {orders.length === 0 ? "No sales orders found." : "No orders match the search."}
                   </TableCell>
                 </TableRow>
               )}
-              {orders.map((o) => (
+              {displayedOrders.map((o) => (
                 <TableRow key={o.id}>
                   <TableCell className="font-mono font-medium">{o.soNumber}</TableCell>
                   <TableCell>{o.customer.name}</TableCell>

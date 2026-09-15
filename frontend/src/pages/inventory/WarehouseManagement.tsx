@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import Papa from "papaparse";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -9,7 +10,8 @@ import { api } from "../../lib/api";
 import { formatMoney } from "../../lib/utils";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { Warehouse, Plus, ArrowRightLeft, AlertTriangle, Building, MapPin, Search, CheckCircle2, XCircle, Layers, Trash2, Download, SlidersHorizontal, History, Printer, ClipboardCheck } from "lucide-react";
+import { Warehouse, Plus, ArrowRightLeft, AlertTriangle, Building, MapPin, Search, CheckCircle2, XCircle, Layers, Trash2, Download, SlidersHorizontal, History, Printer, ClipboardCheck, Activity } from "lucide-react";
+import { StockMovement } from "../reports/StockMovement";
 
 interface StockAdjustment {
   id: string;
@@ -42,6 +44,8 @@ interface BulkRow {
   sellingPrice: string;
   warehouseName: string;
   initialQty: string;
+  batchNumber: string;
+  expiryDate: string;
 }
 
 const EMPTY_BULK_ROW: BulkRow = {
@@ -53,6 +57,8 @@ const EMPTY_BULK_ROW: BulkRow = {
   sellingPrice: "",
   warehouseName: "",
   initialQty: "",
+  batchNumber: "",
+  expiryDate: "",
 };
 
 const CSV_TEMPLATE_HEADERS = ["name", "sku", "category", "unitOfMeasure", "costPrice", "sellingPrice", "warehouseName", "initialQty"];
@@ -77,6 +83,7 @@ interface InventoryItem {
   costPrice: number;
   sellingPrice: number;
   wholesalePrice?: number | null;
+  floorPrice?: number | null;
   reorderLevel: number;
   warehouseStocks: WarehouseStock[];
   regulatoryCategory?: string;
@@ -104,6 +111,7 @@ export function WarehouseManagement() {
   const { showToast } = useToast();
   const { user } = useAuth();
   const canCreateWarehouse = !WAREHOUSE_CREATE_RESTRICTED_ROLES.has((user?.role || "").toLowerCase().trim());
+  const [mainTab, setMainTab] = useState<'inventory' | 'movement'>('inventory');
   const [warehouses, setWarehouses] = useState<WarehouseData[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -168,6 +176,7 @@ export function WarehouseManagement() {
   const [costPrice, setCostPrice] = useState("150");
   const [sellingPrice, setSellingPrice] = useState("250");
   const [wholesalePrice, setWholesalePrice] = useState("");
+  const [floorPrice, setFloorPrice] = useState("");
   const [initialWarehouseId, setInitialWarehouseId] = useState("");
   const [initialQty, setInitialQty] = useState("50");
   const [preferredVendorId, setPreferredVendorId] = useState("");
@@ -253,6 +262,7 @@ export function WarehouseManagement() {
         costPrice: Number(costPrice),
         sellingPrice: Number(sellingPrice),
         wholesalePrice: wholesalePrice !== "" ? Number(wholesalePrice) : undefined,
+        floorPrice: floorPrice !== "" ? Number(floorPrice) : undefined,
         initialWarehouseId,
         initialQty: Number(initialQty),
         preferredVendorId: preferredVendorId || undefined,
@@ -581,6 +591,8 @@ export function WarehouseManagement() {
             sellingPrice: row.sellingPrice?.trim() || "",
             warehouseName: row.warehouseName?.trim() || "",
             initialQty: row.initialQty?.trim() || "",
+            batchNumber: row.batchNumber?.trim() || "",
+            expiryDate: row.expiryDate?.trim() || "",
           }));
 
         if (parsedRows.length === 0) {
@@ -626,6 +638,8 @@ export function WarehouseManagement() {
           sellingPrice: row.sellingPrice ? Number(row.sellingPrice) : 0,
           initialWarehouseId: resolveWarehouseIdByName(row.warehouseName),
           initialQty: row.initialQty ? Number(row.initialQty) : 0,
+          batchNumber: row.batchNumber.trim() || undefined,
+          expiryDate: row.expiryDate || undefined,
         })),
       };
 
@@ -666,19 +680,27 @@ export function WarehouseManagement() {
     return matchesSearch && matchesLowStock;
   });
 
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredItems.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 80,
+    overscan: 10,
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-secondary-900 dark:text-secondary-50">
-            Multi-Warehouse & Shop Inventory Logistics ("Godowns")
+            Inventory & Stock Management
           </h2>
           <p className="text-secondary-500 dark:text-secondary-400 mt-1">
-            Search stock across all shops, track low-stock items, and request instant inter-shop stock transfers.
+            Search stock across all shops, track low-stock items, and view all stock movements in and out.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {mainTab === 'inventory' && <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => openAdjustModal()} className="flex items-center">
             <SlidersHorizontal className="mr-2 h-4 w-4 text-primary-600" />
             Restock / Adjust Stock
@@ -705,9 +727,38 @@ export function WarehouseManagement() {
             <Layers className="mr-2 h-4 w-4" />
             Bulk Add Products
           </Button>
-        </div>
+        </div>}
       </div>
 
+      {/* Tab bar */}
+      <div className="flex border-b border-secondary-200 dark:border-secondary-700">
+        <button
+          onClick={() => setMainTab('inventory')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            mainTab === 'inventory'
+              ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+              : 'border-transparent text-secondary-500 hover:text-secondary-700 dark:hover:text-secondary-300'
+          }`}
+        >
+          <Warehouse className="h-4 w-4" />
+          Inventory & Warehouses
+        </button>
+        <button
+          onClick={() => setMainTab('movement')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            mainTab === 'movement'
+              ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+              : 'border-transparent text-secondary-500 hover:text-secondary-700 dark:hover:text-secondary-300'
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          Stock Movement (In / Out)
+        </button>
+      </div>
+
+      {mainTab === 'movement' && <StockMovement />}
+
+      {mainTab === 'inventory' && <>
       {/* Inter-Shop Stock Visibility & Communication Banner */}
       <div className="p-4 rounded-xl bg-gradient-to-r from-primary-900 to-secondary-900 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -827,116 +878,139 @@ export function WarehouseManagement() {
               No matching inventory items found. Try clearing your search filter or click "Add Product / Item".
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-secondary-50/50 dark:bg-secondary-900/50">
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Cost / Selling</TableHead>
-                  <TableHead className="min-w-[320px]">Live Shop-by-Shop Stock Breakdown</TableHead>
-                  <TableHead className="text-right">Total System Stock</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredItems.map((it) => {
-                  const totalQty = calculateTotalStock(it);
-                  const isLowStock = totalQty <= it.reorderLevel;
+            <div ref={tableContainerRef} style={{ height: '520px', overflowY: 'auto' }}>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-secondary-50/50 dark:bg-secondary-900/50">
+                    <TableHead className="w-[100px]">SKU</TableHead>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Cost / Selling</TableHead>
+                    <TableHead className="min-w-[320px]">Live Shop-by-Shop Stock Breakdown</TableHead>
+                    <TableHead className="text-right">Total System Stock</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rowVirtualizer.getVirtualItems().length > 0 && rowVirtualizer.getVirtualItems()[0].start > 0 && (
+                    <TableRow style={{ height: `${rowVirtualizer.getVirtualItems()[0].start}px` }} aria-hidden />
+                  )}
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const it = filteredItems[virtualRow.index];
+                    const totalQty = calculateTotalStock(it);
+                    const isLowStock = totalQty <= it.reorderLevel;
 
-                  return (
-                    <TableRow key={it.id} className="hover:bg-secondary-50/60 dark:hover:bg-secondary-900/40">
-                      <TableCell className="font-mono text-xs font-semibold text-primary-600 dark:text-primary-400">
-                        {it.sku}
-                      </TableCell>
-                      <TableCell className="font-medium text-secondary-900 dark:text-secondary-50">
-                        {it.name}
-                        {it.regulatoryCategory && it.regulatoryCategory !== "GENERAL" && (
-                          <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${it.regulatoryCategory === "CONTROLLED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"}`}>
-                            {it.regulatoryCategory === "CONTROLLED" ? "CTRL" : "RX"}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs">{it.category}</TableCell>
-                      <TableCell className="text-xs">
-                        <div className="font-medium text-secondary-500">{formatMoney(Number(it.costPrice))} (Cost)</div>
-                        <div className="font-bold text-secondary-900 dark:text-secondary-100">{formatMoney(Number(it.sellingPrice))} (Retail)</div>
-                        {it.wholesalePrice != null && (
-                          <div className="text-xs text-primary-600 dark:text-primary-400">{formatMoney(Number(it.wholesalePrice))} (Wholesale)</div>
-                        )}
-                      </TableCell>
+                    return (
+                      <TableRow
+                        key={it.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        className="hover:bg-secondary-50/60 dark:hover:bg-secondary-900/40"
+                      >
+                        <TableCell className="font-mono text-xs font-semibold text-primary-600 dark:text-primary-400">
+                          {it.sku}
+                        </TableCell>
+                        <TableCell className="font-medium text-secondary-900 dark:text-secondary-50">
+                          {it.name}
+                          {it.regulatoryCategory && it.regulatoryCategory !== "GENERAL" && (
+                            <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${it.regulatoryCategory === "CONTROLLED" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"}`}>
+                              {it.regulatoryCategory === "CONTROLLED" ? "CTRL" : "RX"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{it.category}</TableCell>
+                        <TableCell className="text-xs">
+                          <div className="font-medium text-secondary-500">{formatMoney(Number(it.costPrice))} (Cost)</div>
+                          <div className="font-bold text-secondary-900 dark:text-secondary-100">{formatMoney(Number(it.sellingPrice))} (Retail)</div>
+                          {it.wholesalePrice != null && (
+                            <div className="text-xs text-primary-600 dark:text-primary-400">{formatMoney(Number(it.wholesalePrice))} (Wholesale)</div>
+                          )}
+                          {(it as any).floorPrice != null && (
+                            <div className="text-xs text-amber-600 dark:text-amber-400">Floor: {formatMoney(Number((it as any).floorPrice))}</div>
+                          )}
+                        </TableCell>
 
-                      {/* Shop Availability Badges */}
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2 py-1">
-                          {warehouses.map((wh) => {
-                            const stockObj = it.warehouseStocks?.find(s => s.warehouseId === wh.id);
-                            const qty = stockObj ? stockObj.quantityOnHand : 0;
-                            const hasStock = qty > 0;
+                        {/* Shop Availability Badges */}
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2 py-1">
+                            {warehouses.map((wh) => {
+                              const stockObj = it.warehouseStocks?.find(s => s.warehouseId === wh.id);
+                              const qty = stockObj ? stockObj.quantityOnHand : 0;
+                              const hasStock = qty > 0;
 
-                            return (
-                              <div
-                                key={wh.id}
-                                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${
-                                  hasStock
-                                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-                                    : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 opacity-80"
-                                }`}
-                              >
-                                {hasStock ? (
-                                  <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                                ) : (
-                                  <XCircle className="mr-1 h-3.5 w-3.5 text-red-500" />
-                                )}
-                                <span>
-                                  <strong>{wh.name}</strong>: {qty} {it.unitOfMeasure}
-                                </span>
-                                {hasStock && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openQuickTransferModal(it.id, wh.id)}
-                                    title={`Request transfer from ${wh.name}`}
-                                    className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
-                                  >
-                                    Transfer
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => openAdjustModal(it.id, wh.id)}
-                                  title={`Restock or correct ${it.name} at ${wh.name}`}
-                                  className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-xs"
+                              return (
+                                <div
+                                  key={wh.id}
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${
+                                    hasStock
+                                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                                      : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 opacity-80"
+                                  }`}
                                 >
-                                  Adjust
-                                </button>
-                                {user?.orgType === "PHARMACY" && it.requiresBatchTracking && (
+                                  {hasStock ? (
+                                    <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                  ) : (
+                                    <XCircle className="mr-1 h-3.5 w-3.5 text-red-500" />
+                                  )}
+                                  <span>
+                                    <strong>{wh.name}</strong>: {qty} {it.unitOfMeasure}
+                                  </span>
+                                  {hasStock && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openQuickTransferModal(it.id, wh.id)}
+                                      title={`Request transfer from ${wh.name}`}
+                                      className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
+                                    >
+                                      Transfer
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
-                                    onClick={() => { setBatchItemId(it.id); setBatchWarehouseId(wh.id); setBatchCostPrice(String(it.costPrice)); setIsBatchModalOpen(true); }}
-                                    className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-xs"
+                                    onClick={() => openAdjustModal(it.id, wh.id)}
+                                    title={`Restock or correct ${it.name} at ${wh.name}`}
+                                    className="ml-2 px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-xs"
                                   >
-                                    + Batch
+                                    Adjust
                                   </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
+                                  {user?.orgType === "PHARMACY" && it.requiresBatchTracking && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setBatchItemId(it.id); setBatchWarehouseId(wh.id); setBatchCostPrice(String(it.costPrice)); setIsBatchModalOpen(true); }}
+                                      className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-xs"
+                                    >
+                                      + Batch
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </TableCell>
 
-                      <TableCell className="text-right">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${isLowStock ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400 border border-rose-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
-                          {isLowStock && <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
-                          {totalQty} {it.unitOfMeasure}{it.secondaryUnitOfMeasure && it.conversionFactor ? ` (${it.secondaryUnitOfMeasure} = ${it.conversionFactor} ${it.unitOfMeasure})` : ''}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        <TableCell className="text-right">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${isLowStock ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-400 border border-rose-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                            {isLowStock && <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
+                            {totalQty} {it.unitOfMeasure}{it.secondaryUnitOfMeasure && it.conversionFactor ? ` (${it.secondaryUnitOfMeasure} = ${it.conversionFactor} ${it.unitOfMeasure})` : ''}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {rowVirtualizer.getVirtualItems().length > 0 && (() => {
+                    const items = rowVirtualizer.getVirtualItems();
+                    const lastItem = items[items.length - 1];
+                    const paddingBottom = rowVirtualizer.getTotalSize() - lastItem.end;
+                    return paddingBottom > 0 ? (
+                      <TableRow style={{ height: `${paddingBottom}px` }} aria-hidden />
+                    ) : null;
+                  })()}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
+      </>}
 
       {/* Add Warehouse / Shop Modal */}
       <Modal isOpen={isWarehouseModalOpen} onClose={() => setIsWarehouseModalOpen(false)} title="Add Warehouse / Shop Location">
@@ -1019,6 +1093,10 @@ export function WarehouseManagement() {
             <div>
               <label className="block text-sm font-medium mb-1">Wholesale Price (GH₵) <span className="text-secondary-400 font-normal">optional</span></label>
               <Input type="number" placeholder="Leave blank if same as retail" value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Floor Price (GH₵) <span className="text-secondary-400 font-normal">optional — min sale price</span></label>
+              <Input type="number" placeholder="Attendants cannot sell below this" value={floorPrice} onChange={(e) => setFloorPrice(e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -1200,6 +1278,12 @@ export function WarehouseManagement() {
                   <th className="text-left p-2 font-medium">Sell</th>
                   <th className="text-left p-2 font-medium">Warehouse</th>
                   <th className="text-left p-2 font-medium">Qty</th>
+                  {user?.orgType === "PHARMACY" && (
+                    <>
+                      <th className="text-left p-2 font-medium text-amber-700 dark:text-amber-400">Batch #</th>
+                      <th className="text-left p-2 font-medium text-amber-700 dark:text-amber-400">Expiry Date</th>
+                    </>
+                  )}
                   <th className="p-2"></th>
                 </tr>
               </thead>
@@ -1225,6 +1309,12 @@ export function WarehouseManagement() {
                       </select>
                     </td>
                     <td className="p-1"><Input type="number" className="h-8 text-xs w-16" value={row.initialQty} onChange={(e) => updateBulkRow(i, "initialQty", e.target.value)} /></td>
+                    {user?.orgType === "PHARMACY" && (
+                      <>
+                        <td className="p-1"><Input className="h-8 text-xs w-28 font-mono" placeholder="e.g. BN-001" value={row.batchNumber} onChange={(e) => updateBulkRow(i, "batchNumber", e.target.value)} /></td>
+                        <td className="p-1"><Input type="date" className="h-8 text-xs w-32" value={row.expiryDate} onChange={(e) => updateBulkRow(i, "expiryDate", e.target.value)} /></td>
+                      </>
+                    )}
                     <td className="p-1">
                       <button type="button" onClick={() => removeBulkRow(i)} className="text-secondary-400 hover:text-red-500 p-1" title="Remove row">
                         <Trash2 className="h-3.5 w-3.5" />

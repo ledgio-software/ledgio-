@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import app from './app';
 import { connectDatabase, disconnectDatabase } from './config/db';
 import { connectRedis, disconnectRedis } from './config/redis';
@@ -9,12 +10,51 @@ import { registerJob } from './services/cronJobRegistry';
 const PORT = process.env.PORT || 4000;
 
 const startServer = async () => {
+  // Guard: refuse to start if CORS is misconfigured in production.
+  // An open wildcard or missing origin setting would let any website make
+  // credentialed cross-origin requests against tenant data.
+  if (process.env.NODE_ENV === 'production') {
+    const corsOrigin = process.env.CORS_ALLOWED_ORIGINS || process.env.APP_URL || '';
+    if (!corsOrigin || corsOrigin.trim() === '*') {
+      console.error('[Server] FATAL: CORS_ALLOWED_ORIGINS must not be empty or "*" in production. Set it to your frontend origin (e.g. https://app.ledgio.com). Refusing to start.');
+      process.exit(1);
+    }
+    if (!process.env.BROADCAST_MASTER_SECRET) {
+      console.error('[Server] FATAL: BROADCAST_MASTER_SECRET is not set. Admin endpoints would be open without a passcode. Refusing to start.');
+      process.exit(1);
+    }
+  }
+
+  // Resolve a migration that rolled back due to DROP INDEX without IF EXISTS.
+  // The repair migration below (20260912170000_repair_cash_sale_void_and_creator)
+  // re-applies all changes idempotently, so we mark the original as applied to
+  // prevent migrate deploy from retrying the unfixed SQL on every startup.
+  try {
+    execSync(
+      'npx prisma migrate resolve --applied 20260731121052_add_cash_sale_void_and_creator',
+      { stdio: 'pipe' },
+    );
+    console.log('[Server] Resolved rolled-back migration 20260731121052_add_cash_sale_void_and_creator.');
+  } catch (_) {
+    // Already applied or not found — both are fine; suppress the error.
+  }
+
+  // Run pending DB migrations before accepting traffic
+  try {
+    console.log('[Server] Running pending DB migrations...');
+    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+    console.log('[Server] Migrations applied.');
+  } catch (err) {
+    console.error('[Server] prisma migrate deploy failed:', err);
+    // Non-fatal: DB may already be up to date; startup continues
+  }
+
   // Initialize telemetry first
   await startTelemetry();
-  
+
   const server = app.listen(PORT, async () => {
     console.log(`[Server] Backend microservice running on port ${PORT}`);
-    
+
     // Initialize database connection
     await connectDatabase();
     
@@ -67,6 +107,11 @@ const startServer = async () => {
     GraEvatCronService.init();
     registerJob('GRA E-VAT Sync', '*/15 * * * *', '15-minute sweep to clear pending/failed GRA VSDC invoices within the 48-hour mandate window', () => GraEvatCronService.runSync());
 
+    // Initialize daily subscription auto-renewal sweep (charges saved card/MoMo before plan expires)
+    const { SubscriptionAutoRenewCronService } = require('./services/subscriptionAutoRenewCronService');
+    SubscriptionAutoRenewCronService.init();
+    registerJob('Subscription Auto-Renew', '30 6 * * *', 'Daily auto-charge of saved card/MoMo before subscription expires', () => SubscriptionAutoRenewCronService.processAutoRenewals?.() ?? Promise.resolve());
+
     // Initialize daily fixed-asset depreciation sweep
     const { FixedAssetDepreciationCronService } = require('./services/fixedAssetDepreciationCronService');
     FixedAssetDepreciationCronService.init();
@@ -81,6 +126,11 @@ const startServer = async () => {
     const { GlReconciliationCronService } = require('./services/glReconciliationCronService');
     GlReconciliationCronService.init();
     registerJob('GL Reconciliation', '30 2 * * *', 'Daily AR/AP subledger vs GL control account balance check', () => GlReconciliationCronService.runJob());
+
+    // Keep Render from spinning down: ping /health every 10 minutes
+    const { KeepAliveCronService } = require('./services/keepAliveCronService');
+    KeepAliveCronService.init();
+    registerJob('Keep-Alive Ping', '*/10 * * * *', 'Self-ping every 10 min to prevent Render cold starts');
 
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');

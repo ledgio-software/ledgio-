@@ -19,6 +19,8 @@ import {
   ShoppingCart, Package, FileText as FileTextIcon, DollarSign,
   Wallet as WalletIcon, ArrowLeftRight, ClipboardList, BarChart2,
   Receipt as ReceiptIcon, Store, AlertTriangle, CheckCircle2, TrendingUp,
+  Users, GraduationCap, CalendarCheck, BookOpen, ClipboardCheck,
+  FileSpreadsheet, BadgeDollarSign, HeartPulse, Award,
 } from "lucide-react";
 import { useProfitAndLoss } from "./hooks/useProfitAndLoss";
 import { useAccounts } from "./hooks/useAccounts";
@@ -34,6 +36,8 @@ const HowItWorksPage = lazy(() => import("./pages/landing/HowItWorksPage").then(
 const LegalHubPage = lazy(() => import("./pages/legal/LegalHubPage").then(m => ({ default: m.LegalHubPage })));
 const LegalDocumentPage = lazy(() => import("./pages/legal/LegalDocumentPage").then(m => ({ default: m.LegalDocumentPage })));
 const AdminCoreEngine = lazy(() => import("./pages/admin/AdminCoreEngine").then(m => ({ default: m.AdminCoreEngine })));
+const AgodTeamLogin = lazy(() => import("./pages/admin/AgodTeamLogin").then(m => ({ default: m.AgodTeamLogin })));
+const AgodTeamConsole = lazy(() => import("./pages/admin/AgodTeamConsole").then(m => ({ default: m.AgodTeamConsole })));
 const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts").then(m => ({ default: m.ChartOfAccounts })));
 const OnboardingWizard = lazy(() => import("./pages/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
 const Settings = lazy(() => import("./pages/settings/Settings").then(m => ({ default: m.Settings })));
@@ -46,6 +50,30 @@ const Funds = lazy(() => import("./pages/settings/Funds").then(m => ({ default: 
 const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m => ({ default: m.FiscalPeriods })));
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
 const Approvals = lazy(() => import("./pages/approvals/Approvals").then(m => ({ default: m.Approvals })));
+const SchoolStudents = lazy(() => import("./pages/school/Students").then(m => ({ default: m.Students })));
+const SchoolTeachers = lazy(() => import("./pages/school/Teachers").then(m => ({ default: m.Teachers })));
+const SchoolClasses = lazy(() => import("./pages/school/Classes").then(m => ({ default: m.Classes })));
+const MomoReconciliation = lazy(() => import("./pages/school/MomoReconciliation").then(m => ({ default: m.MomoReconciliation })));
+const AcademicTerms = lazy(() => import("./pages/school/AcademicTerms").then(m => ({ default: m.AcademicTerms })));
+const FeeSchedules = lazy(() => import("./pages/school/FeeSchedules").then(m => ({ default: m.FeeSchedules })));
+const FeeCollection = lazy(() => import("./pages/school/FeeCollection").then(m => ({ default: m.FeeCollection })));
+const FeeDefaulters = lazy(() => import("./pages/school/FeeDefaulters").then(m => ({ default: m.FeeDefaulters })));
+const DemandVsCollection = lazy(() => import("./pages/school/DemandVsCollection").then(m => ({ default: m.DemandVsCollection })));
+const StudentLedger = lazy(() => import("./pages/school/StudentLedger").then(m => ({ default: m.StudentLedger })));
+const SchoolAttendance = lazy(() => import("./pages/school/Attendance").then(m => ({ default: m.Attendance })));
+const SchoolAssessments = lazy(() => import("./pages/school/Assessments").then(m => ({ default: m.Assessments })));
+const SchoolReportCards = lazy(() => import("./pages/school/ReportCards").then(m => ({ default: m.ReportCards })));
+const SchoolAdmissions = lazy(() => import("./pages/school/Admissions").then(m => ({ default: m.Admissions })));
+const SchoolTimetable = lazy(() => import("./pages/school/Timetable").then(m => ({ default: m.Timetable })));
+const SchoolCertificates = lazy(() => import("./pages/school/Certificates").then(m => ({ default: m.Certificates })));
+const SchoolScholarships = lazy(() => import("./pages/school/Scholarships").then(m => ({ default: m.Scholarships })));
+const SchoolStudentHealth = lazy(() => import("./pages/school/StudentHealth").then(m => ({ default: m.StudentHealth })));
+const SchoolEventsPage = lazy(() => import("./pages/school/SchoolEvents").then(m => ({ default: m.SchoolEvents })));
+const SchoolMIS = lazy(() => import("./pages/school/SchoolMIS").then(m => ({ default: m.SchoolMIS })));
+const NasiaDashboard = lazy(() => import("./pages/school/NasiaDashboard").then(m => ({ default: m.NasiaDashboard })));
+const FeePaymentPlans = lazy(() => import("./pages/school/FeePaymentPlans").then(m => ({ default: m.FeePaymentPlans })));
+const SchoolTransport = lazy(() => import("./pages/school/Transport").then(m => ({ default: m.Transport })));
+const ParentComms = lazy(() => import("./pages/school/ParentComms").then(m => ({ default: m.ParentComms })));
 const ExpenseClaims = lazy(() => import("./pages/expenses/ExpenseClaims").then(m => ({ default: m.ExpenseClaims })));
 const Budgets = lazy(() => import("./pages/reports/Budgets").then(m => ({ default: m.Budgets })));
 const TeamManagement = lazy(() => import("./pages/team/TeamManagement").then(m => ({ default: m.TeamManagement })));
@@ -77,6 +105,7 @@ const LandedCostReport = lazy(() => import("./pages/reports/LandedCostReport").t
 const Daybook = lazy(() => import("./pages/reports/Daybook").then(m => ({ default: m.Daybook })));
 const StockMovement = lazy(() => import("./pages/reports/StockMovement").then(m => ({ default: m.StockMovement })));
 const Registers = lazy(() => import("./pages/reports/Registers").then(m => ({ default: m.Registers })));
+const ReceiptLog = lazy(() => import("./pages/reports/ReceiptLog").then(m => ({ default: m.ReceiptLog })));
 const AnalyticsDashboard = lazy(() => import("./pages/reports/AnalyticsDashboard").then(m => ({ default: m.AnalyticsDashboard })));
 const PettyCash = lazy(() => import("./pages/pettycash/PettyCash").then(m => ({ default: m.PettyCash })));
 const PurchaseOrders = lazy(() => import("./pages/purchaseorders/PurchaseOrders").then(m => ({ default: m.PurchaseOrders })));
@@ -89,10 +118,14 @@ const Employees = lazy(() => import("./pages/payroll/Employees").then(m => ({ de
 const PayrollRuns = lazy(() => import("./pages/payroll/PayrollRuns").then(m => ({ default: m.PayrollRuns })));
 const Loans = lazy(() => import("./pages/payroll/Loans").then(m => ({ default: m.Loans })));
 const Leave = lazy(() => import("./pages/payroll/Leave").then(m => ({ default: m.Leave })));
+const SsnitCompliance = lazy(() => import("./pages/payroll/SsnitCompliance").then(m => ({ default: m.SsnitCompliance })));
 const PaymentCallback = lazy(() => import("./pages/subscription/PaymentCallback").then(m => ({ default: m.PaymentCallback })));
 const PrescriptionRegister = lazy(() => import("./pages/pharmacy/PrescriptionRegister").then(m => ({ default: m.PrescriptionRegister })));
 const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister").then(m => ({ default: m.NarcoticsRegister })));
 const ExpiryAlerts = lazy(() => import("./pages/pharmacy/ExpiryAlerts").then(m => ({ default: m.ExpiryAlerts })));
+const PharmacyPatients = lazy(() => import("./pages/pharmacy/PharmacyPatients").then(m => ({ default: m.PharmacyPatients })));
+const NhisClaims = lazy(() => import("./pages/pharmacy/NhisClaims").then(m => ({ default: m.NhisClaims })));
+const PharmacyInventoryMatrix = lazy(() => import("./pages/pharmacy/PharmacyInventoryMatrix").then(m => ({ default: m.PharmacyInventoryMatrix })));
 const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m => ({ default: m.CostCentres })));
 const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
 const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ default: m.VatReturn })));
@@ -179,16 +212,18 @@ const Dashboard = () => {
   const { settings } = useTenantSettings();
   const { mode } = useWorkspaceMode();
 
-  // Roles with a reduced nav (Shop Manager, Cashier, HR, Auditor) don't have
-  // backend read access to company-wide P&L/ledger data (rbacMiddleware.ts's
-  // scoped-role rules) - the underlying hooks above still fire regardless
-  // (rules of hooks), but their 403s are swallowed by the hooks' own
-  // catch/console.error, so just skip rendering these cards rather than
-  // showing stale/zeroed figures. Also not shown to these roles: financial
-  // data they have no operational need for anyway.
+  // Roles with a reduced nav (Shop Manager, Cashier, HR, Auditor, Teacher, etc.)
+  // don't have backend read access to company-wide P&L/ledger data
+  // (rbacMiddleware.ts's scoped-role rules) - the underlying hooks above still
+  // fire regardless (rules of hooks), but their 403s are swallowed by the
+  // hooks' own catch/console.error, so just skip rendering these cards rather
+  // than showing stale/zeroed figures.
   const isRestrictedRole = getVisibleHrefs((user?.role || "").toLowerCase().trim()) !== null;
+  const isSchool = user?.orgType === 'NONPROFIT';
+  const role = (user?.role || '').toLowerCase().trim();
+  const isSchoolRestrictedRole = isSchool && (role === 'teacher' || role === 'class teacher');
 
-  const showGuidedPanel = !isRestrictedRole && (mode === "operations" || mode === "business");
+  const showGuidedPanel = !isRestrictedRole && !isSchool && (mode === "operations" || mode === "business");
 
   // One-time self-heal for tenants with POS sales recorded before revenue
   // posting existed (see routes/cashTill.ts POST /tills/sales) - an old
@@ -200,7 +235,7 @@ const Dashboard = () => {
   // effect included) - not per every render.
   const backfillAttempted = useRef(false);
   useEffect(() => {
-    if (isRestrictedRole || backfillAttempted.current) return;
+    if (isRestrictedRole || isSchool || backfillAttempted.current) return;
     backfillAttempted.current = true;
     api.post('/tills/backfill-revenue')
       .then((response) => {
@@ -229,8 +264,22 @@ const Dashboard = () => {
     }).format(amount);
   };
 
-  const headerSubtitle =
-    mode === "operations"
+  // Compact formatter for KPI tiles so large numbers (e.g. GHS 3.12B) don't overflow cards.
+  const fmtKpi = (amount: number) => {
+    const abs = Math.abs(amount);
+    const sign = amount < 0 ? '-' : '';
+    const sym = settings.baseCurrency === 'GHS' ? 'GHS ' : (settings.baseCurrency + ' ');
+    if (abs >= 1_000_000_000) return `${sign}${sym}${(abs / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000)     return `${sign}${sym}${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000)         return `${sign}${sym}${(abs / 1_000).toFixed(1)}K`;
+    return formatCurrency(amount);
+  };
+
+  const headerSubtitle = isSchool
+    ? isSchoolRestrictedRole
+      ? "Welcome back. Use the quick links below to get started."
+      : "School overview — fees, enrolment, and academic progress at a glance."
+    : mode === "operations"
       ? "Here's your business at a glance. Tap a quick action below to get started."
       : mode === "business"
       ? "Sales, purchases, and finance — all in one place."
@@ -247,7 +296,7 @@ const Dashboard = () => {
             {headerSubtitle}
           </p>
         </div>
-        {!isRestrictedRole && mode === "professional" && (
+        {!isRestrictedRole && !isSchool && mode === "professional" && (
           <Button variant="primary" onClick={() => navigate("/journals/new")}>
             New Voucher
           </Button>
@@ -258,14 +307,22 @@ const Dashboard = () => {
         <GuidedOperationsPanel mode={mode as "operations" | "business"} />
       )}
 
-      {!isRestrictedRole && (
+      {!isRestrictedRole && !isSchool && (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalRevenue)}</div>
+              <div
+                className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 truncate"
+                title={formatCurrency(totalRevenue)}
+              >
+                {fmtKpi(totalRevenue)}
+              </div>
+              <p className="text-xs text-secondary-400 mt-0.5 truncate" title={formatCurrency(totalRevenue)}>
+                {formatCurrency(totalRevenue)}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -273,7 +330,15 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium">Expenses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{formatCurrency(totalExpense)}</div>
+              <div
+                className="text-2xl font-bold text-amber-600 dark:text-amber-400 truncate"
+                title={formatCurrency(totalExpense)}
+              >
+                {fmtKpi(totalExpense)}
+              </div>
+              <p className="text-xs text-secondary-400 mt-0.5 truncate" title={formatCurrency(totalExpense)}>
+                {formatCurrency(totalExpense)}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -281,9 +346,15 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${netIncome >= 0 ? 'text-primary-600 dark:text-primary-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatCurrency(netIncome)}
+              <div
+                className={`text-2xl font-bold truncate ${netIncome >= 0 ? 'text-primary-600 dark:text-primary-400' : 'text-red-600 dark:text-red-400'}`}
+                title={formatCurrency(netIncome)}
+              >
+                {fmtKpi(netIncome)}
               </div>
+              <p className="text-xs text-secondary-400 mt-0.5 truncate" title={formatCurrency(netIncome)}>
+                {formatCurrency(netIncome)}
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -297,8 +368,13 @@ const Dashboard = () => {
         </div>
       )}
 
-      {isRestrictedRole && <ShopManagerDashboard />}
-      {!isRestrictedRole && <DashboardFinanceWidgets currency={settings.baseCurrency} />}
+      {/* School-specific dashboards take over for school tenants */}
+      {isSchoolRestrictedRole && <TeacherDashboard />}
+      {isSchool && !isSchoolRestrictedRole && !isRestrictedRole && <SchoolAdminDashboard />}
+      {/* Retail/general restricted roles (Shop Manager, Cashier, etc.) */}
+      {!isSchool && isRestrictedRole && <ShopManagerDashboard />}
+      {/* Full finance widgets for unrestricted non-school roles */}
+      {!isSchool && !isRestrictedRole && <DashboardFinanceWidgets currency={settings.baseCurrency} />}
     </div>
   );
 };
@@ -508,6 +584,192 @@ function DashboardFinanceWidgets({ currency }: { currency: string }) {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── School Admin / Bursar dashboard (orgType === NONPROFIT, unrestricted role) ─
+function SchoolAdminDashboard() {
+  const { settings } = useTenantSettings();
+  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: settings.baseCurrency }).format(n);
+  const [data, setData] = useState<{
+    studentCount: number | null;
+    activeTerm: string | null;
+    feesCollectedTerm: number | null;
+    feesOutstandingTerm: number | null;
+  }>({ studentCount: null, activeTerm: null, feesCollectedTerm: null, feesOutstandingTerm: null });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.allSettled([
+      api.get('/school/students?limit=1'),
+      api.get('/school/terms'),
+      api.get('/school/fee-collection/info'),
+    ]).then(([studentsRes, termsRes, feeRes]) => {
+      let studentCount: number | null = null;
+      let activeTerm: string | null = null;
+      let activeTermId: string | null = null;
+
+      if (studentsRes.status === 'fulfilled') {
+        studentCount = studentsRes.value.data?.data?.students?.length ?? null;
+        // Re-fetch without limit to get real count
+        api.get('/school/students').then((r) => {
+          setData((d) => ({ ...d, studentCount: r.data?.data?.students?.length ?? 0 }));
+        }).catch(() => {});
+      }
+      if (termsRes.status === 'fulfilled') {
+        const terms: any[] = termsRes.value.data?.data?.terms ?? [];
+        const active = terms.find((t: any) => t.isActive) ?? terms[0];
+        if (active) { activeTerm = active.name; activeTermId = active.id; }
+      }
+      setData((d) => ({ ...d, studentCount: studentCount ?? d.studentCount, activeTerm }));
+
+      if (activeTermId && feeRes.status === 'fulfilled') {
+        const info = feeRes.value.data?.data ?? {};
+        setData((d) => ({
+          ...d,
+          feesCollectedTerm: info.totalCollected != null ? Number(info.totalCollected) : null,
+          feesOutstandingTerm: info.totalOutstanding != null ? Number(info.totalOutstanding) : null,
+        }));
+      }
+    }).finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const SCHOOL_QUICK_ACTIONS = [
+    { label: 'Collect Fees',       href: '/school/fee-collection',  icon: BadgeDollarSign, color: 'emerald' },
+    { label: 'Mark Attendance',    href: '/school/attendance',      icon: CalendarCheck,   color: 'blue'    },
+    { label: 'Enter Assessments',  href: '/school/assessments',     icon: ClipboardCheck,  color: 'purple'  },
+    { label: 'View Students',      href: '/school/students',        icon: Users,           color: 'indigo'  },
+    { label: 'Report Cards',       href: '/school/report-cards',    icon: FileSpreadsheet, color: 'orange'  },
+    { label: 'Fee Defaulters',     href: '/school/fee-defaulters',  icon: AlertTriangle,   color: 'red'     },
+    { label: 'School MIS',         href: '/school/mis',             icon: BarChart2,       color: 'teal'    },
+    { label: 'Admissions',         href: '/school/admissions',      icon: GraduationCap,   color: 'sky'     },
+  ];
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 animate-pulse">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 rounded-xl bg-secondary-100 dark:bg-secondary-800" />)}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* KPI tiles */}
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <Users className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data.studentCount ?? '—'}</div>
+            <p className="text-xs text-secondary-500 mt-1">Active enrolments</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Current Term</CardTitle>
+            <BookOpen className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold truncate">{data.activeTerm ?? '—'}</div>
+            <p className="text-xs text-secondary-500 mt-1">Active academic term</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Fees Collected</CardTitle>
+            <BadgeDollarSign className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+              {data.feesCollectedTerm != null ? fmt(data.feesCollectedTerm) : '—'}
+            </div>
+            <p className="text-xs text-secondary-500 mt-1">This term</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Outstanding Fees</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-secondary-400" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${(data.feesOutstandingTerm ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-secondary-900 dark:text-secondary-50'}`}>
+              {data.feesOutstandingTerm != null ? fmt(data.feesOutstandingTerm) : '—'}
+            </div>
+            <p className="text-xs text-secondary-500 mt-1">This term</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick-action tiles */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold text-secondary-900 dark:text-secondary-50">Quick Actions</CardTitle>
+          <p className="text-xs text-secondary-500 dark:text-secondary-400">Jump to the most-used school modules.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {SCHOOL_QUICK_ACTIONS.map(({ label, href, icon: Icon, color }) => (
+              <Link key={label} to={href} className={`flex flex-col items-center gap-2 rounded-xl p-4 text-center text-xs font-medium transition-all duration-150 ${ACTION_COLOR_CLASSES[color] ?? ACTION_COLOR_CLASSES.blue}`}>
+                <Icon className="h-6 w-6 flex-shrink-0" />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Teacher / Class Teacher dashboard (school restricted role) ─────────────────
+function TeacherDashboard() {
+  const { user } = useAuth();
+  const isClassTeacher = (user?.role || '').toLowerCase().trim() === 'class teacher';
+
+  const TEACHER_ACTIONS = [
+    { label: 'Mark Attendance',   href: '/school/attendance',   icon: CalendarCheck,  color: 'blue'    },
+    { label: 'Enter Assessments', href: '/school/assessments',  icon: ClipboardCheck, color: 'purple'  },
+    { label: 'Report Cards',      href: '/school/report-cards', icon: FileSpreadsheet, color: 'orange' },
+    { label: 'Timetable',         href: '/school/timetable',    icon: BookOpen,       color: 'teal'    },
+    { label: 'Students',          href: '/school/students',     icon: Users,          color: 'indigo'  },
+    { label: 'School Events',     href: '/school/events',       icon: Award,          color: 'emerald' },
+    ...(isClassTeacher ? [
+      { label: 'Student Health',  href: '/school/health',       icon: HeartPulse,     color: 'red'     },
+      { label: 'Certificates',    href: '/school/certificates',  icon: GraduationCap, color: 'sky'     },
+    ] : []),
+  ];
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold text-secondary-900 dark:text-secondary-50">
+            {isClassTeacher ? 'Class Teacher Portal' : 'Teacher Portal'}
+          </CardTitle>
+          <p className="text-xs text-secondary-500 dark:text-secondary-400">
+            {isClassTeacher
+              ? 'Manage attendance, assessments, report cards, and health records for your class.'
+              : 'Record attendance, enter assessment scores, and generate report cards.'}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {TEACHER_ACTIONS.map(({ label, href, icon: Icon, color }) => (
+              <Link key={label} to={href} className={`flex flex-col items-center gap-2 rounded-xl p-4 text-center text-xs font-medium transition-all duration-150 ${ACTION_COLOR_CLASSES[color] ?? ACTION_COLOR_CLASSES.blue}`}>
+                <Icon className="h-6 w-6 flex-shrink-0" />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -773,6 +1035,8 @@ function App() {
               <Route path="/legal" element={<LegalHubPage />} />
               <Route path="/legal/:policyName" element={<LegalDocumentPage />} />
               <Route path="/admin/core-engine" element={<AdminCoreEngine />} />
+              <Route path="/agod/login" element={<AgodTeamLogin />} />
+              <Route path="/agod/console" element={<AgodTeamConsole />} />
 
               {/* Protected Routes */}
               <Route path="/dashboard" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
@@ -821,6 +1085,7 @@ function App() {
               <Route path="/reports/daybook" element={<ProtectedRoute><MainLayout><Daybook /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/stock-movement" element={<ProtectedRoute><MainLayout><StockMovement /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/registers" element={<ProtectedRoute><MainLayout><Registers /></MainLayout></ProtectedRoute>} />
+              <Route path="/reports/receipt-log" element={<ProtectedRoute><MainLayout><ReceiptLog /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/vat-return" element={<ProtectedRoute><MainLayout><VatReturn /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/stock-aging" element={<ProtectedRoute><MainLayout><StockAging /></MainLayout></ProtectedRoute>} />
               <Route path="/reports/trial-balance" element={<ProtectedRoute><MainLayout><TrialBalance /></MainLayout></ProtectedRoute>} />
@@ -840,9 +1105,37 @@ function App() {
               <Route path="/payroll/runs" element={<ProtectedRoute><MainLayout><PayrollRuns /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/loans" element={<ProtectedRoute><MainLayout><Loans /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/leave" element={<ProtectedRoute><MainLayout><Leave /></MainLayout></ProtectedRoute>} />
+              <Route path="/payroll/ssnit" element={<ProtectedRoute><MainLayout><SsnitCompliance /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/patients" element={<ProtectedRoute><MainLayout><PharmacyPatients /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/nhis-claims" element={<ProtectedRoute><MainLayout><NhisClaims /></MainLayout></ProtectedRoute>} />
+              <Route path="/pharmacy/inventory-matrix" element={<ProtectedRoute><MainLayout><PharmacyInventoryMatrix /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/teachers" element={<ProtectedRoute><MainLayout><SchoolTeachers /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/classes" element={<ProtectedRoute><MainLayout><SchoolClasses /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/momo-reconciliation" element={<ProtectedRoute><MainLayout><MomoReconciliation /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/students" element={<ProtectedRoute><MainLayout><SchoolStudents /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/terms" element={<ProtectedRoute><MainLayout><AcademicTerms /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/fee-schedules" element={<ProtectedRoute><MainLayout><FeeSchedules /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/fee-collection" element={<ProtectedRoute><MainLayout><FeeCollection /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/fee-defaulters" element={<ProtectedRoute><MainLayout><FeeDefaulters /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/demand-vs-collection" element={<ProtectedRoute><MainLayout><DemandVsCollection /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/student-ledger" element={<ProtectedRoute><MainLayout><StudentLedger /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/attendance" element={<ProtectedRoute><MainLayout><SchoolAttendance /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/assessments" element={<ProtectedRoute><MainLayout><SchoolAssessments /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/report-cards" element={<ProtectedRoute><MainLayout><SchoolReportCards /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/admissions" element={<ProtectedRoute><MainLayout><SchoolAdmissions /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/timetable" element={<ProtectedRoute><MainLayout><SchoolTimetable /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/certificates" element={<ProtectedRoute><MainLayout><SchoolCertificates /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/scholarships" element={<ProtectedRoute><MainLayout><SchoolScholarships /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/health" element={<ProtectedRoute><MainLayout><SchoolStudentHealth /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/events" element={<ProtectedRoute><MainLayout><SchoolEventsPage /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/mis" element={<ProtectedRoute><MainLayout><SchoolMIS /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/nasia" element={<ProtectedRoute><MainLayout><NasiaDashboard /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/fee-payment-plans" element={<ProtectedRoute><MainLayout><FeePaymentPlans /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/transport" element={<ProtectedRoute><MainLayout><SchoolTransport /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/parent-comms" element={<ProtectedRoute><MainLayout><ParentComms /></MainLayout></ProtectedRoute>} />
               <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing" element={<ProtectedRoute><MainLayout><Manufacturing /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing/jobs" element={<ProtectedRoute><MainLayout><Jobs /></MainLayout></ProtectedRoute>} />

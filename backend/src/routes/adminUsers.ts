@@ -1,25 +1,16 @@
 import { Router, Request, Response } from 'express';
-import { BroadcastService } from '../services/broadcastService';
 import { prisma } from '../config/db';
 import { recordAuditLog } from '../services/auditLogService';
 
 const router = Router();
 
-function verifyPasscode(req: Request, res: Response): boolean {
-  const passcode = (req.headers['x-admin-passcode'] as string | undefined) ?? '';
-  if (!BroadcastService.verifyPasscode(passcode)) {
-    res.status(401).json({ success: false, error: 'Invalid master passcode.' });
-    return false;
-  }
-  return true;
-}
+// Auth is handled upstream by adminPasscodeMiddleware.
 
 /**
  * GET /api/v1/admin/users/search?q=<email>&tenantId=<id>
  * Cross-tenant user search. Never returns password hashes.
  */
 router.get('/search', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyPasscode(req, res)) return;
   const q = String(req.query.q ?? '').trim();
   const tenantId = String(req.query.tenantId ?? '').trim();
   if (!q && !tenantId) {
@@ -55,7 +46,6 @@ router.get('/search', async (req: Request, res: Response): Promise<void> => {
  * Platform-level user deactivation (isActive = false).
  */
 router.patch('/:userId/deactivate', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyPasscode(req, res)) return;
   const { userId } = req.params;
   try {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, tenantId: true, isActive: true } });
@@ -86,7 +76,6 @@ router.patch('/:userId/deactivate', async (req: Request, res: Response): Promise
  * Platform-level user re-activation.
  */
 router.patch('/:userId/activate', async (req: Request, res: Response): Promise<void> => {
-  if (!verifyPasscode(req, res)) return;
   const { userId } = req.params;
   try {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, tenantId: true, isActive: true } });

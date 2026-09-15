@@ -34,6 +34,7 @@ interface InventoryItemOption {
   name: string;
   sellingPrice: number;
   wholesalePrice: number | null;
+  floorPrice: number | null;
   unitOfMeasure: string;
   stockQty: number;
   regulatoryCategory?: string;
@@ -46,8 +47,10 @@ interface CartLine {
   unitOfMeasure: string;
   sellingPrice: number;
   wholesalePrice: number | null;
+  floorPrice: number | null;
   stockQty: number;
   quantity: number;
+  customPrice: number | null;
   regulatoryCategory?: string;
 }
 
@@ -123,6 +126,9 @@ export function PointOfSale() {
   const [isRecordingSale, setIsRecordingSale] = useState(false);
   const [saleError, setSaleError] = useState<string | null>(null);
   const [lastReceipt, setLastReceipt] = useState<LastReceipt | null>(null);
+  // Receipt must be printed before the cashier can start the next sale.
+  // Cleared to false on each new completed sale; set to true when Print Receipt is clicked.
+  const [receiptPrinted, setReceiptPrinted] = useState(true);
 
   // Close Till Modal
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
@@ -145,7 +151,7 @@ export function PointOfSale() {
     { userId: string; name: string; totalSales: number; voidedSales: number; voidRatio: number; anomaly: boolean }[]
   >([]);
 
-  const openReceipt = useCallback(async (saleId: string) => {
+  const openReceipt = useCallback(async (saleId: string, markPrinted = false) => {
     try {
       const res = await api.get(`/tills/sales/${saleId}/receipt.pdf`, { responseType: 'blob' });
       const blobUrl = URL.createObjectURL(res.data);
@@ -154,6 +160,7 @@ export function PointOfSale() {
       // re-reads it when the user opens the print dialog, and revoking it
       // before they print produces a blank print preview.
       // The browser releases the blob automatically when the tab closes.
+      if (markPrinted) setReceiptPrinted(true);
     } catch {
       showToast('Failed to open receipt. Please try again.', 'error');
     }
@@ -220,6 +227,7 @@ export function PointOfSale() {
               name: it.name,
               sellingPrice: Number(it.sellingPrice),
               wholesalePrice: it.wholesalePrice != null ? Number(it.wholesalePrice) : null,
+              floorPrice: it.floorPrice != null ? Number(it.floorPrice) : null,
               unitOfMeasure: it.unitOfMeasure,
               stockQty: stock ? stock.quantityOnHand : 0,
               regulatoryCategory: it.regulatoryCategory,
@@ -372,17 +380,31 @@ export function PointOfSale() {
           unitOfMeasure: item.unitOfMeasure,
           sellingPrice: item.sellingPrice,
           wholesalePrice: item.wholesalePrice,
+          floorPrice: item.floorPrice,
           stockQty: item.stockQty,
           quantity: 1,
+          customPrice: null,
           regulatoryCategory: item.regulatoryCategory,
         },
       ];
     });
   };
 
-  // Effective price for a cart line based on current saleType
-  const effectivePriceFor = (l: CartLine) =>
-    saleType === "WHOLESALE" && l.wholesalePrice != null ? l.wholesalePrice : l.sellingPrice;
+  // Effective price for a cart line: custom negotiated price > wholesale > retail
+  const effectivePriceFor = (l: CartLine) => {
+    if (l.customPrice !== null) return l.customPrice;
+    if (saleType === "WHOLESALE" && l.wholesalePrice != null) return l.wholesalePrice;
+    return l.sellingPrice;
+  };
+
+  const updateCartPrice = (itemId: string, rawValue: string) => {
+    const val = rawValue === "" ? null : Number(rawValue);
+    setCart((prev) => prev.map((l) => l.itemId === itemId ? { ...l, customPrice: val } : l));
+  };
+
+  const floorViolations = cart.filter(
+    (l) => l.floorPrice !== null && effectivePriceFor(l) < l.floorPrice
+  );
 
   const adjustCartQty = (itemId: string, delta: number) => {
     setCart((prev) =>
@@ -419,9 +441,14 @@ export function PointOfSale() {
     const clientTxnId = crypto.randomUUID();
     const clientOccurredAt = new Date().toISOString();
     try {
+      if (floorViolations.length > 0) {
+        setSaleError(`Price below floor for: ${floorViolations.map(l => l.name).join(", ")}. Adjust prices before recording.`);
+        setIsRecordingSale(false);
+        return;
+      }
       const res = await api.post("/tills/sales", {
         tillId: till.id,
-        items: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity })),
+        items: cart.map((l) => ({ itemId: l.itemId, quantity: l.quantity, ...(l.customPrice !== null ? { customPrice: l.customPrice } : {}) })),
         cashGiven: paymentMethod === "CASH" ? Number(cashGiven) : cartTotal,
         saleType,
         clientTxnId,
@@ -437,6 +464,14 @@ export function PointOfSale() {
         if (warnings.length > 0) {
           showToast(`Warning: ${warnings.join(" ")}`, "warning" as any);
         }
+        const { whatsappSent } = res.data.data;
+        if (customerPhone.trim()) {
+          if (whatsappSent) {
+            showToast(`WhatsApp receipt sent to ${customerPhone.trim()} ✓`, "success" as any);
+          } else {
+            showToast(`WhatsApp receipt could not be sent to ${customerPhone.trim()}`, "error");
+          }
+        }
         setLastReceipt({
           id: res.data.data.sale.id,
           receiptNo: res.data.data.sale.receiptNo,
@@ -444,6 +479,7 @@ export function PointOfSale() {
           changeGiven: res.data.data.changeGiven,
           lines: res.data.data.lines.map((l: any) => ({ itemName: l.itemName, quantity: l.quantity })),
         });
+        setReceiptPrinted(false);
         setCart([]);
         setItemSearch("");
         setCashGiven("");
@@ -795,16 +831,33 @@ export function PointOfSale() {
                   ) : (
                     <table className="w-full text-sm">
                       <tbody>
-                        {cart.map((l) => (
-                          <tr key={l.itemId} className="border-t border-secondary-100 dark:border-secondary-800 first:border-t-0">
+                        {cart.map((l) => {
+                          const price = effectivePriceFor(l);
+                          const belowFloor = l.floorPrice !== null && price < l.floorPrice;
+                          return (
+                          <tr key={l.itemId} className={`border-t border-secondary-100 dark:border-secondary-800 first:border-t-0 ${belowFloor ? "bg-red-50 dark:bg-red-900/20" : ""}`}>
                             <td className="p-2">
                               <div className="font-medium text-secondary-900 dark:text-secondary-50">{l.name}</div>
-                              <div className="text-xs text-secondary-500">
-                                {formatMoney(effectivePriceFor(l))} / {l.unitOfMeasure}
-                                {saleType === "WHOLESALE" && l.wholesalePrice != null && (
-                                  <span className="text-blue-600 dark:text-blue-400 ml-1">(wholesale)</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <input
+                                  type="number"
+                                  min={l.floorPrice ?? 0}
+                                  step="0.01"
+                                  placeholder={String(saleType === "WHOLESALE" && l.wholesalePrice != null ? l.wholesalePrice : l.sellingPrice)}
+                                  value={l.customPrice !== null ? l.customPrice : ""}
+                                  onChange={(e) => updateCartPrice(l.itemId, e.target.value)}
+                                  className={`w-24 text-xs rounded border px-2 py-0.5 focus:outline-none focus:ring-1 ${belowFloor ? "border-red-400 bg-red-50 dark:bg-red-900/20 focus:ring-red-400" : "border-secondary-300 dark:border-secondary-600 bg-background focus:ring-primary"}`}
+                                />
+                                <span className="text-xs text-secondary-400">/ {l.unitOfMeasure}</span>
+                                {l.floorPrice !== null && (
+                                  <span className={`text-xs ${belowFloor ? "text-red-600 dark:text-red-400 font-medium" : "text-secondary-400"}`}>
+                                    min {formatMoney(l.floorPrice)}
+                                  </span>
                                 )}
                               </div>
+                              {belowFloor && (
+                                <div className="text-xs text-red-600 dark:text-red-400 mt-0.5">Below floor price</div>
+                              )}
                             </td>
                             <td className="p-2">
                               <div className="flex items-center gap-1.5">
@@ -822,14 +875,15 @@ export function PointOfSale() {
                                 </button>
                               </div>
                             </td>
-                            <td className="p-2 text-right font-semibold whitespace-nowrap">{formatMoney(effectivePriceFor(l) * l.quantity)}</td>
+                            <td className="p-2 text-right font-semibold whitespace-nowrap">{formatMoney(price * l.quantity)}</td>
                             <td className="p-2">
                               <button type="button" onClick={() => removeFromCart(l.itemId)} className="text-secondary-400 hover:text-red-500 p-1">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}
@@ -909,27 +963,32 @@ export function PointOfSale() {
                     </div>
                   )}
 
-                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven)}>
-                    {isRecordingSale ? "Recording..." : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}
+                  <Button type="submit" variant="primary" className="w-full" disabled={isRecordingSale || cart.length === 0 || (paymentMethod === "CASH" && !cashGiven) || floorViolations.length > 0 || !receiptPrinted}>
+                    {isRecordingSale ? "Recording..." : !receiptPrinted ? "Print previous receipt first" : `Record Sale${cart.length > 0 ? ` (${cart.length} item${cart.length === 1 ? "" : "s"})` : ""}`}
                   </Button>
                 </form>
 
                 {lastReceipt && (
-                  <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                  <div className={`mt-4 p-4 border rounded-lg ${receiptPrinted ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800" : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700"}`}>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-1">
+                      <div className={`flex items-center font-bold text-sm mb-1 ${receiptPrinted ? "text-emerald-800 dark:text-emerald-300" : "text-amber-800 dark:text-amber-300"}`}>
                         <Receipt className="mr-1.5 h-4 w-4" />
-                        Sale recorded — Receipt {lastReceipt.receiptNo}
+                        {receiptPrinted ? `Printed — Receipt ${lastReceipt.receiptNo}` : `Print required — Receipt ${lastReceipt.receiptNo}`}
                       </div>
                       <button
                         type="button"
-                        className="text-xs text-emerald-700 dark:text-emerald-400 underline hover:text-emerald-900"
-                        onClick={() => openReceipt(lastReceipt.id)}
+                        className={`text-xs font-semibold underline ${receiptPrinted ? "text-emerald-700 dark:text-emerald-400 hover:text-emerald-900" : "text-amber-700 dark:text-amber-400 hover:text-amber-900"}`}
+                        onClick={() => openReceipt(lastReceipt.id, true)}
                       >
-                        Print Receipt
+                        {receiptPrinted ? "Reprint" : "Print Receipt"}
                       </button>
                     </div>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                    {!receiptPrinted && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">
+                        Give the customer their receipt before starting a new sale.
+                      </p>
+                    )}
+                    <p className={`text-xs ${receiptPrinted ? "text-emerald-700 dark:text-emerald-400" : "text-amber-600 dark:text-amber-500"}`}>
                       {lastReceipt.lines.map((l) => `${l.quantity} × ${l.itemName}`).join(", ")} — Total {formatMoney(lastReceipt.amount)} — Change given {formatMoney(lastReceipt.changeGiven)}
                     </p>
                   </div>

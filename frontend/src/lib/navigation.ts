@@ -1,5 +1,14 @@
 import {
   LayoutDashboard,
+  Activity,
+  ClipboardCheck,
+  FileCheck,
+  UserPlus,
+  ScrollText,
+  Gem,
+  HeartPulse,
+  CalendarCheck,
+  Award,
   BookOpen,
   FileSpreadsheet,
   PieChart,
@@ -41,6 +50,9 @@ import {
   Layers,
   Cog,
   Key,
+  GraduationCap,
+  CalendarDays,
+  MessageSquare,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -76,6 +88,78 @@ const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/payroll/employees', '/payroll/runs', '/payroll/loans', '/payroll/leave',
   '/approvals', '/audit-logs', '/help-assistant/activity', '/import',
 ]);
+
+// Items hidden per org type at signup — applied before tier/role/mode filtering.
+// RETAIL keeps POS + Inventory; removes heavy industrial features.
+// WHOLESALE removes POS; keeps Inventory + bulk-sales tooling.
+// SERVICE removes POS + entire Inventory section + stock-specific reports.
+// CONSTRUCTION removes POS + manufacturing; keeps Job Costing, Purchase Orders, Payroll.
+// PHARMACY removes manufacturing; keeps POS + Inventory + Pharmacy section.
+const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
+  RETAIL: new Set([
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+  ]),
+  WHOLESALE: new Set([
+    '/pos',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+  ]),
+  SERVICE: new Set([
+    '/pos',
+    '/analytics/inventory', '/inventory/serial-numbers',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders', '/cost-categories',
+    '/pdc', '/reports/interest-charges',
+    '/reports/stock-movement', '/reports/stock-aging', '/reports/landed-costs',
+    '/reports/sales-channel', '/reports/monthly-sales-ledger',
+  ]),
+  CONSTRUCTION: new Set([
+    '/pos',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+    '/reports/stock-aging', '/reports/sales-channel', '/reports/monthly-sales-ledger',
+  ]),
+  PHARMACY: new Set([
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+  ]),
+  NONPROFIT: new Set([
+    // No product sales or stock
+    '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
+    '/inventory', '/inventory/serial-numbers', '/analytics/inventory',
+    // No manufacturing or job costing
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/cost-categories',
+    // Schools use Fee Collection for income — not generic AR invoicing
+    '/invoices',
+    // Schools rarely raise formal purchase orders; no payment matching workflow
+    '/purchase-orders', '/payment-matching',
+    // No interest charges or product price lists
+    '/reports/interest-charges', '/settings/price-lists',
+    // WHT is a GRA obligation for commercial entities; schools are typically exempt
+    '/settings/wht-rates',
+    // Advanced accounting features not used in school context
+    '/settings/scenarios', '/settings/voucher-classes', '/pdc',
+    // Reports irrelevant to schools
+    '/reports/monthly-sales-ledger', '/reports/sales-channel',
+    '/reports/landed-costs', '/reports/stock-movement',
+    '/reports/stock-aging', '/reports/registers',
+    // Multi-campus comparison not relevant (single-campus schools)
+    '/reports/branch-comparison',
+    // Schools typically VAT-exempt on educational services
+    '/reports/vat-return',
+    // Analytics Dashboard replaced by MIS Dashboard in School section
+    '/reports/analytics',
+    // Too specialised for school finance team
+    '/reports/benford-analysis',
+    // No customer CRM (schools use Students module)
+    '/customers',
+    // Retail POS executive report (shops, tills, till closeouts) — not applicable to schools
+    '/reports/executive',
+    // Tax Rates configure VAT/NHIL on sales invoices; educational services are VAT-exempt under GRA
+    '/settings/tax-rates',
+  ]),
+};
 
 const BUSINESS_HIDDEN: ReadonlySet<string> = new Set([
   '/settings/fiscal-periods', '/settings/recurring-transactions',
@@ -190,6 +274,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Daybook", href: "/reports/daybook", icon: BookOpen, minTier: 2 },
       { name: "Stock Movement", href: "/reports/stock-movement", icon: TrendingUp, minTier: 2 },
       { name: "Purchase & Sales Registers", href: "/reports/registers", icon: FileSpreadsheet, minTier: 2 },
+      { name: "Receipt Audit Log", href: "/reports/receipt-log", icon: Receipt },
       { name: "VAT Return", href: "/reports/vat-return", icon: Percent, minTier: 2 },
       { name: "Stock Aging", href: "/reports/stock-aging", icon: Clock, minTier: 2 },
       { name: "Financial Ratios", href: "/reports/financial-ratios", icon: BarChart3, minTier: 2 },
@@ -204,6 +289,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Payroll Runs", href: "/payroll/runs", icon: BadgeDollarSign, minTier: 2 },
       { name: "Employee Loans", href: "/payroll/loans", icon: Landmark, minTier: 2 },
       { name: "Leave Management", href: "/payroll/leave", icon: CalendarClock, minTier: 2 },
+      { name: "SSNIT Compliance", href: "/payroll/ssnit", icon: ShieldCheck, minTier: 2 },
     ],
   },
   {
@@ -218,10 +304,43 @@ export const navigationGroups: NavGroup[] = [
     ],
   },
   {
+    sectionTitle: "SCHOOL",
+    orgTypeOnly: "NONPROFIT",
+    items: [
+      { name: "Teachers", href: "/school/teachers", icon: GraduationCap },
+      { name: "Classes", href: "/school/classes", icon: Layers },
+      { name: "Students", href: "/school/students", icon: Users },
+      { name: "Academic Terms", href: "/school/terms", icon: CalendarDays },
+      { name: "Fee Schedules", href: "/school/fee-schedules", icon: Receipt },
+      { name: "Fee Collection", href: "/school/fee-collection", icon: BookOpen },
+      { name: "Payment Plans", href: "/school/fee-payment-plans", icon: CalendarDays },
+      { name: "MoMo Reconciliation", href: "/school/momo-reconciliation", icon: Wallet2 },
+      { name: "Fee Defaulters", href: "/school/fee-defaulters", icon: AlertTriangle },
+      { name: "Demand vs Collection", href: "/school/demand-vs-collection", icon: BarChart3 },
+      { name: "Student Ledger", href: "/school/student-ledger", icon: ClipboardList },
+      { name: "Attendance", href: "/school/attendance", icon: ClipboardCheck },
+      { name: "Assessments", href: "/school/assessments", icon: FileCheck },
+      { name: "Report Cards", href: "/school/report-cards", icon: ScrollText },
+      { name: "Admissions", href: "/school/admissions", icon: UserPlus },
+      { name: "Timetable", href: "/school/timetable", icon: Activity },
+      { name: "Certificates", href: "/school/certificates", icon: Gem },
+      { name: "Scholarships", href: "/school/scholarships", icon: Award },
+      { name: "Health Records", href: "/school/health", icon: HeartPulse },
+      { name: "Events & Calendar", href: "/school/events", icon: CalendarCheck },
+      { name: "MIS Dashboard", href: "/school/mis", icon: LayoutDashboard },
+      { name: "NaSIA Dashboard", href: "/school/nasia", icon: ClipboardList },
+      { name: "Transport", href: "/school/transport", icon: Truck },
+      { name: "Parent Comms", href: "/school/parent-comms", icon: MessageSquare },
+    ],
+  },
+  {
     sectionTitle: "PHARMACY",
     orgTypeOnly: "PHARMACY",
     items: [
       { name: "Prescription Register", href: "/pharmacy/prescriptions", icon: ClipboardList },
+      { name: "Patient Registry", href: "/pharmacy/patients", icon: Users },
+      { name: "NHIS Claims", href: "/pharmacy/nhis-claims", icon: CreditCard },
+      { name: "Inventory Matrix", href: "/pharmacy/inventory-matrix", icon: BarChart3 },
       { name: "Narcotics Register", href: "/pharmacy/narcotics", icon: ShieldAlert },
       { name: "Expiry Alerts", href: "/pharmacy/expiry", icon: AlertTriangle },
     ],
@@ -243,6 +362,28 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
   cashier: ["/dashboard", "/inventory", "/pos", "/expenses"],
   "warehouse manager": ["/dashboard", "/inventory", "/analytics/inventory", "/purchase-orders", "/expenses"],
   hr: ["/dashboard", "/team", "/expenses", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave"],
+  // School-specific restricted roles — see to full school module set they teach/manage.
+  // Admin (Head Teacher) and Accountant (Bursar) are unrestricted so they see the full nav.
+  teacher: [
+    "/dashboard",
+    "/school/students",
+    "/school/attendance",
+    "/school/assessments",
+    "/school/report-cards",
+    "/school/timetable",
+    "/school/events",
+  ],
+  "class teacher": [
+    "/dashboard",
+    "/school/students",
+    "/school/attendance",
+    "/school/assessments",
+    "/school/report-cards",
+    "/school/timetable",
+    "/school/events",
+    "/school/health",
+    "/school/certificates",
+  ],
   "payroll officer": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
   "payroll approver": ["/dashboard", "/payroll/employees", "/payroll/runs", "/payroll/loans", "/payroll/leave", "/expenses"],
   "accounts payable clerk": ["/dashboard", "/bills", "/purchase-orders", "/delivery-notes", "/payment-matching", "/expenses", "/inventory", "/vendors"],
@@ -327,6 +468,7 @@ export const SETTINGS_RESTRICTED_ROLES = new Set([
   "hr", "payroll officer", "payroll approver",
   "accounts payable clerk", "accounts receivable clerk",
   "auditor", "external accountant", "viewer",
+  "teacher", "class teacher",
 ]);
 
 export function isSettingsRestricted(role: string | undefined): boolean {
@@ -357,6 +499,7 @@ export function getVisibleNavGroups(
   orgType?: string,
   mode: WorkspaceMode = 'professional',
   tier: number = 1,
+  posEnabled: boolean = true,
 ): NavGroup[] {
   // Filter groups restricted to a specific org type (e.g. PHARMACY section)
   let groups = navigationGroups.filter(
@@ -366,16 +509,40 @@ export function getVisibleNavGroups(
   if (orgType === "NONPROFIT") {
     groups = groups
       .map((group) => {
+        // INVENTORY section is entirely irrelevant for schools (handled by ORG_TYPE_HIDDEN too, belt-and-suspenders)
         if (group.sectionTitle === "INVENTORY & GODOWNS") return null;
-        if (group.sectionTitle === "SALES & PURCHASES") {
-          return { ...group, items: group.items.filter((item) => item.href !== "/pos") };
-        }
+        // Add Funds to Finance & Banking for grant/endowment tracking
         if (group.sectionTitle === "FINANCE & BANKING") {
           return { ...group, items: [...group.items, { name: "Funds", href: "/settings/funds", icon: Landmark }] };
         }
         return group;
       })
       .filter((group): group is NavGroup => group !== null);
+  }
+
+  // SERVICE orgs carry no physical stock — remove the entire inventory section.
+  if (orgType === "SERVICE") {
+    groups = groups.filter((group) => group.sectionTitle !== "INVENTORY & GODOWNS");
+  }
+
+  // Apply per-org-type item hiding (RETAIL / WHOLESALE / SERVICE / CONSTRUCTION / PHARMACY).
+  const orgHidden = orgType ? ORG_TYPE_HIDDEN[orgType] : undefined;
+  if (orgHidden) {
+    groups = groups
+      .map((group) => ({ ...group, items: group.items.filter((item) => !orgHidden.has(item.href)) }))
+      .filter((group) => group.items.length > 0);
+  }
+
+  // POS toggle: when posEnabled is false, hide /pos from BUSINESS tenants.
+  // Types that already hide POS via ORG_TYPE_HIDDEN or NONPROFIT block are unaffected.
+  if (!posEnabled && orgType !== "NONPROFIT") {
+    groups = groups
+      .map((group) =>
+        group.sectionTitle === "SALES & PURCHASES"
+          ? { ...group, items: group.items.filter((item) => item.href !== "/pos") }
+          : group
+      )
+      .filter((group) => group.items.length > 0);
   }
 
   // Plan tier gate: hide items that require a higher-tier plan.

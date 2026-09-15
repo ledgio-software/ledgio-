@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -8,7 +8,7 @@ import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
-import { Plus, CheckCircle, Building2, CreditCard, AlertCircle, Package, Ship, Trash2, Undo2, History, Clock } from "lucide-react";
+import { Plus, CheckCircle, Building2, CreditCard, AlertCircle, Package, Ship, Trash2, Undo2, History, Clock, Search } from "lucide-react";
 
 interface Vendor {
   id: string;
@@ -88,6 +88,8 @@ export function VendorBills() {
   const { settings } = useTenantSettings();
   const navigate = useNavigate();
   const [bills, setBills] = useState<VendorBill[]>([]);
+  const [billSearch, setBillSearch] = useState("");
+  const [billStatusFilter, setBillStatusFilter] = useState("");
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [items, setItems] = useState<InventoryItemOption[]>([]);
@@ -370,6 +372,15 @@ export function VendorBills() {
   const totalAP = bills.reduce((acc, b) => acc + (b.status !== "PAID" ? Number(b.amount) : 0), 0);
   const totalPaid = bills.reduce((acc, b) => acc + (b.status === "PAID" ? Number(b.amount) : 0), 0);
 
+  const displayedBills = useMemo(() => {
+    const q = billSearch.toLowerCase().trim();
+    return bills.filter((b) => {
+      if (billStatusFilter && b.status !== billStatusFilter) return false;
+      if (q) return b.billNumber.toLowerCase().includes(q) || (b.vendor?.name ?? "").toLowerCase().includes(q);
+      return true;
+    });
+  }, [bills, billSearch, billStatusFilter]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -434,12 +445,38 @@ export function VendorBills() {
           <CardDescription>Manage incoming vendor invoices and schedule payments.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex flex-wrap gap-2 mb-4 items-center">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+              <Input
+                placeholder="Search bill # or vendor…"
+                className="pl-8"
+                value={billSearch}
+                onChange={(e) => setBillSearch(e.target.value)}
+              />
+            </div>
+            {["", "DRAFT", "RECEIVED", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED"].map((s) => (
+              <button
+                key={s}
+                onClick={() => setBillStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${billStatusFilter === s ? "bg-primary-600 text-white border-primary-600" : "border-secondary-300 text-secondary-600 hover:border-primary-400 dark:border-secondary-600 dark:text-secondary-300"}`}
+              >
+                {s === "" ? "All" : s === "PARTIALLY_PAID" ? "Partial" : s.charAt(0) + s.slice(1).toLowerCase()}
+              </button>
+            ))}
+            {(billSearch || billStatusFilter) && (
+              <span className="text-xs text-secondary-500">{displayedBills.length} of {bills.length}</span>
+            )}
+          </div>
+
           {isLoading ? (
             <div className="py-8 text-center text-secondary-500">Loading vendor bills...</div>
           ) : bills.length === 0 ? (
             <div className="py-8 text-center text-secondary-500 text-sm">
               No vendor bills recorded yet. Click "Add Vendor Bill" to enter a payable.
             </div>
+          ) : displayedBills.length === 0 ? (
+            <div className="py-8 text-center text-secondary-500 text-sm">No bills match the current filters.</div>
           ) : (
             <Table>
               <TableHeader>
@@ -454,7 +491,7 @@ export function VendorBills() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bills.map((b) => (
+                {displayedBills.map((b) => (
                   <TableRow key={b.id}>
                     <TableCell className="font-mono font-medium text-primary-600 dark:text-primary-400">
                       {b.billNumber}

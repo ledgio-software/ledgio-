@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger';
+import { buildIdorPrismaMiddleware } from '../middleware/idorGuard';
 
 // Configurable via env — defaults match the statement_timeout in DATABASE_URL (30 s),
 // but fire 5 s earlier so the API returns a structured error before Postgres kills
@@ -36,6 +37,20 @@ export const prisma = new PrismaClient({
   return Promise.race([next(params), deadline]);
 });
 
+// IDOR prevention: auto-inject tenantId into reads on tenant-scoped models.
+(prisma as any).$use(buildIdorPrismaMiddleware());
+
+// In-memory ring buffer of the 200 most-recent slow queries — read by GET /admin/slow-queries.
+const SLOW_QUERY_BUFFER_SIZE = 200;
+export interface SlowQueryEntry {
+  ts: string;
+  query: string;
+  durationMs: number;
+  target?: string;
+  level: 'warn' | 'critical';
+}
+export const slowQueryBuffer: SlowQueryEntry[] = [];
+
 // Slow-query and critical-query logging.
 prisma.$on('query' as any, (e: any) => {
   const { duration } = e;
@@ -47,6 +62,8 @@ prisma.$on('query' as any, (e: any) => {
       params: e.params,
       target: e.target,
     });
+    slowQueryBuffer.push({ ts: new Date().toISOString(), query: e.query ?? '', durationMs: duration, target: e.target, level: 'critical' });
+    if (slowQueryBuffer.length > SLOW_QUERY_BUFFER_SIZE) slowQueryBuffer.shift();
   } else if (duration > SLOW_QUERY_MS) {
     logger.warn('Slow Query Detected', {
       query: e.query,
@@ -54,6 +71,8 @@ prisma.$on('query' as any, (e: any) => {
       params: e.params,
       target: e.target,
     });
+    slowQueryBuffer.push({ ts: new Date().toISOString(), query: e.query ?? '', durationMs: duration, target: e.target, level: 'warn' });
+    if (slowQueryBuffer.length > SLOW_QUERY_BUFFER_SIZE) slowQueryBuffer.shift();
   }
 
   if (process.env.NODE_ENV === 'development' && duration > 10) {

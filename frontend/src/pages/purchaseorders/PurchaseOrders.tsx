@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -6,9 +6,10 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
+import { confirm } from "../../components/ui/AlertDialog";
 import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
-import { Plus, FileSpreadsheet, Trash2, Send, XCircle, ReceiptText, AlertTriangle, RefreshCcw } from "lucide-react";
+import { Plus, FileSpreadsheet, Trash2, Send, XCircle, ReceiptText, AlertTriangle, RefreshCcw, Search } from "lucide-react";
 
 interface Vendor {
   id: string;
@@ -75,10 +76,21 @@ export function PurchaseOrders() {
   const { settings: tenantSettings, isLoading: isLoadingTenantSettings } = useTenantSettings();
   const { showToast } = useToast();
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [poSearch, setPoSearch] = useState("");
+  const [poStatusFilter, setPoStatusFilter] = useState("");
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [items, setItems] = useState<InventoryItemOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const displayedPOs = useMemo(() => {
+    const q = poSearch.toLowerCase().trim();
+    return purchaseOrders.filter((po) => {
+      if (poStatusFilter && po.status !== poStatusFilter) return false;
+      if (q) return po.poNumber.toLowerCase().includes(q) || (po.vendor?.name ?? "").toLowerCase().includes(q);
+      return true;
+    });
+  }, [purchaseOrders, poSearch, poStatusFilter]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState("");
@@ -178,7 +190,7 @@ export function PurchaseOrders() {
   };
 
   const handleCancel = async (po: PurchaseOrder) => {
-    if (!window.confirm(`Cancel ${po.poNumber}?`)) return;
+    if (!await confirm({ title: `Cancel ${po.poNumber}?`, confirmLabel: "Cancel PO" })) return;
     try {
       await api.put(`/purchase-orders/${po.id}/status`, { status: "CANCELLED" });
       showToast("Purchase Order cancelled.", "success");
@@ -236,8 +248,11 @@ export function PurchaseOrders() {
       if (res.data.success) {
         showToast(res.data.message, "success");
         if (res.data.data.skippedNoVendor.length > 0) {
+          const skipped = res.data.data.skippedNoVendor;
+          const preview = skipped.slice(0, 3).map((s: any) => s.itemName).join(", ");
+          const more = skipped.length > 3 ? ` and ${skipped.length - 3} more` : "";
           showToast(
-            `${res.data.data.skippedNoVendor.length} low-stock item(s) skipped - no preferred vendor set (${res.data.data.skippedNoVendor.map((s: any) => s.itemName).join(", ")}).`,
+            `${skipped.length} low-stock item(s) have no preferred vendor set — skipped. (${preview}${more})`,
             "error"
           );
         }
@@ -285,10 +300,36 @@ export function PurchaseOrders() {
           <CardDescription>DRAFT and SENT orders can be billed against; CANCELLED cannot.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex flex-wrap gap-2 mb-4 items-center">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+              <Input
+                placeholder="Search PO # or vendor…"
+                className="pl-8"
+                value={poSearch}
+                onChange={(e) => setPoSearch(e.target.value)}
+              />
+            </div>
+            {["", "DRAFT", "SENT", "BILLED", "CANCELLED"].map((s) => (
+              <button
+                key={s}
+                onClick={() => setPoStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${poStatusFilter === s ? "bg-primary-600 text-white border-primary-600" : "border-secondary-300 text-secondary-600 hover:border-primary-400 dark:border-secondary-600 dark:text-secondary-300"}`}
+              >
+                {s === "" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+              </button>
+            ))}
+            {(poSearch || poStatusFilter) && (
+              <span className="text-xs text-secondary-500">{displayedPOs.length} of {purchaseOrders.length}</span>
+            )}
+          </div>
+
           {isLoading ? (
             <div className="py-8 text-center text-secondary-500">Loading...</div>
           ) : purchaseOrders.length === 0 ? (
             <div className="py-12 text-center text-secondary-500 text-sm">No purchase orders yet.</div>
+          ) : displayedPOs.length === 0 ? (
+            <div className="py-8 text-center text-secondary-500 text-sm">No purchase orders match the current filters.</div>
           ) : (
             <Table>
               <TableHeader>
@@ -302,7 +343,7 @@ export function PurchaseOrders() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {purchaseOrders.map((po) => (
+                {displayedPOs.map((po) => (
                   <TableRow key={po.id}>
                     <TableCell className="font-medium">{po.poNumber}</TableCell>
                     <TableCell>{po.vendor.name}</TableCell>

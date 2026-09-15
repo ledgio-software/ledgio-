@@ -1,0 +1,44 @@
+name: Migrate DB
+
+# Runs production migrations immediately after every push to main (before
+# Render's deploy finishes), so the schema is always ahead of the code rather
+# than the other way round. `prisma migrate deploy` is idempotent — already-
+# applied migrations are skipped, so re-runs are safe.
+#
+# Required GitHub Secrets:
+#   DATABASE_URL — the DIRECT (non-pooled) Prisma Postgres connection string.
+#                  Use the DIRECT_URL value from Prisma Console, not the pooled
+#                  one. `migrate deploy` needs session continuity that a pooled
+#                  connection can't provide.
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  migrate:
+    name: Apply Prisma migrations to production DB
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}

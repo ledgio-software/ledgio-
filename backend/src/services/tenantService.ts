@@ -26,6 +26,7 @@ export interface OnboardTenantDTO {
   // sections the frontend shows. Any unrecognized/omitted value defaults
   // safely to BUSINESS (matches tier's default-on-absence style).
   orgType?: string;
+  referralCode?: string;
 }
 
 export interface OnboardTenantResult {
@@ -160,8 +161,20 @@ export async function onboardTenant(
   }
 
   const tier = dto.tier !== undefined ? Number(dto.tier) : 1;
-  const orgType = dto.orgType === 'NONPROFIT' ? 'NONPROFIT' : dto.orgType === 'PHARMACY' ? 'PHARMACY' : 'BUSINESS';
+  const VALID_ORG_TYPES = new Set(['BUSINESS', 'NONPROFIT', 'PHARMACY', 'RETAIL', 'WHOLESALE', 'SERVICE', 'CONSTRUCTION']);
+  const orgType = dto.orgType && VALID_ORG_TYPES.has(dto.orgType) ? dto.orgType : 'BUSINESS';
   const trialEndsAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+  // Validate referral code if provided
+  const rawReferralCode = (dto.referralCode || '').trim().toUpperCase();
+  let referralCode: string | undefined;
+  if (rawReferralCode) {
+    const partner = await (prisma as any).referralPartner.findUnique({ where: { code: rawReferralCode } });
+    if (!partner || !partner.isActive) {
+      throw new TenantOnboardingError('Invalid or inactive referral code', 400);
+    }
+    referralCode = rawReferralCode;
+  }
 
   const schemaName = sanitizeSchemaName(slug);
 
@@ -190,6 +203,7 @@ export async function onboardTenant(
       orgType,
       subscriptionStatus: 'TRIAL',
       trialEndsAt,
+      referralCode,
     });
   } catch (err: any) {
     if (err.message && err.message.includes('unique constraint')) {

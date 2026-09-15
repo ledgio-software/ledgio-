@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
+import { redis } from '../config/redis';
 import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
@@ -11,6 +12,9 @@ import * as paystackService from '../services/paystackService';
 import { PaystackServiceError } from '../services/paystackService';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validateBody';
+
+// Webhook references are stored in Redis for 90 days to detect replays.
+const WEBHOOK_DEDUP_TTL_SECONDS = 90 * 24 * 60 * 60;
 
 const initializeSchema = z.object({ planTier: z.number().int().min(1).max(3) });
 const verifySchema = z.object({
@@ -63,7 +67,15 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
     const context = req.tenantContext!;
     const tenant = await prisma.tenant.findUnique({
       where: { id: context.tenantId },
-      select: { tier: true, subscriptionStatus: true, trialEndsAt: true, subscriptionPaidUntil: true },
+      select: {
+        tier: true,
+        subscriptionStatus: true,
+        trialEndsAt: true,
+        subscriptionPaidUntil: true,
+        paystackAuthChannel: true,
+        paystackAuthSummary: true,
+        autoRenewEnabled: true,
+      },
     });
     if (!tenant) {
       res.status(404).json({ success: false, error: 'Tenant not found.' });
@@ -106,6 +118,10 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
       graceDaysRemaining,
       renewalDaysRemaining,
       subscriptionPaidUntil: tenant.subscriptionPaidUntil?.toISOString() ?? null,
+      savedPaymentMethod: tenant.paystackAuthSummary
+        ? { channel: tenant.paystackAuthChannel, summary: tenant.paystackAuthSummary }
+        : null,
+      autoRenewEnabled: tenant.autoRenewEnabled,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -143,14 +159,16 @@ router.post('/initialize', requireRole('Admin'), validateBody(initializeSchema),
 
     const user = (req as any).user;
     const reference = `sub_${context.tenantId}_${planTier}_${Date.now()}`;
-    const callbackUrl = process.env.PAYSTACK_SUBSCRIPTION_CALLBACK_URL || process.env.APP_URL || '';
+    const appUrl = (process.env.PAYSTACK_SUBSCRIPTION_CALLBACK_URL || process.env.APP_URL || '').replace(/\/$/, '');
 
     const result = await paystackService.initializeTransaction({
       email: user.email,
       amount: plan.priceGhs,
       currency: 'GHS',
       reference,
-      callbackUrl: callbackUrl ? `${callbackUrl}?tab=subscription&ref=${reference}` : undefined,
+      // /verify is the SPA route that auto-calls POST /subscription/verify on load
+      callbackUrl: appUrl ? `${appUrl}/verify?ref=${reference}` : undefined,
+      metadata: { tenantId: context.tenantId, planTier },
     });
 
     res.json({ success: true, authorizationUrl: result.authorizationUrl, reference: result.reference, plan });
@@ -195,12 +213,23 @@ router.post('/verify', requireRole('Admin'), validateBody(verifySchema), async (
     const tenant = await prisma.tenant.findUnique({ where: { id: context.tenantId }, select: { tier: true } });
     const newTier = plan.tier > (tenant?.tier ?? 1) ? plan.tier : (tenant?.tier ?? 1);
 
+    // Capture the reusable authorization so auto-renewal can charge it later
+    const authUpdate = verification.authorization
+      ? {
+          paystackAuthCode: verification.authorization.authCode,
+          paystackAuthChannel: verification.authorization.channel,
+          paystackAuthSummary: verification.authorization.summary,
+          autoRenewEnabled: true,
+        }
+      : {};
+
     await prisma.tenant.update({
       where: { id: context.tenantId },
       data: {
         subscriptionStatus: 'ACTIVE',
         subscriptionPaidUntil,
         tier: newTier,
+        ...authUpdate,
       },
     });
 
@@ -250,6 +279,22 @@ router.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Replay protection: reject any reference we have already processed.
+    // Uses SET NX EX so the check-and-mark is atomic.
+    const reference = event.data?.reference as string | undefined;
+    if (reference) {
+      const dedupKey = `paystack_webhook:${reference}`;
+      try {
+        const isNew = await redis.set(dedupKey, '1', 'EX', WEBHOOK_DEDUP_TTL_SECONDS, 'NX');
+        if (!isNew) {
+          res.json({ success: true, ignored: true, reason: 'duplicate' });
+          return;
+        }
+      } catch {
+        // Redis unavailable — process the event; idempotent updates are safe.
+      }
+    }
+
     const metadata = event.data?.metadata as { tenantId?: string; planTier?: number } | undefined;
     if (!metadata?.tenantId || !metadata?.planTier) {
       res.json({ success: true, ignored: true });
@@ -278,6 +323,54 @@ router.post('/webhook', async (req: Request, res: Response): Promise<void> => {
     await invalidateTenantCacheById(metadata.tenantId);
 
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/v1/subscription/payment-method
+ * Removes the stored Paystack authorization and disables auto-renewal.
+ * The tenant can still pay manually on next renewal.
+ */
+router.delete('/payment-method', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const context = requireTenantContext();
+    await prisma.tenant.update({
+      where: { id: context.tenantId },
+      data: {
+        paystackAuthCode: null,
+        paystackAuthChannel: null,
+        paystackAuthSummary: null,
+        autoRenewEnabled: false,
+      },
+    });
+    await invalidateTenantCacheById(context.tenantId);
+    res.json({ success: true, message: 'Payment method removed. Auto-renewal is now off.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PATCH /api/v1/subscription/auto-renew
+ * Toggles auto-renewal on or off without removing the saved payment method.
+ * Body: { enabled: boolean }
+ */
+router.patch('/auto-renew', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { enabled } = req.body as { enabled: boolean };
+    if (typeof enabled !== 'boolean') {
+      res.status(400).json({ success: false, error: '`enabled` must be a boolean.' });
+      return;
+    }
+    const context = requireTenantContext();
+    await prisma.tenant.update({
+      where: { id: context.tenantId },
+      data: { autoRenewEnabled: enabled },
+    });
+    await invalidateTenantCacheById(context.tenantId);
+    res.json({ success: true, autoRenewEnabled: enabled });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

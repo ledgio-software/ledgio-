@@ -126,3 +126,19 @@ export const helpAssistantRateLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   message: 'Too many Help Assistant messages this hour. Please try again shortly.',
 });
+
+/**
+ * Admin endpoint rate limiter: 10 requests per 60 seconds per IP.
+ *
+ * Admin routes are passcode-gated (no JWT, no user session), so the only
+ * meaningful identifier is the source IP. 10 req/min is generous enough
+ * for legitimate operator use but makes passcode brute-forcing impractical
+ * (an attacker probing 10 guesses/min would need ~2.8 years to exhaust a
+ * random 6-digit passcode, far longer for a real secret).
+ */
+export const adminRateLimiter = createRateLimiter({
+  name: 'admin',
+  maxRequests: 10,
+  windowMs: 60 * 1000,
+  message: 'Too many admin requests. Maximum 10 per minute per IP.',
+});

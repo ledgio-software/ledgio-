@@ -33,7 +33,7 @@ export interface RecordInvoicePaymentOptions {
   // route with no body, Paystack collecting its full requested amount)
   // keeps working unchanged.
   amount?: number;
-  method?: 'MANUAL' | 'PAYSTACK';
+  method?: 'MANUAL' | 'PAYSTACK' | 'CASH' | 'MOBILE_MONEY' | 'CHEQUE' | 'BANK_TRANSFER';
   description?: string;
   // Caller-supplied idempotency key (e.g. Paystack transaction reference).
   // If a payment with this key already exists for the tenant, the call

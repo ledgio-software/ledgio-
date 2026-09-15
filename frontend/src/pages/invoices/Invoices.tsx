@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -8,11 +8,11 @@ import { Input } from "../../components/ui/Input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
-import { syncDb, createInvoiceLocalFirst, payInvoiceLocalFirst, resyncInvoicesFromServer } from "../../lib/syncEngine";
+import { syncDb, createInvoiceLocalFirst, payInvoiceLocalFirst, resyncInvoicesFromServer, retryFailedInvoice } from "../../lib/syncEngine";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
-import { Plus, CheckCircle, UserPlus, DollarSign, Banknote, Clock, Undo2, RefreshCw, History, Mail, ChevronDown, ShieldCheck, Download, Trash2 } from "lucide-react";
+import { Plus, CheckCircle, UserPlus, DollarSign, Banknote, Clock, Undo2, RefreshCw, History, Mail, ChevronDown, ShieldCheck, Download, Trash2, Search } from "lucide-react";
 
 // Mirrors rbacMiddleware.ts's SCOPED_ROLES - these actions all backend-gate
 // to requireRole('Accountant') (Email Invoice, Request GRA Clearance, Pay
@@ -147,6 +147,19 @@ export function Invoices() {
   const invoices: Invoice[] = ((localInvoices ?? []) as unknown as Invoice[])
     .slice()
     .sort((a, b) => new Date(b.issueDate ?? 0).getTime() - new Date(a.issueDate ?? 0).getTime());
+
+  // Surface negative-stock warnings from invoice creation (set by sync engine after server responds)
+  useEffect(() => {
+    if (!localInvoices) return;
+    const withWarnings = localInvoices.filter((inv) => (inv as any)._stockWarnings?.length > 0);
+    if (withWarnings.length === 0) return;
+    for (const inv of withWarnings) {
+      for (const w of (inv as any)._stockWarnings as string[]) {
+        showToast(`Stock warning on ${inv.invoiceNumber}: ${w}`, "error");
+      }
+      syncDb.invoices.update(inv.id, { _stockWarnings: undefined } as any).catch(() => {});
+    }
+  }, [localInvoices, showToast]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [funds, setFunds] = useState<Fund[]>([]);
@@ -585,6 +598,22 @@ export function Invoices() {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: curr }).format(amt);
   };
 
+  const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("");
+
+  const displayedInvoices = useMemo(() => {
+    const q = invoiceSearch.toLowerCase().trim();
+    return invoices.filter((inv) => {
+      if (invoiceStatusFilter && inv.status !== invoiceStatusFilter) return false;
+      if (q) {
+        const customer = customers.find((c) => c.id === (inv as any).customerId);
+        const name = customer?.name?.toLowerCase() ?? "";
+        return inv.invoiceNumber.toLowerCase().includes(q) || name.includes(q);
+      }
+      return true;
+    });
+  }, [invoices, invoiceSearch, invoiceStatusFilter, customers]);
+
   // Balance still owed, not the original total - a partially-paid invoice
   // must only count what's actually still outstanding.
   const totalAR = invoices.reduce((acc, inv) => acc + (inv.status !== "PAID" ? Number(inv.total) - Number(inv.amountPaid || 0) : 0), 0);
@@ -654,12 +683,39 @@ export function Invoices() {
           <CardDescription>View, issue, and collect customer payments.</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search + Filter bar */}
+          <div className="flex flex-wrap gap-2 mb-4 items-center">
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+              <Input
+                placeholder="Search invoice # or customer…"
+                className="pl-8"
+                value={invoiceSearch}
+                onChange={(e) => setInvoiceSearch(e.target.value)}
+              />
+            </div>
+            {["", "DRAFT", "SENT", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED"].map((s) => (
+              <button
+                key={s}
+                onClick={() => setInvoiceStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${invoiceStatusFilter === s ? "bg-primary-600 text-white border-primary-600" : "border-secondary-300 text-secondary-600 hover:border-primary-400 dark:border-secondary-600 dark:text-secondary-300"}`}
+              >
+                {s === "" ? "All" : s === "PARTIALLY_PAID" ? "Partial" : s.charAt(0) + s.slice(1).toLowerCase()}
+              </button>
+            ))}
+            {(invoiceSearch || invoiceStatusFilter) && (
+              <span className="text-xs text-secondary-500">{displayedInvoices.length} of {invoices.length}</span>
+            )}
+          </div>
+
           {isLoading ? (
             <div className="py-8 text-center text-secondary-500">Loading invoices...</div>
           ) : invoices.length === 0 ? (
             <div className="py-8 text-center text-secondary-500 text-sm">
               No invoices created yet. Click "Create Invoice" to issue your first invoice.
             </div>
+          ) : displayedInvoices.length === 0 ? (
+            <div className="py-8 text-center text-secondary-500 text-sm">No invoices match the current filters.</div>
           ) : (
             <Table>
               <TableHeader>
@@ -674,7 +730,7 @@ export function Invoices() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((inv) => (
+                {displayedInvoices.map((inv) => (
                   <TableRow key={inv.id}>
                     <TableCell className="font-mono font-medium text-primary-600 dark:text-primary-400">
                       <div className="flex items-center gap-2">
@@ -685,14 +741,24 @@ export function Invoices() {
                           </span>
                         )}
                         {inv._failed && (
-                          <span
-                            className="font-sans text-[10px] font-normal text-red-600 dark:text-red-400"
-                            title={inv._failureReason || 'This change was rejected and needs your attention.'}
-                          >
+                          <span className="font-sans text-[10px] font-normal text-red-600 dark:text-red-400">
                             Needs attention
                           </span>
                         )}
                       </div>
+                      {inv._failed && (
+                        <div className="mt-1 max-w-[220px] rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-2 py-1 font-sans font-normal leading-snug">
+                          <p className="text-[11px] text-red-700 dark:text-red-300">
+                            {inv._failureReason || 'This change was rejected by the server.'}
+                          </p>
+                          <button
+                            className="mt-1 text-[11px] font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                            onClick={() => retryFailedInvoice(inv.id).catch(() => {})}
+                          >
+                            Retry →
+                          </button>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-secondary-900 dark:text-secondary-50">{inv.customer?.name}</div>

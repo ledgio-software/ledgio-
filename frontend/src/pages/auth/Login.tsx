@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../lib/api";
+import { collectBotFingerprint } from "../../lib/botFingerprint";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/Card";
 import { AuthSplitLayout } from "../../components/layout/AuthSplitLayout";
 
@@ -37,7 +38,7 @@ export function Login() {
     setResendMsg("");
 
     try {
-      const response = await api.post("/auth/login", { email, password });
+      const response = await api.post("/auth/login", { email, password, _bf: collectBotFingerprint() });
 
       if (response.data.mfaRequired) {
         setMfaToken(response.data.data.mfaToken);

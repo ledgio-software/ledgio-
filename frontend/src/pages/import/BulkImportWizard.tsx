@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 
 type ImportType = "accounts" | "customers" | "inventory-items" | "invoices" | "payments";
@@ -141,12 +142,50 @@ const IMPORT_CONFIGS: Record<ImportType, {
   },
 };
 
+const PHARMACY_INVENTORY_CONFIG: typeof IMPORT_CONFIGS["inventory-items"] = {
+  label: "Inventory Items",
+  description: "Import products with batch and expiry data. batchNumber and expiryDate create opening InventoryBatch records for FEFO dispensing. SKU auto-generated if blank.",
+  headers: ["name", "sku", "category", "unitOfMeasure", "costPrice", "sellingPrice", "warehouseName", "initialQty", "batchNumber", "expiryDate"],
+  sample: `name,sku,category,unitOfMeasure,costPrice,sellingPrice,warehouseName,initialQty,batchNumber,expiryDate\nAmoxicillin 500mg,AMX-500,Antibiotics,tablet,0.50,1.20,Main Pharmacy,200,LOT-2024-001,2026-12-31\nParacetamol 500mg,PCM-500,Analgesics,tablet,0.10,0.30,Main Pharmacy,500,LOT-2024-002,2027-06-30\nMetronidazole 200mg,MTZ-200,Antibiotics,tablet,0.20,0.60,Main Pharmacy,300,LOT-2024-003,2027-03-15`,
+  endpoint: "/import/inventory-items",
+  payloadKey: "items",
+  buildPayload: (rows) => rows.map((r) => ({
+    name: r.name,
+    sku: r.sku || "",
+    category: r.category || "General",
+    unitOfMeasure: r.unitofmeasure || r.unit || "tablet",
+    costPrice: r.costprice,
+    sellingPrice: r.sellingprice,
+    warehouseName: r.warehousename || "",
+    initialQty: r.initialqty || "",
+    batchNumber: r.batchnumber || "",
+    expiryDate: r.expirydate || "",
+  })),
+  previewColumns: [
+    { key: "name", label: "Name" },
+    { key: "sku", label: "SKU" },
+    { key: "costprice", label: "Cost Price" },
+    { key: "sellingprice", label: "Sell Price" },
+    { key: "initialqty", label: "Qty" },
+    { key: "batchnumber", label: "Batch #" },
+    { key: "expirydate", label: "Expiry Date" },
+  ],
+  successNav: { label: "View Inventory", href: "/inventory/items" },
+};
+
 export function BulkImportWizard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const isPharmacy = user?.orgType === "PHARMACY";
+
+  const configs: typeof IMPORT_CONFIGS = isPharmacy
+    ? { ...IMPORT_CONFIGS, "inventory-items": PHARMACY_INVENTORY_CONFIG }
+    : IMPORT_CONFIGS;
+
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [importType, setImportType] = useState<ImportType>("accounts");
-  const config = IMPORT_CONFIGS[importType];
+  const config = configs[importType];
 
   const [rawCsv, setRawCsv] = useState(config.sample);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
@@ -160,7 +199,7 @@ export function BulkImportWizard() {
 
   const handleTypeChange = (type: ImportType) => {
     setImportType(type);
-    setRawCsv(IMPORT_CONFIGS[type].sample);
+    setRawCsv(configs[type].sample);
     setParsedRows([]);
     setResultSummary(null);
     setProgress(null);

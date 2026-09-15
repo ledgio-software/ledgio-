@@ -6,6 +6,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vite.dev/config/
 export default defineConfig({
   build: {
+    // Target Chrome 72+, Safari 12+, Firefox 68+ so the PWA runs on 2018-era
+    // budget Android phones and older iOS devices, not just 2021+ flagships.
+    target: ['chrome72', 'firefox68', 'safari12.1', 'edge79'],
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -65,12 +68,35 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache only the built static app shell (JS/CSS/HTML/icons) - the
-        // plugin's default globPatterns. Financial data must never be served
-        // from a cache, so /api/** is explicitly excluded from every caching
-        // path: no runtimeCaching entry matches it, and navigation fallback
-        // (used for client-side routing) never intercepts it either.
-        navigateFallbackDenylist: [/^\/api\//],
+        // Cap per-file precache size so the SW install doesn't download the
+        // entire split-bundle set on a slow connection (default is 2 MB).
+        maximumFileSizeToCacheInBytes: 500 * 1024, // 500 KB per asset
+        // Financial data must never be served from cache; partner static pages
+        // must resolve to their own HTML, not the SPA shell.
+        navigateFallbackDenylist: [/^\/api\//, /^\/partner\//],
+        runtimeCaching: [
+          {
+            // Cache Google Fonts stylesheets for 1 year (stale-while-revalidate
+            // so the page doesn't block on a slow connection).
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'google-fonts-stylesheets',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            // Cache the actual font files (woff2) for 1 year — they are
+            // content-addressed so a new font version gets a new URL.
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-webfonts',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

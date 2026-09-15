@@ -1,0 +1,547 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledgio Platform Capabilities</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Outfit:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ink:      #0d1b2a;
+    --ink-mid:  #334155;
+    --muted:    #64748b;
+    --border:   #cbd5e1;
+    --ground:   #ffffff;
+    --surface:  #f8fafc;
+    --mint:     #f0fdf8;
+    --emerald:  #059669;
+    --blue:     #2563eb;
+    --grad-a:   #059669;
+    --grad-b:   #2563eb;
+    --rule:     #e2e8f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:     #f1f5f9;
+      --ink-mid: #cbd5e1;
+      --muted:   #94a3b8;
+      --border:  #334155;
+      --ground:  #0f172a;
+      --surface: #1e293b;
+      --mint:    #0d2b22;
+      --rule:    #1e293b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink:     #f1f5f9;
+    --ink-mid: #cbd5e1;
+    --muted:   #94a3b8;
+    --border:  #334155;
+    --ground:  #0f172a;
+    --surface: #1e293b;
+    --mint:    #0d2b22;
+    --rule:    #1e293b;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: var(--ground);
+    color: var(--ink);
+    line-height: 1.6;
+    padding-inline: 24px;
+    padding-block: 0;
+  }
+
+  /* ── Header bar ── */
+  .header {
+    background: linear-gradient(135deg, var(--grad-a) 0%, var(--grad-b) 100%);
+    margin-inline: -24px;
+    padding: 28px 32px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 10px;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    padding: 8px 9px;
+  }
+  .bar { background: #fff; border-radius: 2px; width: 6px; }
+  .b1 { height: 10px; }
+  .b2 { height: 16px; }
+  .b3 { height: 22px; opacity: 0.92; }
+  .brand-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.3px;
+  }
+  .header-label {
+    text-align: right;
+  }
+  .header-label strong {
+    display: block;
+    color: #fff;
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .header-label span {
+    color: rgba(255,255,255,0.6);
+    font-size: 12px;
+  }
+
+  /* ── Intro strip ── */
+  .intro {
+    background: var(--mint);
+    margin-inline: -24px;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .intro p {
+    font-size: 14px;
+    color: var(--ink-mid);
+    max-width: 680px;
+  }
+  .intro strong { color: var(--emerald); font-weight: 600; }
+
+  /* ── Main content ── */
+  .content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding-block: 40px;
+  }
+
+  /* ── Pillar (group) ── */
+  .pillar {
+    margin-bottom: 48px;
+  }
+  .pillar-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--rule);
+  }
+  .pillar-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pillar-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.2px;
+    text-wrap: balance;
+  }
+  .pillar-count {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── Module grid ── */
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0;
+  }
+  .module {
+    padding: 18px 20px 20px 20px;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid var(--rule);
+    transition: background 0.15s;
+  }
+  .module:hover {
+    background: var(--surface);
+  }
+  .module-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 3px;
+    text-wrap: balance;
+  }
+  .module-tag {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .module ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .module ul li {
+    font-size: 13px;
+    color: var(--ink-mid);
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.4;
+  }
+  .module ul li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--emerald);
+    font-weight: 600;
+  }
+
+  /* Pillar accent colours */
+  .pillar-financial .pillar-dot { background: #059669; }
+  .pillar-financial .module      { border-left-color: #059669; }
+  .pillar-commerce  .pillar-dot  { background: #2563eb; }
+  .pillar-commerce  .module      { border-left-color: #2563eb; }
+  .pillar-ops       .pillar-dot  { background: #7c3aed; }
+  .pillar-ops       .module      { border-left-color: #7c3aed; }
+  .pillar-admin     .pillar-dot  { background: #d97706; }
+  .pillar-admin     .module      { border-left-color: #d97706; }
+
+  /* ── Summary strip ── */
+  .summary {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+  .stat { text-align: center; }
+  .stat-value {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #059669, #2563eb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    background: var(--ink);
+    margin-inline: -24px;
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .footer span {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+  }
+  .footer a {
+    color: #6ee7b7;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .footer a:hover { text-decoration: underline; }
+
+  /* ── Responsive ── */
+  @media (max-width: 520px) {
+    .header { padding: 20px 20px 18px; }
+    .header-label { display: none; }
+    .intro { padding: 14px 20px; }
+    .content { padding-block: 24px; }
+    .module-grid { grid-template-columns: 1fr; }
+    .summary { grid-template-columns: 1fr 1fr; }
+    .footer { padding: 16px 20px; }
+  }
+</style>
+
+<!-- Header -->
+<div class="header">
+  <div class="brand">
+    <div class="brand-icon">
+      <div class="bar b1"></div>
+      <div class="bar b2"></div>
+      <div class="bar b3"></div>
+    </div>
+    <span class="brand-name">Ledgio</span>
+  </div>
+  <div class="header-label">
+    <strong>Platform Capabilities</strong>
+    <span>Feature &amp; Module Reference · 2026</span>
+  </div>
+</div>
+
+<!-- Intro -->
+<div class="intro">
+  <p>
+    Ledgio is <strong>cloud software for business management</strong> — covering accounting, POS, inventory, and sales in a single system.
+    Multi-tenant and multi-branch: every business gets its own isolated workspace.
+    Installs on any device as a PWA — Windows PC, Mac, Android, or iPhone. No app store. No IT department.
+  </p>
+</div>
+
+<div class="content">
+
+  <!-- Stats summary -->
+  <div class="summary">
+    <div class="stat">
+      <div class="stat-value">12</div>
+      <div class="stat-label">Core Modules</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">60+</div>
+      <div class="stat-label">Features</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">4</div>
+      <div class="stat-label">Access Roles</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">∞</div>
+      <div class="stat-label">Branches / Shops</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">PWA</div>
+      <div class="stat-label">Any Device</div>
+    </div>
+  </div>
+
+  <!-- Pillar 1: Financial Accounting -->
+  <div class="pillar pillar-financial">
+    <div class="pillar-header">
+      <div class="pillar-dot"></div>
+      <h2 class="pillar-title">Financial Accounting</h2>
+      <span class="pillar-count">3 modules</span>
+    </div>
+    <div class="module-grid">
+
+      <div class="module">
+        <div class="module-name">Chart of Accounts</div>
+        <div class="module-tag">Double-entry bookkeeping foundation</div>
+        <ul>
+          <li>Hierarchical account structure (Assets, Liabilities, Equity, Income, Expenses)</li>
+          <li>Account codes and sub-accounts</li>
+          <li>Opening balance configuration</li>
+          <li>Trial balance view</li>
+          <li>Locked periods to prevent retrospective edits</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Cash &amp; Banking</div>
+        <div class="module-tag">Bank accounts, reconciliation, journals</div>
+        <ul>
+          <li>Multiple bank accounts and cash books</li>
+          <li>Bank statement import &amp; reconciliation</li>
+          <li>Manual journal entries</li>
+          <li>Cash deposit and withdrawal logging</li>
+          <li>Inter-account bank transfers</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Reports &amp; Audit</div>
+        <div class="module-tag">Statutory and management reporting</div>
+        <ul>
+          <li>Profit &amp; Loss statement</li>
+          <li>Balance Sheet</li>
+          <li>Cash Flow report</li>
+          <li>VAT / Tax summary for filing</li>
+          <li>Receipt audit log (admin/accountant only)</li>
+          <li>PDF export for all reports</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Pillar 2: Sales & Commerce -->
+  <div class="pillar pillar-commerce">
+    <div class="pillar-header">
+      <div class="pillar-dot"></div>
+      <h2 class="pillar-title">Sales &amp; Commerce</h2>
+      <span class="pillar-count">3 modules</span>
+    </div>
+    <div class="module-grid">
+
+      <div class="module">
+        <div class="module-name">Sales &amp; Invoicing</div>
+        <div class="module-tag">Quotes, invoices, credit notes</div>
+        <ul>
+          <li>Tax-inclusive and tax-exclusive invoices</li>
+          <li>Quote → Invoice conversion</li>
+          <li>Credit notes and customer refunds</li>
+          <li>Customer statement generation</li>
+          <li>Recurring invoice scheduling</li>
+          <li>PDF download per document</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Point of Sale (POS)</div>
+        <div class="module-tag">Multi-till retail &amp; wholesale checkout</div>
+        <ul>
+          <li>Multi-till, multi-shop support</li>
+          <li>Retail and wholesale sale types</li>
+          <li>Cash, card, and mobile-money payments</li>
+          <li>Automatic receipt with serial number</li>
+          <li>Force-print receipt gate (anti-fraud)</li>
+          <li>Cash-up and daily till reconciliation</li>
+          <li>Void / refund with reason logging</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Tax Management</div>
+        <div class="module-tag">VAT / GST configuration and compliance</div>
+        <ul>
+          <li>Configurable VAT / GST rates per item</li>
+          <li>Tax-inclusive and tax-exclusive calculations</li>
+          <li>Multi-rate tax support</li>
+          <li>Tax summary report for filing period</li>
+          <li>Tax number on all customer documents</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Pillar 3: Operations -->
+  <div class="pillar pillar-ops">
+    <div class="pillar-header">
+      <div class="pillar-dot"></div>
+      <h2 class="pillar-title">Operations</h2>
+      <span class="pillar-count">3 modules</span>
+    </div>
+    <div class="module-grid">
+
+      <div class="module">
+        <div class="module-name">Inventory &amp; Warehousing</div>
+        <div class="module-tag">Multi-location stock control</div>
+        <ul>
+          <li>Multi-location (warehouse / shop) tracking</li>
+          <li>SKU and barcode support</li>
+          <li>Stock adjustments and write-offs</li>
+          <li>Low-stock alert thresholds</li>
+          <li>Inter-warehouse stock transfers</li>
+          <li>Item variants (size, colour, grade)</li>
+          <li>COGS (cost of goods sold) tracking</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Purchase Management</div>
+        <div class="module-tag">Supplier orders, receiving, returns</div>
+        <ul>
+          <li>Supplier purchase orders</li>
+          <li>Goods received notes (GRN)</li>
+          <li>Supplier invoice matching</li>
+          <li>Purchase returns to supplier</li>
+          <li>Supplier statement view</li>
+          <li>Outstanding payables tracking</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Contacts</div>
+        <div class="module-tag">Customer and supplier database</div>
+        <ul>
+          <li>Unified customer and supplier directory</li>
+          <li>Full transaction history per contact</li>
+          <li>Outstanding balance per contact</li>
+          <li>CSV import / export</li>
+          <li>Contact notes and communication log</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Pillar 4: Administration -->
+  <div class="pillar pillar-admin">
+    <div class="pillar-header">
+      <div class="pillar-dot"></div>
+      <h2 class="pillar-title">Administration &amp; Platform</h2>
+      <span class="pillar-count">3 modules</span>
+    </div>
+    <div class="module-grid">
+
+      <div class="module">
+        <div class="module-name">User &amp; Access Control</div>
+        <div class="module-tag">Role-based permissions, audit trail</div>
+        <ul>
+          <li>Four roles: Admin, Accountant, Cashier, Viewer</li>
+          <li>Granular permission per module</li>
+          <li>Invite team members by email</li>
+          <li>Per-user activity and login log</li>
+          <li>Session management</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Multi-Branch Management</div>
+        <div class="module-tag">Branches, shops, departments</div>
+        <ul>
+          <li>Unlimited shops / branches per account</li>
+          <li>Per-branch POS tills and stock</li>
+          <li>Consolidated company-wide reporting</li>
+          <li>Branch-level user assignments</li>
+          <li>Strict data isolation between tenants</li>
+        </ul>
+      </div>
+
+      <div class="module">
+        <div class="module-name">Dashboard &amp; Analytics</div>
+        <div class="module-tag">Real-time KPIs and trend charts</div>
+        <ul>
+          <li>Revenue and expense overview tiles</li>
+          <li>Profit &amp; loss summary at a glance</li>
+          <li>Cash flow trend chart</li>
+          <li>Top-selling items by revenue</li>
+          <li>Multi-period comparison</li>
+          <li>Role-scoped view (each role sees relevant data)</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- Footer -->
+<div class="footer">
+  <span>Ledgio Business Platform · ledgioapp@gmail.com</span>
+  <a href="mailto:ledgioapp@gmail.com">Get in touch</a>
+</div>
