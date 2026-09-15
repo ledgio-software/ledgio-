@@ -2,6 +2,19 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-15] - School Student Ledger: Class Filter + Backend isActive Fix (PR #60 merged)
+
+**What/Why:**
+User reported the class filter dropdown was missing from the Student Ledger page. Added a class filter to both backend and frontend so users can browse and search students by class without typing a search query.
+
+**Backend changes:**
+- `backend/src/routes/schoolStudents.ts` — `GET /school/students` now accepts optional `className` query param and applies it as a Prisma `where` filter; also added `isActive: true` so only enrolled students are returned.
+
+**Frontend changes:**
+- `frontend/src/pages/school/StudentLedger.tsx` — added `SchoolClass` interface, `classFilter`/`classes` state, `useEffect` loading `/school/classes` on mount, class filter dropdown rendered before the search input, `doSearch` updated with `overrideClass` param to avoid stale closure when called from `onChange`.
+
+---
+
 ## [Date: 2026-09-15] - CI Fix: useMemo hooks-of-rules violation in PurchaseOrders
 
 **What/Why:**
