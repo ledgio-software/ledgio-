@@ -3,7 +3,7 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../config/db';
 
 // Ghana SSNIT contribution rates (effective 2024+)
 const TIER1_EMPLOYEE_RATE = 0.055;  // 5.5% — employee
@@ -25,7 +25,7 @@ const db = prisma as unknown as {
 
 // GET /compliance — employee registration overview
 router.get('/compliance', requireRole('Admin', 'Accountant', 'Auditor', 'HR'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
 
   const employees = await db.$queryRawUnsafe<{
     id: string; employee_number: string; first_name: string; last_name: string;
@@ -72,7 +72,7 @@ router.get('/compliance', requireRole('Admin', 'Accountant', 'Auditor', 'HR'), a
 
 // PATCH /employees/:id — update SSNIT registration details
 router.patch('/employees/:id', requireRole('Admin', 'HR'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
   const { id } = req.params;
   const { ssnitNumber, tier2Scheme, tier2MemberNo } = req.body as {
     ssnitNumber?: string; tier2Scheme?: string; tier2MemberNo?: string;
@@ -102,7 +102,7 @@ router.patch('/employees/:id', requireRole('Admin', 'HR'), async (req: Request, 
 
 // GET /schedules — list all schedules
 router.get('/schedules', requireRole('Admin', 'Accountant', 'Auditor', 'HR'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
 
   const schedules = await db.$queryRawUnsafe<{
     id: string; period_month: number; period_year: number; payroll_run_id: string | null;
@@ -136,7 +136,7 @@ router.get('/schedules', requireRole('Admin', 'Accountant', 'Auditor', 'HR'), as
 
 // POST /schedules/generate — generate from a payroll run
 router.post('/schedules/generate', requireRole('Admin', 'Accountant', 'HR'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
   const { payrollRunId } = req.body as { payrollRunId: string };
 
   if (!payrollRunId) return res.status(400).json({ error: 'payrollRunId is required' });
@@ -240,7 +240,7 @@ router.post('/schedules/generate', requireRole('Admin', 'Accountant', 'HR'), asy
 
 // GET /schedules/:id — detailed schedule with lines
 router.get('/schedules/:id', requireRole('Admin', 'Accountant', 'Auditor', 'HR'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
   const { id } = req.params;
 
   const schedules = await db.$queryRawUnsafe<Record<string, unknown>>(
@@ -285,7 +285,7 @@ router.get('/schedules/:id', requireRole('Admin', 'Accountant', 'Auditor', 'HR')
 
 // PATCH /schedules/:id/submit — mark as submitted
 router.patch('/schedules/:id/submit', requireRole('Admin', 'Accountant'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
   const { id } = req.params;
   const userId = (req as Request & { user?: { userId?: string } }).user?.userId;
 
@@ -304,7 +304,7 @@ router.patch('/schedules/:id/submit', requireRole('Admin', 'Accountant'), async 
 
 // DELETE /schedules/:id — delete a DRAFT schedule
 router.delete('/schedules/:id', requireRole('Admin', 'Accountant'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
   const { id } = req.params;
 
   const rows = await db.$queryRawUnsafe<{ id: string; status: string }>(
@@ -319,7 +319,7 @@ router.delete('/schedules/:id', requireRole('Admin', 'Accountant'), async (req: 
 
 // GET /payroll-runs — list POSTED runs for the dropdown
 router.get('/payroll-runs', requireRole('Admin', 'Accountant', 'Auditor', 'HR'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
 
   const runs = await db.$queryRawUnsafe<{
     id: string; period_month: number; period_year: number; status: string; total_net_pay: string;
