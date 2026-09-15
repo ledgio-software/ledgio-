@@ -4,7 +4,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Plus, Edit2, X, Trash2, AlertTriangle, ShieldCheck, Clock, BookOpen } from 'lucide-react';
+import { Plus, Edit2, X, Trash2, AlertTriangle, ShieldCheck, Clock, BookOpen, Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 const CPD_CATEGORIES = ['WORKSHOP', 'CONFERENCE', 'ONLINE_COURSE', 'PGDE', 'SEMINAR', 'SCHOOL_BASED', 'OTHER'] as const;
 type CpdCategory = typeof CPD_CATEGORIES[number];
@@ -89,6 +89,12 @@ export function Teachers() {
   const [showInactive, setShowInactive] = useState(false);
 
   // CPD panel state
+  // CSV import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<Record<string, string>[]>([]);
+  const [importResults, setImportResults] = useState<Array<{ row: number; success: boolean; name?: string; error?: string }> | null>(null);
+  const [importing, setImporting] = useState(false);
+
   const [cpdTeacherId, setCpdTeacherId] = useState<string | null>(null);
   const [cpdTeacherName, setCpdTeacherName] = useState('');
   const [activities, setActivities] = useState<CpdActivity[]>([]);
@@ -221,6 +227,68 @@ export function Teachers() {
     }
   };
 
+  function downloadTeacherTemplate() {
+    const header = "First Name,Last Name,Staff ID,Email,Phone,Subject,Class Assigned,NTC Licence No,NTC Issue Date,NTC Expiry Date";
+    const example = "Ama,Mensah,GES-001,ama@school.edu.gh,0244000001,Mathematics,JHS 2A,NTC/0001/2022,2022-01-15,2024-01-15";
+    const blob = new Blob([header + "\n" + example], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "teachers_template.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function parseTeacherCSV(text: string): Record<string, string>[] {
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(Boolean);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+    return lines.slice(1).map((line) => {
+      const vals = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+      const row: Record<string, string> = {};
+      headers.forEach((h, i) => { row[h] = vals[i] ?? ""; });
+      return row;
+    });
+  }
+
+  function onTeacherFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const rows = parseTeacherCSV(ev.target?.result as string);
+      setImportRows(rows);
+      setImportResults(null);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function handleImportTeachers() {
+    if (importRows.length === 0) return;
+    setImporting(true);
+    try {
+      const teachers = importRows.map((r) => ({
+        firstName: r["First Name"] ?? "",
+        lastName: r["Last Name"] ?? "",
+        staffId: r["Staff ID"] || undefined,
+        email: r["Email"] || undefined,
+        phone: r["Phone"] || undefined,
+        subject: r["Subject"] || undefined,
+        className: r["Class Assigned"] || undefined,
+        ntcLicenseNo: r["NTC Licence No"] || undefined,
+        ntcIssueDate: r["NTC Issue Date"] || undefined,
+        ntcExpiryDate: r["NTC Expiry Date"] || undefined,
+      }));
+      const res = await api.post("/school/teachers/bulk", { teachers });
+      setImportResults(res.data.data.results);
+      showToast(res.data.message ?? "Import complete.", "success");
+      loadTeachers();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Import failed.", "error");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const visible = teachers.filter((t) => showInactive ? true : t.isActive);
 
   return (
@@ -230,9 +298,14 @@ export function Teachers() {
           <h2 className="text-3xl font-bold tracking-tight text-secondary-900 dark:text-secondary-50">Teacher Registry</h2>
           <p className="text-secondary-500 dark:text-secondary-400 mt-1">NTC licence tracking and CPD hours management.</p>
         </div>
-        <Button variant="primary" onClick={openAdd}>
-          <Plus className="h-4 w-4 mr-1.5" />Add Teacher
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => { setImportRows([]); setImportResults(null); setImportOpen(true); }}>
+            <Upload className="h-4 w-4 mr-1.5" />Import CSV
+          </Button>
+          <Button variant="primary" onClick={openAdd}>
+            <Plus className="h-4 w-4 mr-1.5" />Add Teacher
+          </Button>
+        </div>
       </div>
 
       {/* Summary tiles */}
@@ -341,6 +414,98 @@ export function Teachers() {
           )}
         </CardContent>
       </Card>
+
+      {/* CSV Import Modal */}
+      {importOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200 dark:border-secondary-700">
+              <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-50">Import Teachers from CSV</h3>
+              <button onClick={() => setImportOpen(false)} className="text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-200">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-secondary-600 dark:text-secondary-400">Upload a CSV file to bulk-import teachers. Max 200 rows.</p>
+                <button
+                  onClick={downloadTeacherTemplate}
+                  className="flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 font-medium"
+                >
+                  <Download className="h-4 w-4" />Download Template
+                </button>
+              </div>
+
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-secondary-300 dark:border-secondary-600 rounded-lg p-6 cursor-pointer hover:border-primary-400 transition-colors">
+                <Upload className="w-6 h-6 text-secondary-400 mb-2" />
+                <span className="text-sm text-secondary-500">Click to choose a CSV file</span>
+                <input type="file" accept=".csv,text/csv" className="hidden" onChange={onTeacherFileChange} />
+              </label>
+
+              {importRows.length > 0 && !importResults && (
+                <>
+                  <div className="text-sm font-medium text-secondary-700 dark:text-secondary-300">{importRows.length} row{importRows.length !== 1 ? "s" : ""} ready to import</div>
+                  <div className="max-h-48 overflow-y-auto border border-secondary-200 dark:border-secondary-700 rounded-lg">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary-50 dark:bg-secondary-800 sticky top-0">
+                        <tr>
+                          {["First Name","Last Name","Staff ID","Subject","Class Assigned"].map((h) => (
+                            <th key={h} className="px-3 py-2 text-left font-medium text-secondary-600 dark:text-secondary-400">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importRows.map((r, i) => (
+                          <tr key={i} className="border-t border-secondary-100 dark:border-secondary-800">
+                            <td className="px-3 py-1.5">{r["First Name"]}</td>
+                            <td className="px-3 py-1.5">{r["Last Name"]}</td>
+                            <td className="px-3 py-1.5">{r["Staff ID"]}</td>
+                            <td className="px-3 py-1.5">{r["Subject"]}</td>
+                            <td className="px-3 py-1.5">{r["Class Assigned"]}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setImportRows([])}>Clear</Button>
+                    <Button variant="primary" onClick={handleImportTeachers} disabled={importing}>
+                      {importing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+                      Import {importRows.length} Teachers
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {importResults && (
+                <div className="space-y-2">
+                  <div className="flex gap-4 text-sm font-medium">
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle className="inline h-4 w-4 mr-1" />{importResults.filter((r) => r.success).length} imported
+                    </span>
+                    {importResults.some((r) => !r.success) && (
+                      <span className="text-red-600 dark:text-red-400">
+                        <XCircle className="inline h-4 w-4 mr-1" />{importResults.filter((r) => !r.success).length} failed
+                      </span>
+                    )}
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {importResults.filter((r) => !r.success).map((r) => (
+                      <div key={r.row} className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded px-3 py-1.5">
+                        <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span><strong>Row {r.row}:</strong> {r.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <Button variant="outline" onClick={() => setImportOpen(false)}>Done</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Teacher Modal */}
       {showModal && (

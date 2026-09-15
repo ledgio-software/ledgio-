@@ -119,6 +119,74 @@ router.post('/', requireRole('Admin'), async (req: Request, res: Response): Prom
   }
 });
 
+// POST /api/v1/school/teachers/bulk — CSV import, up to 200 rows
+// IMPORTANT: must be registered before /:id routes to avoid route collision.
+router.post('/bulk', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { teachers } = req.body as {
+      teachers: Array<{
+        firstName: string; lastName: string; staffId?: string; email?: string;
+        phone?: string; subject?: string; className?: string;
+        ntcLicenseNo?: string; ntcIssueDate?: string; ntcExpiryDate?: string;
+      }>;
+    };
+
+    if (!Array.isArray(teachers) || teachers.length === 0) {
+      res.status(400).json({ success: false, error: 'teachers array is required and must not be empty.' });
+      return;
+    }
+    if (teachers.length > 200) {
+      res.status(400).json({ success: false, error: 'Maximum 200 teachers per import.' });
+      return;
+    }
+
+    const results: Array<{ row: number; success: boolean; name?: string; error?: string }> = [];
+    let successCount = 0;
+
+    for (let i = 0; i < teachers.length; i++) {
+      const t = teachers[i];
+      if (!t.firstName?.trim() || !t.lastName?.trim()) {
+        results.push({ row: i + 1, success: false, error: 'Missing required fields (First Name, Last Name).' });
+        continue;
+      }
+      try {
+        await prisma.teacher.create({
+          data: {
+            tenantId,
+            firstName: t.firstName.trim(),
+            lastName: t.lastName.trim(),
+            staffId: t.staffId?.trim() || null,
+            email: t.email?.trim() || null,
+            phone: t.phone?.trim() || null,
+            subject: t.subject?.trim() || null,
+            className: t.className?.trim() || null,
+            ntcLicenseNo: t.ntcLicenseNo?.trim() || null,
+            ntcIssueDate: t.ntcIssueDate ? new Date(t.ntcIssueDate) : null,
+            ntcExpiryDate: t.ntcExpiryDate ? new Date(t.ntcExpiryDate) : null,
+          },
+        });
+        successCount++;
+        results.push({ row: i + 1, success: true, name: `${t.firstName.trim()} ${t.lastName.trim()}` });
+      } catch (err: any) {
+        const msg = err.code === 'P2002'
+          ? `Duplicate staff ID "${t.staffId}" — already exists.`
+          : err.message;
+        results.push({ row: i + 1, success: false, error: msg });
+      }
+    }
+
+    const failed = results.filter((r) => !r.success).length;
+    res.status(201).json({
+      success: true,
+      data: { imported: successCount, failed, results },
+      message: `Imported ${successCount} teacher${successCount !== 1 ? 's' : ''}${failed > 0 ? `. ${failed} row${failed !== 1 ? 's' : ''} had errors.` : '.'}`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // PUT /api/v1/school/teachers/:id
 router.put('/:id', requireRole('Admin'), async (req: Request, res: Response): Promise<void> => {
   try {
