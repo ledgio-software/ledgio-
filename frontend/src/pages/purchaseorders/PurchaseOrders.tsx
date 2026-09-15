@@ -83,6 +83,15 @@ export function PurchaseOrders() {
   const [items, setItems] = useState<InventoryItemOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const displayedPOs = useMemo(() => {
+    const q = poSearch.toLowerCase().trim();
+    return purchaseOrders.filter((po) => {
+      if (poStatusFilter && po.status !== poStatusFilter) return false;
+      if (q) return po.poNumber.toLowerCase().includes(q) || (po.vendor?.name ?? "").toLowerCase().includes(q);
+      return true;
+    });
+  }, [purchaseOrders, poSearch, poStatusFilter]);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState("");
@@ -260,15 +269,6 @@ export function PurchaseOrders() {
   if (!isLoadingTenantSettings && tenantSettings.tier < 2) {
     return <UpgradeRequired featureLabel="Purchase Orders" requiredTier={2} currentTier={tenantSettings.tier} />;
   }
-
-  const displayedPOs = useMemo(() => {
-    const q = poSearch.toLowerCase().trim();
-    return purchaseOrders.filter((po) => {
-      if (poStatusFilter && po.status !== poStatusFilter) return false;
-      if (q) return po.poNumber.toLowerCase().includes(q) || (po.vendor?.name ?? "").toLowerCase().includes(q);
-      return true;
-    });
-  }, [purchaseOrders, poSearch, poStatusFilter]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
