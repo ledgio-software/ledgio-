@@ -51,6 +51,7 @@ const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
 const Approvals = lazy(() => import("./pages/approvals/Approvals").then(m => ({ default: m.Approvals })));
 const SchoolStudents = lazy(() => import("./pages/school/Students").then(m => ({ default: m.Students })));
+const SchoolTeachers = lazy(() => import("./pages/school/Teachers").then(m => ({ default: m.Teachers })));
 const SchoolClasses = lazy(() => import("./pages/school/Classes").then(m => ({ default: m.Classes })));
 const MomoReconciliation = lazy(() => import("./pages/school/MomoReconciliation").then(m => ({ default: m.MomoReconciliation })));
 const AcademicTerms = lazy(() => import("./pages/school/AcademicTerms").then(m => ({ default: m.AcademicTerms })));
@@ -1105,6 +1106,7 @@ function App() {
               <Route path="/pharmacy/inventory-matrix" element={<ProtectedRoute><MainLayout><PharmacyInventoryMatrix /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/teachers" element={<ProtectedRoute><MainLayout><SchoolTeachers /></MainLayout></ProtectedRoute>} />
               <Route path="/school/classes" element={<ProtectedRoute><MainLayout><SchoolClasses /></MainLayout></ProtectedRoute>} />
               <Route path="/school/momo-reconciliation" element={<ProtectedRoute><MainLayout><MomoReconciliation /></MainLayout></ProtectedRoute>} />
               <Route path="/school/students" element={<ProtectedRoute><MainLayout><SchoolStudents /></MainLayout></ProtectedRoute>} />

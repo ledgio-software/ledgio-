@@ -305,8 +305,9 @@ export const navigationGroups: NavGroup[] = [
     sectionTitle: "SCHOOL",
     orgTypeOnly: "NONPROFIT",
     items: [
+      { name: "Teachers", href: "/school/teachers", icon: GraduationCap },
       { name: "Classes", href: "/school/classes", icon: Layers },
-      { name: "Students", href: "/school/students", icon: GraduationCap },
+      { name: "Students", href: "/school/students", icon: Users },
       { name: "Academic Terms", href: "/school/terms", icon: CalendarDays },
       { name: "Fee Schedules", href: "/school/fee-schedules", icon: Receipt },
       { name: "Fee Collection", href: "/school/fee-collection", icon: BookOpen },

@@ -111,6 +111,7 @@ import schoolScholarshipsRouter from './routes/schoolScholarships';
 import schoolHealthRouter from './routes/schoolHealth';
 import schoolEventsRouter from './routes/schoolEvents';
 import schoolMISRouter from './routes/schoolMIS';
+import schoolTeachersRouter from './routes/schoolTeachers';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
 import scenariosRouter from './routes/scenarios';
@@ -295,6 +296,7 @@ app.use('/api/v1/school/scholarships', schoolScholarshipsRouter);
 app.use('/api/v1/school/health', schoolHealthRouter);
 app.use('/api/v1/school/events', schoolEventsRouter);
 app.use('/api/v1/school/mis', schoolMISRouter);
+app.use('/api/v1/school/teachers', schoolTeachersRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);
