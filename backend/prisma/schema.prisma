@@ -2927,3 +2927,24 @@ model TransportMaintLog {
   @@index([tenantId, vehicleId])
   @@map("transport_maint_logs")
 }
+
+// ── Parent Communication Portal ──────────────────────────────────────────────
+
+model ParentMessage {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  studentId   String   @map("student_id")
+  type        String   // FEE_REMINDER | ATTENDANCE | RESULTS | GENERAL
+  channel     String   // SMS | EMAIL | WHATSAPP
+  recipient   String   // phone or email address
+  message     String   @db.Text
+  status      String   @default("SENT") // SENT | FAILED | PENDING
+  sentAt      DateTime @default(now()) @map("sent_at")
+  sentBy      String?  @map("sent_by")
+  referenceId String?  @map("reference_id") // termId, date, installmentId, etc.
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, type])
+  @@map("parent_messages")
+}

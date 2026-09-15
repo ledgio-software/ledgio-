@@ -52,6 +52,7 @@ import {
   Key,
   GraduationCap,
   CalendarDays,
+  MessageSquare,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -328,6 +329,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "MIS Dashboard", href: "/school/mis", icon: LayoutDashboard },
       { name: "NaSIA Dashboard", href: "/school/nasia", icon: ClipboardList },
       { name: "Transport", href: "/school/transport", icon: Truck },
+      { name: "Parent Comms", href: "/school/parent-comms", icon: MessageSquare },
     ],
   },
   {
