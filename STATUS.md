@@ -2,6 +2,31 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-15] - School-specific Chart of Accounts & P&L Labels (PR #62)
+
+**What/Why:**
+P&L report for NONPROFIT (school) tenants was displaying generic business labels ("Sales Revenue", "Cost of Goods Sold", "Net Profit"). Added a school-specific chart of accounts template and org-type-aware P&L section labels so school tenants see appropriate terminology. Business/shop tenants are completely unaffected.
+
+**Backend changes:**
+- `backend/src/data/ghanaSmeChartOfAccountsTemplate.ts` — added `GHANA_SCHOOL_CHART_OF_ACCOUNTS_TEMPLATE` (Tuition/Exam/PTA/Boarding Fee Income, School Fees Receivable, Fees Received in Advance, Teachers' Salaries, Sports & Activities, Library, Student Welfare, no VAT/NHIL/GETFund lines) and `getTemplateForOrgType()` dispatcher.
+- `backend/src/services/onboardingWizardService.ts` — `getChartOfAccountsTemplate()` now accepts and forwards `orgType`.
+- `backend/src/routes/onboardingWizard.ts` — `GET /api/v1/onboarding/chart-of-accounts-template` fetches tenant `orgType` and passes it to the service.
+
+**Frontend changes:**
+- `frontend/src/pages/reports/ProfitAndLoss.tsx` — reads `user.orgType` via `useAuth()`; for `NONPROFIT` tenants shows "Income & Expenditure Statement", "Fee Income", "Direct Educational Costs", "Gross Surplus", "Net Surplus"/"Net Deficit" in both single-period and compare-periods views.
+
+---
+
+## [Date: 2026-09-15] - Student Health Records: Name/Code Search (PR #61)
+
+**What/Why:**
+Student Health Records page had a class filter but no text search. Added a name/code search input with client-side `useMemo` filtering so staff can quickly locate individual students without scrolling.
+
+**Files affected:**
+- `frontend/src/pages/school/StudentHealth.tsx` — added `search` state, `displayed` useMemo filtering on student name and code, Search icon input in the header toolbar; table now renders `displayed` instead of `records`; empty state message distinguishes "no students" from "no match".
+
+---
+
 ## [Date: 2026-09-15] - School Student Ledger: Class Filter + Backend isActive Fix (PR #60 merged)
 
 **What/Why:**
