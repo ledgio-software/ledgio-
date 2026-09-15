@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { Heart, Pencil, Loader2, X, Plus } from "lucide-react";
+import { Heart, Pencil, Loader2, X, Plus, Search } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { Input } from "../../components/ui/Input";
 
 interface HealthRecord {
   studentId: string;
@@ -43,6 +44,7 @@ export function StudentHealth() {
     vaccinationNotes: "",
   });
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +63,14 @@ export function StudentHealth() {
   }, [filterClass, showToast]);
 
   useEffect(() => { load(); }, [load]);
+
+  const displayed = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return records;
+    return records.filter((r) =>
+      r.studentName.toLowerCase().includes(q) || r.studentCode.toLowerCase().includes(q)
+    );
+  }, [records, search]);
 
   function openEdit(r: HealthRecord) {
     setEditing(r);
@@ -104,14 +114,25 @@ export function StudentHealth() {
           <Heart className="h-5 w-5 text-red-500" />
           <h1 className="text-xl font-semibold">Student Health Records</h1>
         </div>
-        <select
-          className="border rounded px-3 py-1.5 text-sm bg-background"
-          value={filterClass}
-          onChange={(e) => setFilterClass(e.target.value)}
-        >
-          <option value="">All Classes</option>
-          {classes.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search student…"
+              className="pl-8 w-44"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <select
+            className="border rounded px-3 py-1.5 text-sm bg-background"
+            value={filterClass}
+            onChange={(e) => setFilterClass(e.target.value)}
+          >
+            <option value="">All Classes</option>
+            {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -134,13 +155,13 @@ export function StudentHealth() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {records.length === 0 ? (
+                  {displayed.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={canEdit ? 8 : 7} className="text-center py-10 text-muted-foreground">
-                        No students found.
+                        {records.length === 0 ? "No students found." : "No students match the search."}
                       </TableCell>
                     </TableRow>
-                  ) : records.map((r) => (
+                  ) : displayed.map((r) => (
                     <TableRow key={r.studentId}>
                       <TableCell>
                         <div className="font-medium">{r.studentName}</div>
