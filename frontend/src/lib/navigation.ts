@@ -311,6 +311,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Academic Terms", href: "/school/terms", icon: CalendarDays },
       { name: "Fee Schedules", href: "/school/fee-schedules", icon: Receipt },
       { name: "Fee Collection", href: "/school/fee-collection", icon: BookOpen },
+      { name: "Payment Plans", href: "/school/fee-payment-plans", icon: CalendarDays },
       { name: "MoMo Reconciliation", href: "/school/momo-reconciliation", icon: Wallet2 },
       { name: "Fee Defaulters", href: "/school/fee-defaulters", icon: AlertTriangle },
       { name: "Demand vs Collection", href: "/school/demand-vs-collection", icon: BarChart3 },

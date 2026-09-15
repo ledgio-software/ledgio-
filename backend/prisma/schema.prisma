@@ -2782,3 +2782,40 @@ model NasiaRating {
   @@unique([assessmentId, indicatorCode])
   @@map("nasia_ratings")
 }
+
+model FeePaymentPlan {
+  id           String            @id @default(uuid())
+  tenantId     String            @map("tenant_id")
+  studentId    String            @map("student_id")
+  termId       String            @map("term_id")
+  scheduleId   String            @map("schedule_id")
+  totalAmount  Decimal           @map("total_amount") @db.Decimal(15, 2)
+  notes        String?
+  status       String            @default("ACTIVE") // ACTIVE | COMPLETED | CANCELLED
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  installments FeeInstallment[]
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, termId])
+  @@map("fee_payment_plans")
+}
+
+model FeeInstallment {
+  id         String         @id @default(uuid())
+  planId     String         @map("plan_id")
+  plan       FeePaymentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dueDate    DateTime       @map("due_date")
+  amount     Decimal        @db.Decimal(15, 2)
+  amountPaid Decimal        @default(0) @map("amount_paid") @db.Decimal(15, 2)
+  status     String         @default("PENDING") // PENDING | PARTIAL | PAID | OVERDUE
+  paidAt     DateTime?      @map("paid_at")
+  paymentMode String?       @map("payment_mode") // CASH | MOBILE_MONEY | CHEQUE | BANK_TRANSFER | WAIVER
+  notes      String?
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  @@index([planId])
+  @@map("fee_installments")
+}
