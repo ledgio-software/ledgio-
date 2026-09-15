@@ -2,6 +2,14 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-15] - Bug fix: Blank print preview when printing POS receipts and receipt log PDFs
+
+**What/Why:**
+Opening a receipt PDF worked correctly (new tab, PDF visible), but clicking Print in the browser print dialog showed a blank page. Root cause: `URL.revokeObjectURL` was called on the window `load` event. The browser's PDF viewer re-reads the blob URL internally when the user opens the print dialog, but the blob had already been revoked by that point. Fix: removed the `revokeObjectURL` call entirely. Browsers automatically release blob memory when the owning tab is closed, so this change does not leak memory. Applied to both `PointOfSale.tsx` (POS receipt) and `ReceiptLog.tsx` (receipt log viewer).
+
+**Files Affected:**
+- `frontend/src/pages/pos/PointOfSale.tsx` — removed `URL.revokeObjectURL` call from `openReceipt`
+- `frontend/src/pages/reports/ReceiptLog.tsx` — removed `URL.revokeObjectURL` call from `openPdf`
 ## [Date: 2026-09-15] - School-specific Chart of Accounts & P&L Labels (PR #62)
 
 **What/Why:**
