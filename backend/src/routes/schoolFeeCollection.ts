@@ -541,4 +541,173 @@ router.put('/late-fine-config', requireRole('Admin'), async (req: Request, res: 
   }
 });
 
+// ─── MoMo Reconciliation ──────────────────────────────────────────────────────
+
+interface MomoTxn {
+  phone: string;
+  amount: number;
+  momoRef?: string;
+  date?: string;
+}
+
+function normalizePhone(p: string): string {
+  const digits = p.replace(/\D/g, '');
+  // Convert +233XXXXXXXXX or 233XXXXXXXXX → 0XXXXXXXXX
+  if (digits.startsWith('233') && digits.length === 12) return '0' + digits.slice(3);
+  return digits;
+}
+
+/**
+ * POST /api/v1/school/fee-collection/momo-reconcile/preview
+ * Matches a list of MoMo transactions (phone, amount) to students by guardian phone.
+ * Returns matched rows (student info + outstanding balance) and unmatched transactions.
+ */
+router.post('/momo-reconcile/preview', requireRole('Accountant', 'Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { termId, transactions } = req.body as { termId: string; transactions: MomoTxn[] };
+
+    if (!termId || !Array.isArray(transactions) || transactions.length === 0) {
+      res.status(400).json({ success: false, error: 'termId and transactions[] are required.' });
+      return;
+    }
+
+    const [students, schedules] = await Promise.all([
+      prisma.student.findMany({ where: { tenantId, isActive: true } }),
+      prisma.feeSchedule.findMany({ where: { tenantId, termId } }),
+    ]);
+
+    // Build normalized phone → student lookup
+    const studentByPhone = new Map<string, typeof students[0]>();
+    for (const s of students) {
+      if (s.guardianPhone) studentByPhone.set(normalizePhone(s.guardianPhone), s);
+    }
+
+    // Get outstanding SF invoice balances per student for this term
+    const scheduleIds = schedules.map((s) => s.id);
+    const candidateTxnIds = scheduleIds.flatMap((sid) => students.map((st) => `SF:${sid}:${st.id}`));
+    const invoices = candidateTxnIds.length > 0
+      ? await prisma.invoice.findMany({
+          where: { tenantId, clientTxnId: { in: candidateTxnIds }, status: { notIn: ['PAID', 'VOIDED'] } },
+          select: { clientTxnId: true, total: true, amountPaid: true },
+        })
+      : [];
+
+    const balanceByStudent = new Map<string, number>();
+    for (const inv of invoices) {
+      const m = inv.clientTxnId?.match(/^SF:[^:]+:([^:]+)$/);
+      if (!m) continue;
+      const balance = Math.max(0, Number(inv.total) - Number(inv.amountPaid));
+      balanceByStudent.set(m[1], (balanceByStudent.get(m[1]) ?? 0) + balance);
+    }
+
+    const matched: Array<{
+      txn: MomoTxn;
+      student: { id: string; studentCode: string; firstName: string; lastName: string; className: string; guardianPhone: string; guardianName: string };
+      outstandingBalance: number;
+    }> = [];
+    const unmatched: MomoTxn[] = [];
+
+    for (const txn of transactions) {
+      const phone = normalizePhone(txn.phone);
+      const student = studentByPhone.get(phone);
+      if (!student) { unmatched.push(txn); continue; }
+      matched.push({
+        txn,
+        student: {
+          id: student.id, studentCode: student.studentCode,
+          firstName: student.firstName, lastName: student.lastName,
+          className: student.className,
+          guardianPhone: student.guardianPhone, guardianName: student.guardianName,
+        },
+        outstandingBalance: balanceByStudent.get(student.id) ?? 0,
+      });
+    }
+
+    res.json({ success: true, data: { matched, unmatched, termId } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/school/fee-collection/momo-reconcile/commit
+ * Posts MOBILE_MONEY payments for the selected matched transactions.
+ * Each entry is applied to the student's oldest unpaid SF invoices first.
+ */
+router.post('/momo-reconcile/commit', requireRole('Accountant', 'Admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const actor = actorFromRequest(req);
+    const { termId, entries } = req.body as {
+      termId: string;
+      entries: Array<{ studentId: string; amount: number; momoRef?: string }>;
+    };
+
+    if (!termId || !Array.isArray(entries) || entries.length === 0) {
+      res.status(400).json({ success: false, error: 'termId and entries[] are required.' });
+      return;
+    }
+
+    const schedules = await prisma.feeSchedule.findMany({ where: { tenantId, termId } });
+    if (schedules.length === 0) {
+      res.status(404).json({ success: false, error: 'No fee schedules found for this term.' });
+      return;
+    }
+    const scheduleIds = schedules.map((s) => s.id);
+
+    let processed = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const entry of entries) {
+      try {
+        const student = await prisma.student.findFirst({ where: { id: entry.studentId, tenantId } });
+        if (!student) { errors.push(`Student not found: ${entry.studentId}`); failed++; continue; }
+
+        const invoices = await prisma.invoice.findMany({
+          where: {
+            tenantId,
+            clientTxnId: { in: scheduleIds.map((sid) => `SF:${sid}:${entry.studentId}`) },
+            status: { notIn: ['PAID', 'VOIDED'] },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        if (invoices.length === 0) {
+          errors.push(`No outstanding invoices for ${student.firstName} ${student.lastName}`);
+          failed++;
+          continue;
+        }
+
+        let remaining = Number(entry.amount);
+        for (const inv of invoices) {
+          if (remaining <= 0) break;
+          const balance = Number(inv.total) - Number(inv.amountPaid);
+          if (balance <= 0) continue;
+          const toPay = Math.min(remaining, balance);
+          await recordInvoicePayment(inv.id, actor, {
+            amount: toPay,
+            method: 'MOBILE_MONEY' as any,
+            description: `MoMo reconciliation${entry.momoRef ? ` — Ref: ${entry.momoRef}` : ''} — ${student.firstName} ${student.lastName} (${student.className})`,
+          });
+          remaining -= toPay;
+        }
+        processed++;
+      } catch (e: any) {
+        errors.push(e.message);
+        failed++;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { processed, failed, errors: errors.length ? errors : undefined },
+      message: `Posted ${processed} MoMo payment(s). ${failed} failed.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;
