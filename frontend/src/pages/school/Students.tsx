@@ -8,7 +8,7 @@ import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { confirm } from "../../components/ui/AlertDialog";
-import { Plus, Edit2, Trash2, GraduationCap, Phone, Search, Loader2, ArrowUpCircle } from "lucide-react";
+import { Plus, Edit2, Trash2, GraduationCap, Phone, Search, Loader2, ArrowUpCircle, Upload, Download, CheckCircle, XCircle } from "lucide-react";
 
 interface SchoolClass {
   id: string;
@@ -47,6 +47,12 @@ export function Students() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  // CSV import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<Record<string, string>[]>([]);
+  const [importResults, setImportResults] = useState<Array<{ row: number; success: boolean; studentCode?: string; name?: string; error?: string }> | null>(null);
+  const [importing, setImporting] = useState(false);
 
   // Promote class modal state
   const [promoteOpen, setPromoteOpen] = useState(false);
@@ -174,6 +180,65 @@ export function Students() {
     }
   }
 
+  function downloadStudentTemplate() {
+    const header = "First Name,Last Name,Class,Guardian Name,Guardian Phone,Guardian Email,Date of Birth";
+    const example = "Ama,Mensah,Primary 3A,Kofi Mensah,0244000001,kofi@example.com,2015-06-12";
+    const blob = new Blob([header + "\n" + example], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "students_template.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function parseStudentCSV(text: string): Record<string, string>[] {
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(Boolean);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+    return lines.slice(1).map((line) => {
+      const vals = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+      const row: Record<string, string> = {};
+      headers.forEach((h, i) => { row[h] = vals[i] ?? ""; });
+      return row;
+    });
+  }
+
+  function onStudentFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const rows = parseStudentCSV(ev.target?.result as string);
+      setImportRows(rows);
+      setImportResults(null);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function handleImportStudents() {
+    if (importRows.length === 0) return;
+    setImporting(true);
+    try {
+      const students = importRows.map((r) => ({
+        firstName: r["First Name"] ?? "",
+        lastName: r["Last Name"] ?? "",
+        className: r["Class"] ?? "",
+        guardianName: r["Guardian Name"] ?? "",
+        guardianPhone: r["Guardian Phone"] ?? "",
+        guardianEmail: r["Guardian Email"] || undefined,
+        dateOfBirth: r["Date of Birth"] || undefined,
+      }));
+      const res = await api.post("/school/students/bulk", { students });
+      setImportResults(res.data.data.results);
+      showToast(res.data.message ?? "Import complete.", "success");
+      load();
+    } catch (e: any) {
+      showToast(e?.response?.data?.error ?? "Import failed.", "error");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const filtered = students.filter((s) => {
     const q = search.toLowerCase();
     const matchSearch = !q || `${s.firstName} ${s.lastName} ${s.studentCode}`.toLowerCase().includes(q) || s.guardianPhone.includes(q);
@@ -193,6 +258,11 @@ export function Students() {
           {isAdmin && (
             <Button size="sm" variant="outline" onClick={openPromote}>
               <ArrowUpCircle className="w-4 h-4 mr-1" /> Promote Class
+            </Button>
+          )}
+          {!isReadOnly && (
+            <Button size="sm" variant="outline" onClick={() => { setImportRows([]); setImportResults(null); setImportOpen(true); }}>
+              <Upload className="w-4 h-4 mr-1" /> Import CSV
             </Button>
           )}
           {!isReadOnly && (
@@ -327,6 +397,87 @@ export function Students() {
               {editing ? "Save Changes" : "Add Student"}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* CSV Import Modal */}
+      <Modal isOpen={importOpen} onClose={() => setImportOpen(false)} title="Import Students from CSV">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-secondary-600 dark:text-secondary-400">
+              Upload a CSV file to bulk-import students. Max 500 rows.
+            </p>
+            <Button size="sm" variant="outline" onClick={downloadStudentTemplate}>
+              <Download className="w-3 h-3 mr-1" /> Template
+            </Button>
+          </div>
+
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-secondary-300 dark:border-secondary-600 rounded-lg p-6 cursor-pointer hover:border-primary-400 transition-colors">
+            <Upload className="w-6 h-6 text-secondary-400 mb-2" />
+            <span className="text-sm text-secondary-500">Click to choose a CSV file</span>
+            <input type="file" accept=".csv,text/csv" className="hidden" onChange={onStudentFileChange} />
+          </label>
+
+          {importRows.length > 0 && !importResults && (
+            <>
+              <div className="text-sm font-medium text-secondary-700 dark:text-secondary-300">{importRows.length} row{importRows.length !== 1 ? "s" : ""} ready to import</div>
+              <div className="max-h-48 overflow-y-auto border border-secondary-200 dark:border-secondary-700 rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-secondary-50 dark:bg-secondary-800 sticky top-0">
+                    <tr>
+                      {["First Name","Last Name","Class","Guardian Name","Guardian Phone"].map((h) => (
+                        <th key={h} className="px-3 py-2 text-left font-medium text-secondary-600 dark:text-secondary-400">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importRows.map((r, i) => (
+                      <tr key={i} className="border-t border-secondary-100 dark:border-secondary-800">
+                        <td className="px-3 py-1.5">{r["First Name"]}</td>
+                        <td className="px-3 py-1.5">{r["Last Name"]}</td>
+                        <td className="px-3 py-1.5">{r["Class"]}</td>
+                        <td className="px-3 py-1.5">{r["Guardian Name"]}</td>
+                        <td className="px-3 py-1.5">{r["Guardian Phone"]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => setImportRows([])}>Clear</Button>
+                <Button onClick={handleImportStudents} disabled={importing}>
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
+                  Import {importRows.length} Students
+                </Button>
+              </div>
+            </>
+          )}
+
+          {importResults && (
+            <div className="space-y-2">
+              <div className="flex gap-4 text-sm font-medium">
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle className="inline w-4 h-4 mr-1" />{importResults.filter((r) => r.success).length} imported
+                </span>
+                {importResults.some((r) => !r.success) && (
+                  <span className="text-red-600 dark:text-red-400">
+                    <XCircle className="inline w-4 h-4 mr-1" />{importResults.filter((r) => !r.success).length} failed
+                  </span>
+                )}
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {importResults.filter((r) => !r.success).map((r) => (
+                  <div key={r.row} className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded px-3 py-1.5">
+                    <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span><strong>Row {r.row}:</strong> {r.error}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button onClick={() => setImportOpen(false)}>Done</Button>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 
