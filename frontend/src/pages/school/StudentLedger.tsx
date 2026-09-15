@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -44,9 +44,16 @@ interface LedgerSummary {
   balance: number;
 }
 
+interface SchoolClass {
+  id: string;
+  name: string;
+}
+
 export function StudentLedger() {
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [searchResults, setSearchResults] = useState<StudentResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentResult | null>(null);
@@ -57,24 +64,34 @@ export function StudentLedger() {
   const [termFilter, setTermFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
+  useEffect(() => {
+    api.get("/school/classes").then((res) => {
+      setClasses(res.data?.data?.classes ?? []);
+    }).catch(() => {});
+  }, []);
+
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS" }).format(n);
 
   const fmtDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString("en-GH", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-  const doSearch = useCallback(async () => {
-    if (searchQuery.trim().length < 2) return;
+  const doSearch = useCallback(async (overrideClass?: string) => {
+    const cls = overrideClass !== undefined ? overrideClass : classFilter;
+    if (searchQuery.trim().length < 2 && !cls) return;
     setSearching(true);
     try {
-      const res = await api.get(`/school/students?search=${encodeURIComponent(searchQuery.trim())}&limit=10`);
+      const params = new URLSearchParams({ limit: "50" });
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (cls) params.set("className", cls);
+      const res = await api.get(`/school/students?${params.toString()}`);
       setSearchResults(res.data?.data?.students ?? []);
     } catch {
       showToast("Search failed", "error");
     } finally {
       setSearching(false);
     }
-  }, [searchQuery, showToast]);
+  }, [searchQuery, classFilter, showToast]);
 
   const loadLedger = useCallback(async (student: StudentResult) => {
     setSelectedStudent(student);
@@ -212,7 +229,24 @@ export function StudentLedger() {
       {/* Search */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
+            <select
+              className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              value={classFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setClassFilter(val);
+                setSelectedStudent(null);
+                setSearchResults([]);
+                if (val) doSearch(val);
+                else setSearchResults([]);
+              }}
+            >
+              <option value="">All Classes</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
             <Input
               placeholder="Search by name, student code…"
               value={searchQuery}
@@ -220,7 +254,7 @@ export function StudentLedger() {
               onKeyDown={(e) => e.key === "Enter" && doSearch()}
               className="max-w-sm"
             />
-            <Button variant="outline" size="sm" onClick={doSearch} disabled={searching}>
+            <Button variant="outline" size="sm" onClick={() => doSearch()} disabled={searching}>
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
           </div>
