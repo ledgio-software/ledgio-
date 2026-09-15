@@ -118,6 +118,7 @@ const Employees = lazy(() => import("./pages/payroll/Employees").then(m => ({ de
 const PayrollRuns = lazy(() => import("./pages/payroll/PayrollRuns").then(m => ({ default: m.PayrollRuns })));
 const Loans = lazy(() => import("./pages/payroll/Loans").then(m => ({ default: m.Loans })));
 const Leave = lazy(() => import("./pages/payroll/Leave").then(m => ({ default: m.Leave })));
+const SsnitCompliance = lazy(() => import("./pages/payroll/SsnitCompliance").then(m => ({ default: m.SsnitCompliance })));
 const PaymentCallback = lazy(() => import("./pages/subscription/PaymentCallback").then(m => ({ default: m.PaymentCallback })));
 const PrescriptionRegister = lazy(() => import("./pages/pharmacy/PrescriptionRegister").then(m => ({ default: m.PrescriptionRegister })));
 const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister").then(m => ({ default: m.NarcoticsRegister })));
@@ -1104,6 +1105,7 @@ function App() {
               <Route path="/payroll/runs" element={<ProtectedRoute><MainLayout><PayrollRuns /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/loans" element={<ProtectedRoute><MainLayout><Loans /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/leave" element={<ProtectedRoute><MainLayout><Leave /></MainLayout></ProtectedRoute>} />
+              <Route path="/payroll/ssnit" element={<ProtectedRoute><MainLayout><SsnitCompliance /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/patients" element={<ProtectedRoute><MainLayout><PharmacyPatients /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/nhis-claims" element={<ProtectedRoute><MainLayout><NhisClaims /></MainLayout></ProtectedRoute>} />

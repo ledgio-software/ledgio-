@@ -289,6 +289,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Payroll Runs", href: "/payroll/runs", icon: BadgeDollarSign, minTier: 2 },
       { name: "Employee Loans", href: "/payroll/loans", icon: Landmark, minTier: 2 },
       { name: "Leave Management", href: "/payroll/leave", icon: CalendarClock, minTier: 2 },
+      { name: "SSNIT Compliance", href: "/payroll/ssnit", icon: ShieldCheck, minTier: 2 },
     ],
   },
   {
