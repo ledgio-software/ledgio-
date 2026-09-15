@@ -52,6 +52,7 @@ import {
   Key,
   GraduationCap,
   CalendarDays,
+  MessageSquare,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -288,6 +289,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Payroll Runs", href: "/payroll/runs", icon: BadgeDollarSign, minTier: 2 },
       { name: "Employee Loans", href: "/payroll/loans", icon: Landmark, minTier: 2 },
       { name: "Leave Management", href: "/payroll/leave", icon: CalendarClock, minTier: 2 },
+      { name: "SSNIT Compliance", href: "/payroll/ssnit", icon: ShieldCheck, minTier: 2 },
     ],
   },
   {
@@ -305,10 +307,14 @@ export const navigationGroups: NavGroup[] = [
     sectionTitle: "SCHOOL",
     orgTypeOnly: "NONPROFIT",
     items: [
-      { name: "Students", href: "/school/students", icon: GraduationCap },
+      { name: "Teachers", href: "/school/teachers", icon: GraduationCap },
+      { name: "Classes", href: "/school/classes", icon: Layers },
+      { name: "Students", href: "/school/students", icon: Users },
       { name: "Academic Terms", href: "/school/terms", icon: CalendarDays },
       { name: "Fee Schedules", href: "/school/fee-schedules", icon: Receipt },
       { name: "Fee Collection", href: "/school/fee-collection", icon: BookOpen },
+      { name: "Payment Plans", href: "/school/fee-payment-plans", icon: CalendarDays },
+      { name: "MoMo Reconciliation", href: "/school/momo-reconciliation", icon: Wallet2 },
       { name: "Fee Defaulters", href: "/school/fee-defaulters", icon: AlertTriangle },
       { name: "Demand vs Collection", href: "/school/demand-vs-collection", icon: BarChart3 },
       { name: "Student Ledger", href: "/school/student-ledger", icon: ClipboardList },
@@ -322,6 +328,9 @@ export const navigationGroups: NavGroup[] = [
       { name: "Health Records", href: "/school/health", icon: HeartPulse },
       { name: "Events & Calendar", href: "/school/events", icon: CalendarCheck },
       { name: "MIS Dashboard", href: "/school/mis", icon: LayoutDashboard },
+      { name: "NaSIA Dashboard", href: "/school/nasia", icon: ClipboardList },
+      { name: "Transport", href: "/school/transport", icon: Truck },
+      { name: "Parent Comms", href: "/school/parent-comms", icon: MessageSquare },
     ],
   },
   {

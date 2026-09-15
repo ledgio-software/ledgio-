@@ -95,6 +95,7 @@ import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
+import schoolClassesRouter from './routes/schoolClasses';
 import schoolStudentsRouter from './routes/schoolStudents';
 import schoolTermsRouter from './routes/schoolTerms';
 import schoolFeeSchedulesRouter from './routes/schoolFeeSchedules';
@@ -110,6 +111,12 @@ import schoolScholarshipsRouter from './routes/schoolScholarships';
 import schoolHealthRouter from './routes/schoolHealth';
 import schoolEventsRouter from './routes/schoolEvents';
 import schoolMISRouter from './routes/schoolMIS';
+import schoolTeachersRouter from './routes/schoolTeachers';
+import schoolNasiaRouter from './routes/schoolNasia';
+import schoolFeePaymentPlansRouter from './routes/schoolFeePaymentPlans';
+import schoolTransportRouter from './routes/schoolTransport';
+import schoolParentCommsRouter from './routes/schoolParentComms';
+import ssnitRouter from './routes/ssnit';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
 import scenariosRouter from './routes/scenarios';
@@ -278,6 +285,7 @@ app.use('/api/v1/tills', cashTillRouter);
 app.use('/api/v1/pharmacy', pharmacyRouter);
 
 // School module (NONPROFIT/SCHOOL org-type tenants)
+app.use('/api/v1/school/classes', schoolClassesRouter);
 app.use('/api/v1/school/students', schoolStudentsRouter);
 app.use('/api/v1/school/terms', schoolTermsRouter);
 app.use('/api/v1/school/fee-schedules', schoolFeeSchedulesRouter);
@@ -293,6 +301,12 @@ app.use('/api/v1/school/scholarships', schoolScholarshipsRouter);
 app.use('/api/v1/school/health', schoolHealthRouter);
 app.use('/api/v1/school/events', schoolEventsRouter);
 app.use('/api/v1/school/mis', schoolMISRouter);
+app.use('/api/v1/school/teachers', schoolTeachersRouter);
+app.use('/api/v1/school/nasia', schoolNasiaRouter);
+app.use('/api/v1/school/fee-payment-plans', schoolFeePaymentPlansRouter);
+app.use('/api/v1/school/transport', schoolTransportRouter);
+app.use('/api/v1/school/parent-comms', schoolParentCommsRouter);
+app.use('/api/v1/ssnit', ssnitRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);

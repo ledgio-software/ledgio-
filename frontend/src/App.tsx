@@ -51,6 +51,9 @@ const FiscalPeriods = lazy(() => import("./pages/settings/FiscalPeriods").then(m
 const RecurringTransactions = lazy(() => import("./pages/settings/RecurringTransactions").then(m => ({ default: m.RecurringTransactions })));
 const Approvals = lazy(() => import("./pages/approvals/Approvals").then(m => ({ default: m.Approvals })));
 const SchoolStudents = lazy(() => import("./pages/school/Students").then(m => ({ default: m.Students })));
+const SchoolTeachers = lazy(() => import("./pages/school/Teachers").then(m => ({ default: m.Teachers })));
+const SchoolClasses = lazy(() => import("./pages/school/Classes").then(m => ({ default: m.Classes })));
+const MomoReconciliation = lazy(() => import("./pages/school/MomoReconciliation").then(m => ({ default: m.MomoReconciliation })));
 const AcademicTerms = lazy(() => import("./pages/school/AcademicTerms").then(m => ({ default: m.AcademicTerms })));
 const FeeSchedules = lazy(() => import("./pages/school/FeeSchedules").then(m => ({ default: m.FeeSchedules })));
 const FeeCollection = lazy(() => import("./pages/school/FeeCollection").then(m => ({ default: m.FeeCollection })));
@@ -67,6 +70,10 @@ const SchoolScholarships = lazy(() => import("./pages/school/Scholarships").then
 const SchoolStudentHealth = lazy(() => import("./pages/school/StudentHealth").then(m => ({ default: m.StudentHealth })));
 const SchoolEventsPage = lazy(() => import("./pages/school/SchoolEvents").then(m => ({ default: m.SchoolEvents })));
 const SchoolMIS = lazy(() => import("./pages/school/SchoolMIS").then(m => ({ default: m.SchoolMIS })));
+const NasiaDashboard = lazy(() => import("./pages/school/NasiaDashboard").then(m => ({ default: m.NasiaDashboard })));
+const FeePaymentPlans = lazy(() => import("./pages/school/FeePaymentPlans").then(m => ({ default: m.FeePaymentPlans })));
+const SchoolTransport = lazy(() => import("./pages/school/Transport").then(m => ({ default: m.Transport })));
+const ParentComms = lazy(() => import("./pages/school/ParentComms").then(m => ({ default: m.ParentComms })));
 const ExpenseClaims = lazy(() => import("./pages/expenses/ExpenseClaims").then(m => ({ default: m.ExpenseClaims })));
 const Budgets = lazy(() => import("./pages/reports/Budgets").then(m => ({ default: m.Budgets })));
 const TeamManagement = lazy(() => import("./pages/team/TeamManagement").then(m => ({ default: m.TeamManagement })));
@@ -111,6 +118,7 @@ const Employees = lazy(() => import("./pages/payroll/Employees").then(m => ({ de
 const PayrollRuns = lazy(() => import("./pages/payroll/PayrollRuns").then(m => ({ default: m.PayrollRuns })));
 const Loans = lazy(() => import("./pages/payroll/Loans").then(m => ({ default: m.Loans })));
 const Leave = lazy(() => import("./pages/payroll/Leave").then(m => ({ default: m.Leave })));
+const SsnitCompliance = lazy(() => import("./pages/payroll/SsnitCompliance").then(m => ({ default: m.SsnitCompliance })));
 const PaymentCallback = lazy(() => import("./pages/subscription/PaymentCallback").then(m => ({ default: m.PaymentCallback })));
 const PrescriptionRegister = lazy(() => import("./pages/pharmacy/PrescriptionRegister").then(m => ({ default: m.PrescriptionRegister })));
 const NarcoticsRegister = lazy(() => import("./pages/pharmacy/NarcoticsRegister").then(m => ({ default: m.NarcoticsRegister })));
@@ -1097,12 +1105,16 @@ function App() {
               <Route path="/payroll/runs" element={<ProtectedRoute><MainLayout><PayrollRuns /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/loans" element={<ProtectedRoute><MainLayout><Loans /></MainLayout></ProtectedRoute>} />
               <Route path="/payroll/leave" element={<ProtectedRoute><MainLayout><Leave /></MainLayout></ProtectedRoute>} />
+              <Route path="/payroll/ssnit" element={<ProtectedRoute><MainLayout><SsnitCompliance /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/prescriptions" element={<ProtectedRoute><MainLayout><PrescriptionRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/patients" element={<ProtectedRoute><MainLayout><PharmacyPatients /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/nhis-claims" element={<ProtectedRoute><MainLayout><NhisClaims /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/inventory-matrix" element={<ProtectedRoute><MainLayout><PharmacyInventoryMatrix /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/teachers" element={<ProtectedRoute><MainLayout><SchoolTeachers /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/classes" element={<ProtectedRoute><MainLayout><SchoolClasses /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/momo-reconciliation" element={<ProtectedRoute><MainLayout><MomoReconciliation /></MainLayout></ProtectedRoute>} />
               <Route path="/school/students" element={<ProtectedRoute><MainLayout><SchoolStudents /></MainLayout></ProtectedRoute>} />
               <Route path="/school/terms" element={<ProtectedRoute><MainLayout><AcademicTerms /></MainLayout></ProtectedRoute>} />
               <Route path="/school/fee-schedules" element={<ProtectedRoute><MainLayout><FeeSchedules /></MainLayout></ProtectedRoute>} />
@@ -1120,6 +1132,10 @@ function App() {
               <Route path="/school/health" element={<ProtectedRoute><MainLayout><SchoolStudentHealth /></MainLayout></ProtectedRoute>} />
               <Route path="/school/events" element={<ProtectedRoute><MainLayout><SchoolEventsPage /></MainLayout></ProtectedRoute>} />
               <Route path="/school/mis" element={<ProtectedRoute><MainLayout><SchoolMIS /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/nasia" element={<ProtectedRoute><MainLayout><NasiaDashboard /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/fee-payment-plans" element={<ProtectedRoute><MainLayout><FeePaymentPlans /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/transport" element={<ProtectedRoute><MainLayout><SchoolTransport /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/parent-comms" element={<ProtectedRoute><MainLayout><ParentComms /></MainLayout></ProtectedRoute>} />
               <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing" element={<ProtectedRoute><MainLayout><Manufacturing /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing/jobs" element={<ProtectedRoute><MainLayout><Jobs /></MainLayout></ProtectedRoute>} />
