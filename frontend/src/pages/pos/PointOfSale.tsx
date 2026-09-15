@@ -149,10 +149,11 @@ export function PointOfSale() {
     try {
       const res = await api.get(`/tills/sales/${saleId}/receipt.pdf`, { responseType: 'blob' });
       const blobUrl = URL.createObjectURL(res.data);
-      const win = window.open(blobUrl, '_blank');
-      if (win) {
-        win.addEventListener('load', () => URL.revokeObjectURL(blobUrl), { once: true });
-      }
+      window.open(blobUrl, '_blank');
+      // Do not revoke the blob URL immediately — the browser's PDF viewer
+      // re-reads it when the user opens the print dialog, and revoking it
+      // before they print produces a blank print preview.
+      // The browser releases the blob automatically when the tab closes.
     } catch {
       showToast('Failed to open receipt. Please try again.', 'error');
     }
