@@ -58,7 +58,9 @@ router.put('/business-profile', requireRole('Admin'), async (req: Request, res: 
  * and edit before seeding.
  */
 router.get('/chart-of-accounts-template', requireRole('Admin'), async (_req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ success: true, data: onboardingWizardService.getChartOfAccountsTemplate() });
+  const { tenantId } = requireTenantContext();
+  const tenant = await (await import('../config/db')).prisma.tenant.findUnique({ where: { id: tenantId }, select: { orgType: true } });
+  res.status(200).json({ success: true, data: onboardingWizardService.getChartOfAccountsTemplate(tenant?.orgType) });
 });
 
 /**

@@ -5,7 +5,7 @@ import * as journalEntryRepository from '../repository/journalEntryRepository';
 import * as accountService from './accountService';
 import * as journalEntryService from './journalEntryService';
 import { AuditActor } from './auditLogService';
-import { GHANA_SME_CHART_OF_ACCOUNTS_TEMPLATE, ChartOfAccountsTemplateEntry } from '../data/ghanaSmeChartOfAccountsTemplate';
+import { getTemplateForOrgType, ChartOfAccountsTemplateEntry } from '../data/ghanaSmeChartOfAccountsTemplate';
 
 export class OnboardingWizardServiceError extends Error {
   statusCode: number;
@@ -35,8 +35,8 @@ export interface OnboardingStatus {
 
 const OPENING_BALANCE_ENTRY_PREFIX = 'OB-';
 
-export function getChartOfAccountsTemplate(): ChartOfAccountsTemplateEntry[] {
-  return GHANA_SME_CHART_OF_ACCOUNTS_TEMPLATE;
+export function getChartOfAccountsTemplate(orgType?: string | null): ChartOfAccountsTemplateEntry[] {
+  return getTemplateForOrgType(orgType);
 }
 
 export async function getOnboardingStatus(tenantId: string): Promise<OnboardingStatus> {
