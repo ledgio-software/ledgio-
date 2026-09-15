@@ -5,7 +5,8 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { UserPlus, Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { UserPlus, Loader2, Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Input } from "../../components/ui/Input";
 
 interface Admission {
   id: string; applicationNumber: string; applicantFirstName: string; applicantLastName: string;
@@ -33,6 +34,7 @@ export function Admissions() {
   const canWrite = isAdmin || (user?.role ?? "").toLowerCase() === "accountant";
 
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [admissionSearch, setAdmissionSearch] = useState("");
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -106,7 +108,18 @@ export function Admissions() {
         </div>
       </div>
 
-      {/* Status filter tabs */}
+      {/* Search + Status filter tabs */}
+      <div className="flex flex-wrap gap-3 items-center mb-1">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search applicant or app #…"
+            className="pl-8 w-56"
+            value={admissionSearch}
+            onChange={(e) => setAdmissionSearch(e.target.value)}
+          />
+        </div>
+      </div>
       <div className="flex gap-1 flex-wrap border-b">
         {(["", ...STATUSES] as string[]).map((s) => (
           <button
@@ -139,10 +152,16 @@ export function Admissions() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {admissions.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">No applications found.</TableCell></TableRow>
-                  ) : (
-                    admissions.map((a) => (
+                  {(() => {
+                    const q = admissionSearch.toLowerCase().trim();
+                    const displayed = q ? admissions.filter((a) =>
+                      `${a.applicantFirstName} ${a.applicantLastName}`.toLowerCase().includes(q) ||
+                      a.applicationNumber.toLowerCase().includes(q)
+                    ) : admissions;
+                    if (displayed.length === 0) return (
+                      <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">{admissions.length === 0 ? "No applications found." : "No applications match the search."}</TableCell></TableRow>
+                    );
+                    return displayed.map((a) => (
                       <TableRow key={a.id}>
                         <TableCell className="font-mono text-xs">{a.applicationNumber}</TableCell>
                         <TableCell className="font-medium">{a.applicantFirstName} {a.applicantLastName}</TableCell>
@@ -162,8 +181,8 @@ export function Admissions() {
                           </TableCell>
                         )}
                       </TableRow>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </TableBody>
               </Table>
             </div>

@@ -2,6 +2,14 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-15] - CI Fix: useMemo hooks-of-rules violation in PurchaseOrders
+
+**What/Why:**
+PR #59 (feature/search-filter-all-modules) had a failing CI check due to `react-hooks/rules-of-hooks` oxlint error. The `displayedPOs` useMemo was placed after a conditional early return (`UpgradeRequired` guard) in `PurchaseOrders.tsx`, causing oxlint to flag it as a conditionally-called hook.
+
+**Files affected:**
+- `frontend/src/pages/purchaseorders/PurchaseOrders.tsx` — moved `displayedPOs` useMemo to before the `UpgradeRequired` early return (alongside other state declarations), then removed the duplicate that remained after the guard. TypeScript (`tsc --noEmit`) and oxlint both pass clean.
+
 ## [Date: 2026-09-14] - School Module: 5 ERP Gap Features (Complete)
 
 **What/Why:**

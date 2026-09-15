@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -8,7 +8,7 @@ import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { confirm } from "../../components/ui/AlertDialog";
-import { Plus, Edit2, Trash2, Receipt, Loader2, Zap } from "lucide-react";
+import { Plus, Edit2, Trash2, Receipt, Loader2, Zap, Search } from "lucide-react";
 
 interface AcademicTerm {
   id: string;
@@ -42,6 +42,16 @@ export function FeeSchedules() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [scheduleSearch, setScheduleSearch] = useState("");
+
+  const displayedSchedules = useMemo(() => {
+    const q = scheduleSearch.toLowerCase().trim();
+    if (!q) return schedules;
+    return schedules.filter((s) =>
+      s.feeName.toLowerCase().includes(q) ||
+      (s.className ?? "").toLowerCase().includes(q)
+    );
+  }, [schedules, scheduleSearch]);
 
   const isAdmin = (user?.role ?? "").toLowerCase() === "admin";
 
@@ -176,7 +186,16 @@ export function FeeSchedules() {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+          <Input
+            placeholder="Search fee name or class…"
+            className="pl-8 w-52"
+            value={scheduleSearch}
+            onChange={(e) => setScheduleSearch(e.target.value)}
+          />
+        </div>
         <label className="text-sm font-medium text-secondary-700 dark:text-secondary-300 whitespace-nowrap">Term:</label>
         <select
           className="border border-secondary-300 dark:border-secondary-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white"
@@ -219,7 +238,7 @@ export function FeeSchedules() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {schedules.map((s) => (
+                  {displayedSchedules.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.feeName}</TableCell>
                       <TableCell>{s.className ?? <span className="text-secondary-400 text-xs">All classes</span>}</TableCell>

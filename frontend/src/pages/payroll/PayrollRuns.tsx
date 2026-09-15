@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { BadgeDollarSign, Plus, ChevronDown, ChevronUp, CheckCircle, Download } from "lucide-react";
+import { BadgeDollarSign, Plus, ChevronDown, ChevronUp, CheckCircle, Download, Search } from "lucide-react";
+import { Input } from "../../components/ui/Input";
 import { confirm } from "../../components/ui/AlertDialog";
 
 interface Payslip {
@@ -69,6 +70,16 @@ export function PayrollRuns() {
   const [periodYear, setPeriodYear] = useState(new Date().getFullYear());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [postingId, setPostingId] = useState<string | null>(null);
+  const [runSearch, setRunSearch] = useState("");
+
+  const displayedRuns = useMemo(() => {
+    const q = runSearch.toLowerCase().trim();
+    if (!q) return runs;
+    return runs.filter((r) =>
+      r.runNumber.toLowerCase().includes(q) ||
+      `${MONTHS[r.periodMonth - 1]} ${r.periodYear}`.toLowerCase().includes(q)
+    );
+  }, [runs, runSearch]);
 
   const fetchRuns = useCallback(async () => {
     setIsLoading(true);
@@ -163,15 +174,27 @@ export function PayrollRuns() {
         </Button>
       </div>
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+        <Input
+          placeholder="Search run # or period…"
+          className="pl-8"
+          value={runSearch}
+          onChange={(e) => setRunSearch(e.target.value)}
+        />
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-8 text-center text-secondary-400 text-sm">Loading payroll runs…</div>
           ) : runs.length === 0 ? (
             <div className="p-8 text-center text-secondary-400 text-sm">No payroll runs yet. Create your first run to process salaries.</div>
+          ) : displayedRuns.length === 0 ? (
+            <div className="p-8 text-center text-secondary-400 text-sm">No runs match the search.</div>
           ) : (
             <div className="divide-y divide-secondary-100 dark:divide-secondary-800">
-              {runs.map((run) => (
+              {displayedRuns.map((run) => (
                 <div key={run.id}>
                   <div className="flex items-center gap-4 px-4 py-3 hover:bg-secondary-50 dark:hover:bg-secondary-800/30">
                     <button
