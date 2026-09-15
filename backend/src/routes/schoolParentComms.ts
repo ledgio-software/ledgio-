@@ -1,11 +1,17 @@
 import { Router, Request, Response } from 'express';
-import { authenticateJwt } from '../middleware/auth';
-import { tenantContextMiddleware, requireTenantContext } from '../middleware/tenantContext';
-import { requireRole } from '../middleware/rbac';
-import { prisma } from '../lib/prisma';
+import { authenticateJwt } from '../middleware/authMiddleware';
+import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
+import { requireRole } from '../middleware/rbacMiddleware';
+import { requireTenantContext } from '../context/tenantContext';
+import { prisma } from '../config/db';
 
 const router = Router();
 router.use(authenticateJwt, tenantContextMiddleware);
+
+const db = prisma as unknown as {
+  $queryRawUnsafe: <T = unknown>(sql: string, ...args: unknown[]) => Promise<T[]>;
+  $executeRawUnsafe: (sql: string, ...args: unknown[]) => Promise<number>;
+};
 
 // ── Message templates ────────────────────────────────────────────────────────
 
@@ -74,84 +80,98 @@ router.get('/templates', (_req: Request, res: Response) => {
 });
 
 // GET / — list messages
-router.get('/', async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+router.get('/', requireRole('Admin', 'Accountant', 'HR'), async (req: Request, res: Response) => {
+  const { tenantId } = requireTenantContext();
   const { studentId, type, channel, status, from, to, limit = '50', offset = '0' } = req.query as Record<string, string>;
 
-  const where: Record<string, unknown> = { tenantId };
-  if (studentId) where.studentId = studentId;
-  if (type) where.type = type;
-  if (channel) where.channel = channel;
-  if (status) where.status = status;
-  if (from || to) {
-    where.sentAt = {
-      ...(from ? { gte: new Date(from) } : {}),
-      ...(to ? { lte: new Date(to) } : {}),
-    };
-  }
+  const conditions: string[] = ['m.tenant_id = $1'];
+  const params: unknown[] = [tenantId];
+  let p = 2;
 
-  const [messages, total] = await Promise.all([
-    prisma.parentMessage.findMany({
-      where,
-      orderBy: { sentAt: 'desc' },
-      take: Math.min(parseInt(limit), 200),
-      skip: parseInt(offset),
-    }),
-    prisma.parentMessage.count({ where }),
+  if (studentId) { conditions.push(`m.student_id = $${p++}`); params.push(studentId); }
+  if (type)      { conditions.push(`m.type = $${p++}`);       params.push(type); }
+  if (channel)   { conditions.push(`m.channel = $${p++}`);    params.push(channel); }
+  if (status)    { conditions.push(`m.status = $${p++}`);     params.push(status); }
+  if (from)      { conditions.push(`m.sent_at >= $${p++}`);   params.push(new Date(from)); }
+  if (to)        { conditions.push(`m.sent_at <= $${p++}`);   params.push(new Date(to)); }
+
+  const where = conditions.join(' AND ');
+  const lim = Math.min(parseInt(limit) || 50, 200);
+  const off = parseInt(offset) || 0;
+
+  const [messages, countRows] = await Promise.all([
+    db.$queryRawUnsafe<{
+      id: string; student_id: string; type: string; channel: string;
+      recipient: string; message: string; status: string;
+      sent_at: string; sent_by: string | null; reference_id: string | null;
+      first_name: string | null; last_name: string | null; class_name: string | null;
+    }>(
+      `SELECT m.id, m.student_id, m.type, m.channel, m.recipient, m.message, m.status,
+              m.sent_at, m.sent_by, m.reference_id,
+              s.first_name, s.last_name, s.class_name
+       FROM parent_messages m
+       LEFT JOIN students s ON s.id = m.student_id
+       WHERE ${where}
+       ORDER BY m.sent_at DESC
+       LIMIT $${p} OFFSET $${p + 1}`,
+      ...params, lim, off,
+    ),
+    db.$queryRawUnsafe<{ cnt: string }>(
+      `SELECT COUNT(*)::text AS cnt FROM parent_messages m WHERE ${where}`,
+      ...params,
+    ),
   ]);
 
-  // Enrich with student names
-  const studentIds = [...new Set(messages.map((m) => m.studentId))];
-  const students = await prisma.student.findMany({
-    where: { id: { in: studentIds } },
-    select: { id: true, firstName: true, lastName: true, className: true },
-  });
-  const studentMap = Object.fromEntries(students.map((s) => [s.id, s]));
-
   res.json({
-    total,
+    total: parseInt(countRows[0]?.cnt ?? '0'),
     messages: messages.map((m) => ({
-      ...m,
-      student: studentMap[m.studentId] ?? null,
+      id: m.id,
+      studentId: m.student_id,
+      type: m.type,
+      channel: m.channel,
+      recipient: m.recipient,
+      message: m.message,
+      status: m.status,
+      sentAt: m.sent_at,
+      sentBy: m.sent_by,
+      referenceId: m.reference_id,
+      student: m.first_name
+        ? { firstName: m.first_name, lastName: m.last_name, className: m.class_name }
+        : null,
     })),
   });
 });
 
 // GET /stats
-router.get('/stats', async (_req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+router.get('/stats', requireRole('Admin', 'Accountant', 'HR'), async (_req: Request, res: Response) => {
+  const { tenantId } = requireTenantContext();
 
-  const [total, byType, byChannel, recent] = await Promise.all([
-    prisma.parentMessage.count({ where: { tenantId } }),
-    prisma.parentMessage.groupBy({
-      by: ['type'],
-      where: { tenantId },
-      _count: { id: true },
-    }),
-    prisma.parentMessage.groupBy({
-      by: ['channel'],
-      where: { tenantId },
-      _count: { id: true },
-    }),
-    prisma.parentMessage.count({
-      where: {
-        tenantId,
-        sentAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-      },
-    }),
+  const [totalRows, byTypeRows, byChannelRows, recentRows] = await Promise.all([
+    db.$queryRawUnsafe<{ cnt: string }>(
+      `SELECT COUNT(*)::text AS cnt FROM parent_messages WHERE tenant_id = $1`, tenantId,
+    ),
+    db.$queryRawUnsafe<{ type: string; cnt: string }>(
+      `SELECT type, COUNT(*)::text AS cnt FROM parent_messages WHERE tenant_id = $1 GROUP BY type`, tenantId,
+    ),
+    db.$queryRawUnsafe<{ channel: string; cnt: string }>(
+      `SELECT channel, COUNT(*)::text AS cnt FROM parent_messages WHERE tenant_id = $1 GROUP BY channel`, tenantId,
+    ),
+    db.$queryRawUnsafe<{ cnt: string }>(
+      `SELECT COUNT(*)::text AS cnt FROM parent_messages WHERE tenant_id = $1 AND sent_at >= NOW() - INTERVAL '7 days'`, tenantId,
+    ),
   ]);
 
   res.json({
-    total,
-    last7Days: recent,
-    byType: Object.fromEntries(byType.map((r) => [r.type, r._count.id])),
-    byChannel: Object.fromEntries(byChannel.map((r) => [r.channel, r._count.id])),
+    total: parseInt(totalRows[0]?.cnt ?? '0'),
+    last7Days: parseInt(recentRows[0]?.cnt ?? '0'),
+    byType: Object.fromEntries(byTypeRows.map((r) => [r.type, parseInt(r.cnt)])),
+    byChannel: Object.fromEntries(byChannelRows.map((r) => [r.channel, parseInt(r.cnt)])),
   });
 });
 
 // POST /send — single student message
-router.post('/send', requireRole('Admin', 'Manager', 'Staff'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+router.post('/send', requireRole('Admin', 'HR'), async (req: Request, res: Response) => {
+  const { tenantId } = requireTenantContext();
   const { studentId, type, channel, templateData, customMessage } = req.body as {
     studentId: string;
     type: string;
@@ -164,16 +184,18 @@ router.post('/send', requireRole('Admin', 'Manager', 'Staff'), async (req: Reque
     return res.status(400).json({ error: 'studentId, type, and channel are required' });
   }
 
-  const student = await prisma.student.findFirst({
-    where: { id: studentId, tenantId },
-  });
-  if (!student) return res.status(404).json({ error: 'Student not found' });
+  const students = await db.$queryRawUnsafe<{
+    id: string; first_name: string; last_name: string;
+    guardian_name: string; guardian_phone: string; guardian_email: string | null;
+  }>(
+    `SELECT id, first_name, last_name, guardian_name, guardian_phone, guardian_email
+     FROM students WHERE id = $1 AND tenant_id = $2 LIMIT 1`,
+    studentId, tenantId,
+  );
+  if (students.length === 0) return res.status(404).json({ error: 'Student not found' });
+  const student = students[0];
 
-  const recipient =
-    channel === 'EMAIL'
-      ? student.guardianEmail || ''
-      : student.guardianPhone;
-
+  const recipient = channel === 'EMAIL' ? (student.guardian_email || '') : student.guardian_phone;
   if (!recipient) {
     return res.status(400).json({
       error: `No ${channel === 'EMAIL' ? 'email' : 'phone number'} on record for this student's guardian`,
@@ -184,36 +206,29 @@ router.post('/send', requireRole('Admin', 'Manager', 'Staff'), async (req: Reque
   if (!templateFn) return res.status(400).json({ error: `Unknown message type: ${type}` });
 
   const mergedData = {
-    guardianName: student.guardianName,
-    studentName: `${student.firstName} ${student.lastName}`,
+    guardianName: student.guardian_name,
+    studentName: `${student.first_name} ${student.last_name}`,
     currency: 'GHS ',
     ...(templateData || {}),
     message: customMessage || '',
   };
-  const message = type === 'GENERAL' && customMessage ? customMessage : templateFn(mergedData);
+  const messageText = type === 'GENERAL' && customMessage ? customMessage : templateFn(mergedData);
 
   const userId = (req as Request & { user?: { userId?: string } }).user?.userId;
 
-  const record = await prisma.parentMessage.create({
-    data: {
-      tenantId,
-      studentId,
-      type,
-      channel,
-      recipient,
-      message,
-      status: 'SENT',
-      sentBy: userId,
-      referenceId: templateData?.referenceId,
-    },
-  });
+  const [record] = await db.$queryRawUnsafe<{ id: string; sent_at: string }>(
+    `INSERT INTO parent_messages (tenant_id, student_id, type, channel, recipient, message, status, sent_by, reference_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'SENT', $7, $8)
+     RETURNING id, sent_at`,
+    tenantId, studentId, type, channel, recipient, messageText, userId ?? null, templateData?.referenceId ?? null,
+  );
 
-  res.status(201).json({ message: record });
+  res.status(201).json({ message: { id: record.id, sentAt: record.sent_at } });
 });
 
 // POST /bulk — bulk messages by trigger type
-router.post('/bulk', requireRole('Admin', 'Manager'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+router.post('/bulk', requireRole('Admin'), async (req: Request, res: Response) => {
+  const { tenantId } = requireTenantContext();
   const { trigger, channel = 'SMS', termId, date, className } = req.body as {
     trigger: 'FEE_DEFAULTERS' | 'ABSENT_TODAY' | 'RESULTS_READY';
     channel?: string;
@@ -225,138 +240,152 @@ router.post('/bulk', requireRole('Admin', 'Manager'), async (req: Request, res: 
   if (!trigger) return res.status(400).json({ error: 'trigger is required' });
 
   const userId = (req as Request & { user?: { userId?: string } }).user?.userId;
-  let records: Array<{
+
+  interface BulkRecord {
     tenantId: string; studentId: string; type: string; channel: string;
-    recipient: string; message: string; status: string; sentBy?: string; referenceId?: string;
-  }> = [];
+    recipient: string; message: string; status: string; sentBy: string | null; referenceId: string | null;
+  }
+  const records: BulkRecord[] = [];
 
   if (trigger === 'FEE_DEFAULTERS') {
-    // Students with outstanding invoices (status UNPAID or PARTIAL)
-    const invoices = await prisma.invoice.findMany({
-      where: {
-        tenantId,
-        status: { in: ['UNPAID', 'PARTIAL'] },
-        clientTxnId: { startsWith: 'SF:' },
-      },
-      select: { clientId: true, amountDue: true, dueDate: true, clientTxnId: true },
-    });
+    // Outstanding school-fee invoices (client_txn_id starts with 'SF:')
+    const rows = await db.$queryRawUnsafe<{
+      student_id: string; first_name: string; last_name: string;
+      guardian_name: string; guardian_phone: string; guardian_email: string | null;
+      amount_due: string; due_date: string | null; client_txn_id: string | null;
+    }>(
+      `SELECT s.id AS student_id, s.first_name, s.last_name,
+              s.guardian_name, s.guardian_phone, s.guardian_email,
+              (i.total - i.amount_paid)::text AS amount_due,
+              i.due_date, i.client_txn_id
+       FROM invoices i
+       JOIN students s ON s.id = i.customer_id
+       WHERE i.tenant_id = $1
+         AND i.status IN ('SENT', 'PARTIALLY_PAID')
+         AND i.client_txn_id LIKE 'SF:%'
+         AND s.is_active = true
+       ORDER BY s.last_name, s.first_name`,
+      tenantId,
+    );
 
-    const studentIds = [...new Set(invoices.map((i) => i.clientId).filter(Boolean))] as string[];
-    const students = await prisma.student.findMany({
-      where: { id: { in: studentIds }, tenantId, isActive: true },
-    });
-
-    for (const s of students) {
-      const inv = invoices.find((i) => i.clientId === s.id);
-      if (!inv) continue;
-      const recipient = channel === 'EMAIL' ? s.guardianEmail : s.guardianPhone;
+    for (const r of rows) {
+      const recipient = channel === 'EMAIL' ? (r.guardian_email || '') : r.guardian_phone;
       if (!recipient) continue;
-      const amount = inv.amountDue?.toString() ?? '0.00';
-      const dueDate = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-GB') : 'soon';
+      const dueDate = r.due_date ? new Date(r.due_date).toLocaleDateString('en-GB') : 'soon';
       records.push({
         tenantId,
-        studentId: s.id,
+        studentId: r.student_id,
         type: 'FEE_REMINDER',
         channel,
         recipient,
         message: TEMPLATES.FEE_REMINDER({
-          guardianName: s.guardianName,
-          studentName: `${s.firstName} ${s.lastName}`,
+          guardianName: r.guardian_name,
+          studentName: `${r.first_name} ${r.last_name}`,
           currency: 'GHS ',
-          amount,
+          amount: r.amount_due,
           dueDate,
         }),
         status: 'SENT',
-        sentBy: userId,
-        referenceId: inv.clientTxnId,
+        sentBy: userId ?? null,
+        referenceId: r.client_txn_id,
       });
     }
   } else if (trigger === 'ABSENT_TODAY') {
     const checkDate = date ? new Date(date) : new Date();
     const dateStr = checkDate.toISOString().split('T')[0];
-
-    const attendanceWhere: Record<string, unknown> = {
-      tenantId,
-      date: { gte: new Date(dateStr), lt: new Date(new Date(dateStr).getTime() + 86400000) },
-      status: 'ABSENT',
-    };
-    if (className) attendanceWhere.className = className;
-
-    const absentRecords = await prisma.attendanceRecord.findMany({
-      where: attendanceWhere,
-      select: { studentId: true },
-    });
-
-    const absentIds = [...new Set(absentRecords.map((a) => a.studentId))];
-    const students = await prisma.student.findMany({
-      where: { id: { in: absentIds }, tenantId, isActive: true },
-    });
-
     const displayDate = checkDate.toLocaleDateString('en-GB');
-    for (const s of students) {
-      const recipient = channel === 'EMAIL' ? s.guardianEmail : s.guardianPhone;
+
+    const classFilter = className ? ` AND s.class_name = $3` : '';
+    const params: unknown[] = [tenantId, dateStr];
+    if (className) params.push(className);
+
+    const rows = await db.$queryRawUnsafe<{
+      student_id: string; first_name: string; last_name: string;
+      guardian_name: string; guardian_phone: string; guardian_email: string | null;
+    }>(
+      `SELECT DISTINCT s.id AS student_id, s.first_name, s.last_name,
+              s.guardian_name, s.guardian_phone, s.guardian_email
+       FROM school_attendance a
+       JOIN students s ON s.id = a.student_id
+       WHERE a.tenant_id = $1
+         AND a.date = $2::date
+         AND a.status = 'ABSENT'
+         AND s.is_active = true${classFilter}
+       ORDER BY s.last_name, s.first_name`,
+      ...params,
+    );
+
+    for (const r of rows) {
+      const recipient = channel === 'EMAIL' ? (r.guardian_email || '') : r.guardian_phone;
       if (!recipient) continue;
       records.push({
         tenantId,
-        studentId: s.id,
+        studentId: r.student_id,
         type: 'ATTENDANCE',
         channel,
         recipient,
         message: TEMPLATES.ATTENDANCE({
-          guardianName: s.guardianName,
-          studentName: `${s.firstName} ${s.lastName}`,
+          guardianName: r.guardian_name,
+          studentName: `${r.first_name} ${r.last_name}`,
           status: 'absent',
           date: displayDate,
         }),
         status: 'SENT',
-        sentBy: userId,
+        sentBy: userId ?? null,
         referenceId: dateStr,
       });
     }
   } else if (trigger === 'RESULTS_READY') {
     if (!termId) return res.status(400).json({ error: 'termId is required for RESULTS_READY' });
 
-    const term = await prisma.academicTerm.findFirst({ where: { id: termId, tenantId } });
-    if (!term) return res.status(404).json({ error: 'Term not found' });
+    const terms = await db.$queryRawUnsafe<{ id: string; name: string }>(
+      `SELECT id, name FROM academic_terms WHERE id = $1 AND tenant_id = $2 LIMIT 1`,
+      termId, tenantId,
+    );
+    if (terms.length === 0) return res.status(404).json({ error: 'Term not found' });
+    const termName = terms[0].name;
 
-    const studentWhere: Record<string, unknown> = { tenantId, isActive: true };
-    if (className) studentWhere.className = className;
+    const classFilter = className ? ` AND s.class_name = $3` : '';
+    const sparams: unknown[] = [tenantId, termId];
+    if (className) sparams.push(className);
 
-    const students = await prisma.student.findMany({ where: studentWhere });
+    const rows = await db.$queryRawUnsafe<{
+      student_id: string; first_name: string; last_name: string;
+      guardian_name: string; guardian_phone: string; guardian_email: string | null;
+      total_score: string | null; max_score: string | null;
+    }>(
+      `SELECT s.id AS student_id, s.first_name, s.last_name,
+              s.guardian_name, s.guardian_phone, s.guardian_email,
+              SUM(a.total_score)::text AS total_score,
+              SUM(a.max_score)::text AS max_score
+       FROM students s
+       LEFT JOIN student_assessments a ON a.student_id = s.id AND a.term_id = $2
+       WHERE s.tenant_id = $1 AND s.is_active = true${classFilter}
+       GROUP BY s.id, s.first_name, s.last_name, s.guardian_name, s.guardian_phone, s.guardian_email
+       ORDER BY s.last_name, s.first_name`,
+      ...sparams,
+    );
 
-    // Compute each student's average from assessments in the term
-    const assessments = await prisma.studentAssessment.findMany({
-      where: { tenantId, termId },
-      select: { studentId: true, totalScore: true, maxScore: true },
-    });
-
-    const avgMap: Record<string, { sum: number; max: number; count: number }> = {};
-    for (const a of assessments) {
-      if (!avgMap[a.studentId]) avgMap[a.studentId] = { sum: 0, max: 0, count: 0 };
-      avgMap[a.studentId].sum += Number(a.totalScore ?? 0);
-      avgMap[a.studentId].max += Number(a.maxScore ?? 100);
-      avgMap[a.studentId].count += 1;
-    }
-
-    for (const s of students) {
-      const recipient = channel === 'EMAIL' ? s.guardianEmail : s.guardianPhone;
+    for (const r of rows) {
+      const recipient = channel === 'EMAIL' ? (r.guardian_email || '') : r.guardian_phone;
       if (!recipient) continue;
-      const agg = avgMap[s.id];
-      const avg = agg && agg.max > 0 ? ((agg.sum / agg.max) * 100).toFixed(1) : 'N/A';
+      const totalScore = parseFloat(r.total_score ?? '0');
+      const maxScore = parseFloat(r.max_score ?? '0');
+      const avg = maxScore > 0 ? ((totalScore / maxScore) * 100).toFixed(1) : 'N/A';
       records.push({
         tenantId,
-        studentId: s.id,
+        studentId: r.student_id,
         type: 'RESULTS',
         channel,
         recipient,
         message: TEMPLATES.RESULTS({
-          guardianName: s.guardianName,
-          studentName: `${s.firstName} ${s.lastName}`,
-          term: term.name,
+          guardianName: r.guardian_name,
+          studentName: `${r.first_name} ${r.last_name}`,
+          term: termName,
           average: avg,
         }),
         status: 'SENT',
-        sentBy: userId,
+        sentBy: userId ?? null,
         referenceId: termId,
       });
     }
@@ -366,19 +395,28 @@ router.post('/bulk', requireRole('Admin', 'Manager'), async (req: Request, res: 
     return res.json({ sent: 0, message: 'No eligible recipients found' });
   }
 
-  const created = await prisma.parentMessage.createMany({ data: records });
-  res.status(201).json({ sent: created.count });
+  for (const r of records) {
+    await db.$executeRawUnsafe(
+      `INSERT INTO parent_messages (tenant_id, student_id, type, channel, recipient, message, status, sent_by, reference_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      r.tenantId, r.studentId, r.type, r.channel, r.recipient, r.message, r.status, r.sentBy, r.referenceId,
+    );
+  }
+
+  res.status(201).json({ sent: records.length });
 });
 
 // DELETE /:id
 router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response) => {
-  const tenantId = requireTenantContext();
+  const { tenantId } = requireTenantContext();
   const { id } = req.params;
 
-  const msg = await prisma.parentMessage.findFirst({ where: { id, tenantId } });
-  if (!msg) return res.status(404).json({ error: 'Message not found' });
+  const rows = await db.$queryRawUnsafe<{ id: string }>(
+    `SELECT id FROM parent_messages WHERE id = $1 AND tenant_id = $2`, id, tenantId,
+  );
+  if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
 
-  await prisma.parentMessage.delete({ where: { id } });
+  await db.$executeRawUnsafe(`DELETE FROM parent_messages WHERE id = $1`, id);
   res.status(204).send();
 });
 
