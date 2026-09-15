@@ -58,11 +58,11 @@ export function Jobs() {
   const displayedJobs = useMemo(() => {
     const q = jobSearch.toLowerCase().trim();
     if (!q) return jobs;
-    return jobs.filter((j) =>
-      j.name.toLowerCase().includes(q) ||
-      (j.customer?.name ?? "").toLowerCase().includes(q)
-    );
-  }, [jobs, jobSearch]);
+    return jobs.filter((j) => {
+      const custName = (customers.find((c) => c.id === j.customerId)?.name ?? "").toLowerCase();
+      return j.name.toLowerCase().includes(q) || custName.includes(q);
+    });
+  }, [jobs, jobSearch, customers]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
