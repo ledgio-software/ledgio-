@@ -327,6 +327,7 @@ export const navigationGroups: NavGroup[] = [
       { name: "Events & Calendar", href: "/school/events", icon: CalendarCheck },
       { name: "MIS Dashboard", href: "/school/mis", icon: LayoutDashboard },
       { name: "NaSIA Dashboard", href: "/school/nasia", icon: ClipboardList },
+      { name: "Transport", href: "/school/transport", icon: Truck },
     ],
   },
   {

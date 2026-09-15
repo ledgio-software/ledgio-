@@ -114,6 +114,7 @@ import schoolMISRouter from './routes/schoolMIS';
 import schoolTeachersRouter from './routes/schoolTeachers';
 import schoolNasiaRouter from './routes/schoolNasia';
 import schoolFeePaymentPlansRouter from './routes/schoolFeePaymentPlans';
+import schoolTransportRouter from './routes/schoolTransport';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
 import scenariosRouter from './routes/scenarios';
@@ -301,6 +302,7 @@ app.use('/api/v1/school/mis', schoolMISRouter);
 app.use('/api/v1/school/teachers', schoolTeachersRouter);
 app.use('/api/v1/school/nasia', schoolNasiaRouter);
 app.use('/api/v1/school/fee-payment-plans', schoolFeePaymentPlansRouter);
+app.use('/api/v1/school/transport', schoolTransportRouter);
 
 // Cost Centres / Profit Centres (departmental/branch P&L segmentation)
 app.use('/api/v1/cost-centres', costCentresRouter);

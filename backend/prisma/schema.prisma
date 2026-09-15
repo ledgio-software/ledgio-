@@ -2819,3 +2819,111 @@ model FeeInstallment {
   @@index([planId])
   @@map("fee_installments")
 }
+
+// ─── Transport Management ─────────────────────────────────────────────────────
+
+model TransportVehicle {
+  id               String             @id @default(uuid())
+  tenantId         String             @map("tenant_id")
+  regNumber        String             @map("reg_number")
+  make             String?
+  model            String?
+  capacity         Int?
+  fuelType         String?            @map("fuel_type") // PETROL | DIESEL | LPG
+  status           String             @default("ACTIVE") // ACTIVE | MAINTENANCE | RETIRED
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  routes           TransportRoute[]
+  fuelLogs         TransportFuelLog[]
+  maintenanceLogs  TransportMaintLog[]
+
+  @@unique([tenantId, regNumber])
+  @@index([tenantId])
+  @@map("transport_vehicles")
+}
+
+model TransportDriver {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  firstName   String           @map("first_name")
+  lastName    String           @map("last_name")
+  phone       String?
+  licenseNo   String?          @map("license_no")
+  licenseExp  DateTime?        @map("license_exp")
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  routes      TransportRoute[]
+
+  @@index([tenantId])
+  @@map("transport_drivers")
+}
+
+model TransportRoute {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  name        String
+  description String?
+  vehicleId   String?          @map("vehicle_id")
+  vehicle     TransportVehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driverId    String?          @map("driver_id")
+  driver      TransportDriver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  morningDep  String?          @map("morning_dep")  // "06:30"
+  afternoonDep String?         @map("afternoon_dep") // "15:00"
+  fee         Decimal?         @db.Decimal(15, 2)
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  stops       TransportStop[]
+
+  @@index([tenantId])
+  @@map("transport_routes")
+}
+
+model TransportStop {
+  id        String         @id @default(uuid())
+  routeId   String         @map("route_id")
+  route     TransportRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int
+  landmark  String?
+
+  @@index([routeId])
+  @@map("transport_stops")
+}
+
+model TransportFuelLog {
+  id         String           @id @default(uuid())
+  tenantId   String           @map("tenant_id")
+  vehicleId  String           @map("vehicle_id")
+  vehicle    TransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  date       DateTime
+  litres     Decimal          @db.Decimal(8, 2)
+  costPerLitre Decimal        @map("cost_per_litre") @db.Decimal(10, 4)
+  totalCost  Decimal          @map("total_cost") @db.Decimal(15, 2)
+  odometer   Int?
+  station    String?
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, vehicleId])
+  @@map("transport_fuel_logs")
+}
+
+model TransportMaintLog {
+  id          String           @id @default(uuid())
+  tenantId    String           @map("tenant_id")
+  vehicleId   String           @map("vehicle_id")
+  vehicle     TransportVehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  date        DateTime
+  type        String           // OIL_CHANGE | TYRE | BRAKE | SERVICE | REPAIR | OTHER
+  description String
+  cost        Decimal          @db.Decimal(15, 2)
+  workshop    String?
+  nextDueDate DateTime?        @map("next_due_date")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, vehicleId])
+  @@map("transport_maint_logs")
+}
