@@ -70,6 +70,7 @@ const SchoolScholarships = lazy(() => import("./pages/school/Scholarships").then
 const SchoolStudentHealth = lazy(() => import("./pages/school/StudentHealth").then(m => ({ default: m.StudentHealth })));
 const SchoolEventsPage = lazy(() => import("./pages/school/SchoolEvents").then(m => ({ default: m.SchoolEvents })));
 const SchoolMIS = lazy(() => import("./pages/school/SchoolMIS").then(m => ({ default: m.SchoolMIS })));
+const NasiaDashboard = lazy(() => import("./pages/school/NasiaDashboard").then(m => ({ default: m.NasiaDashboard })));
 const ExpenseClaims = lazy(() => import("./pages/expenses/ExpenseClaims").then(m => ({ default: m.ExpenseClaims })));
 const Budgets = lazy(() => import("./pages/reports/Budgets").then(m => ({ default: m.Budgets })));
 const TeamManagement = lazy(() => import("./pages/team/TeamManagement").then(m => ({ default: m.TeamManagement })));
@@ -1126,6 +1127,7 @@ function App() {
               <Route path="/school/health" element={<ProtectedRoute><MainLayout><SchoolStudentHealth /></MainLayout></ProtectedRoute>} />
               <Route path="/school/events" element={<ProtectedRoute><MainLayout><SchoolEventsPage /></MainLayout></ProtectedRoute>} />
               <Route path="/school/mis" element={<ProtectedRoute><MainLayout><SchoolMIS /></MainLayout></ProtectedRoute>} />
+              <Route path="/school/nasia" element={<ProtectedRoute><MainLayout><NasiaDashboard /></MainLayout></ProtectedRoute>} />
               <Route path="/cost-centres" element={<ProtectedRoute><MainLayout><CostCentres /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing" element={<ProtectedRoute><MainLayout><Manufacturing /></MainLayout></ProtectedRoute>} />
               <Route path="/manufacturing/jobs" element={<ProtectedRoute><MainLayout><Jobs /></MainLayout></ProtectedRoute>} />

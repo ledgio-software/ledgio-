@@ -2756,3 +2756,29 @@ model CpdActivity {
   @@index([tenantId, teacherId])
   @@map("cpd_activities")
 }
+
+model NasiaAssessment {
+  id        String        @id @default(uuid())
+  tenantId  String        @map("tenant_id")
+  title     String
+  date      DateTime
+  status    String        @default("draft") // draft | completed
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  ratings   NasiaRating[]
+
+  @@index([tenantId])
+  @@map("nasia_assessments")
+}
+
+model NasiaRating {
+  id            String          @id @default(uuid())
+  assessmentId  String          @map("assessment_id")
+  indicatorCode String          @map("indicator_code")
+  score         Int
+  notes         String?
+  assessment    NasiaAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, indicatorCode])
+  @@map("nasia_ratings")
+}
