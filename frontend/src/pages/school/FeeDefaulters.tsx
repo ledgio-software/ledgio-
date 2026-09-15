@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { AlertTriangle, Loader2, Printer, Settings, MessageSquare } from "lucide-react";
+import { AlertTriangle, Loader2, Printer, Settings, MessageSquare, Search } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface LateFineConfig {
@@ -52,6 +53,7 @@ export function FeeDefaulters() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [showSmsConfirm, setShowSmsConfirm] = useState(false);
+  const [defaulterSearch, setDefaulterSearch] = useState("");
   const isAdmin = (user?.role ?? "").toLowerCase() === "admin";
   const canSendSms = isAdmin || (user?.role ?? "").toLowerCase() === "accountant";
 
@@ -123,6 +125,16 @@ export function FeeDefaulters() {
     }
   }
 
+    const displayedDefaulters = useMemo(() => {
+    const q = defaulterSearch.toLowerCase().trim();
+    if (!q) return defaulters;
+    return defaulters.filter((d) =>
+      `${d.student.firstName} ${d.student.lastName}`.toLowerCase().includes(q) ||
+      (d.student.studentCode ?? "").toLowerCase().includes(q) ||
+      (d.student.className ?? "").toLowerCase().includes(q)
+    );
+  }, [defaulters, defaulterSearch]);
+
   const totalBalance = defaulters.reduce((s, d) => s + d.balance, 0);
   const totalLateFine = defaulters.reduce((s, d) => s + d.lateFineAmount, 0);
   const totalDue = defaulters.reduce((s, d) => s + d.totalDue, 0);
@@ -170,6 +182,16 @@ export function FeeDefaulters() {
             <Printer className="h-4 w-4 mr-1" /> Print
           </Button>
         </div>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+        <Input
+          placeholder="Search student name, code or class…"
+          className="pl-8"
+          value={defaulterSearch}
+          onChange={(e) => setDefaulterSearch(e.target.value)}
+        />
       </div>
 
       {showConfigPanel && isAdmin && (
@@ -285,7 +307,7 @@ export function FeeDefaulters() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    defaulters.map((d) => (
+                    displayedDefaulters.map((d) => (
                       <TableRow key={d.student.id}>
                         <TableCell>
                           <div className="font-medium">

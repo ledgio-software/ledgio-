@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from "react";
-import { Plus, RefreshCw, Truck, Package, CheckCircle } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Plus, RefreshCw, Truck, Package, CheckCircle, Search } from "lucide-react";
+import { Input } from "../../components/ui/Input";
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
@@ -52,6 +53,16 @@ function DeliveryNotesTab() {
   const [formLines, setFormLines] = useState([{ description: "", quantity: 1 }]);
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [dnSearch, setDnSearch] = useState("");
+
+  const displayedNotes = useMemo(() => {
+    const q = dnSearch.toLowerCase().trim();
+    if (!q) return notes;
+    return notes.filter((n) =>
+      n.dnNumber.toLowerCase().includes(q) ||
+      n.customer.name.toLowerCase().includes(q)
+    );
+  }, [notes, dnSearch]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -182,6 +193,16 @@ function DeliveryNotesTab() {
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+        <Input
+          placeholder="Search DN # or customer…"
+          className="pl-8"
+          value={dnSearch}
+          onChange={(e) => setDnSearch(e.target.value)}
+        />
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -204,7 +225,12 @@ function DeliveryNotesTab() {
                   </TableCell>
                 </TableRow>
               )}
-              {notes.map((n) => (
+              {notes.length > 0 && displayedNotes.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">No delivery notes match the search.</TableCell>
+                </TableRow>
+              )}
+              {displayedNotes.map((n) => (
                 <TableRow key={n.id}>
                   <TableCell className="font-mono font-medium">{n.dnNumber}</TableCell>
                   <TableCell>{n.customer.name}</TableCell>

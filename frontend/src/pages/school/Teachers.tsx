@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../../lib/api';
 import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Plus, Edit2, X, Trash2, AlertTriangle, ShieldCheck, Clock, BookOpen, Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Edit2, X, Trash2, AlertTriangle, ShieldCheck, Clock, BookOpen, Upload, Download, CheckCircle, XCircle, Loader2, Search } from 'lucide-react';
 
 const CPD_CATEGORIES = ['WORKSHOP', 'CONFERENCE', 'ONLINE_COURSE', 'PGDE', 'SEMINAR', 'SCHOOL_BASED', 'OTHER'] as const;
 type CpdCategory = typeof CPD_CATEGORIES[number];
@@ -289,7 +289,15 @@ export function Teachers() {
     }
   }
 
-  const visible = teachers.filter((t) => showInactive ? true : t.isActive);
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const visible = useMemo(() => {
+    const q = teacherSearch.toLowerCase().trim();
+    return teachers.filter((t) => {
+      if (!showInactive && !t.isActive) return false;
+      if (q) return `${t.firstName} ${t.lastName}`.toLowerCase().includes(q) || (t.staffId ?? "").toLowerCase().includes(q) || (t.subject ?? "").toLowerCase().includes(q);
+      return true;
+    });
+  }, [teachers, showInactive, teacherSearch]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -331,12 +339,23 @@ export function Teachers() {
 
       {/* Teacher table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3 flex-wrap">
           <CardTitle className="text-base">Teachers</CardTitle>
-          <label className="flex items-center gap-2 text-xs text-secondary-500 cursor-pointer select-none">
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded" />
-            Show inactive
-          </label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+              <Input
+                placeholder="Search name, ID or subject…"
+                className="pl-8 w-56"
+                value={teacherSearch}
+                onChange={(e) => setTeacherSearch(e.target.value)}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-secondary-500 cursor-pointer select-none whitespace-nowrap">
+              <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded" />
+              Show inactive
+            </label>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
