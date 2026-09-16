@@ -74,7 +74,7 @@ export function Demo() {
                 ))}
                 <div className="flex items-center gap-3">
                   <Mail className="h-4 w-4 text-brand-600 flex-shrink-0" />
-                  <a href="mailto:hello@ledgio.io" className="text-sm text-brand-400 hover:text-brand-300 transition-colors">hello@ledgio.io</a>
+                  <a href="mailto:ledgioapp@gmail.com" className="text-sm text-brand-400 hover:text-brand-300 transition-colors">ledgioapp@gmail.com</a>
                 </div>
               </div>
             </div>

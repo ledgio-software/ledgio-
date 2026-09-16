@@ -95,8 +95,8 @@ export function Blog() {
           <div className="mt-16 text-center p-8 bg-ink-900/40 border border-ink-800/60 rounded-2xl max-w-xl mx-auto">
             <h3 className="text-base font-black text-white mb-2">Want us to cover a specific topic?</h3>
             <p className="text-sm text-ink-400 mb-4">Send us your questions and we'll write a guide for it.</p>
-            <a href="mailto:hello@ledgio.io" className="text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors">
-              hello@ledgio.io
+            <a href="mailto:ledgioapp@gmail.com" className="text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors">
+              ledgioapp@gmail.com
             </a>
           </div>
         </div>

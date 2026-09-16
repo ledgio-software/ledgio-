@@ -93,7 +93,7 @@ export function FAQ() {
           <div className="mt-12 text-center p-8 bg-ink-900/40 border border-ink-800/60 rounded-2xl">
             <p className="text-sm text-ink-400 mb-4">Still have questions?</p>
             <div className="flex flex-wrap justify-center gap-4">
-              <a href="mailto:hello@ledgio.io" className="text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors">hello@ledgio.io</a>
+              <a href="mailto:ledgioapp@gmail.com" className="text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors">ledgioapp@gmail.com</a>
               <span className="text-ink-700">·</span>
               <a href="tel:+233248051379" className="text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors">+233 24 805 1379</a>
             </div>
