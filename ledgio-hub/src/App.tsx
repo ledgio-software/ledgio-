@@ -10,6 +10,7 @@ import { Demo } from './pages/Demo';
 import { FAQ } from './pages/FAQ';
 import { Blog } from './pages/Blog';
 import { SectorPage } from './pages/SectorPage';
+import { PartnerPortal } from './pages/PartnerPortal';
 import { SECTORS } from './lib/sectors';
 
 function SectorRoute() {
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/faq" element={<FAQ />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/for/:slug" element={<SectorRoute />} />
+          <Route path="/partner/portal/:partnerId" element={<PartnerPortal />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

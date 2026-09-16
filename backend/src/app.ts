@@ -268,6 +268,51 @@ app.post('/api/v1/referrals/verify', async (req, res): Promise<void> => {
   }
 });
 
+// Public partner portal — secured by partner UUID (hard to guess, no password).
+// Returns the list of referred tenants for that partner.
+app.get('/api/v1/referrals/portal/:partnerId', async (req, res): Promise<void> => {
+  try {
+    const { prisma } = await import('./config/db');
+    const partner = await prisma.referralPartner.findUnique({
+      where: { id: req.params.partnerId },
+      select: { id: true, name: true, code: true, commissionRate: true, isActive: true },
+    });
+    if (!partner || !partner.isActive) {
+      res.status(404).json({ success: false, error: 'Partner not found.' });
+      return;
+    }
+    const tenants = await prisma.tenant.findMany({
+      where: { referralCode: partner.code },
+      select: {
+        id: true,
+        name: true,
+        orgType: true,
+        tier: true,
+        subscriptionStatus: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const TIER_LABEL: Record<number, string> = { 0: 'Free', 1: 'Starter', 2: 'Professional', 3: 'Enterprise' };
+    res.json({
+      success: true,
+      data: {
+        partner: { name: partner.name, code: partner.code, commissionRate: Number(partner.commissionRate) },
+        tenants: tenants.map(t => ({
+          id: t.id,
+          name: t.name,
+          orgType: t.orgType,
+          tier: TIER_LABEL[t.tier] ?? `Tier ${t.tier}`,
+          subscriptionStatus: t.subscriptionStatus,
+          joinedAt: t.createdAt,
+        })),
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to load portal data.' });
+  }
+});
+
 // Tenant onboarding & management endpoints. The strict 5-req/min onboarding
 // limiter is applied per-route (POST /onboard, POST /admin-onboard) inside
 // tenants.ts, not to the whole router - it previously throttled unrelated
