@@ -2,6 +2,10 @@
 
 This file lists the development tasks for the Multi-Tenant Web-Based Accounting Platform, with weighted checkboxes indicating progress. Tasks are considered complete only after verification.
 
+## Bug Fixes & Features (2026-09-16)
+
+- [x] **Feature: Landing page — org-type sections (Retail & Trading, Schools, Churches & NGOs)** (2026-09-16) — Added a "Built for Your Organisation" section to the public landing page between the features grid and pricing. Three cards, one per org type, each listing 12 purpose-built features. Retail & Trading (emerald): POS, receipt audit log, inventory, multi-warehouse, payroll, bank reconciliation, budgets, recurring transactions, Mobile Money, SMS shortage alerts, analytics. Schools (blue): student admissions, student ledger, health records, school chart of accounts, Income & Expenditure report, fund accounting, expense claims, budgets, approval workflows, weekly PDF email, role-based access, audit trail. Churches & NGOs (purple): restricted/unrestricted donor fund tracking, per-fund tagging, per-fund Balance Sheet, expense claims, approval workflows, budgets, recurring transactions, vendor bills, Mobile Money, bank reconciliation, weekly PDF email, audit trail. Each card has a branded "Register as …" CTA. Tagline at section footer explains org type is chosen once at registration and drives the entire workspace. Verified: frontend typecheck + build pass, Vercel preview deployed. PR #64. (`frontend/src/pages/landing/LandingPage.tsx`)
+
 ## Bug Fixes & Features (2026-09-15)
 
 - [x] **Fix: Blank browser print preview when printing POS receipt PDFs** (2026-09-15) — `URL.revokeObjectURL` was being called on the blob URL immediately after `window.open`, before the browser's built-in PDF viewer could re-read it for the print dialog. Removed the `revokeObjectURL` call from `openReceipt` in `PointOfSale.tsx` and from `openPdf` in `ReceiptLog.tsx`; the browser releases the blob automatically when the tab closes. Verified: frontend build passes, Vercel deployed. PR #63. (`frontend/src/pages/pos/PointOfSale.tsx`, `frontend/src/pages/reports/ReceiptLog.tsx`)
