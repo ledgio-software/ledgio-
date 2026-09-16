@@ -3,6 +3,7 @@ export interface SectorData {
   icon: string;
   label: string;
   tagline: string;
+  heroImage: string;
   hero: {
     headline: string;
     sub: string;
@@ -27,6 +28,7 @@ export const SECTORS: SectorData[] = [
     icon: '🛒',
     label: 'Small Retail & Shops',
     tagline: 'For single-location shops, boutiques, sole traders and market sellers.',
+    heroImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80&auto=format&fit=crop',
     hero: {
       headline: 'Run Your Shop Like a Pro',
       sub: 'POS, inventory, invoicing, and cash management — everything a small retail business needs in one place, with zero accounting knowledge required.',
@@ -72,6 +74,7 @@ export const SECTORS: SectorData[] = [
     icon: '🏢',
     label: 'Enterprise & Multi-Branch',
     tagline: 'For wholesalers, distributors, trading chains, and large multi-location businesses.',
+    heroImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80&auto=format&fit=crop',
     hero: {
       headline: 'One System. Every Branch. Full Control.',
       sub: 'Multi-warehouse logistics, approval workflows, advanced budgeting, and consolidated reporting — built for businesses that have outgrown basic accounting.',
@@ -117,6 +120,7 @@ export const SECTORS: SectorData[] = [
     icon: '🎓',
     label: 'Schools',
     tagline: 'Purpose-built for basic and secondary schools in Ghana and across Africa.',
+    heroImage: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1920&q=80&auto=format&fit=crop',
     hero: {
       headline: 'Financial Clarity for Every School Term',
       sub: 'Student admissions, fee collection, health records, and fund-based accounting — all in one system designed specifically for how schools manage money.',
@@ -162,6 +166,7 @@ export const SECTORS: SectorData[] = [
     icon: '💜',
     label: 'Churches & NGOs',
     tagline: 'Transparent fund accounting for faith communities, charities, and nonprofits.',
+    heroImage: 'https://images.unsplash.com/photo-1542810634-71277d95dcbb?w=1920&q=80&auto=format&fit=crop',
     hero: {
       headline: 'Steward Every Offering with Confidence',
       sub: 'Restricted donor funds, offering collections, expense approvals, and full audit trails — built so your congregation and donors always know their money is properly accounted for.',
@@ -207,6 +212,7 @@ export const SECTORS: SectorData[] = [
     icon: '💊',
     label: 'Pharmacy',
     tagline: 'For licensed community pharmacies, hospital dispensaries, and drug stores.',
+    heroImage: 'https://images.unsplash.com/photo-1576602976047-174e57a47881?w=1920&q=80&auto=format&fit=crop',
     hero: {
       headline: 'Dispense Safely. Account Accurately.',
       sub: 'Prescription management, NHIS claims, GRA e-VAT, drug interaction checks, and full pharmacy accounting — everything a modern pharmacy needs, fully integrated.',
@@ -252,6 +258,7 @@ export const SECTORS: SectorData[] = [
     icon: '⚙️',
     label: 'Manufacturing',
     tagline: 'For manufacturers, fabricators, and job-order production businesses.',
+    heroImage: 'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1920&q=80&auto=format&fit=crop',
     hero: {
       headline: 'Know the True Cost of Every Job',
       sub: 'Job costing, WIP tracking, COGS automation, and production management — built for manufacturers who need to know exactly what each product costs to make.',
@@ -297,6 +304,7 @@ export const SECTORS: SectorData[] = [
     icon: '💼',
     label: 'Professional Services',
     tagline: 'For accounting firms, law firms, consultancies, and independent professionals.',
+    heroImage: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=1920&q=80&auto=format&fit=crop',
     hero: {
       headline: 'Manage Your Practice. Serve Your Clients.',
       sub: 'Client invoicing, retainer management, payroll, expense approvals, and full double-entry accounting — built for professional service firms that need clean books and efficient billing.',

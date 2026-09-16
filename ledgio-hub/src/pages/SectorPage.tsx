@@ -11,8 +11,14 @@ export function SectorPage({ sector }: Props) {
 
       {/* Hero */}
       <section className="relative py-24 sm:py-32 overflow-hidden">
-        <div className={`absolute inset-0 bg-gradient-to-br ${sector.accent.from} ${sector.accent.to} opacity-10`} />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
+        <img
+          src={sector.heroImage}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.14] mix-blend-luminosity"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-ink-950/40" />
+        <div className={`absolute inset-0 bg-gradient-to-br ${sector.accent.from} ${sector.accent.to} opacity-[0.08]`} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 ${sector.accent.badge}`}>

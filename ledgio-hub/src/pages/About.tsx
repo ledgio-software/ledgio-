@@ -18,6 +18,13 @@ export function About() {
 
       {/* Hero */}
       <section className="relative py-28 overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1920&q=80&auto=format&fit=crop"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.08]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-ink-950" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(5,150,105,0.12)_0%,transparent_70%)]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
@@ -47,9 +54,20 @@ export function About() {
               <p className="text-ink-300 leading-relaxed mb-4">
                 We built Ledgio from the ground up to solve these problems — with sector-specific workflows, local payment integrations, and a focus on the real-world challenges faced by African businesses every day.
               </p>
-              <p className="text-ink-300 leading-relaxed">
+              <p className="text-ink-300 leading-relaxed mb-8">
                 Every business on Ledgio gets its own completely isolated database schema. Your books are yours — private, secure, and never mixed with another tenant's data.
               </p>
+              <div className="relative rounded-2xl overflow-hidden aspect-[16/9]">
+                <img
+                  src="https://images.unsplash.com/photo-1542744094-3a31f272c490?w=900&q=80&auto=format&fit=crop"
+                  alt="Team working together"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink-950/60 to-transparent" />
+                <div className="absolute bottom-4 left-4">
+                  <p className="text-xs font-bold text-white/70 uppercase tracking-widest">Built for Africa</p>
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-5">
               {VALUES.map((v) => {

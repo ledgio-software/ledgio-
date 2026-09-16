@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Shield, Zap, Globe } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Shield, Zap, Globe, Play } from 'lucide-react';
 import { SECTORS } from '../lib/sectors';
 
 const TRUST_STATS = [
@@ -21,6 +21,13 @@ export function Home() {
 
       {/* Hero */}
       <section className="relative py-28 sm:py-36 overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1920&q=80&auto=format&fit=crop"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.07]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink-950/60 to-ink-950" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(5,150,105,0.15)_0%,transparent_70%)]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/60 border border-brand-700/40 text-brand-300 text-xs font-bold uppercase tracking-widest mb-8">
@@ -63,6 +70,60 @@ export function Home() {
                 <div className="text-xs text-ink-500 font-medium">{s.label}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* See it in Action */}
+      <section className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            <div>
+              <span className="inline-flex items-center px-3 py-1 rounded-full bg-brand-950/60 border border-brand-700/40 text-brand-300 text-[10px] font-black uppercase tracking-widest mb-6">
+                Product Tour
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-black text-white mb-5 leading-tight">
+                See Ledgio in Action
+              </h2>
+              <p className="text-ink-400 text-sm leading-relaxed mb-6">
+                Watch how a business goes from registration to their first sale in under 10 minutes — POS, inventory, and automated accounting all running together.
+              </p>
+              <ul className="space-y-3 mb-8">
+                {[
+                  'Live POS with receipt printing and Mobile Money',
+                  'Real-time stock deductions on every sale',
+                  'Automatic journal entries — no manual bookkeeping',
+                  'SMS shortage alert fired the moment a till closes short',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <CheckCircle2 className="h-4 w-4 text-brand-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-ink-300">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/demo"
+                className="inline-flex items-center gap-2 text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors"
+              >
+                Book a live walkthrough <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <Link to="/demo" className="group block relative aspect-video rounded-2xl overflow-hidden shadow-2xl shadow-ink-950 border border-ink-800/60">
+              <img
+                src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80&auto=format&fit=crop"
+                alt="Ledgio dashboard preview"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-ink-950/30 to-transparent" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-brand-600/90 backdrop-blur-sm flex items-center justify-center shadow-xl shadow-brand-950 group-hover:scale-110 transition-transform duration-300">
+                    <Play className="h-7 w-7 text-white ml-1" fill="white" />
+                  </div>
+                  <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Book a Live Demo</span>
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
       </section>
