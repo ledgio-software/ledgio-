@@ -3600,6 +3600,7 @@ export function AdminCoreEngine() {
                               <TableHead className="text-secondary-400 text-xs text-right">MRR</TableHead>
                               <TableHead className="text-secondary-400 text-xs text-right">Due</TableHead>
                               <TableHead className="text-secondary-400 text-xs text-center">Active</TableHead>
+                              <TableHead className="text-secondary-400 text-xs text-center">Portal Link</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -3622,6 +3623,17 @@ export function AdminCoreEngine() {
                                     } disabled:opacity-50`}
                                   >
                                     {togglingPartnerId === p.id ? "…" : p.isActive ? "Active" : "Inactive"}
+                                  </button>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <button
+                                    onClick={() => {
+                                      const url = `https://ledgio-hub.vercel.app/partner/portal/${p.id}`;
+                                      navigator.clipboard.writeText(url).then(() => showToast("Portal link copied!", "success"));
+                                    }}
+                                    className="text-[10px] font-bold rounded px-2 py-0.5 border border-blue-800 bg-blue-950/60 text-blue-400 hover:bg-blue-950 transition-colors"
+                                  >
+                                    Copy Link
                                   </button>
                                 </TableCell>
                               </TableRow>
