@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "../../components/ui/Card";
@@ -79,7 +79,19 @@ export function Register() {
   const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
+
+  // Auto-fill referral code from ?ref= URL param
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      const code = ref.trim().toUpperCase();
+      setFormData(prev => ({ ...prev, referralCode: code }));
+      validateReferralCode(code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchLegalDoc = async (policyName: "terms-and-conditions" | "privacy-policy") => {
     setActiveLegalDoc(policyName);
