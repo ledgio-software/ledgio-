@@ -112,7 +112,7 @@ export function Register() {
     }
     setReferralStatus("checking");
     try {
-      const res = await api.post("/admin/referrals/verify", { code: code.trim().toUpperCase() });
+      const res = await api.post("/referrals/verify", { code: code.trim().toUpperCase() });
       const payload = res.data?.data ?? res.data;
       if (payload?.valid) {
         setReferralStatus("valid");

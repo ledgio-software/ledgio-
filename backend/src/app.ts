@@ -209,6 +209,7 @@ app.use('/api/v1/admin/totp', adminRateLimiter, adminTotpRouter);
 // router self-protect via isMasterAdmin(), so no global gate is needed here.
 app.use('/api/v1/admin/team', adminRateLimiter, adminTeamAuthRouter);
 
+
 // Strict admin rate limiter (10 req/min per IP) — applied before any admin
 // handler so brute-forcing the master passcode is not feasible.
 app.use('/api/v1/admin/', adminRateLimiter);
@@ -240,6 +241,32 @@ app.use('/api/v1/health', healthRouter);
 // protection and could 429 a legitimate user mid-session (e.g. enabling MFA,
 // logging out, logging back in, then disabling it all within one minute).
 app.use('/api/v1/auth', authRouter);
+
+// Public referral code verification — used by the registration page to
+// validate a code before form submission. No admin auth required.
+// The full adminReferralsRouter is also mounted under /api/v1/admin/referrals
+// (behind the passcode gate) for all other CRUD operations.
+app.post('/api/v1/referrals/verify', async (req, res): Promise<void> => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      res.status(400).json({ success: false, error: 'code is required.' });
+      return;
+    }
+    const { prisma } = await import('./config/db');
+    const partner = await prisma.referralPartner.findUnique({
+      where: { code: String(code).trim().toUpperCase() },
+      select: { id: true, name: true, isActive: true },
+    });
+    if (!partner || !partner.isActive) {
+      res.status(404).json({ success: false, error: 'Invalid or inactive referral code.' });
+      return;
+    }
+    res.json({ success: true, data: { valid: true, partnerName: partner.name } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to verify referral code.' });
+  }
+});
 
 // Tenant onboarding & management endpoints. The strict 5-req/min onboarding
 // limiter is applied per-route (POST /onboard, POST /admin-onboard) inside
