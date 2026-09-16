@@ -110,7 +110,7 @@ export function HowItWorks() {
           <h2 className="text-2xl font-black text-white mb-4">Ready to get started?</h2>
           <p className="text-ink-400 text-sm mb-8">Your workspace is ready in 5 minutes. No credit card. No setup fee.</p>
           <div className="flex flex-wrap justify-center gap-4">
-            <a href="https://app.ledgio.io/register" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 transition-colors shadow-lg">
+            <a href="https://ledgio-fawn.vercel.app/register" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 transition-colors shadow-lg">
               Get Started Free <ArrowRight className="h-4 w-4" />
             </a>
             <Link to="/demo" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-ink-200 border border-ink-700 hover:bg-ink-800 transition-colors">

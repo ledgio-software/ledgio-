@@ -18,7 +18,7 @@ const PLANS = [
       'Dedicated database schema',
     ],
     cta: 'Get Started Free',
-    href: 'https://app.ledgio.io/register',
+    href: 'https://ledgio-fawn.vercel.app/register',
   },
   {
     name: 'Professional',
@@ -41,7 +41,7 @@ const PLANS = [
       'Priority support',
     ],
     cta: 'Start Professional Trial',
-    href: 'https://app.ledgio.io/register',
+    href: 'https://ledgio-fawn.vercel.app/register',
   },
   {
     name: 'Enterprise',

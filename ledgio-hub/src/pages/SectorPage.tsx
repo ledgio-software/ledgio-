@@ -27,7 +27,7 @@ export function SectorPage({ sector }: Props) {
             </p>
             <div className="flex flex-wrap gap-4">
               <a
-                href="https://app.ledgio.io/register"
+                href="https://ledgio-fawn.vercel.app/register"
                 className={`inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r ${sector.accent.from} ${sector.accent.to} shadow-lg transition-opacity hover:opacity-90`}
               >
                 {sector.hero.cta} <ArrowRight className="h-4 w-4" />
@@ -119,7 +119,7 @@ export function SectorPage({ sector }: Props) {
               </p>
               <div className="flex flex-wrap gap-4">
                 <a
-                  href="https://app.ledgio.io/register"
+                  href="https://ledgio-fawn.vercel.app/register"
                   className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm bg-white text-ink-900 hover:bg-ink-100 transition-colors shadow-lg"
                 >
                   {sector.hero.cta} <ArrowRight className="h-4 w-4" />

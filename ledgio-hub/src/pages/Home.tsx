@@ -38,7 +38,7 @@ export function Home() {
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <a
-              href="https://app.ledgio.io/register"
+              href="https://ledgio-fawn.vercel.app/register"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-950 transition-colors"
             >
               Get Started Free <ArrowRight className="h-4 w-4" />
@@ -171,7 +171,7 @@ export function Home() {
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <a
-                  href="https://app.ledgio.io/register"
+                  href="https://ledgio-fawn.vercel.app/register"
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm bg-white text-ink-900 hover:bg-ink-100 transition-colors shadow-lg"
                 >
                   Get Started Free <ArrowRight className="h-4 w-4" />

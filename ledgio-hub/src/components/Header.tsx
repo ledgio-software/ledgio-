@@ -80,13 +80,13 @@ export function Header() {
         {/* CTAs */}
         <div className="hidden lg:flex items-center gap-3">
           <a
-            href="https://app.ledgio.io/login"
+            href="https://ledgio-fawn.vercel.app/login"
             className="text-sm font-medium text-ink-300 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-ink-800"
           >
             Sign In
           </a>
           <a
-            href="https://app.ledgio.io/register"
+            href="https://ledgio-fawn.vercel.app/register"
             className="text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-brand-950"
           >
             Get Started Free
@@ -130,10 +130,10 @@ export function Header() {
               </Link>
             ))}
             <div className="border-t border-ink-800 pt-4 mt-2 flex flex-col gap-3">
-              <a href="https://app.ledgio.io/login" className="block text-center py-2.5 text-sm font-medium text-ink-300 border border-ink-700 rounded-xl hover:bg-ink-800 transition-colors">
+              <a href="https://ledgio-fawn.vercel.app/login" className="block text-center py-2.5 text-sm font-medium text-ink-300 border border-ink-700 rounded-xl hover:bg-ink-800 transition-colors">
                 Sign In
               </a>
-              <a href="https://app.ledgio.io/register" className="block text-center py-2.5 text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white rounded-xl transition-colors">
+              <a href="https://ledgio-fawn.vercel.app/register" className="block text-center py-2.5 text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white rounded-xl transition-colors">
                 Get Started Free
               </a>
             </div>
