@@ -1,81 +1,26 @@
+import { useState } from 'react';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useOnboarding } from '../lib/onboardingContext';
+import { SECTOR_PRICING, DEFAULT_SECTOR_SLUG } from '../lib/sectorPricing';
+import { SectorIcon } from '../lib/sectorIcons';
 
-const PLANS = [
-  {
-    name: 'Starter',
-    price: 'Free',
-    period: '',
-    description: 'For individuals and very small businesses getting started.',
-    highlight: false,
-    features: [
-      'Up to 2 users',
-      'Invoicing & basic accounts',
-      'POS (1 till)',
-      'Basic inventory',
-      'Bank reconciliation',
-      'Customer & supplier management',
-      'Weekly P&L email',
-      'Dedicated database schema',
-    ],
-    cta: 'Get Started Free',
-    href: 'https://ledgio-fawn.vercel.app/register',
-  },
-  {
-    name: 'Professional',
-    price: '₵299',
-    period: '/ month',
-    description: 'For growing businesses that need the full platform.',
-    highlight: true,
-    features: [
-      'Up to 10 users',
-      'All Starter features',
-      'Multi-warehouse / godown',
-      'Payroll management',
-      'Budgets & variance tracking',
-      'Approval workflows',
-      'Mobile Money collections',
-      'SMS shortage alerts',
-      'Student / fund accounting (sector)',
-      'Recurring transactions',
-      'Advanced analytics dashboard',
-      'Priority support',
-    ],
-    cta: 'Start Professional Trial',
-    href: 'https://ledgio-fawn.vercel.app/register',
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    description: 'For large organisations with advanced requirements.',
-    highlight: false,
-    features: [
-      'Unlimited users',
-      'All Professional features',
-      'Unlimited branches & warehouses',
-      'Custom approval chain configuration',
-      'Dedicated account manager',
-      'SLA-backed support',
-      'Mono bank feed integration',
-      'Custom reporting & exports',
-      'White-glove onboarding',
-    ],
-    cta: 'Contact Sales',
-    href: '/demo',
-  },
-];
+const SECTOR_TABS = SECTOR_PRICING.map((s) => ({ slug: s.sectorSlug, label: s.label }));
 
 const FAQ = [
-  { q: 'Can I start on the free Starter plan and upgrade later?', a: 'Yes. You can upgrade at any time from your Settings. Your workspace moves to the new tier instantly.' },
-  { q: 'How is billing handled?', a: 'Professional plans are billed monthly via Mobile Money (MTN, Telecel, AirtelTigo) or card. Enterprise plans are invoiced quarterly.' },
-  { q: 'Is there a setup or implementation fee?', a: 'No. Registration provisions your workspace instantly — no consultant, no setup charge.' },
-  { q: 'Do all sectors have access to the same plans?', a: 'Yes. All plans are available to every sector — Retail, Schools, Churches, Pharmacy, Manufacturing, and Professional Services.' },
+  { q: 'Is there a free trial?', a: 'Yes. Every new account starts on a free trial so you can explore the platform before choosing a plan. No credit card required to register.' },
+  { q: 'How is billing handled?', a: 'Plans are billed monthly via Mobile Money (MTN, Telecel, AirtelTigo) or card through Paystack. Your subscription renews automatically every 30 days.' },
+  { q: 'Is there a setup or implementation fee?', a: 'No. Registration provisions your workspace instantly — no consultant, no setup charge, no implementation fee.' },
+  { q: 'Can I upgrade or downgrade my plan?', a: 'Yes. You can upgrade at any time from your Settings. Your workspace moves to the new tier instantly.' },
+  { q: 'Do all sectors have their own pricing?', a: 'Yes. Each sector is priced based on the depth of features it includes. Select your sector above to see the relevant plans.' },
 ];
 
 export function Pricing() {
   const { open: openOnboarding } = useOnboarding();
+  const [activeSector, setActiveSector] = useState(DEFAULT_SECTOR_SLUG);
+
+  const sectorData = SECTOR_PRICING.find((s) => s.sectorSlug === activeSector)!;
+
   return (
     <div className="min-h-screen">
 
@@ -87,21 +32,43 @@ export function Pricing() {
             Pricing
           </span>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight mb-4">
-            Simple, Honest Pricing
+            Priced for Your Sector
           </h1>
           <p className="text-lg text-ink-300 max-w-xl mx-auto">
-            Start free. Upgrade when you're ready. No hidden fees, no implementation charges, no surprises.
+            Each sector is priced based on what it includes. Select yours below to see the right plan for your organisation.
           </p>
         </div>
       </section>
 
+      {/* Sector tabs */}
+      <section className="pb-4 pt-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap gap-2 justify-center">
+            {SECTOR_TABS.map((tab) => (
+              <button
+                key={tab.slug}
+                onClick={() => setActiveSector(tab.slug)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                  activeSector === tab.slug
+                    ? 'bg-brand-600 border-brand-500 text-white shadow-lg'
+                    : 'bg-ink-900/60 border-ink-800/60 text-ink-400 hover:text-white hover:border-ink-700'
+                }`}
+              >
+                <SectorIcon slug={tab.slug} className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Plans */}
-      <section className="py-16">
+      <section className="py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {PLANS.map((plan) => (
+            {sectorData.tiers.map((plan) => (
               <div
-                key={plan.name}
+                key={plan.slug}
                 className={`relative flex flex-col rounded-2xl p-8 ${
                   plan.highlight
                     ? 'bg-gradient-to-b from-brand-950/80 to-ink-900 border-2 border-brand-600/60 shadow-2xl shadow-brand-950'
@@ -116,10 +83,11 @@ export function Pricing() {
                   </div>
                 )}
                 <h3 className="text-lg font-black text-white mb-1">{plan.name}</h3>
-                <div className="flex items-baseline gap-1 mb-3">
+                <div className="flex items-baseline gap-1 mb-1">
                   <span className="text-4xl font-black text-white">{plan.price}</span>
                   {plan.period && <span className="text-sm text-ink-500">{plan.period}</span>}
                 </div>
+                <p className="text-[11px] text-brand-400 font-medium mb-2">{plan.seats}</p>
                 <p className="text-xs text-ink-500 mb-6 leading-relaxed">{plan.description}</p>
                 <ul className="space-y-2.5 flex-1 mb-8">
                   {plan.features.map((f) => (
@@ -129,23 +97,23 @@ export function Pricing() {
                     </li>
                   ))}
                 </ul>
-                {plan.href === '/demo' ? (
+                {plan.enterprise ? (
                   <Link
                     to="/demo"
-                    className={`block text-center py-3.5 rounded-xl font-bold text-sm transition-colors border border-ink-700 text-ink-200 hover:bg-ink-800`}
+                    className="block text-center py-3.5 rounded-xl font-bold text-sm transition-colors border border-ink-700 text-ink-200 hover:bg-ink-800"
                   >
-                    {plan.cta}
+                    Contact Sales
                   </Link>
                 ) : (
                   <button
-                    onClick={() => openOnboarding()}
+                    onClick={() => openOnboarding(activeSector)}
                     className={`block w-full text-center py-3.5 rounded-xl font-bold text-sm transition-colors ${
                       plan.highlight
                         ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-950'
                         : 'border border-ink-700 text-ink-200 hover:bg-ink-800'
                     }`}
                   >
-                    {plan.cta} {plan.highlight && <ArrowRight className="inline h-4 w-4" />}
+                    Get Started {plan.highlight && <ArrowRight className="inline h-4 w-4" />}
                   </button>
                 )}
               </div>
