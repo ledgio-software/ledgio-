@@ -1,4 +1,6 @@
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useOnboarding } from '../lib/onboardingContext';
 
 const PLANS = [
   {
@@ -73,6 +75,7 @@ const FAQ = [
 ];
 
 export function Pricing() {
+  const { open: openOnboarding } = useOnboarding();
   return (
     <div className="min-h-screen">
 
@@ -126,16 +129,25 @@ export function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <a
-                  href={plan.href}
-                  className={`block text-center py-3.5 rounded-xl font-bold text-sm transition-colors ${
-                    plan.highlight
-                      ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-950'
-                      : 'border border-ink-700 text-ink-200 hover:bg-ink-800'
-                  }`}
-                >
-                  {plan.cta} {plan.highlight && <ArrowRight className="inline h-4 w-4" />}
-                </a>
+                {plan.href === '/demo' ? (
+                  <Link
+                    to="/demo"
+                    className={`block text-center py-3.5 rounded-xl font-bold text-sm transition-colors border border-ink-700 text-ink-200 hover:bg-ink-800`}
+                  >
+                    {plan.cta}
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => openOnboarding()}
+                    className={`block w-full text-center py-3.5 rounded-xl font-bold text-sm transition-colors ${
+                      plan.highlight
+                        ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-950'
+                        : 'border border-ink-700 text-ink-200 hover:bg-ink-800'
+                    }`}
+                  >
+                    {plan.cta} {plan.highlight && <ArrowRight className="inline h-4 w-4" />}
+                  </button>
+                )}
               </div>
             ))}
           </div>

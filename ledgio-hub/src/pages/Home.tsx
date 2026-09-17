@@ -24,6 +24,7 @@ import {
 import { SECTORS } from '../lib/sectors';
 import { SectorIcon } from '../lib/sectorIcons';
 import { useState } from 'react';
+import { useOnboarding } from '../lib/onboardingContext';
 
 const CAPABILITY_CARDS = [
   {
@@ -216,6 +217,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 }
 
 export function Home() {
+  const { open: openOnboarding } = useOnboarding();
   return (
     <div className="min-h-screen">
 
@@ -232,8 +234,8 @@ export function Home() {
 
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
 
-          <a
-            href="https://ledgio-fawn.vercel.app/register?sector=pharmacy"
+          <button
+            onClick={() => openOnboarding('pharmacy')}
             className="inline-flex flex-col items-center px-5 py-3 mb-10 rounded-2xl border border-brand-700/40 bg-brand-950/50 backdrop-blur-sm hover:bg-brand-950/70 transition-colors group"
           >
             <span className="text-[11px] font-black uppercase tracking-widest text-brand-200">
@@ -243,7 +245,7 @@ export function Home() {
               NHIS claims · GRA e-VAT · Drug interaction checks
               <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
             </span>
-          </a>
+          </button>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-[1.08] tracking-tight mb-6">
             Accounting software built{' '}
@@ -257,12 +259,12 @@ export function Home() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-4 mb-12">
-            <a
-              href="https://ledgio-fawn.vercel.app/register"
+            <button
+              onClick={() => openOnboarding()}
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-950/60 transition-colors"
             >
               Start free — no credit card <ArrowRight className="h-4 w-4" />
-            </a>
+            </button>
             <Link
               to="/features"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-ink-200 border border-ink-700 hover:bg-ink-800/60 transition-colors"
@@ -700,12 +702,12 @@ export function Home() {
                 No credit card. No setup fee. Your workspace is provisioned in under 5 minutes — with the chart of accounts, reports, and workflows already configured for your type of business.
               </p>
               <div className="flex flex-wrap justify-center gap-4">
-                <a
-                  href="https://ledgio-fawn.vercel.app/register"
+                <button
+                  onClick={() => openOnboarding()}
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm bg-white text-ink-900 hover:bg-ink-100 transition-colors shadow-lg"
                 >
                   Get Started Free <ArrowRight className="h-4 w-4" />
-                </a>
+                </button>
                 <Link
                   to="/demo"
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white border border-white/30 hover:bg-white/10 transition-colors"

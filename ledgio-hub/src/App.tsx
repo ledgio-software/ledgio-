@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -12,6 +13,8 @@ import { Blog } from './pages/Blog';
 import { SectorPage } from './pages/SectorPage';
 import { PartnerPortal } from './pages/PartnerPortal';
 import { SECTORS } from './lib/sectors';
+import { OnboardingContext } from './lib/onboardingContext';
+import { OnboardingModal } from './components/OnboardingModal';
 
 function SectorRoute() {
   const { slug } = useParams<{ slug: string }>();
@@ -30,9 +33,17 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
+function AppInner() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [preSector, setPreSector] = useState<string | undefined>();
+
+  function openOnboarding(sectorSlug?: string) {
+    setPreSector(sectorSlug);
+    setModalOpen(true);
+  }
+
   return (
-    <BrowserRouter>
+    <OnboardingContext.Provider value={{ open: openOnboarding }}>
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -48,6 +59,19 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
+      <OnboardingModal
+        open={modalOpen}
+        preselectedSector={preSector}
+        onClose={() => setModalOpen(false)}
+      />
+    </OnboardingContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppInner />
     </BrowserRouter>
   );
 }
