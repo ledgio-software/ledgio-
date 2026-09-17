@@ -2,6 +2,26 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - System Hardening Phase 5: Queue Durability (pg-boss)
+
+**What/Why:**
+14 background jobs were registered as in-process node-cron schedules. These jobs were lost on every server restart, pod replacement, or crash — the next scheduled tick was the earliest they would re-run. Failed executions were not retryable. Distributed locking (preventing duplicate concurrent runs on multiple pods) depended on Redis, which is volatile. Phase 5 moves all job scheduling into PostgreSQL via pg-boss.
+
+- New `backend/src/services/queueService.ts` initialises a `pg-boss` instance (schema `pgboss`, 3-connection dedicated pool, independent of the Prisma OLTP pool). `scheduleJob(name, cron, handler, description)` stores each schedule in `pgboss.schedule` — it is re-applied on every startup, so schedules survive restarts and pod replacements without data loss.
+- `singletonKey` option on each schedule prevents a new job being queued while the previous run is still active, replacing the former Redis distributed lock. Failed executions are recorded in `pgboss.job` and can be retried via the pg-boss API.
+- `cronJobRegistry.ts` stripped of the Redis lock layer (`acquireCronLock`, `releaseCronLock`, and the `redis` import removed). `wrapCronTick` retained as a thin metadata wrapper for backward compatibility with service `init()` methods (no service file was changed). Admin job list and manual trigger endpoints remain unchanged.
+- `KeepAliveCronService` gained a `static ping()` method exposing the HTTP work without calling `init()`.
+- `index.ts` now calls `startQueue()` after DB + Redis connect, replaces all 14 `.init()` + `registerJob()` pairs with `await scheduleJob(...)`, and calls `stopQueue()` in the graceful shutdown handler before releasing the DB connection.
+
+**Files changed:**
+- `backend/src/services/queueService.ts` — new; pg-boss wrapper
+- `backend/src/services/cronJobRegistry.ts` — removed Redis lock; slimmed `wrapCronTick`
+- `backend/src/services/keepAliveCronService.ts` — added `static ping()` method
+- `backend/src/index.ts` — uses `scheduleJob` from queue service; graceful shutdown extended
+- `backend/package.json` / `backend/package-lock.json` — added `pg-boss ^12`
+
+---
+
 ## [Date: 2026-09-17] - System Hardening Phase 4: Report Pool Separation
 
 **What/Why:**
