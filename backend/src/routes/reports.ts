@@ -7,6 +7,7 @@ import * as reportingService from '../services/reportingService';
 import { ReportingServiceError } from '../services/reportingService';
 import { requireTenantContext } from '../context/tenantContext';
 import { prisma } from '../config/db';
+import { reportPrisma } from '../config/reportDb';
 import { withCurrentTenantDb } from '../database/tenantClient';
 import { generateBalanceSheetPdf, generateProfitAndLossPdf, generateCashFlowPdf } from '../services/pdfGenerationService';
 import { generateBalanceSheetDocx, generateProfitAndLossDocx, generateCashFlowDocx } from '../services/reportDocxService';
@@ -359,7 +360,7 @@ router.get('/aging/ar', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Vie
     const cached = await getCachedReport(tenantId, 'aging-ar', {});
     if (cached) { res.status(200).json({ success: true, data: cached }); return; }
 
-    const result = await withCurrentTenantDb(prisma, (client) => agingReportService.getArAging(client as any, tenantId));
+    const result = await withCurrentTenantDb(reportPrisma, (client) => agingReportService.getArAging(client as any, tenantId));
     void setCachedReport(tenantId, 'aging-ar', {}, result);
     res.status(200).json({ success: true, data: result });
   } catch (error: any) {
@@ -382,7 +383,7 @@ router.get('/aging/ap', requireTier(2, 'AP/AR Aging Analysis'), requireRole('Vie
     const cached = await getCachedReport(tenantId, 'aging-ap', {});
     if (cached) { res.status(200).json({ success: true, data: cached }); return; }
 
-    const result = await withCurrentTenantDb(prisma, (client) => agingReportService.getApAging(client as any, tenantId));
+    const result = await withCurrentTenantDb(reportPrisma, (client) => agingReportService.getApAging(client as any, tenantId));
     void setCachedReport(tenantId, 'aging-ap', {}, result);
     res.status(200).json({ success: true, data: result });
   } catch (error: any) {
@@ -442,7 +443,7 @@ router.get('/overdue-invoice-summary', requireRole('Viewer'), async (_req: Reque
     const cached = await getCachedReport(tenantId, 'overdue-invoice-summary', {});
     if (cached) { res.json({ success: true, data: cached }); return; }
 
-    const { rows } = await withCurrentTenantDb(prisma, (client) =>
+    const { rows } = await withCurrentTenantDb(reportPrisma, (client) =>
       agingReportService.getArAging(client as any, tenantId)
     );
 
@@ -502,7 +503,7 @@ router.get('/sales-channel', requireTier(2, 'Sales Channel Report'), requireRole
       }
     }
 
-    const sales = (await withCurrentTenantDb(prisma, (client) =>
+    const sales = (await withCurrentTenantDb(reportPrisma, (client) =>
       (client as any).cashSale.findMany({
         where,
         select: {
@@ -698,7 +699,7 @@ router.get(
       }
 
       // Primary bills that have at least one landed cost bill linked to them
-      const primaryBills = await withCurrentTenantDb(prisma, async (client) => {
+      const primaryBills = await withCurrentTenantDb(reportPrisma, async (client) => {
         return (client as any).vendorBill.findMany({
           where: {
             tenantId,
@@ -934,7 +935,7 @@ router.get('/analytics/top-items', requireTier(2, 'Analytics Dashboard'), requir
       dateFilter.lte = end;
     }
 
-    const lines = await withCurrentTenantDb(prisma, (client) =>
+    const lines = await withCurrentTenantDb(reportPrisma, (client) =>
       (client as any).cashSaleLine.findMany({
         where: {
           tenantId,
@@ -1132,7 +1133,7 @@ router.get('/stock-movement', requireTier(2, 'Stock Movement Report'), requireRo
     // Opening balance (all movements before startDate)
     let openingBalance = 0;
     if (startDate) {
-      const openingRows = await prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
+      const openingRows = await reportPrisma.$queryRawUnsafe<Array<{ total: bigint }>>(
         `SELECT COALESCE(SUM(qty_change), 0) AS total FROM (${buildUnion(openingEndFilter)}) ob`,
         ...openingParams
       );
@@ -1145,7 +1146,7 @@ router.get('/stock-movement', requireTier(2, 'Stock Movement Report'), requireRo
       endDate ? `AND event_date <= $${warehouseId ? (startDate ? 5 : 4) : (startDate ? 4 : 3)}` : '',
     ].join(' ');
 
-    const movements = await prisma.$queryRawUnsafe<Array<{
+    const movements = await reportPrisma.$queryRawUnsafe<Array<{
       event_date: Date;
       event_type: string;
       reference: string;
@@ -1173,7 +1174,7 @@ router.get('/stock-movement', requireTier(2, 'Stock Movement Report'), requireRo
     });
 
     // Item name lookup
-    const item = await withCurrentTenantDb(prisma, (client) =>
+    const item = await withCurrentTenantDb(reportPrisma, (client) =>
       (client as any).inventoryItem.findFirst({
         where: { id: itemId as string, tenantId },
         select: { name: true, sku: true },
@@ -1229,8 +1230,8 @@ router.get('/sales-register', requireTier(2, 'Sales & Purchase Registers'), requ
     };
 
     const [total, invoices] = await Promise.all([
-      prisma.invoice.count({ where }),
-      prisma.invoice.findMany({
+      reportPrisma.invoice.count({ where }),
+      reportPrisma.invoice.findMany({
         where,
         include: { customer: { select: { id: true, name: true } } },
         orderBy: { issueDate: 'asc' },
@@ -1307,8 +1308,8 @@ router.get('/purchase-register', requireTier(2, 'Sales & Purchase Registers'), r
     };
 
     const [total, bills] = await Promise.all([
-      prisma.vendorBill.count({ where }),
-      prisma.vendorBill.findMany({
+      reportPrisma.vendorBill.count({ where }),
+      reportPrisma.vendorBill.findMany({
         where,
         include: { vendor: { select: { id: true, name: true } } },
         orderBy: { billDate: 'asc' },
@@ -1386,7 +1387,7 @@ router.get('/daybook', requireTier(2, 'Daybook'), requireRole('Viewer'), async (
       : `WHERE je.status = 'POSTED'`;
 
     // Count total vouchers for pagination
-    const countResult = await withCurrentTenantDb(prisma, (client) =>
+    const countResult = await withCurrentTenantDb(reportPrisma, (client) =>
       (client as any).$queryRawUnsafe(
         `SELECT COUNT(DISTINCT je.id)::int AS total
          FROM journal_entries je
@@ -1398,7 +1399,7 @@ router.get('/daybook', requireTier(2, 'Daybook'), requireRole('Viewer'), async (
 
     // Fetch paged vouchers with all lines and account names
     const offset = (page - 1) * pageSize;
-    const rows = await withCurrentTenantDb(prisma, (client) =>
+    const rows = await withCurrentTenantDb(reportPrisma, (client) =>
       (client as any).$queryRawUnsafe(
         `SELECT
            je.id            AS "entryId",
@@ -1488,7 +1489,7 @@ router.get('/cost-centre-pnl', requireTier(2, 'Cost Centre P&L'), requireRole('V
       return;
     }
 
-    const report = await withCurrentTenantDb(prisma, async (client) => {
+    const report = await withCurrentTenantDb(reportPrisma, async (client) => {
       const conditions: string[] = [`a.type IN ('REVENUE', 'EXPENSE', 'COST_OF_SALES')`];
       const params: any[] = [costCentreId as string];
       let paramIdx = 2;
