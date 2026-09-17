@@ -2,6 +2,19 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - Sync Failure Log Viewer
+
+**What/Why:**
+The `sync_failure_logs` table, Prisma model (`SyncFailureLog`), and write path (`POST /api/v1/sync/failures`) were already in place from the local-first sync implementation. The missing piece was any way for operators to actually see these failures. This adds the read side end-to-end.
+
+**Files changed:**
+- `backend/src/routes/sync.ts` — added `GET /api/v1/sync/failures` (requires Auditor role; paginated, filters: entityType/operationKind substring, dateFrom/dateTo date range; capped at 200/page)
+- `frontend/src/pages/sync/SyncFailureLogs.tsx` — new page: paginated table of failures with colour-coded HTTP status badges (amber 4xx / red 5xx), truncated entity/txn IDs, inline filter bar
+- `frontend/src/App.tsx` — lazy-loaded route at `/sync/failures`
+- `frontend/src/lib/navigation.ts` — "Sync Failures" nav item under ADMINISTRATION; route added to all admin-visible route sets
+
+---
+
 ## [Date: 2026-09-17] - Phase 7 Audit Log: Chain Verification UI & Integration Tests
 
 **What/Why:**

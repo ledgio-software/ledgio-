@@ -78,6 +78,7 @@ const ExpenseClaims = lazy(() => import("./pages/expenses/ExpenseClaims").then(m
 const Budgets = lazy(() => import("./pages/reports/Budgets").then(m => ({ default: m.Budgets })));
 const TeamManagement = lazy(() => import("./pages/team/TeamManagement").then(m => ({ default: m.TeamManagement })));
 const AuditLogs = lazy(() => import("./pages/audit/AuditLogs").then(m => ({ default: m.AuditLogs })));
+const SyncFailureLogs = lazy(() => import("./pages/sync/SyncFailureLogs").then(m => ({ default: m.SyncFailureLogs })));
 const HelpAssistantActivity = lazy(() => import("./pages/help/HelpAssistantActivity").then(m => ({ default: m.HelpAssistantActivity })));
 const FeedbackInbox = lazy(() => import("./pages/feedback/FeedbackInbox").then(m => ({ default: m.FeedbackInbox })));
 const BulkImportWizard = lazy(() => import("./pages/import/BulkImportWizard").then(m => ({ default: m.BulkImportWizard })));
@@ -1054,6 +1055,7 @@ function App() {
               <Route path="/reports/budgets" element={<ProtectedRoute><MainLayout><Budgets /></MainLayout></ProtectedRoute>} />
               <Route path="/team" element={<ProtectedRoute><MainLayout><TeamManagement /></MainLayout></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute><MainLayout><AuditLogs /></MainLayout></ProtectedRoute>} />
+              <Route path="/sync/failures" element={<ProtectedRoute><MainLayout><SyncFailureLogs /></MainLayout></ProtectedRoute>} />
               <Route path="/help-assistant/activity" element={<ProtectedRoute><MainLayout><HelpAssistantActivity /></MainLayout></ProtectedRoute>} />
               <Route path="/feedback" element={<ProtectedRoute><MainLayout><FeedbackInbox /></MainLayout></ProtectedRoute>} />
               <Route path="/import" element={<ProtectedRoute><MainLayout><BulkImportWizard /></MainLayout></ProtectedRoute>} />
