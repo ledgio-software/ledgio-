@@ -2,6 +2,21 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - System Hardening Phase 4: Report Pool Separation
+
+**What/Why:**
+Heavy aggregation queries (aging, stock movement, sales/purchase registers, trial balance, P&L, etc.) were running on the same 50-connection OLTP pool as invoice writes and POS sales. Under reporting load, connection exhaustion could delay transactional operations. Phase 4 separates concerns:
+
+- New `backend/src/config/reportDb.ts` creates a dedicated `reportPrisma` PrismaClient reading from `REPORT_DATABASE_URL` (falls back to `DATABASE_URL`). When `REPORT_DATABASE_URL` points to a read replica, all reporting load moves there automatically.
+- `reportPrisma` has a 55-second ORM timeout (heavy cross-table aggregations need the longer window vs the 25 s on OLTP), the same IDOR guard middleware (tenant isolation preserved), and a 500 ms slow-query log threshold.
+- `reports.ts` now uses `reportPrisma` for all heavy reads: 10 `withCurrentTenantDb` call sites, 2 `$queryRawUnsafe` stock-movement queries, direct `invoice.count/findMany` and `vendorBill.count/findMany` calls. The one remaining OLTP call — `prisma.tenant.findUnique` for currency metadata — stays on the OLTP client (it's a fast point lookup, not a reporting query).
+
+**Files changed:**
+- `backend/src/config/reportDb.ts` — new; dedicated report PrismaClient
+- `backend/src/routes/reports.ts` — imports `reportPrisma`; all heavy reads switched from `prisma` to `reportPrisma`
+
+---
+
 ## [Date: 2026-09-17] - System Hardening Phase 3: Offline Sync Robustness
 
 **What/Why:**
