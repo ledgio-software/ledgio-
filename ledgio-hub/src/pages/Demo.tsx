@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, Mail, CheckCircle2 } from 'lucide-react';
+import { Phone, Mail, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 
 const SECTORS = [
   'Small Retail & Shops',
@@ -14,16 +14,31 @@ const SECTORS = [
 
 export function Demo() {
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', email: '', phone: '', business: '', sector: '', message: '' });
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // In production, POST to a form endpoint / email service
-    setSubmitted(true);
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('https://formspree.io/f/xzezbqpn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error('Submission failed');
+      setSubmitted(true);
+    } catch {
+      setError('Something went wrong. Please try again or call us directly.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -133,11 +148,23 @@ export function Demo() {
                       className="w-full bg-ink-800/60 border border-ink-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-ink-600 focus:outline-none focus:border-brand-600 transition-colors resize-none"
                     />
                   </div>
+                  {error && (
+                    <div className="flex items-center gap-2 p-3 bg-red-950/40 border border-red-800/60 rounded-xl">
+                      <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                      <p className="text-xs text-red-300">{error}</p>
+                    </div>
+                  )}
                   <button
                     type="submit"
-                    className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 transition-colors shadow-lg shadow-brand-950"
+                    disabled={loading}
+                    className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 transition-colors shadow-lg shadow-brand-950 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Request Demo
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Sending…
+                      </>
+                    ) : 'Request Demo'}
                   </button>
                 </form>
               )}
