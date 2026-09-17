@@ -181,7 +181,7 @@ app.use(
   })
 );
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 // ── Observability ──────────────────────────────────────────────────────────────
 // Inject X-Request-ID and structured HTTP request/latency logs on every request
