@@ -2,6 +2,56 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - System Hardening Phase 4: Report Pool Separation
+
+**What/Why:**
+Heavy aggregation queries (aging, stock movement, sales/purchase registers, trial balance, P&L, etc.) were running on the same 50-connection OLTP pool as invoice writes and POS sales. Under reporting load, connection exhaustion could delay transactional operations. Phase 4 separates concerns:
+
+- New `backend/src/config/reportDb.ts` creates a dedicated `reportPrisma` PrismaClient reading from `REPORT_DATABASE_URL` (falls back to `DATABASE_URL`). When `REPORT_DATABASE_URL` points to a read replica, all reporting load moves there automatically.
+- `reportPrisma` has a 55-second ORM timeout (heavy cross-table aggregations need the longer window vs the 25 s on OLTP), the same IDOR guard middleware (tenant isolation preserved), and a 500 ms slow-query log threshold.
+- `reports.ts` now uses `reportPrisma` for all heavy reads: 10 `withCurrentTenantDb` call sites, 2 `$queryRawUnsafe` stock-movement queries, direct `invoice.count/findMany` and `vendorBill.count/findMany` calls. The one remaining OLTP call — `prisma.tenant.findUnique` for currency metadata — stays on the OLTP client (it's a fast point lookup, not a reporting query).
+
+**Files changed:**
+- `backend/src/config/reportDb.ts` — new; dedicated report PrismaClient
+- `backend/src/routes/reports.ts` — imports `reportPrisma`; all heavy reads switched from `prisma` to `reportPrisma`
+
+---
+
+## [Date: 2026-09-17] - System Hardening Phase 3: Offline Sync Robustness
+
+**What/Why:**
+Closed three sync correctness gaps that could cause data loss or duplicate charges on unreliable connections:
+
+1. **PAY_INVOICE idempotency** — The outbox's `PAY_INVOICE` entry was not passing `clientTxnId` as `idempotencyKey` to the backend payment endpoint. A device replaying a failed payment could charge twice. Fixed: `processOutboxEntry` now sends `idempotencyKey: entry.clientTxnId` so the backend's Phase 1 dedup guard applies.
+
+2. **Conflict resolution** — `applyChangeEntry` previously overwrote any local record unconditionally, including records with `_pending: true` (unsent local edits). A catch-up sweep after reconnect would silently discard edits queued while offline. Fixed: `applyChangeEntry` now skips UPDATE for Accounts and Invoices when the local record is `_pending` — the outbox flush will reconcile the real state once the write goes through.
+
+3. **Server-side sync failure audit log** — When `markEntityFailed` flagged a failed write, the failure was recorded only in the device's IndexedDB (not visible to operators). Fixed: `markEntityFailed` now calls `POST /api/v1/sync/failures` (fire-and-forget) to persist the failure metadata server-side for audit.
+
+**Files changed:**
+- `backend/prisma/schema.prisma` — new `SyncFailureLog` model (`sync_failure_logs` table)
+- `backend/prisma/migrations/20260917000001_add_sync_failure_log/migration.sql` — migration
+- `backend/src/routes/sync.ts` — new `POST /sync/failures` endpoint (writes `SyncFailureLog`)
+- `frontend/src/lib/syncEngine.ts` — PAY_INVOICE idempotency fix; conflict-resolution guard in `applyChangeEntry`; `markEntityFailed` now logs to server; `flushOutbox` passes HTTP status to `markEntityFailed`
+
+---
+
+## [Date: 2026-09-17] - Feature: Overdue Invoice Alert System (in-app notifications + API + cron)
+
+**What/Why:**
+Added a two-part overdue invoice alert system so the internal team is proactively notified when AR invoices cross 30/60/90-day overdue thresholds — complementing the existing dunning service that emails customers.
+
+**Backend changes:**
+- `backend/src/services/overdueInvoiceAlertService.ts` (new) — `OverdueInvoiceAlertCronService`: daily 8:30 AM UTC sweep across all tenants; creates an in-app `Notification` (type `INVOICE_OVERDUE`, link `/reports/aging`) the first time an invoice enters each aging bucket (30/60/90+ days). Uses Redis to remember the last alerted bucket per invoice (`overdue-alert-bucket:{tenantId}:{invoiceId}`, TTL 180 days) so each threshold transition fires exactly once.
+- `backend/src/index.ts` — registers and initialises `OverdueInvoiceAlertCronService` at startup (`30 8 * * *`).
+- `backend/src/routes/reports.ts` — new `GET /api/v1/reports/overdue-invoice-summary` endpoint: returns per-bucket (1–30 / 31–60 / 61–90 / 90+) invoice counts and total balance-due, used by the frontend banner. Result is cached via `setCachedReport`.
+
+**Frontend changes:**
+- `frontend/src/components/OverdueInvoiceAlertBanner.tsx` (new) — dismissible banner shown in the main layout when any AR invoice is overdue. Amber for 1–60 day overdue, red for 61–90+ day overdue. Links directly to `/reports/aging`. Shows a per-bucket breakdown in the message.
+- `frontend/src/components/layout/MainLayout.tsx` — mounts `<OverdueInvoiceAlertBanner />` below `<SubscriptionBanner />`.
+
+---
+
 ## [Date: 2026-09-15] - Bug fix: Blank print preview when printing POS receipts and receipt log PDFs
 
 **What/Why:**
