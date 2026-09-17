@@ -2,6 +2,32 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - System Hardening Phase 6: Observability & Load Testing
+
+**What/Why:**
+Completing the observability stack and establishing load-test baselines before production traffic scales up.
+
+The backend already had: OpenTelemetry SDK with auto-instrumentations + OTLP export (`telemetry.ts`), W3C traceparent propagation in `requestLoggerMiddleware.ts`, structured JSON logging with requestId/traceId/spanId, and an in-memory time-series metrics middleware (`metricsMiddleware.ts` + `adminMetrics.ts`). Two gaps remained:
+
+1. **Alerting webhook** — `alertingService.ts` sends a Slack-compatible payload to `ALERT_WEBHOOK_URL` (no-op when unset). `alertJobFailure` is called from `wrapCronTick` on any cron error, so engineers get paged without polling the dashboard. `alertSlaBreach` is available for future integration with the metrics middleware. Set `ALERT_WEBHOOK_URL` to any Slack incoming-webhook URL or generic HTTP endpoint.
+
+2. **k6 load test suite** — four scripts covering every latency budget:
+   - `smoke.js` — 1 VU, 1 iteration: health check + login + `/me`; confirms target is reachable before a load run.
+   - `invoices.js` — ramp to 20 VUs: list invoices (p95 < 400 ms) + create (p95 < 600 ms); validates OLTP write path under steady-state concurrency.
+   - `reports.js` — ramp to 6 VUs: trial balance, P&L, AR aging (p95 < 5/8 s); validates the Phase 4 report pool doesn't starve OLTP under concurrent aggregation.
+   - `full-suite.js` — three parallel scenarios (20 cashier, 10 accountant, 5 manager VUs) with per-scenario trends; the realistic mixed-workload baseline for capacity planning. Errors must stay below 1 %, overall p99 < 3 000 ms.
+
+**Files changed:**
+- `backend/src/services/alertingService.ts` — new; Slack-compatible webhook alerter
+- `backend/src/services/cronJobRegistry.ts` — added `alertJobFailure` call in `wrapCronTick` error path
+- `backend/load-tests/helpers/auth.js` — shared k6 auth helper (login + header builder)
+- `backend/load-tests/smoke.js` — smoke test
+- `backend/load-tests/invoices.js` — invoice CRUD load test
+- `backend/load-tests/reports.js` — report aggregation load test
+- `backend/load-tests/full-suite.js` — full mixed-workload load test
+
+---
+
 ## [Date: 2026-09-17] - System Hardening Phase 4: Report Pool Separation
 
 **What/Why:**
