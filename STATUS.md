@@ -2,6 +2,21 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - Phase 7 Audit Log: Chain Verification UI & Integration Tests
+
+**What/Why:**
+The audit log infrastructure (hash-chained `audit_logs` table, `auditLogService.ts`, `GET /audit-logs` route with CSV export) was already fully implemented. The gap was that the `/verify-chain` endpoint — which walks all chained rows and re-computes expected SHA-256 hashes to detect tampering or deletions — had no frontend UI and no integration tests.
+
+Added:
+- **"Verify Chain" button** in `AuditLogs.tsx`: one-click call to `GET /api/v1/audit-logs/verify-chain`. Result renders as a dismissible green (intact) or red (broken) banner. When the chain is broken, the banner shows the broken row ID and a "Jump to affected record" link that applies `entityId` as a filter.
+- **`auditLogChainVerify.test.ts`**: four integration tests — no entries returns intact+0, a 3-row correctly-seeded chain passes, a tampered `prevHash` is caught and `brokenAtId` is returned, unauthenticated requests return 401.
+
+**Files changed:**
+- `frontend/src/pages/audit/AuditLogs.tsx` — added `handleVerifyChain`, chain status state, green/red result banner, "Verify Chain" header button
+- `backend/src/tests/auditLogChainVerify.test.ts` — new integration test suite for `/verify-chain`
+
+---
+
 ## [Date: 2026-09-17] - System Hardening Phase 4: Report Pool Separation
 
 **What/Why:**
