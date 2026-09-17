@@ -2,6 +2,22 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - Feature: Overdue Invoice Alert System (in-app notifications + API + cron)
+
+**What/Why:**
+Added a two-part overdue invoice alert system so the internal team is proactively notified when AR invoices cross 30/60/90-day overdue thresholds — complementing the existing dunning service that emails customers.
+
+**Backend changes:**
+- `backend/src/services/overdueInvoiceAlertService.ts` (new) — `OverdueInvoiceAlertCronService`: daily 8:30 AM UTC sweep across all tenants; creates an in-app `Notification` (type `INVOICE_OVERDUE`, link `/reports/aging`) the first time an invoice enters each aging bucket (30/60/90+ days). Uses Redis to remember the last alerted bucket per invoice (`overdue-alert-bucket:{tenantId}:{invoiceId}`, TTL 180 days) so each threshold transition fires exactly once.
+- `backend/src/index.ts` — registers and initialises `OverdueInvoiceAlertCronService` at startup (`30 8 * * *`).
+- `backend/src/routes/reports.ts` — new `GET /api/v1/reports/overdue-invoice-summary` endpoint: returns per-bucket (1–30 / 31–60 / 61–90 / 90+) invoice counts and total balance-due, used by the frontend banner. Result is cached via `setCachedReport`.
+
+**Frontend changes:**
+- `frontend/src/components/OverdueInvoiceAlertBanner.tsx` (new) — dismissible banner shown in the main layout when any AR invoice is overdue. Amber for 1–60 day overdue, red for 61–90+ day overdue. Links directly to `/reports/aging`. Shows a per-bucket breakdown in the message.
+- `frontend/src/components/layout/MainLayout.tsx` — mounts `<OverdueInvoiceAlertBanner />` below `<SubscriptionBanner />`.
+
+---
+
 ## [Date: 2026-09-15] - Bug fix: Blank print preview when printing POS receipts and receipt log PDFs
 
 **What/Why:**

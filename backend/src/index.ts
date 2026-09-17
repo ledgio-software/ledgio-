@@ -122,6 +122,11 @@ const startServer = async () => {
     InterestChargeCronService.init();
     registerJob('Interest Charges', '0 0 * * *', 'Daily interest accrual on overdue invoices', () => InterestChargeCronService.processInterestCharges?.() ?? Promise.resolve());
 
+    // Initialize daily overdue-invoice in-app alert sweep (30/60/90-day bucket notifications for internal team)
+    const { OverdueInvoiceAlertCronService } = require('./services/overdueInvoiceAlertService');
+    OverdueInvoiceAlertCronService.init();
+    registerJob('Overdue Invoice Alerts', '30 8 * * *', 'Daily in-app alerts when invoices cross 30/60/90-day overdue thresholds', () => OverdueInvoiceAlertCronService.runAlertSweep?.() ?? Promise.resolve());
+
     // Daily 2:30 AM GL vs subledger reconciliation
     const { GlReconciliationCronService } = require('./services/glReconciliationCronService');
     GlReconciliationCronService.init();

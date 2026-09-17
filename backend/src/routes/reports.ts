@@ -430,6 +430,53 @@ router.get('/cash-flow-forecast', requireTier(2, 'Cash Flow Forecast'), requireR
 });
 
 /**
+ * GET /api/v1/reports/overdue-invoice-summary
+ * Returns a count and total balance-due breakdown of overdue AR invoices by
+ * aging bucket (30/60/90 days). Used to populate dashboard alert panels.
+ * Access: Viewer role or higher.
+ */
+router.get('/overdue-invoice-summary', requireRole('Viewer'), async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+
+    const cached = await getCachedReport(tenantId, 'overdue-invoice-summary', {});
+    if (cached) { res.json({ success: true, data: cached }); return; }
+
+    const { rows } = await withCurrentTenantDb(prisma, (client) =>
+      agingReportService.getArAging(client as any, tenantId)
+    );
+
+    const summary = {
+      days1to30:  { count: 0, totalBalanceDue: 0 },
+      days31to60: { count: 0, totalBalanceDue: 0 },
+      days61to90: { count: 0, totalBalanceDue: 0 },
+      days90plus: { count: 0, totalBalanceDue: 0 },
+    };
+
+    for (const row of rows) {
+      if (row.bucket === 'current' || row.daysOverdue <= 0) continue;
+      const key = row.bucket as keyof typeof summary;
+      if (key in summary) {
+        summary[key].count++;
+        summary[key].totalBalanceDue = Math.round((summary[key].totalBalanceDue + row.balanceDue) * 100) / 100;
+      }
+    }
+
+    const totalOverdueCount = Object.values(summary).reduce((s, v) => s + v.count, 0);
+    const totalOverdueBal = Math.round(
+      Object.values(summary).reduce((s, v) => s + v.totalBalanceDue, 0) * 100
+    ) / 100;
+
+    const result = { buckets: summary, totalOverdueCount, totalOverdueBalance: totalOverdueBal };
+    void setCachedReport(tenantId, 'overdue-invoice-summary', {}, result);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[Reports] Overdue invoice summary error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate overdue invoice summary.' });
+  }
+});
+
+/**
  * GET /api/v1/reports/sales-channel
  * Revenue breakdown by sales channel (RETAIL vs WHOLESALE) for a date range,
  * based on POS cash sales. Includes per-channel totals and item-level detail.
