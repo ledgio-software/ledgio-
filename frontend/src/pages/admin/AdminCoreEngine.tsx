@@ -157,7 +157,7 @@ export function AdminCoreEngine() {
       })
       .catch(() => setMetricsError("Failed to load performance metrics."))
       .finally(() => setIsLoadingMetrics(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "performance") return;
@@ -175,7 +175,7 @@ export function AdminCoreEngine() {
       .then((res) => setJobsData(res.data.data.jobs))
       .catch(() => setJobsError("Failed to load cron jobs."))
       .finally(() => setIsLoadingJobs(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "jobs") return;
@@ -211,7 +211,7 @@ export function AdminCoreEngine() {
       })
       .catch(() => setErrorsError("Failed to load error logs."))
       .finally(() => setIsLoadingErrors(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "errors") return;
@@ -494,13 +494,13 @@ export function AdminCoreEngine() {
       .then((res) => setIntegrationsData(res.data.data))
       .catch(() => setIntegrationsError("Failed to load integrations status."))
       .finally(() => setIsLoadingIntegrations(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked) return;
     fetchIntegrations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isUnlocked, passcode]);
+  }, [isUnlocked, passcode, sessionToken]);
 
   // Fetch the real platform-wide tenant roster for the "Tenant Schemas & Tiers"
   // tab once unlocked, using the same master passcode already used to unlock
@@ -520,15 +520,15 @@ export function AdminCoreEngine() {
       .finally(() => {
         setIsLoadingTenants(false);
       });
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked) return;
     fetchTenants();
-    // fetchTenants intentionally omitted - it's recreated per passcode change,
-    // which already re-runs this effect via the passcode dependency below.
+    // fetchTenants intentionally omitted - it's recreated per passcode/sessionToken change,
+    // which already re-runs this effect via those dependencies below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isUnlocked, passcode]);
+  }, [isUnlocked, passcode, sessionToken]);
 
   const handleSaveTier = async (tenantId: string) => {
     const tier = tierDrafts[tenantId];
@@ -614,7 +614,7 @@ export function AdminCoreEngine() {
         }
       })
       .catch(() => { /* autocomplete is a nice-to-have, fail silently */ });
-  }, [isUnlocked, passcode]);
+  }, [isUnlocked, passcode, sessionToken]);
 
   const applyAuditFilters = () => setAppliedAuditFilters(draftAuditFilters);
 
@@ -683,7 +683,7 @@ export function AdminCoreEngine() {
       })
       .catch(() => setReferralError("Failed to load referral data."))
       .finally(() => setIsLoadingReferral(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "referral") return;
@@ -769,7 +769,7 @@ export function AdminCoreEngine() {
       .then((res) => setClientHealthData(res.data.data))
       .catch(() => setClientHealthError("Failed to load client health data."))
       .finally(() => setIsLoadingClientHealth(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "clienthealth") return;
@@ -820,7 +820,7 @@ export function AdminCoreEngine() {
       .then((res) => setChurnData(res.data.data))
       .catch(() => setChurnError("Failed to load churn risk data."))
       .finally(() => setIsLoadingChurn(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "churnrisk") return;
@@ -875,7 +875,7 @@ export function AdminCoreEngine() {
       .then((res) => setOnboardingData(res.data.data))
       .catch(() => setOnboardingError("Failed to load onboarding data."))
       .finally(() => setIsLoadingOnboarding(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "onboarding") return;
@@ -923,7 +923,7 @@ export function AdminCoreEngine() {
       .then((res) => setRevenueData(res.data.data))
       .catch(() => setRevenueError("Failed to load revenue data."))
       .finally(() => setIsLoadingRevenue(false));
-  }, [passcode]);
+  }, [passcode, sessionToken]);
 
   useEffect(() => {
     if (!isUnlocked || activeTab !== "revenue") return;
