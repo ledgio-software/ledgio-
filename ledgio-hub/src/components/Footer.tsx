@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Phone } from 'lucide-react';
+import { Mail, Phone, Plus, Minus } from 'lucide-react';
 import { Logo, Wordmark } from './Logo';
 
 const SOLUTIONS = [
@@ -34,14 +35,42 @@ const CONTACTS = [
   { name: 'Exceltrine Ntewusu', role: 'Customer Care', phone: '+233 59 850 0298' },
 ];
 
+type Section = 'solutions' | 'product' | 'company' | 'contact' | null;
+
+function FooterSection({ title, open, onToggle, children }: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-ink-800/60 sm:border-0">
+      <button
+        onClick={onToggle}
+        className="sm:hidden w-full flex items-center justify-between py-4 text-[10px] font-black uppercase tracking-widest text-ink-500"
+      >
+        {title}
+        {open ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+      </button>
+      <h4 className="hidden sm:block text-[10px] font-black uppercase tracking-widest text-ink-500 mb-4">{title}</h4>
+      <div className={`sm:block overflow-hidden transition-all duration-200 ${open ? 'max-h-96 pb-4' : 'max-h-0 sm:max-h-none'}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function Footer() {
+  const [openSection, setOpenSection] = useState<Section>(null);
+  const toggle = (s: Section) => setOpenSection((prev) => (prev === s ? null : s));
+
   return (
     <footer className="border-t border-ink-800/60 bg-ink-950 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-ink-800/60">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-0 sm:gap-10 pb-12 border-b border-ink-800/60">
 
           {/* Brand */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 pb-8 sm:pb-0 border-b border-ink-800/60 sm:border-0 mb-4 sm:mb-0">
             <Link to="/" className="flex items-center gap-3 mb-4">
               <Logo size={32} />
               <Wordmark />
@@ -68,8 +97,7 @@ export function Footer() {
           </div>
 
           {/* Solutions */}
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-4">Solutions</h4>
+          <FooterSection title="Solutions" open={openSection === 'solutions'} onToggle={() => toggle('solutions')}>
             <ul className="space-y-2.5">
               {SOLUTIONS.map((l) => (
                 <li key={l.to}>
@@ -77,11 +105,10 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-          </div>
+          </FooterSection>
 
           {/* Product */}
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-4">Product</h4>
+          <FooterSection title="Product" open={openSection === 'product'} onToggle={() => toggle('product')}>
             <ul className="space-y-2.5">
               {PRODUCT.map((l) => (
                 <li key={l.to}>
@@ -89,11 +116,10 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-          </div>
+          </FooterSection>
 
           {/* Company */}
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-ink-500 mb-4">Company</h4>
+          <FooterSection title="Company" open={openSection === 'company'} onToggle={() => toggle('company')}>
             <ul className="space-y-2.5">
               {COMPANY.map((l) => (
                 <li key={l.to}>
@@ -101,7 +127,7 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-          </div>
+          </FooterSection>
         </div>
 
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-600">
