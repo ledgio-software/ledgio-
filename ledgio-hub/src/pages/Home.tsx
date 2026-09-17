@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { SECTORS } from '../lib/sectors';
+import { SectorIcon } from '../lib/sectorIcons';
 import { useState } from 'react';
 
 const CAPABILITY_CARDS = [
@@ -287,7 +288,7 @@ export function Home() {
                 to={`/for/${s.slug}`}
                 className="flex-shrink-0 inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-ink-700/60 bg-ink-900/60 backdrop-blur-sm text-ink-300 text-sm font-medium hover:border-brand-600/60 hover:text-brand-300 transition-colors"
               >
-                <span className="text-lg leading-none">{s.icon}</span>
+                <SectorIcon slug={s.slug} className="h-4 w-4 flex-shrink-0" />
                 {s.label}
               </Link>
             ))}
@@ -533,7 +534,9 @@ export function Home() {
                 to={`/for/${s.slug}`}
                 className={`group flex flex-col bg-ink-900/60 border ${s.accent.border} rounded-2xl p-6 hover:bg-ink-800/60 transition-all hover:scale-[1.02]`}
               >
-                <div className="text-3xl mb-4">{s.icon}</div>
+                <div className={`mb-4 inline-flex items-center justify-center h-11 w-11 rounded-xl ${s.accent.badge}`}>
+                  <SectorIcon slug={s.slug} className="h-5 w-5" />
+                </div>
                 <h3 className="text-base font-bold text-white mb-2">{s.label}</h3>
                 <p className="text-xs text-ink-500 leading-relaxed flex-1">{s.tagline}</p>
                 <div className={`mt-4 flex items-center gap-1 text-xs font-bold ${s.accent.text}`}>
