@@ -15,7 +15,7 @@ export function SectorPage({ sector }: Props) {
           src={sector.heroImage}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover opacity-[0.14] mix-blend-luminosity"
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.22]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-ink-950/40" />
         <div className={`absolute inset-0 bg-gradient-to-br ${sector.accent.from} ${sector.accent.to} opacity-[0.08]`} />

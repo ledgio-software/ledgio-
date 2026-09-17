@@ -2,6 +2,26 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - Ledgio Hub: Rich Content & Hero Image Fix
+
+**What/Why:**
+The ledgio-hub marketing site had two problems: (1) hero images on all sector pages were invisible because `mix-blend-luminosity` makes images disappear on a near-black background, and (2) the home page lacked enough information to convince businesses and enterprise customers to sign up.
+
+**Changes:**
+- `ledgio-hub/src/pages/SectorPage.tsx` — removed `mix-blend-luminosity` from sector hero images; increased opacity from 0.14 to 0.22 so images are clearly visible
+- `ledgio-hub/src/pages/Home.tsx` — major content expansion:
+  - Hero: opacity fixed (0.06 → 0.15); added trust badge row under CTAs (GH₵0 fee, GRA, NHIS, SSNIT)
+  - New: **Integrations strip** — visual grid of 8 built-in integrations (MTN MoMo, Telecel, AirtelTigo, GRA e-VAT, NHIS, SSNIT, Mono Bank Feed, NEPP)
+  - New: **Product showcase** — two-column section with dashboard image, feature bullets, sample KPI tiles
+  - New: **Payroll & compliance showcase** — two-column section with team image, payroll feature breakdown
+  - Expanded: **Testimonials** — replaced 1 quote with 3 full testimonials in a grid (retail, school, pharmacy)
+  - New: **Security & data protection** — 6-card security feature grid (schema isolation, RBAC, audit hash chain, offline sync, HTTPS, uptime)
+  - New: **How Ledgio compares** — 12-row comparison table vs spreadsheets vs generic software
+  - New: **FAQ** — 6 collapsible questions with accordion component
+  - Final CTA: background photo added; trust bullets added below buttons
+
+---
+
 ## [Date: 2026-09-17] - Sync Failure Log Viewer
 
 **What/Why:**
