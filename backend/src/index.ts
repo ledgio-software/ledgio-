@@ -5,7 +5,7 @@ import { connectRedis, disconnectRedis } from './config/redis';
 import { startTelemetry, stopTelemetry } from './config/telemetry';
 import { initSyncSocketServer } from './websocket/syncSocketServer';
 import { initPresenceSocketServer } from './websocket/presenceSocketServer';
-import { registerJob } from './services/cronJobRegistry';
+import { startQueue, stopQueue, scheduleJob } from './services/queueService';
 
 const PORT = process.env.PORT || 4000;
 
@@ -67,75 +67,78 @@ const startServer = async () => {
     // Initialize live "who's online" presence tracking
     initPresenceSocketServer(server);
 
-    // Initialize Monday 8:00 AM Automated Email Reporting Cron Job
+    // Start durable job queue (pg-boss persists schedules in PostgreSQL).
+    await startQueue();
+
     const { ScheduledEmailCronService } = require('./services/scheduledEmailService');
-    ScheduledEmailCronService.init();
-    registerJob('Scheduled Email Reports', '0 8 * * 1', 'Weekly P&L email reports to tenant admins', () => ScheduledEmailCronService.sendScheduledReports?.() ?? Promise.resolve());
+    await scheduleJob('Scheduled Email Reports', '0 8 * * 1',
+      async () => { await (ScheduledEmailCronService.sendScheduledReports?.() ?? Promise.resolve()); },
+      'Weekly P&L email reports to tenant admins');
 
-    // Initialize hourly Recurring Transactions generator
     const { RecurringTransactionCronService } = require('./services/recurringTransactionService');
-    RecurringTransactionCronService.init();
-    registerJob('Recurring Transactions', '0 * * * *', 'Hourly recurring journal entry generation', () => RecurringTransactionCronService.processRecurringTransactions?.() ?? Promise.resolve());
+    await scheduleJob('Recurring Transactions', '0 * * * *',
+      async () => { await (RecurringTransactionCronService.processRecurringTransactions?.() ?? Promise.resolve()); },
+      'Hourly recurring journal entry generation');
 
-    // Initialize FX rate cache refresher (no-op if FX_RATE_API_KEY isn't configured)
     const { FxRateCronService } = require('./services/fxRateCronService');
-    FxRateCronService.init();
-    registerJob('FX Rate Refresh', '0 */6 * * *', 'Refreshes live exchange rates every 6 hours', () => FxRateCronService.refreshRatesJob());
+    await scheduleJob('FX Rate Refresh', '0 */6 * * *',
+      async () => { await FxRateCronService.refreshRatesJob(); },
+      'Refreshes live exchange rates every 6 hours');
 
-    // Initialize daily overdue-invoice payment reminder (dunning) sweep
     const { DunningReminderCronService } = require('./services/dunningReminderService');
-    DunningReminderCronService.init();
-    registerJob('Dunning Reminders', '0 9 * * *', 'Daily overdue-invoice payment reminder emails', () => DunningReminderCronService.sendReminders?.() ?? Promise.resolve());
+    await scheduleJob('Dunning Reminders', '0 9 * * *',
+      async () => { await (DunningReminderCronService.sendReminders?.() ?? Promise.resolve()); },
+      'Daily overdue-invoice payment reminder emails');
 
-    // Initialize daily Help Assistant conversation-log retention sweep
     const { HelpAssistantMaintenanceCronService } = require('./services/helpAssistantMaintenanceCronService');
-    HelpAssistantMaintenanceCronService.init();
-    registerJob('Help Assistant Maintenance', '0 2 * * *', 'Daily pruning of old AI chat conversation logs', () => HelpAssistantMaintenanceCronService.runMaintenance?.() ?? Promise.resolve());
+    await scheduleJob('Help Assistant Maintenance', '0 2 * * *',
+      async () => { await (HelpAssistantMaintenanceCronService.runMaintenance?.() ?? Promise.resolve()); },
+      'Daily pruning of old AI chat conversation logs');
 
-    // Initialize daily scheduled vendor-bill payments sweep
     const { VendorPaymentSchedulingCronService } = require('./services/vendorPaymentSchedulingCronService');
-    VendorPaymentSchedulingCronService.init();
-    registerJob('Vendor Payment Scheduling', '0 7 * * *', 'Daily sweep for due scheduled vendor bill payments', () => VendorPaymentSchedulingCronService.processScheduledPayments?.() ?? Promise.resolve());
+    await scheduleJob('Vendor Payment Scheduling', '0 7 * * *',
+      async () => { await (VendorPaymentSchedulingCronService.processScheduledPayments?.() ?? Promise.resolve()); },
+      'Daily sweep for due scheduled vendor bill payments');
 
-    // Initialize daily recurring-invoice generation sweep
     const { RecurringInvoiceCronService } = require('./services/recurringInvoiceCronService');
-    RecurringInvoiceCronService.init();
-    registerJob('Recurring Invoices', '0 6 * * *', 'Daily recurring invoice generation', () => RecurringInvoiceCronService.generateRecurringInvoices?.() ?? Promise.resolve());
+    await scheduleJob('Recurring Invoices', '0 6 * * *',
+      async () => { await (RecurringInvoiceCronService.generateRecurringInvoices?.() ?? Promise.resolve()); },
+      'Daily recurring invoice generation');
 
-    // Initialize GRA E-VAT VSDC 15-minute clearance retry sweep
     const { GraEvatCronService } = require('./services/graEvatCronService');
-    GraEvatCronService.init();
-    registerJob('GRA E-VAT Sync', '*/15 * * * *', '15-minute sweep to clear pending/failed GRA VSDC invoices within the 48-hour mandate window', () => GraEvatCronService.runSync());
+    await scheduleJob('GRA E-VAT Sync', '*/15 * * * *',
+      async () => { await GraEvatCronService.runSync(); },
+      '15-minute sweep to clear pending/failed GRA VSDC invoices within the 48-hour mandate window');
 
-    // Initialize daily subscription auto-renewal sweep (charges saved card/MoMo before plan expires)
     const { SubscriptionAutoRenewCronService } = require('./services/subscriptionAutoRenewCronService');
-    SubscriptionAutoRenewCronService.init();
-    registerJob('Subscription Auto-Renew', '30 6 * * *', 'Daily auto-charge of saved card/MoMo before subscription expires', () => SubscriptionAutoRenewCronService.processAutoRenewals?.() ?? Promise.resolve());
+    await scheduleJob('Subscription Auto-Renew', '30 6 * * *',
+      async () => { await (SubscriptionAutoRenewCronService.processAutoRenewals?.() ?? Promise.resolve()); },
+      'Daily auto-charge of saved card/MoMo before subscription expires');
 
-    // Initialize daily fixed-asset depreciation sweep
     const { FixedAssetDepreciationCronService } = require('./services/fixedAssetDepreciationCronService');
-    FixedAssetDepreciationCronService.init();
-    registerJob('Fixed Asset Depreciation', '0 1 * * *', 'Daily fixed-asset depreciation journal posting', () => FixedAssetDepreciationCronService.runDepreciation?.() ?? Promise.resolve());
+    await scheduleJob('Fixed Asset Depreciation', '0 1 * * *',
+      async () => { await (FixedAssetDepreciationCronService.runDepreciation?.() ?? Promise.resolve()); },
+      'Daily fixed-asset depreciation journal posting');
 
-    // Initialize daily interest accrual on overdue receivables
     const { InterestChargeCronService } = require('./services/interestChargeCronService');
-    InterestChargeCronService.init();
-    registerJob('Interest Charges', '0 0 * * *', 'Daily interest accrual on overdue invoices', () => InterestChargeCronService.processInterestCharges?.() ?? Promise.resolve());
+    await scheduleJob('Interest Charges', '0 0 * * *',
+      async () => { await (InterestChargeCronService.processInterestCharges?.() ?? Promise.resolve()); },
+      'Daily interest accrual on overdue invoices');
 
-    // Initialize daily overdue-invoice in-app alert sweep (30/60/90-day bucket notifications for internal team)
     const { OverdueInvoiceAlertCronService } = require('./services/overdueInvoiceAlertService');
-    OverdueInvoiceAlertCronService.init();
-    registerJob('Overdue Invoice Alerts', '30 8 * * *', 'Daily in-app alerts when invoices cross 30/60/90-day overdue thresholds', () => OverdueInvoiceAlertCronService.runAlertSweep?.() ?? Promise.resolve());
+    await scheduleJob('Overdue Invoice Alerts', '30 8 * * *',
+      async () => { await (OverdueInvoiceAlertCronService.runAlertSweep?.() ?? Promise.resolve()); },
+      'Daily in-app alerts when invoices cross 30/60/90-day overdue thresholds');
 
-    // Daily 2:30 AM GL vs subledger reconciliation
     const { GlReconciliationCronService } = require('./services/glReconciliationCronService');
-    GlReconciliationCronService.init();
-    registerJob('GL Reconciliation', '30 2 * * *', 'Daily AR/AP subledger vs GL control account balance check', () => GlReconciliationCronService.runJob());
+    await scheduleJob('GL Reconciliation', '30 2 * * *',
+      async () => { await GlReconciliationCronService.runJob(); },
+      'Daily AR/AP subledger vs GL control account balance check');
 
-    // Keep Render from spinning down: ping /health every 10 minutes
     const { KeepAliveCronService } = require('./services/keepAliveCronService');
-    KeepAliveCronService.init();
-    registerJob('Keep-Alive Ping', '*/10 * * * *', 'Self-ping every 10 min to prevent Render cold starts');
+    await scheduleJob('Keep-Alive Ping', '*/10 * * * *',
+      async () => { await KeepAliveCronService.ping(); },
+      'Self-ping every 10 min to prevent Render cold starts');
 
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
@@ -145,15 +148,18 @@ const startServer = async () => {
   const gracefulShutdown = async () => {
     console.log('[Server] Shutting down gracefully...');
     server.close(async () => {
+      // Stop durable job queue before releasing DB connection.
+      await stopQueue();
+
       // Disconnect from database
       await disconnectDatabase();
-      
+
       // Disconnect from Redis
       await disconnectRedis();
-      
+
       // Stop telemetry
       await stopTelemetry();
-      
+
       process.exit(0);
     });
     
