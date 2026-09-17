@@ -1,144 +1,258 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Shield, Zap, Globe, Play } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronRight,
+  Shield,
+  Zap,
+  CreditCard,
+  BarChart3,
+  Users,
+  CheckCircle2,
+  Quote,
+} from 'lucide-react';
 import { SECTORS } from '../lib/sectors';
 
-const TRUST_STATS = [
-  { value: '7', label: 'Industry sectors' },
-  { value: '100%', label: 'Data isolation per tenant' },
-  { value: '0', label: 'Setup or implementation fee' },
-  { value: 'Ghana', label: 'Built for Africa' },
+const CAPABILITY_CARDS = [
+  {
+    title: 'Automate your accounts',
+    body: 'Full double-entry accounting engine posts every sale, invoice, and expense to your books in real time. No manual journals. No delays.',
+    Icon: BarChart3,
+    color: 'from-brand-900 to-blue-950',
+  },
+  {
+    title: 'Stay tax-compliant',
+    body: 'GRA e-VAT integration, NHIS claims management, and SSNIT payroll compliance — built in and ready to use from day one.',
+    Icon: Shield,
+    color: 'from-blue-950 to-indigo-950',
+  },
+  {
+    title: 'Manage your team',
+    body: 'Run payroll, generate payslips, enforce approval workflows, and give every staff member the exact access they need — nothing more.',
+    Icon: Users,
+    color: 'from-indigo-950 to-violet-950',
+  },
+  {
+    title: 'Accept Mobile Money',
+    body: 'MTN, Telecel, and AirtelTigo collections built in. Every payment posts to the correct account instantly — zero manual reconciliation.',
+    Icon: CreditCard,
+    color: 'from-violet-950 to-brand-950',
+  },
+  {
+    title: 'Know your numbers',
+    body: 'Real-time P&L, Cash Flow, Balance Sheet, and analytics dashboard. Automated weekly financial email every Monday at 8 AM.',
+    Icon: Zap,
+    color: 'from-brand-950 to-teal-950',
+  },
 ];
 
-const GLOBAL_FEATURES = [
-  { icon: Shield, title: 'Bank-grade data isolation', body: 'Every business gets its own dedicated PostgreSQL schema. Your data is never mixed with another tenant.' },
-  { icon: Zap, title: 'Real-time sync', body: 'Every transaction posts to your books instantly. No end-of-day batch runs. No delays.' },
-  { icon: Globe, title: 'Built for Ghana & Africa', body: 'Mobile Money (MTN, Telecel, AirtelTigo), Ghana VAT, SSNIT payroll, and GRA e-VAT compliance built in.' },
+const WHY_STATS = [
+  {
+    value: '7',
+    label: 'Sectors served',
+    body: 'Purpose-built solutions for retail, schools, churches, pharmacies, manufacturers, enterprise businesses, and professional service firms.',
+    link: { label: 'Explore sector solutions', to: '/for/retail' },
+  },
+  {
+    value: '15+',
+    label: 'Core modules',
+    body: 'Every workspace ships with invoicing, payroll, Mobile Money, inventory, bank reconciliation, and full double-entry accounting — out of the box.',
+    link: { label: 'See all features', to: '/features' },
+  },
+  {
+    value: 'GH₵0',
+    label: 'Setup or implementation fee',
+    body: 'No consultants, no implementation costs. Your workspace is provisioned in under 5 minutes and ready to use immediately.',
+    link: { label: 'View pricing', to: '/pricing' },
+  },
+  {
+    value: '100%',
+    label: 'Data isolation per tenant',
+    body: 'Every business gets its own dedicated PostgreSQL schema. Your data is never mixed with another tenant\'s — ever.',
+    link: { label: 'How it works', to: '/how-it-works' },
+  },
 ];
 
 export function Home() {
+  const [activeQuote] = useState(0);
+
   return (
     <div className="min-h-screen">
 
-      {/* Hero */}
-      <section className="relative py-28 sm:py-36 overflow-hidden">
+      {/* ── Hero ── */}
+      <section className="relative pt-20 pb-28 sm:pt-28 sm:pb-36 overflow-hidden">
+        {/* bg layers */}
         <img
           src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1920&q=80&auto=format&fit=crop"
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover opacity-[0.07]"
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.06]"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink-950/60 to-ink-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(5,150,105,0.15)_0%,transparent_70%)]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-950/60 border border-brand-700/40 text-brand-300 text-xs font-bold uppercase tracking-widest mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
-            Enterprise Accounting for Every Sector
-          </div>
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-tight tracking-tight mb-6 max-w-4xl mx-auto">
-            One Platform.{' '}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink-950/70 to-ink-950" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(5,150,105,0.12)_0%,transparent_70%)]" />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+
+          {/* Announcement pill */}
+          <a
+            href="https://ledgio-fawn.vercel.app/register?sector=pharmacy"
+            className="inline-flex flex-col items-center px-5 py-3 mb-10 rounded-2xl border border-brand-700/40 bg-brand-950/50 backdrop-blur-sm hover:bg-brand-950/70 transition-colors group"
+          >
+            <span className="text-[11px] font-black uppercase tracking-widest text-brand-200">
+              Now live: Pharmacy module
+            </span>
+            <span className="flex items-center gap-1 text-brand-400 text-sm font-semibold mt-0.5">
+              NHIS claims · GRA e-VAT · Drug interaction checks
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </span>
+          </a>
+
+          {/* Headline */}
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-[1.08] tracking-tight mb-6">
+            Accounting software built{' '}
             <span className="bg-gradient-to-r from-brand-400 to-blue-400 bg-clip-text text-transparent">
-              Every Sector.
+              for Africa
             </span>
           </h1>
+
           <p className="text-lg sm:text-xl text-ink-300 leading-relaxed max-w-2xl mx-auto mb-10">
-            Ledgio is a multi-tenant ERP and accounting platform built for retail shops, schools, churches, pharmacies, manufacturers, and professional firms across Africa.
+            Control your financial information across every sector — retail, schools, pharmacies, churches, manufacturing, and more.
           </p>
+
+          {/* CTAs */}
           <div className="flex flex-wrap justify-center gap-4">
-            <a
-              href="https://ledgio-fawn.vercel.app/register"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-950 transition-colors"
-            >
-              Get Started Free <ArrowRight className="h-4 w-4" />
-            </a>
             <Link
-              to="/demo"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-ink-200 border border-ink-700 hover:bg-ink-800 transition-colors"
+              to="/for/retail"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-950/60 transition-colors"
             >
-              Book a Demo
+              Explore sector solutions <ArrowRight className="h-4 w-4" />
             </Link>
+            <Link
+              to="/features"
+              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-ink-200 border border-ink-700 hover:bg-ink-800/60 transition-colors"
+            >
+              Explore all features
+            </Link>
+          </div>
+        </div>
+
+        {/* Sector scroll bar */}
+        <div className="relative mt-16 overflow-hidden">
+          <div className="flex gap-4 animate-[scroll_30s_linear_infinite] w-max">
+            {[...SECTORS, ...SECTORS].map((s, i) => (
+              <Link
+                key={i}
+                to={`/for/${s.slug}`}
+                className="flex-shrink-0 inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-ink-700/60 bg-ink-900/60 backdrop-blur-sm text-ink-300 text-sm font-medium hover:border-brand-600/60 hover:text-brand-300 transition-colors"
+              >
+                <span className="text-lg leading-none">{s.icon}</span>
+                {s.label}
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Trust stats */}
-      <section className="border-y border-ink-800/60 bg-ink-900/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-0 sm:divide-x sm:divide-ink-800/60">
-            {TRUST_STATS.map((s) => (
-              <div key={s.label} className="text-center px-4">
-                <div className="text-2xl sm:text-3xl font-black text-brand-400 mb-1">{s.value}</div>
-                <div className="text-xs text-ink-500 font-medium">{s.label}</div>
+      {/* ── Here's what Ledgio can do for you ── */}
+      <section className="py-24 bg-ink-900/30 border-y border-ink-800/60">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
+              Here's what Ledgio can do for you
+            </h2>
+            <p className="text-ink-400 text-base leading-relaxed">
+              Ledgio helps businesses securely manage and automate their finances — transforming raw transactions into trusted, real-time accounting information.
+            </p>
+          </div>
+
+          {/* Horizontal scroll cards */}
+          <div className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-5">
+            {CAPABILITY_CARDS.map((card) => {
+              const Icon = card.Icon;
+              return (
+                <div
+                  key={card.title}
+                  className={`flex-shrink-0 w-[280px] lg:w-auto snap-start bg-gradient-to-b ${card.color} border border-white/5 rounded-2xl p-7 flex flex-col`}
+                >
+                  <div className="p-2.5 bg-white/10 rounded-xl w-fit mb-5">
+                    <Icon className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="text-base font-bold text-white mb-3">{card.title}</h3>
+                  <p className="text-sm text-white/60 leading-relaxed flex-1">{card.body}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Why Ledgio? ── */}
+      <section className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Why Ledgio?</h2>
+            <p className="text-ink-400 text-base leading-relaxed">
+              Ledgio brings enterprise-grade accounting to every type of African business — with zero implementation cost and real-time financial clarity from day one.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-6">
+            {WHY_STATS.map((s) => (
+              <div key={s.label} className="space-y-4">
+                <div className="text-5xl sm:text-6xl font-black text-brand-400">{s.value}</div>
+                <div className="text-base font-bold text-white">{s.label}</div>
+                <p className="text-sm text-ink-400 leading-relaxed">{s.body}</p>
+                <Link
+                  to={s.link.to}
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors"
+                >
+                  {s.link.label} <ChevronRight className="h-4 w-4" />
+                </Link>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* See it in Action */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div>
-              <span className="inline-flex items-center px-3 py-1 rounded-full bg-brand-950/60 border border-brand-700/40 text-brand-300 text-[10px] font-black uppercase tracking-widest mb-6">
-                Product Tour
-              </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-white mb-5 leading-tight">
-                See Ledgio in Action
-              </h2>
-              <p className="text-ink-400 text-sm leading-relaxed mb-6">
-                Watch how a business goes from registration to their first sale in under 10 minutes — POS, inventory, and automated accounting all running together.
-              </p>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Live POS with receipt printing and Mobile Money',
-                  'Real-time stock deductions on every sale',
-                  'Automatic journal entries — no manual bookkeeping',
-                  'SMS shortage alert fired the moment a till closes short',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3">
-                    <CheckCircle2 className="h-4 w-4 text-brand-500 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-ink-300">{item}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                to="/demo"
-                className="inline-flex items-center gap-2 text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors"
-              >
-                Book a live walkthrough <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-            <Link to="/demo" className="group block relative aspect-video rounded-2xl overflow-hidden shadow-2xl shadow-ink-950 border border-ink-800/60">
-              <img
-                src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80&auto=format&fit=crop"
-                alt="Ledgio dashboard preview"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-ink-950/30 to-transparent" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-16 h-16 rounded-full bg-brand-600/90 backdrop-blur-sm flex items-center justify-center shadow-xl shadow-brand-950 group-hover:scale-110 transition-transform duration-300">
-                    <Play className="h-7 w-7 text-white ml-1" fill="white" />
-                  </div>
-                  <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Book a Live Demo</span>
-                </div>
-              </div>
-            </Link>
+      {/* ── Customer quote ── */}
+      <section className="py-24 border-t border-ink-800/60 bg-ink-900/30">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Quote className="h-10 w-10 text-brand-600/60 mx-auto mb-8" />
+          <blockquote className="text-xl sm:text-2xl font-medium text-white leading-relaxed mb-8">
+            "With Ledgio, we can see our Mobile Money collections, stock levels, and daily P&L all in one place.
+            Our Monday morning report lands in my inbox automatically — I haven't had to log in just to check the numbers."
+          </blockquote>
+          <div className="text-sm text-ink-500">
+            <span className="font-bold text-ink-300">Business owner</span>
+            <span className="mx-2">·</span>
+            <span>Small Retail, Greater Accra</span>
+          </div>
+          <div className="mt-8">
+            <a
+              href="https://ledgio-fawn.vercel.app/register"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 transition-colors shadow-lg shadow-brand-950/50"
+            >
+              Get started free <ArrowRight className="h-4 w-4" />
+            </a>
           </div>
         </div>
       </section>
 
-      {/* Sector picker */}
-      <section className="py-24">
+      {/* ── Sector solutions ── */}
+      <section className="py-24 border-t border-ink-800/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-brand-950/60 border border-brand-700/40 text-brand-300 text-[10px] font-black uppercase tracking-widest mb-6">
+              Industry Solutions
+            </span>
             <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
-              Built for Your Sector
+              Built for your sector
             </h2>
             <p className="text-ink-400 text-sm leading-relaxed">
-              Choose your sector below to see the features, workflows, and reports designed specifically for your type of organisation.
+              Choose your sector to see the features, workflows, and reports designed specifically for your type of organisation.
             </p>
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {SECTORS.map((s) => (
               <Link
@@ -147,12 +261,12 @@ export function Home() {
                 className={`group flex flex-col bg-ink-900/60 border ${s.accent.border} rounded-2xl p-6 hover:bg-ink-800/60 transition-all hover:scale-[1.02]`}
               >
                 <div className="text-3xl mb-4">{s.icon}</div>
-                <h3 className={`text-base font-bold text-white mb-2 group-hover:${s.accent.text.replace('text-','text-')} transition-colors`}>
+                <h3 className="text-base font-bold text-white mb-2">
                   {s.label}
                 </h3>
                 <p className="text-xs text-ink-500 leading-relaxed flex-1">{s.tagline}</p>
                 <div className={`mt-4 flex items-center gap-1 text-xs font-bold ${s.accent.text}`}>
-                  See features <ArrowRight className="h-3.5 w-3.5" />
+                  See features <ChevronRight className="h-3.5 w-3.5" />
                 </div>
               </Link>
             ))}
@@ -160,35 +274,11 @@ export function Home() {
         </div>
       </section>
 
-      {/* Global features */}
-      <section className="py-24 border-t border-ink-800/60 bg-ink-900/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-xl mx-auto mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Platform Foundations</h2>
-            <p className="text-ink-400 text-sm">Every Ledgio workspace — regardless of sector — is built on the same enterprise-grade core.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {GLOBAL_FEATURES.map((f) => {
-              const Icon = f.icon;
-              return (
-                <div key={f.title} className="bg-ink-900/60 border border-ink-800/60 rounded-2xl p-8">
-                  <div className="p-3 bg-brand-950/60 rounded-xl w-fit mb-5">
-                    <Icon className="h-5 w-5 text-brand-400" />
-                  </div>
-                  <h3 className="text-base font-bold text-white mb-2">{f.title}</h3>
-                  <p className="text-sm text-ink-400 leading-relaxed">{f.body}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* What every sector gets */}
-      <section className="py-24">
+      {/* ── Platform foundations ── */}
+      <section className="py-24 border-t border-ink-800/60 bg-ink-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mx-auto text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Included in Every Plan</h2>
+            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Included in every plan</h2>
             <p className="text-ink-400 text-sm">These features ship with every Ledgio workspace, across every sector.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-5xl mx-auto">
@@ -197,7 +287,7 @@ export function Home() {
               'Dedicated PostgreSQL schema per tenant',
               'Role-based access control',
               'Full audit trail on every record',
-              'Mobile Money collections (MTN, Telecel, AirtelTigo)',
+              'Mobile Money (MTN, Telecel, AirtelTigo)',
               'Bank reconciliation',
               'Payroll & payslip generation',
               'Vendor bills & accounts payable',
@@ -218,11 +308,11 @@ export function Home() {
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* ── Final CTA ── */}
       <section className="py-24 border-t border-ink-800/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative rounded-3xl bg-gradient-to-br from-brand-600 to-blue-700 p-12 sm:p-16 overflow-hidden text-center">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1)_0%,transparent_60%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.10)_0%,transparent_60%)]" />
             <div className="relative max-w-2xl mx-auto">
               <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
                 Find your sector and get started today
