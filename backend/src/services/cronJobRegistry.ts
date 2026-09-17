@@ -1,4 +1,5 @@
 import { redis } from '../config/redis';
+import { alertJobFailure } from './alertingService';
 
 // A lock held for up to 30 minutes guards against two failure modes:
 // (1) a cron tick fires while the previous run is still in progress
@@ -95,6 +96,7 @@ export function wrapCronTick(name: string, fn: () => Promise<void>): () => Promi
       recordJobEnd(name, true);
     } catch (e: any) {
       recordJobEnd(name, false, e?.message ?? 'Unknown error');
+      alertJobFailure(name, e?.message ?? 'Unknown error').catch(() => undefined);
       throw e;
     } finally {
       await releaseCronLock(name);
