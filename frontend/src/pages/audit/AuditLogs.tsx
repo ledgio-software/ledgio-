@@ -7,7 +7,7 @@ import { Input } from "../../components/ui/Input";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { ShieldCheck, History, RefreshCw, Download, X } from "lucide-react";
+import { ShieldCheck, History, RefreshCw, Download, X, Link, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 
 interface AuditLogItem {
   id: string;
@@ -92,6 +92,13 @@ export function AuditLogs() {
   const [draftFilters, setDraftFilters] = useState<AuditLogFilters>(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState<AuditLogFilters>(initialFilters);
   const [isExporting, setIsExporting] = useState(false);
+  const [chainStatus, setChainStatus] = useState<{
+    intact: boolean;
+    checkedRows: number;
+    message: string;
+    brokenAtId?: string;
+  } | null>(null);
+  const [isVerifyingChain, setIsVerifyingChain] = useState(false);
 
   const buildParams = useCallback((currentPage: number, filters: AuditLogFilters) => {
     const params: Record<string, string | number> = { page: currentPage, limit: 20 };
@@ -167,6 +174,22 @@ export function AuditLogs() {
 
   const hasActiveFilters = Object.values(appliedFilters).some((v) => v.trim() !== "");
 
+  const handleVerifyChain = async () => {
+    setIsVerifyingChain(true);
+    setChainStatus(null);
+    try {
+      const res = await api.get("/audit-logs/verify-chain");
+      if (res.data.success) {
+        setChainStatus(res.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to verify audit log chain:", err);
+      showToast("Failed to verify audit log chain.", "error");
+    } finally {
+      setIsVerifyingChain(false);
+    }
+  };
+
   const handleExport = async () => {
     setIsExporting(true);
     try {
@@ -204,6 +227,10 @@ export function AuditLogs() {
         </div>
 
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleVerifyChain} disabled={isVerifyingChain} className="flex items-center">
+            {isVerifyingChain ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link className="mr-2 h-4 w-4" />}
+            {isVerifyingChain ? "Verifying..." : "Verify Chain"}
+          </Button>
           <Button variant="outline" onClick={handleExport} disabled={isExporting} className="flex items-center">
             <Download className="mr-2 h-4 w-4" />
             {isExporting ? "Exporting..." : "Export CSV"}
@@ -214,6 +241,43 @@ export function AuditLogs() {
           </Button>
         </div>
       </div>
+
+      {chainStatus && (
+        <div
+          className={`flex items-start gap-3 rounded-lg border p-4 text-sm ${
+            chainStatus.intact
+              ? "border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300"
+              : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+          }`}
+        >
+          {chainStatus.intact ? (
+            <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
+          ) : (
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+          )}
+          <div>
+            <p className="font-semibold">{chainStatus.intact ? "Chain Intact" : "Chain Broken"}</p>
+            <p className="mt-0.5 text-xs opacity-80">{chainStatus.message}</p>
+            {!chainStatus.intact && chainStatus.brokenAtId && (
+              <button
+                type="button"
+                className="mt-1 text-xs underline hover:no-underline"
+                onClick={() => applyFilters({ entityId: chainStatus.brokenAtId })}
+              >
+                Jump to affected record
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            className="ml-auto shrink-0 opacity-60 hover:opacity-100"
+            onClick={() => setChainStatus(null)}
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

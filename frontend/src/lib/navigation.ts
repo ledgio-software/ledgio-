@@ -53,6 +53,7 @@ import {
   GraduationCap,
   CalendarDays,
   MessageSquare,
+  WifiOff,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -86,7 +87,7 @@ const OPERATIONS_HIDDEN: ReadonlySet<string> = new Set([
   '/reports/cash-flow-forecast', '/reports/kpis', '/reports/aging',
   '/reports/landed-costs', '/reports/budgets', '/reports/analytics', '/reports/branch-comparison',
   '/payroll/employees', '/payroll/runs', '/payroll/loans', '/payroll/leave',
-  '/approvals', '/audit-logs', '/help-assistant/activity', '/import',
+  '/approvals', '/audit-logs', '/sync/failures', '/help-assistant/activity', '/import',
 ]);
 
 // Items hidden per org type at signup — applied before tier/role/mode filtering.
@@ -164,7 +165,7 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
 const BUSINESS_HIDDEN: ReadonlySet<string> = new Set([
   '/settings/fiscal-periods', '/settings/recurring-transactions',
   '/reports/ledger', '/fixed-assets',
-  '/audit-logs', '/help-assistant/activity', '/import',
+  '/audit-logs', '/sync/failures', '/help-assistant/activity', '/import',
 ]);
 
 // Per-href display name overrides for each simplified mode.
@@ -297,6 +298,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Approvals", href: "/approvals", icon: ShieldCheck, minTier: 2 },
       { name: "Audit Trail", href: "/audit-logs", icon: ShieldCheck },
+      { name: "Sync Failures", href: "/sync/failures", icon: WifiOff },
       { name: "AI Assistant Activity", href: "/help-assistant/activity", icon: Bot },
       { name: "Bulk Data Import", href: "/import", icon: FileUp },
       { name: "Team Management", href: "/team", icon: Users },
@@ -451,6 +453,7 @@ export const RESTRICTED_ROLE_NAV: Record<string, string[]> = {
     "/reports/stock-movement",
     "/reports/registers",
     "/audit-logs",
+    "/sync/failures",
     "/help-assistant/activity",
     "/feedback",
     "/reports/benford-analysis",
