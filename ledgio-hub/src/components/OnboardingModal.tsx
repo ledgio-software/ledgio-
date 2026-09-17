@@ -3,39 +3,7 @@ import { X, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SECTORS } from '../lib/sectors';
 import { SectorIcon } from '../lib/sectorIcons';
-
-const PLANS = [
-  {
-    slug: 'starter',
-    name: 'Starter',
-    price: 'Free',
-    period: '',
-    tagline: 'Perfect for individuals and very small businesses.',
-    features: ['Up to 2 users', 'Invoicing & basic accounts', 'POS (1 till)', 'Basic inventory'],
-    highlight: false,
-    enterprise: false,
-  },
-  {
-    slug: 'professional',
-    name: 'Professional',
-    price: '₵299',
-    period: '/ month',
-    tagline: 'For growing businesses that need the full platform.',
-    features: ['Up to 10 users', 'All Starter features', 'Payroll & budgets', 'Priority support'],
-    highlight: true,
-    enterprise: false,
-  },
-  {
-    slug: 'enterprise',
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    tagline: 'For large organisations with advanced requirements.',
-    features: ['Unlimited users', 'Unlimited branches', 'Dedicated account manager', 'SLA-backed support'],
-    highlight: false,
-    enterprise: true,
-  },
-];
+import { SECTOR_PRICING, DEFAULT_SECTOR_SLUG } from '../lib/sectorPricing';
 
 interface Props {
   open: boolean;
@@ -76,7 +44,11 @@ export function OnboardingModal({ open, preselectedSector, onClose }: Props) {
     setStep(2);
   }
 
-  function choosePlan(plan: typeof PLANS[number]) {
+  const sectorPricing = SECTOR_PRICING.find((s) => s.sectorSlug === selectedSector)
+    ?? SECTOR_PRICING.find((s) => s.sectorSlug === DEFAULT_SECTOR_SLUG)!;
+  const plans = sectorPricing.tiers;
+
+  function choosePlan(plan: typeof plans[number]) {
     if (plan.enterprise) {
       onClose();
       navigate('/demo');
@@ -162,7 +134,7 @@ export function OnboardingModal({ open, preselectedSector, onClose }: Props) {
                   <p className="text-sm text-ink-300">Setting up your workspace…</p>
                 </div>
               ) : (
-                PLANS.map((plan) => (
+                plans.map((plan) => (
                   <button
                     key={plan.slug}
                     onClick={() => choosePlan(plan)}
@@ -184,7 +156,8 @@ export function OnboardingModal({ open, preselectedSector, onClose }: Props) {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-ink-400 mb-3">{plan.tagline}</p>
+                        <p className="text-xs text-ink-400 mb-1">{plan.description}</p>
+                        <p className="text-[11px] text-brand-400 font-medium mb-3">{plan.seats}</p>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                           {plan.features.map((f) => (
                             <div key={f} className="flex items-center gap-1.5">
