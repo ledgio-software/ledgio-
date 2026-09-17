@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { Logo, Wordmark } from './Logo';
+import { useOnboarding } from '../lib/onboardingContext';
 
 const SECTORS = [
   { label: 'Small Retail & Shops', to: '/for/retail' },
@@ -34,6 +35,7 @@ export function Header() {
   const [solutionsOpen, setSolutionsOpen] = useState(false);
   const [mobileSolutionsOpen, setMobileSolutionsOpen] = useState(false);
   const location = useLocation();
+  const { open: openOnboarding } = useOnboarding();
 
   const isActive = (to: string) => location.pathname === to;
   const close = () => { setMenuOpen(false); setMobileSolutionsOpen(false); };
@@ -96,12 +98,12 @@ export function Header() {
           >
             Sign In
           </a>
-          <a
-            href="https://ledgio-fawn.vercel.app/register"
+          <button
+            onClick={() => openOnboarding()}
             className="text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white px-5 py-2.5 rounded-xl transition-colors shadow-lg shadow-brand-950"
           >
             Get Started Free
-          </a>
+          </button>
         </div>
 
         {/* Mobile hamburger */}
@@ -161,9 +163,9 @@ export function Header() {
               <a href="https://ledgio-fawn.vercel.app/login" className="block text-center py-2.5 text-sm font-medium text-ink-300 border border-ink-700 rounded-xl hover:bg-ink-800 transition-colors">
                 Sign In
               </a>
-              <a href="https://ledgio-fawn.vercel.app/register" className="block text-center py-3 text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white rounded-xl transition-colors">
+              <button onClick={() => { openOnboarding(); close(); }} className="block w-full text-center py-3 text-sm font-bold bg-brand-600 hover:bg-brand-500 text-white rounded-xl transition-colors">
                 Get Started Free
-              </a>
+              </button>
             </div>
           </nav>
         </div>

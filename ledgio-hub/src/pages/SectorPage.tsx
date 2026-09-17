@@ -1,12 +1,14 @@
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 import type { SectorData } from '../lib/sectors';
 import { SectorIcon } from '../lib/sectorIcons';
+import { useOnboarding } from '../lib/onboardingContext';
 
 interface Props {
   sector: SectorData;
 }
 
 export function SectorPage({ sector }: Props) {
+  const { open: openOnboarding } = useOnboarding();
   return (
     <div className="min-h-screen">
 
@@ -33,12 +35,12 @@ export function SectorPage({ sector }: Props) {
               {sector.hero.sub}
             </p>
             <div className="flex flex-wrap gap-4">
-              <a
-                href="https://ledgio-fawn.vercel.app/register"
+              <button
+                onClick={() => openOnboarding(sector.slug)}
                 className={`inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r ${sector.accent.from} ${sector.accent.to} shadow-lg transition-opacity hover:opacity-90`}
               >
                 {sector.hero.cta} <ArrowRight className="h-4 w-4" />
-              </a>
+              </button>
               <a
                 href="/demo"
                 className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm text-ink-200 border border-ink-700 hover:bg-ink-800 transition-colors"
@@ -127,12 +129,12 @@ export function SectorPage({ sector }: Props) {
                 Register your {sector.label.toLowerCase()} workspace in under 5 minutes. No credit card required. No setup fee. Your data is yours.
               </p>
               <div className="flex flex-wrap gap-4">
-                <a
-                  href="https://ledgio-fawn.vercel.app/register"
+                <button
+                  onClick={() => openOnboarding(sector.slug)}
                   className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm bg-white text-ink-900 hover:bg-ink-100 transition-colors shadow-lg"
                 >
                   {sector.hero.cta} <ArrowRight className="h-4 w-4" />
-                </a>
+                </button>
                 <a
                   href="/demo"
                   className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm text-white border border-white/30 hover:bg-white/10 transition-colors"
