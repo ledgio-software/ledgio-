@@ -2948,3 +2948,23 @@ model ParentMessage {
   @@index([tenantId, type])
   @@map("parent_messages")
 }
+
+// ── Offline Sync Robustness ───────────────────────────────────────────────────
+
+model SyncFailureLog {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  userId        String?  @map("user_id")
+  entityType    String   @map("entity_type")
+  entityId      String?  @map("entity_id")
+  operationKind String   @map("operation_kind")
+  clientTxnId   String?  @map("client_txn_id")
+  failureReason String?  @map("failure_reason") @db.Text
+  httpStatus    Int?     @map("http_status")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([tenantId, entityType])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("sync_failure_logs")
+}
