@@ -1,5 +1,6 @@
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 import type { SectorData } from '../lib/sectors';
+import { SectorIcon } from '../lib/sectorIcons';
 
 interface Props {
   sector: SectorData;
@@ -15,14 +16,14 @@ export function SectorPage({ sector }: Props) {
           src={sector.heroImage}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover opacity-[0.14] mix-blend-luminosity"
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.22]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-ink-950/40" />
         <div className={`absolute inset-0 bg-gradient-to-br ${sector.accent.from} ${sector.accent.to} opacity-[0.08]`} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 ${sector.accent.badge}`}>
-              <span className="text-base">{sector.icon}</span>
+              <SectorIcon slug={sector.slug} className="h-3.5 w-3.5" />
               {sector.label}
             </span>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight mb-6">
@@ -116,7 +117,9 @@ export function SectorPage({ sector }: Props) {
           <div className={`relative rounded-3xl bg-gradient-to-br ${sector.accent.from} ${sector.accent.to} p-12 sm:p-16 overflow-hidden`}>
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(0,0,0,0.3)_0%,transparent_70%)]" />
             <div className="relative max-w-2xl">
-              <div className="text-4xl mb-4">{sector.icon}</div>
+              <div className="mb-4">
+                <SectorIcon slug={sector.slug} className="h-10 w-10 text-white/90" />
+              </div>
               <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
                 Ready to get started?
               </h2>
