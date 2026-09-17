@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -74,8 +73,6 @@ const WHY_STATS = [
 ];
 
 export function Home() {
-  const [activeQuote] = useState(0);
-
   return (
     <div className="min-h-screen">
 
