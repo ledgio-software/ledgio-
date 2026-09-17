@@ -2,6 +2,18 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-17] - Ledgio Hub: Professional Icons (merged PR #79)
+
+**What/Why:**
+Emoji icons (🛒 🏢 🎓 💜 💊 ⚙️ 💼) in the sector scroll bar, sector solutions grid, sector hero badge, and sector CTA sections looked unprofessional. Replaced with Lucide SVG icon components, sized and colour-themed to context.
+
+**Changes:**
+- `ledgio-hub/src/lib/sectorIcons.tsx` — new file: `SectorIcon` component; maps sector slug to lucide icon (`ShoppingCart`, `Building2`, `GraduationCap`, `Heart`, `Pill`, `Factory`, `Briefcase`)
+- `ledgio-hub/src/pages/SectorPage.tsx` — hero badge and CTA block now use `<SectorIcon>`
+- `ledgio-hub/src/pages/Home.tsx` — sector scroll bar and solutions grid now use `<SectorIcon>` with accent-coloured badge wrapper on the grid cards
+
+---
+
 ## [Date: 2026-09-17] - System Hardening Phase 6: Observability & Load Testing
 
 **What/Why:**
