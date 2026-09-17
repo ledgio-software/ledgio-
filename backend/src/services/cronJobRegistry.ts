@@ -43,7 +43,7 @@ export interface JobRecord {
   schedule: string;
   description?: string;
   lastRun?: JobLastRun;
-  runOnce?: () => Promise<void>;  // callable for manual trigger
+  runOnce?: () => Promise<void>;
 }
 
 const registry = new Map<string, JobRecord & { _startedAt?: number }>();
@@ -79,17 +79,12 @@ export function listJobs(): Omit<JobRecord, 'runOnce'>[] {
 }
 
 /**
- * Wraps a cron tick function so that:
- * - A Redis distributed lock prevents overlapping runs (on restart or multi-pod).
- * - Start/end timestamps are recorded in the in-memory registry for the admin dashboard.
+ * Thin wrapper used by cron service init() methods (kept for backward
+ * compatibility). Concurrency is now handled by pg-boss via PostgreSQL
+ * advisory locks, so no Redis lock is taken here.
  */
 export function wrapCronTick(name: string, fn: () => Promise<void>): () => Promise<void> {
   return async () => {
-    const acquired = await acquireCronLock(name);
-    if (!acquired) {
-      console.log(`[CronJobRegistry] Skipping "${name}" — a run is already in progress.`);
-      return;
-    }
     recordJobStart(name);
     try {
       await fn();
@@ -98,8 +93,6 @@ export function wrapCronTick(name: string, fn: () => Promise<void>): () => Promi
       recordJobEnd(name, false, e?.message ?? 'Unknown error');
       alertJobFailure(name, e?.message ?? 'Unknown error').catch(() => undefined);
       throw e;
-    } finally {
-      await releaseCronLock(name);
     }
   };
 }
