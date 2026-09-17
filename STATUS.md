@@ -2,31 +2,29 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
-## [Date: 2026-09-17] - Sync Failure Log Viewer
+## [Date: 2026-09-17] - System Hardening Phase 6: Observability & Load Testing
 
 **What/Why:**
-The `sync_failure_logs` table, Prisma model (`SyncFailureLog`), and write path (`POST /api/v1/sync/failures`) were already in place from the local-first sync implementation. The missing piece was any way for operators to actually see these failures. This adds the read side end-to-end.
+Completing the observability stack and establishing load-test baselines before production traffic scales up.
+
+The backend already had: OpenTelemetry SDK with auto-instrumentations + OTLP export (`telemetry.ts`), W3C traceparent propagation in `requestLoggerMiddleware.ts`, structured JSON logging with requestId/traceId/spanId, and an in-memory time-series metrics middleware (`metricsMiddleware.ts` + `adminMetrics.ts`). Two gaps remained:
+
+1. **Alerting webhook** — `alertingService.ts` sends a Slack-compatible payload to `ALERT_WEBHOOK_URL` (no-op when unset). `alertJobFailure` is called from `wrapCronTick` on any cron error, so engineers get paged without polling the dashboard. `alertSlaBreach` is available for future integration with the metrics middleware. Set `ALERT_WEBHOOK_URL` to any Slack incoming-webhook URL or generic HTTP endpoint.
+
+2. **k6 load test suite** — four scripts covering every latency budget:
+   - `smoke.js` — 1 VU, 1 iteration: health check + login + `/me`; confirms target is reachable before a load run.
+   - `invoices.js` — ramp to 20 VUs: list invoices (p95 < 400 ms) + create (p95 < 600 ms); validates OLTP write path under steady-state concurrency.
+   - `reports.js` — ramp to 6 VUs: trial balance, P&L, AR aging (p95 < 5/8 s); validates the Phase 4 report pool doesn't starve OLTP under concurrent aggregation.
+   - `full-suite.js` — three parallel scenarios (20 cashier, 10 accountant, 5 manager VUs) with per-scenario trends; the realistic mixed-workload baseline for capacity planning. Errors must stay below 1 %, overall p99 < 3 000 ms.
 
 **Files changed:**
-- `backend/src/routes/sync.ts` — added `GET /api/v1/sync/failures` (requires Auditor role; paginated, filters: entityType/operationKind substring, dateFrom/dateTo date range; capped at 200/page)
-- `frontend/src/pages/sync/SyncFailureLogs.tsx` — new page: paginated table of failures with colour-coded HTTP status badges (amber 4xx / red 5xx), truncated entity/txn IDs, inline filter bar
-- `frontend/src/App.tsx` — lazy-loaded route at `/sync/failures`
-- `frontend/src/lib/navigation.ts` — "Sync Failures" nav item under ADMINISTRATION; route added to all admin-visible route sets
-
----
-
-## [Date: 2026-09-17] - Phase 7 Audit Log: Chain Verification UI & Integration Tests
-
-**What/Why:**
-The audit log infrastructure (hash-chained `audit_logs` table, `auditLogService.ts`, `GET /audit-logs` route with CSV export) was already fully implemented. The gap was that the `/verify-chain` endpoint — which walks all chained rows and re-computes expected SHA-256 hashes to detect tampering or deletions — had no frontend UI and no integration tests.
-
-Added:
-- **"Verify Chain" button** in `AuditLogs.tsx`: one-click call to `GET /api/v1/audit-logs/verify-chain`. Result renders as a dismissible green (intact) or red (broken) banner. When the chain is broken, the banner shows the broken row ID and a "Jump to affected record" link that applies `entityId` as a filter.
-- **`auditLogChainVerify.test.ts`**: four integration tests — no entries returns intact+0, a 3-row correctly-seeded chain passes, a tampered `prevHash` is caught and `brokenAtId` is returned, unauthenticated requests return 401.
-
-**Files changed:**
-- `frontend/src/pages/audit/AuditLogs.tsx` — added `handleVerifyChain`, chain status state, green/red result banner, "Verify Chain" header button
-- `backend/src/tests/auditLogChainVerify.test.ts` — new integration test suite for `/verify-chain`
+- `backend/src/services/alertingService.ts` — new; Slack-compatible webhook alerter
+- `backend/src/services/cronJobRegistry.ts` — added `alertJobFailure` call in `wrapCronTick` error path
+- `backend/load-tests/helpers/auth.js` — shared k6 auth helper (login + header builder)
+- `backend/load-tests/smoke.js` — smoke test
+- `backend/load-tests/invoices.js` — invoice CRUD load test
+- `backend/load-tests/reports.js` — report aggregation load test
+- `backend/load-tests/full-suite.js` — full mixed-workload load test
 
 ---
 
