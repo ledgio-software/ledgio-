@@ -43,12 +43,8 @@ export async function scheduleJob(
 
   registerJob(name, cronExpr, description, handler);
 
-  // Ensure the queue row exists before scheduling (pgboss.schedule has a FK on pgboss.queue).
-  await boss.createQueue(name);
-
-  // Persist the schedule in PostgreSQL; singletonKey prevents job stacking.
-  await boss.schedule(name, cronExpr, {}, { singletonKey: name });
-
+  // Register the worker first — pg-boss auto-creates the queue row when work() is called,
+  // satisfying the FK that pgboss.schedule has on pgboss.queue.
   await boss.work<{}, void>(name, { batchSize: 1 }, async (jobs) => {
     for (const _job of jobs) {
       recordJobStart(name);
@@ -62,6 +58,9 @@ export async function scheduleJob(
       }
     }
   });
+
+  // Persist the schedule now that the queue row exists; singletonKey prevents job stacking.
+  await boss.schedule(name, cronExpr, {}, { singletonKey: name });
 
   logger.info(`[Queue] Registered: ${name} (${cronExpr})`);
 }
