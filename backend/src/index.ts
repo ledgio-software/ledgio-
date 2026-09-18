@@ -39,6 +39,19 @@ const startServer = async () => {
     // Already applied or not found — both are fine; suppress the error.
   }
 
+  // Resolve a migration that failed in production due to a transient DB error.
+  // All statements in 20260915050000_add_ssnit_compliance use IF NOT EXISTS,
+  // so marking it rolled-back lets migrate deploy safely re-run it idempotently.
+  try {
+    execSync(
+      'npx prisma migrate resolve --rolled-back 20260915050000_add_ssnit_compliance',
+      { stdio: 'pipe' },
+    );
+    console.log('[Server] Marked 20260915050000_add_ssnit_compliance as rolled-back for retry.');
+  } catch (_) {
+    // Already resolved or not in a failed state — suppress.
+  }
+
   // Run pending DB migrations before accepting traffic
   try {
     console.log('[Server] Running pending DB migrations...');

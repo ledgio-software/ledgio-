@@ -7,7 +7,8 @@ import { downloadBlobResponse } from "../../lib/downloadBlob";
 import { useToast } from "../../contexts/ToastContext";
 import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
-import { Flame, Clock, Lightbulb, Download, FileSpreadsheet, FileType, RefreshCw, ArrowRight } from "lucide-react";
+import { useAiInsights } from "../../hooks/useAiInsights";
+import { Flame, Clock, Lightbulb, Download, FileSpreadsheet, FileType, RefreshCw, ArrowRight, Brain } from "lucide-react";
 
 interface FastSeller {
   id: string;
@@ -36,8 +37,21 @@ interface Suggestion {
   reason: string;
 }
 
+interface StockoutData {
+  item_id: string;
+  item_name: string;
+  sku: string;
+  on_hand: number;
+  weekly_velocity?: number;
+  days_until_stockout?: number;
+  stockout_date?: string;
+  reorder_date?: string;
+}
+
 export function InventoryIntelligence() {
   const { settings: tenantSettings, isLoading: isLoadingTenantSettings } = useTenantSettings();
+  const { insights: aiInsights } = useAiInsights();
+  const stockoutInsights = aiInsights.filter((i) => i.module === "inventory_demand");
   const [fastSellers, setFastSellers] = useState<FastSeller[]>([]);
   const [slowMoving, setSlowMoving] = useState<SlowMoving[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -164,6 +178,67 @@ export function InventoryIntelligence() {
           )}
         </CardContent>
       </Card>
+
+      {/* AI Stockout Predictions */}
+      {stockoutInsights.length > 0 && (
+        <Card className="border-rose-200 bg-rose-50/50 dark:bg-rose-950/20 dark:border-rose-900/50 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold text-rose-900 dark:text-rose-300 flex items-center gap-2">
+              <Brain className="h-5 w-5 text-rose-600" />
+              AI Stockout Predictions ({stockoutInsights.length})
+            </CardTitle>
+            <CardDescription className="text-rose-800/80 dark:text-rose-400/80 text-xs">
+              Nightly AI forecast: items projected to run out within 30 days based on sales velocity.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {stockoutInsights.map((insight) => {
+                const d = insight.data as unknown as StockoutData | null;
+                const isCritical = insight.severity === "critical";
+                return (
+                  <div
+                    key={insight.id}
+                    className={`p-3 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                      isCritical
+                        ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                        : "bg-white dark:bg-secondary-900 border-rose-200 dark:border-rose-900/40"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <span className="font-bold text-secondary-900 dark:text-secondary-100">
+                        {d?.item_name ?? insight.title}
+                      </span>
+                      {d?.sku && (
+                        <span className="ml-2 font-mono text-secondary-400">{d.sku}</span>
+                      )}
+                      <p className="text-secondary-500 dark:text-secondary-400 mt-0.5">{insight.body}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {d?.days_until_stockout !== undefined && (
+                        <span
+                          className={`px-2.5 py-1 rounded-full font-bold ${
+                            isCritical
+                              ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400"
+                              : "bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400"
+                          }`}
+                        >
+                          {Math.round(d.days_until_stockout)}d left
+                        </span>
+                      )}
+                      {d?.reorder_date && (
+                        <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 rounded font-medium">
+                          Reorder by {d.reorder_date}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Grid: Fast Sellers vs Slow Moving / Dead Stock */}
       <div className="grid md:grid-cols-2 gap-6">
