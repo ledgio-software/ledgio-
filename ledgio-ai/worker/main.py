@@ -39,6 +39,7 @@ MODULE_MAP = {
     "inventory_demand": "modules.inventory_demand",
     "anomaly_detection": "modules.anomaly_detection",
     "next_action_prediction": "modules.next_action_prediction",
+    "budget_burn": "modules.budget_burn",
 }
 
 
