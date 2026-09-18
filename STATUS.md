@@ -2,6 +2,26 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 1.5 — Budget Burn Prediction (feature/ledgio-ai-budget-burn)
+
+**What/Why:**
+Adds budget burn prediction for Pro tier tenants. For each open fiscal period, the nightly intelligence worker checks every budgeted account and emits an insight when the current burn rate projects a budget overrun. Severity is `warning` (≥90% projected) or `critical` (≥100% projected or already over). Insights render automatically in the existing `AiInsightsBanner`.
+
+**Architecture:**
+- `ledgio-ai/worker/modules/budget_burn.py` — new module; queries `budgets JOIN accounts JOIN fiscal_periods` for open periods; computes burn rate (actual/elapsed days), projects to period end via linear extrapolation; emits one insight per at-risk account with full chart-ready data payload
+- `ledgio-ai/worker/main.py` — `MODULE_MAP` extended with `"budget_burn": "modules.budget_burn"`
+- `backend/prisma/migrations/20260918000003_add_budget_burn_module/migration.sql` — drops and recreates `ai_tenant_insights_module_check` to include `'budget_burn'`
+
+**Tier gating:** Pro tier only (`tier_config.py` already gates this; no change needed).
+
+**Files changed:**
+- `ledgio-ai/worker/modules/budget_burn.py` (new)
+- `ledgio-ai/worker/main.py`
+- `backend/prisma/migrations/20260918000003_add_budget_burn_module/migration.sql` (new)
+- `STATUS.md`
+
+---
+
 ## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 2 — Behavioral Telemetry & Next-Action Prediction (feature/ledgio-ai-phase2)
 
 **What/Why:**
