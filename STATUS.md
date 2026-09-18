@@ -2,6 +2,36 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-18] - Ledgio AI: Initial Scaffold (feature/ledgio-ai-scaffold)
+
+**What/Why:**
+Created the `ledgio-ai/` module — a Claude Sonnet 4.6-powered financial assistant that embeds into the Ledgio accounting platform. The architecture is based on research into AI-driven ERP for African SMEs and uses MCP-style tool orchestration, PostgreSQL Row-Level Security for tenant isolation, and Anthropic Prompt Caching for cost efficiency.
+
+**Changes:**
+- `ledgio-ai/backend/app/main.py` — FastAPI entry point; CORS + router wiring
+- `ledgio-ai/backend/app/routes/chat.py` — `POST /api/ai/chat` and conversation history endpoint
+- `ledgio-ai/backend/app/routes/health.py` — health check
+- `ledgio-ai/backend/app/middleware/tenant_auth.py` — JWT decode → TenantContext (tenant_id, sector, tier)
+- `ledgio-ai/backend/app/services/claude_service.py` — Claude Sonnet 4.6 integration with full agentic tool-use loop + prompt caching
+- `ledgio-ai/backend/app/services/conversation_service.py` — PostgreSQL-backed conversation history (RLS-scoped)
+- `ledgio-ai/backend/app/tools/definitions.py` — 7 tool schemas: cash position, invoices, inventory alerts, P&L, VAT, payroll, search
+- `ledgio-ai/backend/app/tools/executor.py` — Tool query implementations using asyncpg with RLS activation
+- `ledgio-ai/backend/app/prompts/base_system_prompt.py` — Sector-aware, Ghana-compliance-aware system prompt
+- `ledgio-ai/backend/app/migrations/001_ai_conversations.sql` — Tables + RLS policies for conversation storage
+- `ledgio-ai/backend/requirements.txt` — Python dependencies
+- `ledgio-ai/backend/.env.example` — Environment variable template
+- `ledgio-ai/frontend/src/hooks/useLedgioAI.ts` — React hook: chat state, API calls, conversation management
+- `ledgio-ai/frontend/src/components/LedgioAIChat.tsx` — Chat UI widget (dark theme, suggested prompts, loading state)
+- `ledgio-ai/README.md` — Architecture overview and local dev instructions
+
+**Tech decisions:**
+- Python (FastAPI) chosen as backend language per project tech stack
+- Prompt Caching: system prompt sent with `cache_control: ephemeral` — up to 90% token cost reduction
+- RLS: every DB query sets `app.tenant_id` so PostgreSQL enforces data isolation at DB level
+- JWT passthrough: AI service never stores credentials, decodes token from main Ledgio auth
+
+---
+
 ## [Date: 2026-09-17] - Ledgio Hub: Professional Icons (merged PR #79)
 
 **What/Why:**
