@@ -2968,3 +2968,38 @@ model SyncFailureLog {
   @@index([tenantId, createdAt(sort: Desc)])
   @@map("sync_failure_logs")
 }
+
+// ── Ledgio Intelligence Engine ────────────────────────────────────────────────
+
+model AiTenantInsight {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  module      String
+  severity    String
+  title       String
+  body        String    @db.Text
+  data        Json?
+  computedAt  DateTime  @default(now()) @map("computed_at") @db.Timestamptz()
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz()
+  dismissedAt DateTime? @map("dismissed_at") @db.Timestamptz()
+  dismissedBy String?   @map("dismissed_by") @db.Uuid
+
+  @@index([tenantId, computedAt(sort: Desc)], name: "idx_ai_insights_tenant")
+  @@index([tenantId, module], name: "idx_ai_insights_tenant_module")
+  @@map("ai_tenant_insights")
+}
+
+model BehaviorEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  eventType   String    @map("event_type")
+  entityType  String?   @map("entity_type")
+  entityId    String?   @map("entity_id") @db.Uuid
+  metadata    Json?
+  occurredAt  DateTime  @default(now()) @map("occurred_at") @db.Timestamptz()
+
+  @@index([tenantId, userId, occurredAt(sort: Desc)], name: "idx_behavior_tenant_user")
+  @@index([tenantId, occurredAt(sort: Desc)], name: "idx_behavior_tenant_occurred")
+  @@map("behavior_events")
+}

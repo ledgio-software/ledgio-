@@ -128,6 +128,7 @@ import interestPolicyRouter from './routes/interestPolicy';
 import apiKeysRouter from './routes/apiKeys';
 import externalApiRouter from './routes/externalApi';
 import honeypotProbesRouter from './routes/honeypotProbes';
+import aiInsightsRouter from './routes/aiInsights';
 
 dotenv.config();
 
@@ -519,6 +520,8 @@ app.use('/api/v1/ocr', ocrRouter);
 // be able to reach the payment endpoints (enforcement is applied inside
 // tenantContextMiddleware for all other tenant-scoped routes).
 app.use('/api/v1/subscription', subscriptionRouter);
+
+app.use('/api/v1/ai/insights', aiInsightsRouter);
 
 // Rejected CORS requests otherwise fall through to Express's default HTML
 // error handler, which leaks a stack trace and breaks the API's JSON contract.

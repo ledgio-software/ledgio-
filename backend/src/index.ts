@@ -140,6 +140,28 @@ const startServer = async () => {
       async () => { await KeepAliveCronService.ping(); },
       'Self-ping every 10 min to prevent Render cold starts');
 
+    // Nightly intelligence worker: cash forecast, invoice risk, inventory demand, anomaly detection
+    await scheduleJob(
+      'Ledgio Intelligence Worker',
+      '0 1 * * *',
+      async () => {
+        const { spawn } = require('child_process');
+        await new Promise<void>((resolve, reject) => {
+          const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/main.py');
+          const proc = spawn('python', [workerPath, '--all'], {
+            env: { ...process.env },
+            stdio: 'inherit',
+          });
+          proc.on('close', (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Intelligence worker exited with code ${code}`));
+          });
+          proc.on('error', reject);
+        });
+      },
+      'Nightly AI insight computation: cash forecast, invoice risk, inventory demand, anomaly detection',
+    );
+
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
     migrateCustomerPii().catch((err: unknown) => console.error('[CustomerPiiMigration] Backfill failed:', err));
