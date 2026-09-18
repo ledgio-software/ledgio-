@@ -1,6 +1,7 @@
 import React from "react";
 import { Brain, X, AlertTriangle, Info } from "lucide-react";
-import { useAiInsights, AiInsight } from "../hooks/useAiInsights";
+import { useAiInsights } from "../hooks/useAiInsights";
+import type { AiInsight } from "../hooks/useAiInsights";
 
 const SEVERITY_STYLES: Record<AiInsight["severity"], string> = {
   critical: "bg-red-600 dark:bg-red-700 text-white",

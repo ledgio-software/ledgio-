@@ -4,7 +4,8 @@ import { api } from "../../lib/api";
 import { exportToCsv } from "../../lib/exportCsv";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
-import { useAiInsights, AiInsight } from "../../hooks/useAiInsights";
+import { useAiInsights } from "../../hooks/useAiInsights";
+import type { AiInsight } from "../../hooks/useAiInsights";
 
 type Tab = "duplicate-payments" | "round-amounts" | "ai-anomaly";
 
@@ -142,7 +143,8 @@ export function FraudAlerts() {
       </div>
 
       {/* Filters — hidden on AI Anomaly tab */}
-      {tab !== "ai-anomaly" && <div className="flex flex-wrap gap-3 mb-6" style={{display: tab === "ai-anomaly" ? "none" : undefined}}>
+      {tab !== "ai-anomaly" && (
+      <div className="flex flex-wrap gap-3 mb-6">
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600 dark:text-gray-400">From</label>
           <input
@@ -204,6 +206,7 @@ export function FraudAlerts() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Error */}
       {error && (
