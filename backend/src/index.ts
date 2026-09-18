@@ -197,6 +197,28 @@ const startServer = async () => {
       'Hourly: transform audit_logs into behavior_events for all active tenants',
     );
 
+    // Federated learning round (01:30 UTC, after intelligence worker): noised gradient aggregation
+    await scheduleJob(
+      'Federated Learning Round',
+      '30 1 * * *',
+      async () => {
+        const { spawn } = require('child_process');
+        await new Promise<void>((resolve, reject) => {
+          const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/federated_round.py');
+          const proc = spawn('python', [workerPath], {
+            env: { ...process.env },
+            stdio: 'inherit',
+          });
+          proc.on('close', (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Federated round exited with code ${code}`));
+          });
+          proc.on('error', reject);
+        });
+      },
+      'Nightly federated learning round: noised gradient aggregation across tenants for invoice risk model',
+    );
+
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
     migrateCustomerPii().catch((err: unknown) => console.error('[CustomerPiiMigration] Backfill failed:', err));

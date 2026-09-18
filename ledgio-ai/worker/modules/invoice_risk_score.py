@@ -86,8 +86,32 @@ async def run(conn: asyncpg.Connection, tenant_id: str, tier: int) -> list[dict[
     raw_scores = (X_norm @ weights) * 100
     raw_scores = np.clip(raw_scores, 0, 100)
 
-    # If we have enough history, fit logistic regression and blend
-    if len(hist_df) >= 30:
+    # Prefer the federated global model if available; fall back to local logistic regression
+    global_weights_row = await conn.fetchrow(
+        "SELECT weights FROM global_model_weights WHERE model_name = 'invoice_risk' LIMIT 1"
+    )
+
+    if global_weights_row:
+        try:
+            import json as _json
+            gw = global_weights_row["weights"] if isinstance(global_weights_row["weights"], dict) else _json.loads(global_weights_row["weights"])
+            coef = np.array(gw["coef"], dtype=float)
+            intercept = float(gw["intercept"])
+            Xu = unpaid_df[["avg_days_late", "past_late_count", "amount", "days_outstanding"]].values.astype(float)
+            Xu_norm = Xu / (Xu.max(axis=0) + 1e-9)
+            # Pad or trim to 4 features
+            if Xu_norm.shape[1] < 4:
+                Xu_norm = np.pad(Xu_norm, ((0, 0), (0, 4 - Xu_norm.shape[1])))
+            elif Xu_norm.shape[1] > 4:
+                Xu_norm = Xu_norm[:, :4]
+            z = Xu_norm @ coef + intercept
+            fed_proba = 1.0 / (1.0 + np.exp(-np.clip(z, -500, 500))) * 100
+            raw_scores = 0.4 * raw_scores + 0.6 * fed_proba
+        except Exception:
+            pass  # Fall through to local model
+
+    elif len(hist_df) >= 30:
+        # If we have enough history and no global model, fit local logistic regression
         try:
             from sklearn.linear_model import LogisticRegression  # type: ignore
 
