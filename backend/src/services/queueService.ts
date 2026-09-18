@@ -6,6 +6,11 @@ const QUEUE_SCHEMA = process.env.PGBOSS_SCHEMA ?? 'pgboss';
 
 let boss: PgBoss | null = null;
 
+// pg-boss only allows [a-zA-Z0-9_\-./] in queue names; replace any other character with a hyphen.
+function sanitizeQueueName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_\-.\/]/g, '-');
+}
+
 export async function startQueue(): Promise<void> {
   boss = new PgBoss({
     connectionString: process.env.DATABASE_URL!,
@@ -43,9 +48,11 @@ export async function scheduleJob(
 
   registerJob(name, cronExpr, description, handler);
 
+  const queueName = sanitizeQueueName(name);
+
   // Register the worker first — pg-boss auto-creates the queue row when work() is called,
   // satisfying the FK that pgboss.schedule has on pgboss.queue.
-  await boss.work<{}, void>(name, { batchSize: 1 }, async (jobs) => {
+  await boss.work<{}, void>(queueName, { batchSize: 1 }, async (jobs) => {
     for (const _job of jobs) {
       recordJobStart(name);
       try {
@@ -60,7 +67,7 @@ export async function scheduleJob(
   });
 
   // Persist the schedule now that the queue row exists; singletonKey prevents job stacking.
-  await boss.schedule(name, cronExpr, {}, { singletonKey: name });
+  await boss.schedule(queueName, cronExpr, {}, { singletonKey: queueName });
 
   logger.info(`[Queue] Registered: ${name} (${cronExpr})`);
 }
@@ -68,5 +75,6 @@ export async function scheduleJob(
 /** Enqueues a one-off execution of a named job (admin manual trigger). */
 export async function sendJobNow(name: string): Promise<string | null> {
   if (!boss) throw new Error('[Queue] Call startQueue() before sendJobNow()');
-  return boss.send(name, {}, { singletonKey: `${name}-manual-${Date.now()}` });
+  const queueName = sanitizeQueueName(name);
+  return boss.send(queueName, {}, { singletonKey: `${queueName}-manual-${Date.now()}` });
 }
