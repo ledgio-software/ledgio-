@@ -2,6 +2,24 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 2 — Behavioral Telemetry & Next-Action Prediction (feature/ledgio-ai-phase2)
+
+**What/Why:**
+Phase 2 of the Intelligence Engine adds a behavioral learning pipeline on top of Phase 1's statistical ML foundation. An hourly Python script transforms `audit_logs` into structured `behavior_events`, and a nightly next-action predictor builds a per-tenant Markov transition matrix to predict each active user's most likely next step. Predictions surface as dismissible action chips in a new `QuickSuggestionsBar` in the app header.
+
+**Architecture:**
+- `ledgio-ai/worker/behavioral_telemetry.py` — standalone hourly collector; watermarks per-tenant so only new `audit_logs` rows are processed; maps `(action, entity)` pairs to typed `event_type` strings (22 event types); bulk-inserts into `behavior_events` with ON CONFLICT DO NOTHING
+- `ledgio-ai/worker/modules/next_action_prediction.py` — runs as part of the nightly intelligence worker; reads last 90 days of `behavior_events`; builds first-order Markov transition matrix pooled across all users in the tenant; emits top-3 next-action suggestions per active user (users with events in last 7 days, ≥3 total transitions); results go into `ai_tenant_insights` with `module='next_action'`
+- `backend/prisma/migrations/20260918000002_add_behavioral_module/migration.sql` — extends the `ai_tenant_insights_module_check` constraint to include `'next_action'`
+- `backend/src/index.ts` — new hourly `Behavioral Telemetry Collector` cron job (pg-boss, `0 * * * *`)
+- `backend/src/routes/aiInsights.ts` — `MODULES_BY_TIER` updated to include `'next_action'` for all tiers (Starter through Pro)
+- `frontend/src/components/QuickSuggestionsBar.tsx` — thin action-chip bar; reads `next_action` insights from `useAiInsights()`; each chip navigates to the suggested route; entire bar is dismissible
+- `frontend/src/components/layout/MainLayout.tsx` — `<QuickSuggestionsBar />` inserted after `<AiInsightsBanner />`
+
+**Tier gating:** `next_action` insights are enabled for all tiers (Starter, Standard, Pro) since behavioral learning adds value regardless of financial tier.
+
+**Files Affected:** `ledgio-ai/worker/behavioral_telemetry.py`, `ledgio-ai/worker/modules/next_action_prediction.py`, `ledgio-ai/worker/main.py`, `ledgio-ai/worker/tier_config.py`, `backend/prisma/migrations/20260918000002_add_behavioral_module/migration.sql`, `backend/src/routes/aiInsights.ts`, `backend/src/index.ts`, `frontend/src/components/QuickSuggestionsBar.tsx`, `frontend/src/components/layout/MainLayout.tsx`, `TASKS.md`, `STATUS.md`.
+
 ## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 1 (feature/ledgio-ai-scaffold)
 
 **What/Why:**

@@ -10,9 +10,9 @@ router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
 
 const MODULES_BY_TIER: Record<number, string[]> = {
-  1: ['inventory_demand'],
-  2: ['inventory_demand', 'cash_flow_forecast', 'invoice_risk_score', 'anomaly_detection'],
-  3: ['inventory_demand', 'cash_flow_forecast', 'invoice_risk_score', 'anomaly_detection', 'budget_burn'],
+  1: ['inventory_demand', 'next_action'],
+  2: ['inventory_demand', 'cash_flow_forecast', 'invoice_risk_score', 'anomaly_detection', 'next_action'],
+  3: ['inventory_demand', 'cash_flow_forecast', 'invoice_risk_score', 'anomaly_detection', 'budget_burn', 'next_action'],
 };
 
 function allowedModules(tier: number): string[] {
