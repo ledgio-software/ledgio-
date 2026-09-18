@@ -38,6 +38,7 @@ MODULE_MAP = {
     "invoice_risk_score": "modules.invoice_risk_score",
     "inventory_demand": "modules.inventory_demand",
     "anomaly_detection": "modules.anomaly_detection",
+    "next_action_prediction": "modules.next_action_prediction",
 }
 
 

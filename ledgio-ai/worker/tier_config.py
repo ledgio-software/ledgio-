@@ -14,9 +14,9 @@ STANDARD = 2
 PRO = 3
 
 MODULES_BY_TIER: dict[int, list[str]] = {
-    STARTER: ["inventory_demand"],
-    STANDARD: ["inventory_demand", "cash_flow_forecast", "invoice_risk_score", "anomaly_detection"],
-    PRO: ["inventory_demand", "cash_flow_forecast", "invoice_risk_score", "anomaly_detection", "budget_burn"],
+    STARTER: ["inventory_demand", "next_action_prediction"],
+    STANDARD: ["inventory_demand", "cash_flow_forecast", "invoice_risk_score", "anomaly_detection", "next_action_prediction"],
+    PRO: ["inventory_demand", "cash_flow_forecast", "invoice_risk_score", "anomaly_detection", "budget_burn", "next_action_prediction"],
 }
 
 AUTOENCODER_TIERS = {PRO}  # only Pro gets the deep autoencoder anomaly layer

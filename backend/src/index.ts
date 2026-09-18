@@ -162,6 +162,28 @@ const startServer = async () => {
       'Nightly AI insight computation: cash forecast, invoice risk, inventory demand, anomaly detection',
     );
 
+    // Hourly behavioral telemetry: audit_logs → behavior_events (Phase 2 pipeline)
+    await scheduleJob(
+      'Behavioral Telemetry Collector',
+      '0 * * * *',
+      async () => {
+        const { spawn } = require('child_process');
+        await new Promise<void>((resolve, reject) => {
+          const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/behavioral_telemetry.py');
+          const proc = spawn('python', [workerPath], {
+            env: { ...process.env },
+            stdio: 'inherit',
+          });
+          proc.on('close', (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Behavioral telemetry exited with code ${code}`));
+          });
+          proc.on('error', reject);
+        });
+      },
+      'Hourly: transform audit_logs into behavior_events for all active tenants',
+    );
+
     // One-time idempotent backfill: encrypt customer PII (email/phone/tin)
     const { migrateCustomerPii } = require('./services/customerPiiMigrationService');
     migrateCustomerPii().catch((err: unknown) => console.error('[CustomerPiiMigration] Backfill failed:', err));
