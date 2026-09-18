@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, RefreshCw, Download } from "lucide-react";
+import { AlertTriangle, RefreshCw, Download, Brain } from "lucide-react";
 import { api } from "../../lib/api";
 import { exportToCsv } from "../../lib/exportCsv";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
+import { useAiInsights, AiInsight } from "../../hooks/useAiInsights";
 
-type Tab = "duplicate-payments" | "round-amounts";
+type Tab = "duplicate-payments" | "round-amounts" | "ai-anomaly";
 
 interface DuplicatePaymentGroup {
   vendorName: string;
@@ -26,6 +27,8 @@ interface RoundAmountTransaction {
 
 export function FraudAlerts() {
   const { settings, isLoading: isLoadingTenantSettings } = useTenantSettings();
+  const { insights: aiInsights } = useAiInsights();
+  const anomalyInsights = aiInsights.filter((i) => i.module === "anomaly_detection");
   const today = new Date().toISOString().split("T")[0];
   const yearStart = today.slice(0, 4) + "-01-01";
 
@@ -121,6 +124,7 @@ export function FraudAlerts() {
           [
             { id: "duplicate-payments", label: "Duplicate Payments" },
             { id: "round-amounts", label: "Round-Amount Transactions" },
+            { id: "ai-anomaly", label: `AI Anomaly${anomalyInsights.length > 0 ? ` (${anomalyInsights.length})` : ""}` },
           ] as { id: Tab; label: string }[]
         ).map((t) => (
           <button
@@ -137,8 +141,8 @@ export function FraudAlerts() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      {/* Filters — hidden on AI Anomaly tab */}
+      {tab !== "ai-anomaly" && <div className="flex flex-wrap gap-3 mb-6" style={{display: tab === "ai-anomaly" ? "none" : undefined}}>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600 dark:text-gray-400">From</label>
           <input
@@ -209,7 +213,7 @@ export function FraudAlerts() {
       )}
 
       {/* Content */}
-      {tab === "duplicate-payments" ? (
+      {tab !== "ai-anomaly" && tab === "duplicate-payments" ? (
         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-700">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
@@ -250,7 +254,7 @@ export function FraudAlerts() {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : tab === "round-amounts" ? (
         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-700">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
@@ -287,15 +291,71 @@ export function FraudAlerts() {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
-      {!noData && (
+      {tab !== "ai-anomaly" && !noData && (
         <p className="mt-3 text-xs text-gray-400">
           {tab === "duplicate-payments"
             ? `${dupPayments.length} duplicate group(s) found.`
             : `${roundAmounts.length} transaction(s) found (capped at 500).`}
         </p>
       )}
+
+      {/* AI Anomaly tab content */}
+      {tab === "ai-anomaly" && (
+        <div className="space-y-3">
+          {anomalyInsights.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              <Brain className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              No AI anomalies detected yet. The intelligence worker runs nightly.
+            </div>
+          ) : (
+            anomalyInsights.map((insight) => (
+              <AnomalyInsightCard key={insight.id} insight={insight} />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AnomalyInsightCard({ insight }: { insight: AiInsight }) {
+  const data = insight.data as Record<string, unknown> | null;
+  const score = data?.anomaly_score as number | undefined;
+  const reasons = data?.reasons as string[] | undefined;
+
+  const severityColor =
+    insight.severity === "critical"
+      ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
+      : "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20";
+
+  const badgeColor =
+    insight.severity === "critical"
+      ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400"
+      : "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400";
+
+  return (
+    <div className={`rounded border p-4 ${severityColor}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <Brain className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{insight.title}</span>
+            {score !== undefined && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
+                Score: {score}/100
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{insight.body}</p>
+          {reasons && reasons.length > 0 && (
+            <ul className="text-xs text-gray-500 dark:text-gray-400 list-disc list-inside space-y-0.5">
+              {reasons.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

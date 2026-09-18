@@ -2,6 +2,38 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 1 (feature/ledgio-ai-scaffold)
+
+**What/Why:**
+Built the Ledgio Intelligence Worker — a background Python AI engine that runs nightly per tenant, computes financial insights using statistical ML algorithms, and surfaces them automatically in the frontend. No LLM or API cost. Phase 1 ships 4 insight modules; schema wired for Phase 2 (behavioral learning) and Phase 3 (federated learning).
+
+**Changes:**
+- `ledgio-ai/worker/main.py` — Entry point: `--all` or `--tenant-id` modes; loops tenants via asyncpg pool
+- `ledgio-ai/worker/db.py` — Async pool + RLS activation helper (`set_config('app.tenant_id', ...)`)
+- `ledgio-ai/worker/writer.py` — Upserts insight rows to `ai_tenant_insights` (delete-then-insert per module)
+- `ledgio-ai/worker/tier_config.py` — Maps tier 1/2/3 to enabled module list and feature flags
+- `ledgio-ai/worker/modules/cash_flow_forecast.py` — Prophet time-series: 90-day cash projection + danger day
+- `ledgio-ai/worker/modules/invoice_risk_score.py` — Logistic regression: per-invoice payment risk 0–100
+- `ledgio-ai/worker/modules/inventory_demand.py` — SimpleExpSmoothing + rolling velocity: stockout prediction
+- `ledgio-ai/worker/modules/anomaly_detection.py` — Isolation Forest (all tiers) + Autoencoder (Pro tier)
+- `ledgio-ai/worker/requirements.txt` — prophet, scikit-learn, torch, statsmodels, numpy, pandas, asyncpg
+- `backend/prisma/migrations/20260918000001_add_ai_insights/migration.sql` — `ai_tenant_insights` + `behavior_events` tables
+- `backend/prisma/schema.prisma` — Added `AiTenantInsight` and `BehaviorEvent` Prisma models
+- `backend/src/routes/aiInsights.ts` — `GET /api/v1/ai/insights` (tier-filtered) + `POST /:id/dismiss`
+- `backend/src/app.ts` — Mounted `aiInsightsRouter` at `/api/v1/ai/insights`
+- `backend/src/index.ts` — Registered `Ledgio Intelligence Worker` cron job at `0 1 * * *`
+- `frontend/src/hooks/useAiInsights.ts` — React hook fetching insights, auto-refresh 60s, optimistic dismiss
+- `frontend/src/components/AiInsightsBanner.tsx` — Dismissible severity-coded banners (critical/warning/info)
+- `frontend/src/components/layout/MainLayout.tsx` — Added `<AiInsightsBanner>` after `<OverdueInvoiceAlertBanner>`
+- `frontend/src/pages/reports/FraudAlerts.tsx` — Added "AI Anomaly" tab showing anomaly_detection insights
+
+**Tech decisions:**
+- Phase 1: pure statistical ML (no API cost, runs on existing infra)
+- Hybrid anomaly: Isolation Forest layer 1 (all tiers) + Autoencoder layer 2 (Pro), score = 0.4×iso + 0.6×recon
+- `behavior_events` table created now (empty) so Phase 2 BERT4Rec pipeline can populate it without a migration
+- Worker spawned as a child process by the pg-boss cron handler to isolate Python from the Node.js process
+- Tier isolation: Starter (inventory only), Standard (+ cash/invoice/anomaly), Pro (+ autoencoder + budget)
+
 ## [Date: 2026-09-18] - Ledgio AI: Initial Scaffold (feature/ledgio-ai-scaffold)
 
 **What/Why:**
