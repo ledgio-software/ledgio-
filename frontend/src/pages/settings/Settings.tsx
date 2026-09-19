@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Building2, Globe, Mail, Smartphone, Send, CheckCircle2, Download, FileJson, FileArchive, ShieldCheck, Copy, Sparkles, Stamp, ExternalLink, Wallet, CreditCard, Check, Loader2, AlertTriangle, RefreshCw, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { SECTOR_FEATURE_HIGHLIGHTS } from "../../constants/sectorFeatureHighlights";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/Card";
@@ -22,8 +23,33 @@ const PLANS = [
   { tier: 3, name: "Enterprise", priceGhs: 510, features: ["Everything in Business", "Unlimited team members", "Custom Fields", "Full Audit Trail", "Priority Support"] },
 ];
 
+function SectorHighlightsCard({ orgType, currentTier }: { orgType: string; currentTier: number }) {
+  const highlight = SECTOR_FEATURE_HIGHLIGHTS[orgType] ?? SECTOR_FEATURE_HIGHLIGHTS['BUSINESS'];
+  const tierLabels: Record<number, keyof typeof highlight.planFeatures> = { 1: 'starter', 2: 'business', 3: 'professional' };
+  const features = highlight.planFeatures[tierLabels[currentTier] ?? 'starter'];
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 p-4 mb-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 mb-2">
+        {highlight.tagline}
+      </p>
+      <p className="text-sm font-medium text-emerald-900 dark:text-emerald-200 mb-2">
+        What's included for you on your current plan:
+      </p>
+      <ul className="space-y-1">
+        {features.map((f) => (
+          <li key={f} className="flex items-center gap-2 text-sm text-emerald-800 dark:text-emerald-300">
+            <Check className="h-3.5 w-3.5 flex-shrink-0 text-emerald-600" aria-hidden />{f}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function SubscriptionTab() {
   const { fetchSettings } = useTenantSettings();
+  const { user } = useAuth();
   const [status, setStatus] = useState<{
     state: string; planName: string; tier: number; priceGhs: number;
     trialDaysRemaining: number | null; trialEndsAt: string | null; subscriptionPaidUntil: string | null;
@@ -217,6 +243,9 @@ function SubscriptionTab() {
           <CardDescription>Pay with Mobile Money (MTN/AirtelTigo/Telecel Cash) or Visa/Mastercard via Paystack.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {status && (user as any)?.orgType && (
+            <SectorHighlightsCard orgType={(user as any).orgType} currentTier={status.tier ?? 1} />
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {PLANS.map((plan) => (
               <button

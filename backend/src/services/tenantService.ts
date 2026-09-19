@@ -252,7 +252,7 @@ export async function onboardTenant(
       // entirely and send the real welcome package immediately, matching
       // what a self-serve signup gets once it completes /auth/verify.
       const { EmailService } = require('./EmailService');
-      EmailService.sendWelcomePackage(adminEmail, adminName, companyName).catch((err: any) => {
+      EmailService.sendWelcomePackage(adminEmail, adminName, companyName, orgType).catch((err: any) => {
         console.error('[TenantService] Failed to send welcome package for pre-verified tenant:', err);
       });
     } else {
