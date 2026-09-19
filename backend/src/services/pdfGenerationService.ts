@@ -156,11 +156,11 @@ const SECTOR_CONTENT: Record<string, SectorContent> = {
     ],
     keyFeatures: [
       { title: 'Job Costing', body: 'Track every cost (labour, materials, plant, sub-contractors) against each project contract; instant budget vs. actual.' },
-      { title: 'Progress Billing', body: 'Invoice clients in stages (mobilisation, milestone, retention) and track retention receivables separately.' },
+      { title: 'Material Purchase Orders', body: 'Raise POs for site materials, receive goods against them, and auto-generate the supplier bill on delivery — all tagged to the project.' },
       { title: 'Site Payroll', body: 'Daily-rated and casual-labour payroll with PAYE and SSNIT; supports multiple sites with different rates.' },
-      { title: 'Plant & Equipment Register', body: 'Track each piece of equipment, its depreciation, maintenance schedule, and site allocation.' },
-      { title: 'Subcontractor Management', body: 'Raise subcontract POs, track certified amounts, and manage subcontractor retention and final accounts.' },
-      { title: 'WIP & Retention Accounting', body: 'Work-in-progress and retentions post to the correct balance sheet accounts automatically.' },
+      { title: 'Fixed Assets & Equipment', body: 'Track each piece of plant and equipment, its depreciation schedule, and book value at any point in time.' },
+      { title: 'Delivery Notes', body: 'Generate delivery notes for materials dispatched to site; track delivery status separately from the supplier invoice.' },
+      { title: 'Financial Ratios & Analysis', body: 'Liquidity, profitability, and leverage ratios computed from your live accounts — useful for bonding and tender submissions.' },
     ],
   },
   BUSINESS: {
