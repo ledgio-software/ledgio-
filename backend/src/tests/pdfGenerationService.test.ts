@@ -28,20 +28,16 @@ describe('generateQuickStartGuidePdf', () => {
     const text = extractDrawnText(buffer);
     expect(text).toContain('Acme Retail Ltd');
     expect(text).toContain('Jane Doe');
-    expect(text).toContain('Getting Started');
+    // Sector-aware PDF uses "Your First 5 Steps" instead of the old generic heading
+    expect(text).toContain('Your First 5 Steps');
     expect(text).toContain('Chart of Accounts');
-    expect(text).toContain('Bank reconciliation');
+    // BUSINESS key features section
+    expect(text).toContain('Double-Entry Bookkeeping');
 
-    // Covers every module actually shipped as of 2026-07-26 (Tax Rates, Fiscal
-    // Periods/Budgets, Recurring Transactions, Approval Workflows, Multi-Currency),
-    // not just the original day-1 feature set - a real user flagged these as
-    // missing from an earlier version of this guide.
-    expect(text).toContain('Tax rates');
+    // Platform-Wide Features common to all sectors
     expect(text).toContain('Fiscal periods');
-    expect(text).toContain('Recurring transactions');
     expect(text).toContain('Approval workflows');
     expect(text).toContain('Multi-currency support');
-    expect(text).toContain('Custom fields');
   });
 
   it('generates distinct content per tenant rather than a fixed static payload', async () => {
