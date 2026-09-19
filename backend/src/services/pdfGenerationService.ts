@@ -87,8 +87,8 @@ const SECTOR_CONTENT: Record<string, SectorContent> = {
       { title: 'Narcotics Register', body: 'Dedicated controlled-substance log satisfying GHS narcotics register requirements — running balance maintained automatically.' },
       { title: 'Expiry Alerts', body: 'Automatic notifications for stock within 90 / 30 days of expiry so you can return or discount before wastage.' },
       { title: 'ABC-FSN Inventory Matrix', body: 'Classify stock by value (A/B/C) and movement (F/S/N) to focus ordering effort on high-impact items.' },
-      { title: 'GRA e-VAT Integration', body: 'Invoice receipts are submitted to the GRA VSDC portal automatically within the 48-hour mandate window.' },
-      { title: 'Drug Interaction Checks', body: 'At dispensing, the system flags known drug-drug interactions for the combination in the basket.' },
+      { title: 'Prescription Register', body: 'Full Rx log with drug name, quantity, batch number, prescriber, and patient — every dispensing event recorded and auditable.' },
+      { title: 'Patient Records & History', body: 'Per-patient dispensing history, NHIS member ID, chronic conditions, and allergy flags — surfaces at point of dispensing.' },
     ],
   },
   RETAIL: {
