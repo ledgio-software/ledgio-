@@ -161,7 +161,7 @@ const startServer = async () => {
         const { spawn } = require('child_process');
         await new Promise<void>((resolve, reject) => {
           const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/main.py');
-          const proc = spawn('python', [workerPath, '--all'], {
+          const proc = spawn('python3', [workerPath, '--all'], {
             env: { ...process.env },
             stdio: 'inherit',
           });
@@ -183,7 +183,7 @@ const startServer = async () => {
         const { spawn } = require('child_process');
         await new Promise<void>((resolve, reject) => {
           const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/behavioral_telemetry.py');
-          const proc = spawn('python', [workerPath], {
+          const proc = spawn('python3', [workerPath], {
             env: { ...process.env },
             stdio: 'inherit',
           });
@@ -205,7 +205,7 @@ const startServer = async () => {
         const { spawn } = require('child_process');
         await new Promise<void>((resolve, reject) => {
           const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/federated_round.py');
-          const proc = spawn('python', [workerPath], {
+          const proc = spawn('python3', [workerPath], {
             env: { ...process.env },
             stdio: 'inherit',
           });
