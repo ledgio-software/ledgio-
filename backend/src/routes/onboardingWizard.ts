@@ -5,6 +5,8 @@ import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { actorFromRequest } from '../services/auditLogService';
 import * as onboardingWizardService from '../services/onboardingWizardService';
+import { generateQuickStartGuidePdf } from '../services/pdfGenerationService';
+import { prisma } from '../config/db';
 
 const router = Router();
 
@@ -115,6 +117,35 @@ router.post('/seed-wht-defaults', requireRole('Admin'), async (req: Request, res
   } catch (error: any) {
     console.error('[OnboardingWizard] Error seeding WHT defaults:', error);
     res.status(500).json({ success: false, error: 'Failed to seed WHT rate defaults.' });
+  }
+});
+
+/**
+ * GET /api/v1/onboarding/quick-start-guide
+ * Streams the sector-specific Quick Start Guide PDF for the authenticated tenant.
+ * Any staff member can download it — no Admin role required.
+ */
+router.get('/quick-start-guide', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, orgType: true },
+    });
+
+    const businessName = tenant?.name ?? 'Your Business';
+    const orgType = tenant?.orgType ?? 'BUSINESS';
+    const recipientName = (req as any).user?.name ?? businessName;
+
+    const pdfBuffer = await generateQuickStartGuidePdf(businessName, recipientName, orgType);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Ledgio_Quick_Start_Guide.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.status(200).end(pdfBuffer);
+  } catch (error: any) {
+    console.error('[OnboardingWizard] Error generating quick start guide:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate Quick Start Guide.' });
   }
 });
 

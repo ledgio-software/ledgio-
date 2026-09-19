@@ -10,6 +10,7 @@ import { AiInsightsBanner } from "../AiInsightsBanner";
 import { QuickSuggestionsBar } from "../QuickSuggestionsBar";
 import { SubscriptionWall } from "../SubscriptionWall";
 import { OfflineBanner } from "./OfflineBanner";
+import { SectorChecklist } from "../onboarding/SectorChecklist";
 import { WorkspaceModeProvider } from "../../contexts/WorkspaceModeContext";
 import { api } from "../../lib/api";
 
@@ -38,6 +39,7 @@ export function MainLayout({ children }: { children: ReactNode }) {
           <SubscriptionBanner />
           <OverdueInvoiceAlertBanner />
           <AiInsightsBanner />
+          <SectorChecklist />
           <QuickSuggestionsBar />
           <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
             {/* pb-20 on mobile leaves room above the fixed bottom nav bar */}

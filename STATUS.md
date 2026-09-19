@@ -2,6 +2,41 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-19] - Sector Onboarding: Route audit, test fix, NONPROFIT highlights (feature/sector-onboarding-quick-guide)
+
+**What/Why:**
+Continuation of PR #93 (sector-specific Quick Start Guides + in-app onboarding checklist). Three fixes pushed to get CI green and correct the in-app checklist routes.
+
+**Changes:**
+
+1. **`backend/src/tests/pdfGenerationService.test.ts`** — Updated two failing test assertions that referenced old generic PDF content (`'Getting Started'`, `'Bank reconciliation'`) with strings present in the new sector-aware BUSINESS PDF (`'Your First 5 Steps'`, `'Double-Entry Bookkeeping'`). Also removed three other stale assertions (`'Tax rates'`, `'Recurring transactions'`, `'Custom fields'`) that no longer appear in the PDF output. This was the only failing test blocking CI green on PR #93.
+
+2. **`frontend/src/constants/sectorFeatureHighlights.ts`** — Fixed two misleading NONPROFIT tier labels:
+   - Business tier: `'Multi-Term Fee Schedules'` → `'Parent Comms (SMS/Email/WhatsApp)'` (fee schedules exist on all tiers)
+   - Professional tier: `'Automated Fee Reminders (SMS)'` → `'Advanced Analytics Dashboard'` (SMS reminders via ParentComms.tsx are not gated to Pro)
+
+3. **`frontend/src/constants/sectorChecklists.ts`** — Full route audit across all 7 sectors against App.tsx. Fixed 18 broken routes that would have navigated users to 404 pages. Key corrections:
+   - `/inventory/products` → `/inventory` (no such sub-route)
+   - `/pos/cash-sales`, `/pos/tills`, `/pos/reconciliation` → `/pos` or `/banking`
+   - `/pharmacy/rx-register` → `/pharmacy/prescriptions`
+   - `/pharmacy/nhis` → `/pharmacy/nhis-claims`
+   - `/invoices/new` → `/invoices`
+   - `/reports/profit-loss` → `/reports/pnl`
+   - `/inventory/price-lists` → `/settings/price-lists`
+   - `/projects` → `/manufacturing/jobs`
+   - `/projects/cost-categories` → `/cost-categories`
+   - `/payroll` → `/payroll/runs`
+   - `/accounting/chart-of-accounts` → `/accounts`
+   - NONPROFIT school routes were already correct.
+
+**Files changed:**
+- `backend/src/tests/pdfGenerationService.test.ts`
+- `frontend/src/constants/sectorFeatureHighlights.ts`
+- `frontend/src/constants/sectorChecklists.ts`
+- `STATUS.md`
+
+---
+
 ## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 1.5 — Budget Burn Prediction (feature/ledgio-ai-budget-burn)
 
 **What/Why:**
