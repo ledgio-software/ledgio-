@@ -50,8 +50,12 @@ export async function scheduleJob(
 
   const queueName = sanitizeQueueName(name);
 
-  // Register the worker first — pg-boss auto-creates the queue row when work() is called,
-  // satisfying the FK that pgboss.schedule has on pgboss.queue.
+  // Explicitly create the queue row before registering a worker or schedule.
+  // boss.work() only registers a subscriber — it does NOT insert into pgboss.queue.
+  // Without this row, boss.schedule() fails the FK constraint (schedule_name_fkey).
+  // createQueue() is idempotent: re-deploys that find the row already present are fine.
+  await boss.createQueue(queueName);
+
   await boss.work<{}, void>(queueName, { batchSize: 1 }, async (jobs) => {
     for (const _job of jobs) {
       recordJobStart(name);
