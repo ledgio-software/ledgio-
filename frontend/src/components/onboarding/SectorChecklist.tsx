@@ -2,8 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, X, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { SECTOR_CHECKLISTS, ChecklistStep } from '../../constants/sectorChecklists';
-import api from '../../services/api';
+import { SECTOR_CHECKLISTS } from '../../constants/sectorChecklists';
+import type { ChecklistStep } from '../../constants/sectorChecklists';
+import { api } from '../../lib/api';
 
 const STORAGE_KEY = 'ledgio_sector_checklist_dismissed';
 const VISITED_KEY = 'ledgio_sector_checklist_visited';
