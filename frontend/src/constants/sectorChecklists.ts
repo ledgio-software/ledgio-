@@ -67,7 +67,7 @@ export const SECTOR_CHECKLISTS: Record<string, SectorChecklist> = {
       { id: 'cost-categories', label: 'Add Cost Categories', route: '/cost-categories' },
       { id: 'payroll', label: 'Set Up Site Payroll', route: '/payroll/runs' },
       { id: 'material-purchase', label: 'Record Material Purchase', route: '/bills' },
-      { id: 'job-costing', label: 'Run Job Costing Report', route: '/reports' },
+      { id: 'job-costing', label: 'Run Job Costing Report', route: '/manufacturing/jobs' },
     ],
   },
   BUSINESS: {
