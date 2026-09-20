@@ -13,6 +13,7 @@ import {
   UploadCloud,
   DownloadCloud,
   Globe,
+  BedDouble,
 } from "lucide-react";
 
 export interface FeatureCard {
@@ -78,6 +79,12 @@ const ADDITIONAL_FEATURE_CARDS: FeatureCard[] = [
     title: "Built for Nonprofits, Churches, NGOs & Schools",
     description:
       "Choose Nonprofit as your organization type at signup to unlock dedicated fund accounting - restricted and unrestricted funds are tracked against every invoice, bill, and journal entry.",
+  },
+  {
+    icon: BedDouble,
+    title: "Hotel & Guest House Management",
+    description:
+      "Choose Guest House / Hotel at signup to unlock room management, reservation system, guest folio billing, housekeeping board, and night audit with RevPAR reporting — all integrated with your accounts.",
   },
   {
     icon: ShieldCheck,
