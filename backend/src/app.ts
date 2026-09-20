@@ -95,6 +95,7 @@ import searchRouter from './routes/search';
 import ocrRouter from './routes/ocr';
 import subscriptionRouter from './routes/subscription';
 import pharmacyRouter from './routes/pharmacy';
+import hospitalityRouter from './routes/hospitality';
 import schoolClassesRouter from './routes/schoolClasses';
 import schoolStudentsRouter from './routes/schoolStudents';
 import schoolTermsRouter from './routes/schoolTerms';
@@ -283,6 +284,7 @@ app.use('/api/v1/tills', cashTillRouter);
 
 // Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
 app.use('/api/v1/pharmacy', pharmacyRouter);
+app.use('/api/v1/hospitality', hospitalityRouter);
 
 // School module (NONPROFIT/SCHOOL org-type tenants)
 app.use('/api/v1/school/classes', schoolClassesRouter);

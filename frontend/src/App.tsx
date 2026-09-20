@@ -126,6 +126,12 @@ const ExpiryAlerts = lazy(() => import("./pages/pharmacy/ExpiryAlerts").then(m =
 const PharmacyPatients = lazy(() => import("./pages/pharmacy/PharmacyPatients").then(m => ({ default: m.PharmacyPatients })));
 const NhisClaims = lazy(() => import("./pages/pharmacy/NhisClaims").then(m => ({ default: m.NhisClaims })));
 const PharmacyInventoryMatrix = lazy(() => import("./pages/pharmacy/PharmacyInventoryMatrix").then(m => ({ default: m.PharmacyInventoryMatrix })));
+const HospitalityRoomManagement = lazy(() => import("./pages/hospitality/RoomManagement").then(m => ({ default: m.RoomManagement })));
+const HospitalityRoomTypes = lazy(() => import("./pages/hospitality/RoomTypes").then(m => ({ default: m.RoomTypes })));
+const HospitalityReservations = lazy(() => import("./pages/hospitality/Reservations").then(m => ({ default: m.Reservations })));
+const HospitalityReservationDetail = lazy(() => import("./pages/hospitality/ReservationDetail").then(m => ({ default: m.ReservationDetail })));
+const HospitalityHousekeeping = lazy(() => import("./pages/hospitality/HousekeepingBoard").then(m => ({ default: m.HousekeepingBoard })));
+const HospitalityNightAudit = lazy(() => import("./pages/hospitality/NightAudit").then(m => ({ default: m.NightAudit })));
 const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m => ({ default: m.CostCentres })));
 const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
 const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ default: m.VatReturn })));
@@ -1112,6 +1118,12 @@ function App() {
               <Route path="/pharmacy/inventory-matrix" element={<ProtectedRoute><MainLayout><PharmacyInventoryMatrix /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/narcotics" element={<ProtectedRoute><MainLayout><NarcoticsRegister /></MainLayout></ProtectedRoute>} />
               <Route path="/pharmacy/expiry" element={<ProtectedRoute><MainLayout><ExpiryAlerts /></MainLayout></ProtectedRoute>} />
+              <Route path="/hospitality/rooms" element={<ProtectedRoute><MainLayout><HospitalityRoomManagement /></MainLayout></ProtectedRoute>} />
+              <Route path="/hospitality/room-types" element={<ProtectedRoute><MainLayout><HospitalityRoomTypes /></MainLayout></ProtectedRoute>} />
+              <Route path="/hospitality/reservations" element={<ProtectedRoute><MainLayout><HospitalityReservations /></MainLayout></ProtectedRoute>} />
+              <Route path="/hospitality/reservations/:id" element={<ProtectedRoute><MainLayout><HospitalityReservationDetail /></MainLayout></ProtectedRoute>} />
+              <Route path="/hospitality/housekeeping" element={<ProtectedRoute><MainLayout><HospitalityHousekeeping /></MainLayout></ProtectedRoute>} />
+              <Route path="/hospitality/night-audit" element={<ProtectedRoute><MainLayout><HospitalityNightAudit /></MainLayout></ProtectedRoute>} />
               <Route path="/school/teachers" element={<ProtectedRoute><MainLayout><SchoolTeachers /></MainLayout></ProtectedRoute>} />
               <Route path="/school/classes" element={<ProtectedRoute><MainLayout><SchoolClasses /></MainLayout></ProtectedRoute>} />
               <Route path="/school/momo-reconciliation" element={<ProtectedRoute><MainLayout><MomoReconciliation /></MainLayout></ProtectedRoute>} />

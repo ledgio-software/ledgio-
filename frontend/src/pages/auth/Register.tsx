@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../lib/api";
-import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill, HardHat } from "lucide-react";
+import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill, HardHat, BedDouble } from "lucide-react";
 import { AuthSplitLayout } from "../../components/layout/AuthSplitLayout";
 
 const BUSINESS_PROFILES = [
@@ -51,6 +51,12 @@ const BUSINESS_PROFILES = [
     label: "Licensed Pharmacy",
     sub: "Batch tracking, Rx register, narcotics log",
     icon: Pill,
+  },
+  {
+    value: "HOSPITALITY" as const,
+    label: "Guest House / Hotel",
+    sub: "Rooms, reservations, folios, night audit",
+    icon: BedDouble,
   },
 ];
 

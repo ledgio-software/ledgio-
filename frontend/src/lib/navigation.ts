@@ -53,6 +53,11 @@ import {
   GraduationCap,
   CalendarDays,
   MessageSquare,
+  WifiOff,
+  BedDouble,
+  LayoutGrid,
+  Sparkles,
+  Moon,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -122,6 +127,13 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
   PHARMACY: new Set([
     '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
     '/pdc', '/reports/interest-charges',
+  ]),
+  HOSPITALITY: new Set([
+    '/pos',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/pdc', '/reports/interest-charges',
+    '/reports/stock-aging', '/reports/sales-channel', '/reports/monthly-sales-ledger',
+    '/sales-orders', '/delivery-notes', '/recurring-invoices',
   ]),
   NONPROFIT: new Set([
     // No product sales or stock
@@ -331,6 +343,17 @@ export const navigationGroups: NavGroup[] = [
       { name: "NaSIA Dashboard", href: "/school/nasia", icon: ClipboardList },
       { name: "Transport", href: "/school/transport", icon: Truck },
       { name: "Parent Comms", href: "/school/parent-comms", icon: MessageSquare },
+    ],
+  },
+  {
+    sectionTitle: "HOSPITALITY",
+    orgTypeOnly: "HOSPITALITY",
+    items: [
+      { name: "Reservations",  href: "/hospitality/reservations",  icon: CalendarDays },
+      { name: "Rooms",         href: "/hospitality/rooms",         icon: BedDouble },
+      { name: "Room Types",    href: "/hospitality/room-types",    icon: LayoutGrid },
+      { name: "Housekeeping",  href: "/hospitality/housekeeping",  icon: Sparkles },
+      { name: "Night Audit",   href: "/hospitality/night-audit",   icon: Moon },
     ],
   },
   {
