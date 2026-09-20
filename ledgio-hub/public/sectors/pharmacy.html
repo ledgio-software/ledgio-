@@ -77,6 +77,28 @@
     .footer-links a { font-size: 13px; color: var(--muted); transition: color .2s; }
     .footer-links a:hover { color: var(--text); }
     @media (max-width: 640px) { .hero-content { padding: 60px 20px; } .cta-banner { padding: 40px 20px; } .footer-inner { flex-direction: column; } }
+    /* Testimonials */
+    .testimonials-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .testimonials-grid { grid-template-columns: 1fr; } }
+    .testimonial-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px 28px 24px; }
+    .testimonial-stars { color: #f59e0b; font-size: 13px; letter-spacing: 3px; margin-bottom: 14px; }
+    .testimonial-quote { font-size: 14.5px; color: var(--text); line-height: 1.7; font-style: italic; margin-bottom: 18px; }
+    .testimonial-author { border-top: 1px solid var(--border); padding-top: 14px; }
+    .testimonial-name { font-size: 14px; font-weight: 700; color: var(--white); }
+    .testimonial-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* Integrations */
+    .integrations-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 32px; }
+    .int-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 13px; font-weight: 500; color: var(--text); }
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 4px; max-width: 760px; margin: 0 auto; }
+    .faq-item input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+    .faq-label { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--white); transition: background .2s; gap: 12px; user-select: none; }
+    .faq-label:hover { background: var(--bg3); }
+    .faq-label::after { content: '+'; font-size: 20px; color: var(--em); flex-shrink: 0; font-family: monospace; }
+    .faq-item input:checked + .faq-label { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+    .faq-item input:checked + .faq-label::after { content: '−'; }
+    .faq-body { display: none; padding: 16px 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.65; background: var(--bg3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; }
+    .faq-item input:checked + .faq-label + .faq-body { display: block; }
   </style>
 </head>
 <body>
@@ -120,6 +142,34 @@
       <div class="feature-card"><div class="feature-icon">📱</div><div><h3>SMS Refill Reminders</h3><p>Automated SMS to patients when chronic medication refill is due — reduces lost revenue.</p></div></div>
       <div class="feature-card"><div class="feature-icon">📊</div><div><h3>ABC-FSN Inventory Matrix</h3><p>Classify stock by value and movement to optimise reorder quantities and working capital.</p></div></div>
       <div class="feature-card"><div class="feature-icon">🏪</div><div><h3>Multi-Location Dispensing</h3><p>Manage multiple pharmacy branches from one account with consolidated stock and compliance reports.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Trusted by Ghanaian Pharmacists</h2>
+      <p>Licensed pharmacies managing compliance and profitability with Ledgio.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">NHIS claim tracking and drug expiry alerts have saved us thousands in write-offs. The narcotics register is always audit-ready when FDA visits.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Dr. Ama Boateng</div>
+          <div class="testimonial-role">Pharmacist · Tema</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">FDA inspections used to stress me out. Now I print a complete narcotics log in seconds and every controlled drug is fully accounted for.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Kofi Adu</div>
+          <div class="testimonial-role">Pharmacy Owner · Accra</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -175,6 +225,62 @@
           <li>Priority support</li>
         </ul>
         <a href="https://ledgio-fawn.vercel.app/register" class="plan-cta plan-cta-outline">Start Free Trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Integrations -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Works with the Tools You Already Use</h2>
+      <p>Ledgio connects with Ghana's payment networks, tax systems, and health regulators right out of the box.</p>
+    </div>
+    <div class="integrations-row">
+      <span class="int-badge">🏛️ GRA e-VAT</span>
+      <span class="int-badge">📱 MoMo</span>
+      <span class="int-badge">📶 MTN Mobile Money</span>
+      <span class="int-badge">💧 Vodafone Cash</span>
+      <span class="int-badge">🏦 All Ghana Banks</span>
+      <span class="int-badge">🏥 NHIS</span>
+      <span class="int-badge">💊 FDA Ghana</span>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know before getting started.</p>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p1">
+        <label class="faq-label" for="faq-p1">Does Ledgio handle NHIS billing and claims?</label>
+        <div class="faq-body">Yes. Ledgio supports NHIS claim tracking, so you can record NHIS dispensing separately from cash sales and monitor reimbursement cycles without double-entry.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p2">
+        <label class="faq-label" for="faq-p2">Can I track drug expiry dates automatically?</label>
+        <div class="faq-body">Yes. Each stock item can carry an expiry date. Ledgio flags items nearing expiry and prevents dispensing of expired stock, keeping your pharmacy compliant and reducing waste.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p3">
+        <label class="faq-label" for="faq-p3">Is my data secure?</label>
+        <div class="faq-body">Absolutely. Your data is encrypted in transit and at rest, hosted on enterprise-grade cloud infrastructure with daily backups. Only authorised users can access your workspace.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p4">
+        <label class="faq-label" for="faq-p4">Can I try it free?</label>
+        <div class="faq-body">Yes — every plan starts with a 90-day free trial. No credit card required. You get full access to all features so you can see the value before committing.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p5">
+        <label class="faq-label" for="faq-p5">Can I add more users later?</label>
+        <div class="faq-body">Yes. You can add staff accounts at any time. Different roles (admin, accountant, cashier) can be assigned with custom permissions so everyone only sees what they need to.</div>
       </div>
     </div>
   </div>

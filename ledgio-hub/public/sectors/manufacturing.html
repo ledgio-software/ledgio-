@@ -77,6 +77,28 @@
     .footer-links a { font-size: 13px; color: var(--muted); transition: color .2s; }
     .footer-links a:hover { color: var(--text); }
     @media (max-width: 640px) { .hero-content { padding: 60px 20px; } .cta-banner { padding: 40px 20px; } .footer-inner { flex-direction: column; } }
+    /* Testimonials */
+    .testimonials-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .testimonials-grid { grid-template-columns: 1fr; } }
+    .testimonial-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px 28px 24px; }
+    .testimonial-stars { color: #f59e0b; font-size: 13px; letter-spacing: 3px; margin-bottom: 14px; }
+    .testimonial-quote { font-size: 14.5px; color: var(--text); line-height: 1.7; font-style: italic; margin-bottom: 18px; }
+    .testimonial-author { border-top: 1px solid var(--border); padding-top: 14px; }
+    .testimonial-name { font-size: 14px; font-weight: 700; color: var(--white); }
+    .testimonial-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* Integrations */
+    .integrations-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 32px; }
+    .int-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 13px; font-weight: 500; color: var(--text); }
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 4px; max-width: 760px; margin: 0 auto; }
+    .faq-item input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+    .faq-label { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--white); transition: background .2s; gap: 12px; user-select: none; }
+    .faq-label:hover { background: var(--bg3); }
+    .faq-label::after { content: '+'; font-size: 20px; color: var(--em); flex-shrink: 0; font-family: monospace; }
+    .faq-item input:checked + .faq-label { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+    .faq-item input:checked + .faq-label::after { content: '−'; }
+    .faq-body { display: none; padding: 16px 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.65; background: var(--bg3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; }
+    .faq-item input:checked + .faq-label + .faq-body { display: block; }
   </style>
 </head>
 <body>
@@ -120,6 +142,34 @@
       <div class="feature-card"><div class="feature-icon">👥</div><div><h3>Production Payroll</h3><p>Factory payroll with piece-rate and time-rate workers, shift allowances, and SSNIT deductions.</p></div></div>
       <div class="feature-card"><div class="feature-icon">🧾</div><div><h3>GRA e-VAT &amp; WHT Compliance</h3><p>Automatic VAT on sales invoices, e-VAT filing integration, and WHT certificate generation for suppliers.</p></div></div>
       <div class="feature-card"><div class="feature-icon">📈</div><div><h3>Profitability &amp; Margin Analysis</h3><p>Product-level gross margin, contribution analysis, and manufacturing P&amp;L — know which products are worth making.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Trusted by Ghanaian Manufacturers</h2>
+      <p>Producers and factories tracking every input cost and maximising margins.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">Bill of Materials and WIP tracking means we always know our actual cost of production. Variance analysis showed us exactly where we were losing money.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Kofi Asante</div>
+          <div class="testimonial-role">Production Manager · Tema</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">COGS is now calculated automatically from our BOMs. We stopped guessing at our margin and started pricing our products correctly.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Akua Boateng</div>
+          <div class="testimonial-role">Factory Owner · Accra</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -175,6 +225,63 @@
           <li>Priority support</li>
         </ul>
         <a href="https://ledgio-fawn.vercel.app/register" class="plan-cta plan-cta-outline">Start Free Trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Integrations -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Works with the Tools You Already Use</h2>
+      <p>Ledgio connects with Ghana's payment networks, tax systems, and standards bodies right out of the box.</p>
+    </div>
+    <div class="integrations-row">
+      <span class="int-badge">🏛️ GRA e-VAT</span>
+      <span class="int-badge">📱 MoMo</span>
+      <span class="int-badge">📶 MTN Mobile Money</span>
+      <span class="int-badge">💧 Vodafone Cash</span>
+      <span class="int-badge">🏦 All Ghana Banks</span>
+      <span class="int-badge">🏗️ SSNIT</span>
+      <span class="int-badge">🦺 OSHA Ghana</span>
+      <span class="int-badge">📐 GSA</span>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know before getting started.</p>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <input type="checkbox" id="faq-m1">
+        <label class="faq-label" for="faq-m1">Can I define different BOMs for different products?</label>
+        <div class="faq-body">Yes. Ledgio supports unlimited Bill of Materials configurations. Each finished product can have its own BOM with raw materials, quantities, and wastage factors, and costs flow automatically into production runs.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-m2">
+        <label class="faq-label" for="faq-m2">Does Ledgio track Work-in-Progress (WIP) inventory?</label>
+        <div class="faq-body">Yes. Ledgio captures WIP at each production stage. Costs accumulate as materials and labour are applied, and the WIP value is reflected on your balance sheet until goods move to finished stock.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-m3">
+        <label class="faq-label" for="faq-m3">Is my data secure?</label>
+        <div class="faq-body">Absolutely. Your data is encrypted in transit and at rest, hosted on enterprise-grade cloud infrastructure with daily backups. Only authorised users can access your workspace.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-m4">
+        <label class="faq-label" for="faq-m4">Can I try it free?</label>
+        <div class="faq-body">Yes — every plan starts with a 90-day free trial. No credit card required. You get full access to all features so you can see the value before committing.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-m5">
+        <label class="faq-label" for="faq-m5">Can I add more users later?</label>
+        <div class="faq-body">Yes. You can add staff accounts at any time. Different roles (admin, accountant, cashier) can be assigned with custom permissions so everyone only sees what they need to.</div>
       </div>
     </div>
   </div>
