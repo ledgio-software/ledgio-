@@ -224,11 +224,19 @@
       padding: 28px;
       background: var(--card);
       border: 1.5px solid var(--border);
+      cursor: pointer;
       border-radius: 20px;
       transition: border-color 0.2s, transform 0.2s;
       cursor: default;
     }
-    .sector-card:hover { transform: translateY(-2px); }
+    .sector-card:hover { transform: translateY(-2px); border-color: var(--em-dim); }
+    .sector-card:hover .sector-cta { opacity: 1; max-height: 28px; margin-top: 14px; }
+    .sector-cta {
+      font-size: 12px; font-weight: 600; color: var(--em);
+      display: flex; align-items: center; gap: 4px;
+      opacity: 0; max-height: 0; overflow: hidden;
+      transition: opacity 0.2s, max-height 0.2s, margin-top 0.2s;
+    }
     .sector-card.new { border-color: rgba(16,185,129,.35); box-shadow: 0 0 0 1px rgba(16,185,129,.1); }
     .sector-icon {
       width: 48px; height: 48px; border-radius: 14px;
@@ -508,53 +516,61 @@
     </div>
 
     <div class="sectors-grid">
-      <div class="sector-card">
+      <div class="sector-card" onclick="goToPricing('retail')">
         <div class="sector-icon" style="background:rgba(245,158,11,.1); color:#f59e0b">🛒</div>
         <h3>Retail &amp; Trading</h3>
         <p>POS, multi-warehouse inventory, cash till shortage SMS alerts, weekly P&amp;L email every Monday, and branch comparison reports.</p>
+        <div class="sector-cta">View plans ›</div>
       </div>
 
-      <div class="sector-card new">
+      <div class="sector-card new" onclick="goToPricing('hospitality')">
         <div class="sector-icon" style="background:rgba(16,185,129,.1); color:#10b981">🏨</div>
         <h3>Hotels &amp; Guest Houses</h3>
         <p>Room type &amp; rate management, reservation system, guest folio billing, housekeeping board, and night audit with occupancy % and RevPAR reporting.</p>
         <div class="new-pill">New</div>
+        <div class="sector-cta">View plans ›</div>
       </div>
 
-      <div class="sector-card">
+      <div class="sector-card" onclick="goToPricing('school')">
         <div class="sector-icon" style="background:rgba(139,92,246,.1); color:#8b5cf6">🏫</div>
         <h3>Schools, Churches &amp; NGOs</h3>
         <p>Fund accounting with restricted and unrestricted fund tracking, fee income, donor reports, and PTA levy management — no POS.</p>
+        <div class="sector-cta">View plans ›</div>
       </div>
 
-      <div class="sector-card">
+      <div class="sector-card" onclick="goToPricing('pharmacy')">
         <div class="sector-icon" style="background:rgba(59,130,246,.1); color:#3b82f6">💊</div>
         <h3>Pharmacies</h3>
         <p>Batch &amp; expiry date tracking, controlled substance logs, dispensary stock management, and reorder threshold alerts.</p>
+        <div class="sector-cta">View plans ›</div>
       </div>
 
-      <div class="sector-card">
+      <div class="sector-card" onclick="goToPricing('wholesale')">
         <div class="sector-icon" style="background:rgba(245,158,11,.1); color:#f59e0b">📦</div>
         <h3>Wholesale &amp; Distribution</h3>
         <p>Customer credit limits &amp; terms, multi-warehouse stock, volume discount tiers, aged receivables report, and bulk invoicing.</p>
+        <div class="sector-cta">View plans ›</div>
       </div>
 
-      <div class="sector-card">
+      <div class="sector-card" onclick="goToPricing('services')">
         <div class="sector-icon" style="background:rgba(20,184,166,.1); color:#14b8a6">💼</div>
         <h3>Professional Services</h3>
         <p>Client invoicing &amp; retainers, project tracking, bank reconciliation, payroll management, and WHT certificate generation.</p>
+        <div class="sector-cta">View plans ›</div>
       </div>
 
-      <div class="sector-card">
+      <div class="sector-card" onclick="goToPricing('construction')">
         <div class="sector-icon" style="background:rgba(239,68,68,.1); color:#ef4444">🏗️</div>
         <h3>Construction &amp; Contractors</h3>
         <p>Job costing &amp; profitability, site payroll &amp; labour costs, budget vs actual reports, and subcontractor payment tracking.</p>
+        <div class="sector-cta">View plans ›</div>
       </div>
 
-      <div class="sector-card">
+      <div class="sector-card" onclick="goToPricing('manufacturing')">
         <div class="sector-icon" style="background:rgba(107,114,128,.1); color:#9ca3af">⚙️</div>
         <h3>Manufacturing &amp; Other</h3>
         <p>Job costing, WIP tracking, Bill of Materials, COGS automation, multi-warehouse support, and production workflow management.</p>
+        <div class="sector-cta">View plans ›</div>
       </div>
     </div>
   </div>
@@ -1196,6 +1212,12 @@
       document.addEventListener('DOMContentLoaded', init);
     } else { init(); }
   })();
+
+  function goToPricing(sector) {
+    var fakeBtn = document.querySelector('.ptab[onclick*="\'' + sector + '\'"]');
+    showPricing(sector, fakeBtn);
+    document.getElementById('pricing').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function showPricing(sector, btn) {
     document.querySelectorAll('.pricing-panel').forEach(p => p.classList.remove('active'));
