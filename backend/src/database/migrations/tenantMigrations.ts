@@ -859,6 +859,84 @@ export const TENANT_MIGRATIONS: TenantMigration[] = [
           ));
       END $$;
     `
+  },
+  {
+    version: 26,
+    name: '026_add_hospitality_tables',
+    sql: `
+      -- Room types (king, twin, suite, conference, etc.)
+      CREATE TABLE IF NOT EXISTS room_types (
+        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name           TEXT NOT NULL,
+        description    TEXT,
+        rate_per_night NUMERIC(12,2) NOT NULL DEFAULT 0,
+        capacity       INTEGER NOT NULL DEFAULT 2,
+        amenities      TEXT[] NOT NULL DEFAULT '{}',
+        is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      -- Individual rooms
+      CREATE TABLE IF NOT EXISTS rooms (
+        id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        room_type_id        UUID NOT NULL REFERENCES room_types(id) ON DELETE RESTRICT,
+        room_number         TEXT NOT NULL,
+        floor               TEXT,
+        status              TEXT NOT NULL DEFAULT 'AVAILABLE'
+                              CHECK (status IN ('AVAILABLE','OCCUPIED','MAINTENANCE','HOUSEKEEPING','OUT_OF_ORDER')),
+        housekeeping_status TEXT NOT NULL DEFAULT 'CLEAN'
+                              CHECK (housekeeping_status IN ('CLEAN','DIRTY','INSPECTED','OUT_OF_ORDER')),
+        is_active           BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(room_number)
+      );
+      CREATE INDEX IF NOT EXISTS idx_rooms_type ON rooms(room_type_id);
+      CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
+
+      -- Reservations
+      CREATE TABLE IF NOT EXISTS reservations (
+        id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        reservation_number TEXT NOT NULL,
+        guest_id           UUID,
+        guest_name         TEXT NOT NULL,
+        guest_email        TEXT,
+        guest_phone        TEXT,
+        room_id            UUID NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
+        check_in_date      DATE NOT NULL,
+        check_out_date     DATE NOT NULL,
+        actual_check_in    TIMESTAMPTZ,
+        actual_check_out   TIMESTAMPTZ,
+        status             TEXT NOT NULL DEFAULT 'CONFIRMED'
+                             CHECK (status IN ('CONFIRMED','CHECKED_IN','CHECKED_OUT','CANCELLED','NO_SHOW')),
+        rate_per_night     NUMERIC(12,2) NOT NULL,
+        adults             INTEGER NOT NULL DEFAULT 1,
+        children           INTEGER NOT NULL DEFAULT 0,
+        special_requests   TEXT,
+        invoice_id         UUID,
+        deposit_amount     NUMERIC(12,2) NOT NULL DEFAULT 0,
+        created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(reservation_number)
+      );
+      CREATE INDEX IF NOT EXISTS idx_reservations_room ON reservations(room_id);
+      CREATE INDEX IF NOT EXISTS idx_reservations_dates ON reservations(check_in_date, check_out_date);
+      CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
+      CREATE INDEX IF NOT EXISTS idx_reservations_guest ON reservations(guest_id);
+
+      -- Folio charges (extra charges during stay: F&B, laundry, phone, minibar)
+      CREATE TABLE IF NOT EXISTS folio_charges (
+        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        reservation_id    UUID NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
+        description       TEXT NOT NULL,
+        amount            NUMERIC(12,2) NOT NULL,
+        charge_date       DATE NOT NULL DEFAULT CURRENT_DATE,
+        posted_by_user_id UUID,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_folio_charges_reservation ON folio_charges(reservation_id);
+    `
   }
 ];
 

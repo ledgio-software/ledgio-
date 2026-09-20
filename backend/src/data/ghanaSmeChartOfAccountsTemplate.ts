@@ -117,7 +117,66 @@ export const GHANA_SCHOOL_CHART_OF_ACCOUNTS_TEMPLATE: ChartOfAccountsTemplateEnt
   { code: '6900', name: 'Miscellaneous Expense', type: 'EXPENSE' },
 ];
 
+/**
+ * Chart of accounts for a Ghanaian hotel / guest house (orgType HOSPITALITY).
+ * Extends SME base with hospitality-specific revenue streams and guest ledger accounts.
+ */
+export const GHANA_HOSPITALITY_CHART_OF_ACCOUNTS_TEMPLATE: ChartOfAccountsTemplateEntry[] = [
+  // Assets
+  { code: '1000', name: 'Cash on Hand', type: 'ASSET' },
+  { code: '1010', name: 'Cash Till / Front Desk', type: 'ASSET' },
+  { code: '1020', name: 'Bank Account', type: 'ASSET' },
+  { code: '1030', name: 'Mobile Money Account', type: 'ASSET' },
+  { code: '1100', name: 'Accounts Receivable', type: 'ASSET' },
+  { code: '1110', name: 'Guest Ledger Receivable', type: 'ASSET' },
+  { code: '1200', name: 'Housekeeping & Linen Inventory', type: 'ASSET' },
+  { code: '1210', name: 'Food & Beverage Inventory', type: 'ASSET' },
+  { code: '1500', name: 'Furniture, Fixtures & Equipment', type: 'ASSET' },
+  { code: '1510', name: 'Building & Improvements', type: 'ASSET' },
+
+  // Liabilities
+  { code: '2000', name: 'Accounts Payable', type: 'LIABILITY' },
+  { code: '2100', name: 'VAT Payable', type: 'LIABILITY' },
+  { code: '2110', name: 'NHIL Payable', type: 'LIABILITY' },
+  { code: '2120', name: 'GETFund Levy Payable', type: 'LIABILITY' },
+  { code: '2200', name: 'Staff Salaries Payable', type: 'LIABILITY' },
+  { code: '2210', name: 'PAYE Tax Payable', type: 'LIABILITY' },
+  { code: '2220', name: 'SSNIT Contributions Payable', type: 'LIABILITY' },
+  { code: '2230', name: 'Net Pay Payable', type: 'LIABILITY' },
+  { code: '2300', name: 'Guest Deposits Liability', type: 'LIABILITY' },
+  { code: '2310', name: 'Short-Term Loans', type: 'LIABILITY' },
+
+  // Equity
+  { code: '3000', name: "Owner's Capital", type: 'EQUITY' },
+  { code: '3010', name: "Owner's Drawings", type: 'EQUITY' },
+  { code: '3900', name: 'Opening Balance Equity', type: 'EQUITY' },
+
+  // Revenue
+  { code: '4000', name: 'Room Revenue', type: 'REVENUE' },
+  { code: '4010', name: 'Food & Beverage Revenue', type: 'REVENUE' },
+  { code: '4020', name: 'Laundry & Ancillary Revenue', type: 'REVENUE' },
+  { code: '4030', name: 'Conference / Banquet Revenue', type: 'REVENUE' },
+  { code: '4900', name: 'Other Income', type: 'REVENUE' },
+
+  // Cost of Sales
+  { code: '5000', name: 'Cost of Goods Sold (F&B)', type: 'COST_OF_SALES' },
+
+  // Expenses
+  { code: '6000', name: 'Rent Expense', type: 'EXPENSE' },
+  { code: '6010', name: 'Utilities Expense', type: 'EXPENSE' },
+  { code: '6020', name: 'Salaries & Wages Expense', type: 'EXPENSE' },
+  { code: '6022', name: 'Employer SSNIT Contribution', type: 'EXPENSE' },
+  { code: '6030', name: 'Housekeeping Supplies Expense', type: 'EXPENSE' },
+  { code: '6040', name: 'Maintenance & Repairs Expense', type: 'EXPENSE' },
+  { code: '6050', name: 'Linen & Laundry Expense', type: 'EXPENSE' },
+  { code: '6060', name: 'Bank Charges', type: 'EXPENSE' },
+  { code: '6070', name: 'Marketing & Advertising Expense', type: 'EXPENSE' },
+  { code: '6080', name: 'Communication Expense', type: 'EXPENSE' },
+  { code: '6900', name: 'Miscellaneous Expense', type: 'EXPENSE' },
+];
+
 export function getTemplateForOrgType(orgType?: string | null): ChartOfAccountsTemplateEntry[] {
   if (orgType === 'NONPROFIT') return GHANA_SCHOOL_CHART_OF_ACCOUNTS_TEMPLATE;
+  if (orgType === 'HOSPITALITY') return GHANA_HOSPITALITY_CHART_OF_ACCOUNTS_TEMPLATE;
   return GHANA_SME_CHART_OF_ACCOUNTS_TEMPLATE;
 }

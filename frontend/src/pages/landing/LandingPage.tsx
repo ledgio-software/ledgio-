@@ -64,6 +64,11 @@ const FAQ_ITEMS: { question: string; answer: string }[] = [
       "Yes. Choose Nonprofit/Church/NGO/School as your organization type at registration to unlock dedicated fund accounting — restricted and unrestricted funds are tracked against every invoice, bill, and journal entry, and POS/Inventory are replaced with a Funds view.",
   },
   {
+    question: "Does Ledgio work for guest houses and hotels?",
+    answer:
+      "Yes. Choose Guest House / Hotel as your organization type at registration to unlock the full hospitality module: room type & rate management, reservation system with availability checks, guest folio billing (room nights + extra charges), housekeeping status board, and night audit with occupancy % and RevPAR reporting — all integrated with your double-entry ledger.",
+  },
+  {
     question: "Can I control what each team member can see and do?",
     answer:
       "Yes. Ledgio supports role-based access — Admin, Accountant, Auditor, HR, Shop Manager, and Cashier roles each see a different, purpose-built navigation, and shop-level roles can be restricted to specific warehouse locations.",
@@ -260,7 +265,7 @@ export function LandingPage() {
           </h1>
 
           <p className="mt-7 text-lg sm:text-xl text-secondary-300 max-w-2xl mx-auto leading-relaxed">
-            Instant SMS alerts when a till closes short. A Profit & Loss PDF in your inbox every Monday. Complete invoicing, payroll, inventory, and bank sync — with dedicated fund accounting for nonprofits and churches.
+            Instant SMS alerts when a till closes short. A Profit & Loss PDF in your inbox every Monday. Complete invoicing, payroll, inventory, and bank sync — with dedicated fund accounting for nonprofits, and room & reservation management for hotels and guest houses.
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4">
@@ -311,6 +316,66 @@ export function LandingPage() {
             <p className="mt-3 text-secondary-400 text-sm">Built for owners who want total visibility, not more spreadsheets.</p>
           </div>
           <ImageCarousel />
+        </div>
+      </section>
+
+      {/* Sectors */}
+      <section className="py-16 border-t border-secondary-800/60 bg-secondary-900/40">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-xl mx-auto mb-10">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Built for Every Sector</h2>
+            <p className="mt-2 text-secondary-400 text-sm">One platform, purpose-built modules for the way your business actually works.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              {
+                icon: "🛒",
+                label: "Retail & Trading",
+                desc: "POS, multi-warehouse inventory, cash till shortage alerts, and weekly P&L email.",
+                accent: "border-amber-500/30 hover:border-amber-500/60",
+                badge: "bg-amber-500/10 text-amber-400",
+              },
+              {
+                icon: "💊",
+                label: "Pharmacy",
+                desc: "Batch & expiry tracking, controlled substance logs, and dispensary stock management.",
+                accent: "border-blue-500/30 hover:border-blue-500/60",
+                badge: "bg-blue-500/10 text-blue-400",
+              },
+              {
+                icon: "🏫",
+                label: "Schools & NGOs",
+                desc: "Fund accounting, restricted/unrestricted fund tracking, fee income, and donor reports.",
+                accent: "border-purple-500/30 hover:border-purple-500/60",
+                badge: "bg-purple-500/10 text-purple-400",
+              },
+              {
+                icon: "🏨",
+                label: "Hotels & Guest Houses",
+                desc: "Room management, reservations, guest folio billing, housekeeping board, and night audit.",
+                accent: "border-emerald-500/30 hover:border-emerald-500/60",
+                badge: "bg-emerald-500/10 text-emerald-400",
+                highlight: true,
+              },
+            ].map((sector) => (
+              <div
+                key={sector.label}
+                className={`p-6 rounded-2xl bg-secondary-900 border transition-all duration-300 cursor-default ${sector.accent} ${sector.highlight ? "ring-1 ring-emerald-500/20" : ""}`}
+              >
+                <div className={`text-2xl mb-3 w-10 h-10 flex items-center justify-center rounded-xl ${sector.badge}`}>
+                  {sector.icon}
+                </div>
+                <h3 className="text-sm font-bold text-white mb-1.5">{sector.label}</h3>
+                <p className="text-xs text-secondary-400 leading-relaxed">{sector.desc}</p>
+                {sector.highlight && (
+                  <div className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    New
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -485,7 +550,7 @@ export function LandingPage() {
                 step: "01",
                 icon: Building2,
                 title: "Register Your Business",
-                body: "Enter your Company Name, choose Business or Nonprofit/Church/NGO/School, select your base currency (GHS, USD, NGN…), add your admin email and owner mobile number.",
+                body: "Enter your Company Name, choose Business, Nonprofit/Church/NGO/School, or Guest House / Hotel, select your base currency (GHS, USD, NGN…), add your admin email and owner mobile number.",
               },
               {
                 step: "02",
@@ -520,7 +585,7 @@ export function LandingPage() {
             <ul className="space-y-3">
               {[
                 ["Registered Business Name", "Used to provision your dedicated schema."],
-                ["Organization Type", "Business → POS & Inventory.  Nonprofit/Church/NGO/School → Fund Accounting."],
+                ["Organization Type", "Business → POS & Inventory.  Nonprofit/Church/NGO/School → Fund Accounting.  Guest House / Hotel → Room Management & Reservations."],
                 ["Valid Owner Mobile Number", "Required for instant till shortage SMS alerts."],
                 ["Admin Email Address", "Receives your weekly Monday P&L PDF."],
                 ["Acceptance of Terms & SLA", "Agreement to platform Terms & Conditions and 99.9% uptime SLA."],

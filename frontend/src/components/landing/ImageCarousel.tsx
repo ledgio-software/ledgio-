@@ -68,7 +68,7 @@ export function ImageCarousel() {
                 loading="lazy"
                 decoding="async"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-secondary-950/90 via-secondary-950/10 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-secondary-950/55 via-transparent to-transparent" />
               <p className="absolute bottom-5 left-6 right-6 text-white text-base sm:text-lg font-bold drop-shadow-md">
                 {slide.caption}
               </p>

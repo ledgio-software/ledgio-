@@ -270,6 +270,42 @@ export const SECTOR_PRICING: SectorPricing[] = [
       },
     ],
   },
+  {
+    sectorSlug: 'hospitality',
+    label: 'Guest Houses & Hotels',
+    tiers: [
+      {
+        slug: 'starter',
+        name: 'Starter',
+        price: '₵200',
+        period: '/ month',
+        seats: 'Up to 3 users',
+        description: 'For small guest houses and B&Bs.',
+        highlight: false,
+        features: ['Room & rate management', 'Reservation system', 'Guest folio & billing', 'Expense tracking', 'Basic revenue reports'],
+      },
+      {
+        slug: 'standard',
+        name: 'Standard',
+        price: '₵400',
+        period: '/ month',
+        seats: 'Up to 10 users',
+        description: 'For growing hotels with housekeeping and analytics needs.',
+        highlight: true,
+        features: ['Everything in Starter', 'Housekeeping board', 'Night audit & RevPAR', 'Guest history & profiles', 'GRA e-VAT clearance', 'Bank reconciliation'],
+      },
+      {
+        slug: 'pro',
+        name: 'Pro',
+        price: '₵650',
+        period: '/ month',
+        seats: 'Unlimited users',
+        description: 'For established hotels with advanced operations.',
+        highlight: false,
+        features: ['Everything in Standard', 'Multi-property management (coming soon)', 'Conference & banquet revenue', 'Staff payroll', 'Advanced analytics', 'Priority support'],
+      },
+    ],
+  },
 ];
 
 export const DEFAULT_SECTOR_SLUG = 'retail';
