@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ledgio for Retail &amp; Trading — Accounting Built for Shops</title>
+  <meta name="description" content="POS, inventory management, daily sales reports, cash reconciliation, and branch comparison — accounting purpose-built for Ghanaian retail shops and boutiques." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #070d0a; --bg2: #0d1510; --bg3: #111a15; --card: #131c17;
+      --border: #1e2d24; --border2: #253323;
+      --em: #10b981; --em-dim: #059669; --em-light: #6ee7b7; --em-faint: rgba(16,185,129,.08);
+      --text: #e2ede8; --muted: #7a9485; --muted2: #4a6356; --white: #ffffff;
+      --accent: #f59e0b;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    h1,h2,h3,h4 { font-family: 'Syne', sans-serif; line-height: 1.15; }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Nav */
+    nav { position: sticky; top: 0; z-index: 100; background: rgba(7,13,10,.88); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; max-width: 1100px; margin: 0 auto; }
+    .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; color: var(--white); letter-spacing: -0.5px; }
+    .logo span { color: var(--em); }
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .nav-back { font-size: 13px; color: var(--muted); padding: 8px 14px; border-radius: 8px; transition: color .2s; }
+    .nav-back:hover { color: var(--text); }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 24px; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; border: none; transition: all .2s; text-decoration: none; white-space: nowrap; }
+    .btn-primary { background: var(--em); color: #fff; box-shadow: 0 6px 20px rgba(16,185,129,.25); }
+    .btn-primary:hover { background: #0ea472; transform: translateY(-1px); }
+    .btn-lg { padding: 14px 32px; font-size: 16px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25); color: var(--em-light); font-size: 12px; font-weight: 600; }
+
+    /* Hero */
+    .sector-hero { position: relative; min-height: 520px; display: flex; align-items: center; overflow: hidden; }
+    .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+    .hero-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(7,13,10,.92) 0%, rgba(7,13,10,.65) 60%, rgba(7,13,10,.4) 100%); }
+    .hero-content { position: relative; z-index: 2; padding: 80px 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+    .hero-content .badge { margin-bottom: 20px; }
+    .hero-content h1 { font-size: clamp(36px, 5vw, 62px); font-weight: 900; color: var(--white); letter-spacing: -1.5px; margin-bottom: 18px; max-width: 680px; }
+    .hero-content h1 .em { color: var(--em); }
+    .hero-content p { font-size: 17px; color: rgba(226,237,232,.8); max-width: 540px; margin-bottom: 32px; line-height: 1.7; }
+
+    /* Sections */
+    .section { padding: 80px 0; }
+    .section-alt { background: var(--bg2); }
+    .section-header { text-align: center; margin-bottom: 56px; }
+    .section-header h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 800; color: var(--white); letter-spacing: -1px; margin-bottom: 12px; }
+    .section-header p { font-size: 16px; color: var(--muted); max-width: 520px; margin: 0 auto; }
+
+    /* Features */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .feature-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: flex; gap: 14px; align-items: flex-start; }
+    .feature-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+    .feature-card h3 { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+    .feature-card p { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+    /* Pricing */
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    @media (max-width: 768px) { .pricing-grid { grid-template-columns: 1fr; } }
+    .plan-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 20px; padding: 32px 28px; display: flex; flex-direction: column; }
+    .plan-card.highlight { border-color: var(--em); box-shadow: 0 0 0 1px rgba(16,185,129,.2), 0 8px 40px rgba(16,185,129,.1); }
+    .plan-badge { display: inline-flex; font-size: 11px; font-weight: 700; color: var(--em); background: rgba(16,185,129,.12); border-radius: 999px; padding: 3px 10px; margin-bottom: 12px; width: fit-content; }
+    .plan-name { font-size: 20px; font-weight: 800; color: var(--white); margin-bottom: 6px; }
+    .plan-price { font-size: 38px; font-weight: 900; color: var(--white); letter-spacing: -1px; font-family: 'Syne', sans-serif; }
+    .plan-price span { font-size: 15px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+    .plan-seats { font-size: 12px; color: var(--muted); margin: 6px 0 20px; }
+    .plan-desc { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+    .plan-features { list-style: none; flex: 1; margin-bottom: 28px; display: flex; flex-direction: column; gap: 10px; }
+    .plan-features li { font-size: 13px; color: var(--text); display: flex; gap: 8px; align-items: flex-start; }
+    .plan-features li::before { content: '✓'; color: var(--em); font-weight: 700; flex-shrink: 0; }
+    .plan-cta { display: block; text-align: center; padding: 12px; border-radius: 12px; font-weight: 600; font-size: 14px; transition: all .2s; }
+    .plan-cta-primary { background: var(--em); color: #fff; }
+    .plan-cta-primary:hover { background: #0ea472; }
+    .plan-cta-outline { border: 1.5px solid var(--border2); color: var(--text); }
+    .plan-cta-outline:hover { background: var(--bg3); }
+
+    /* CTA Banner */
+    .cta-banner { background: linear-gradient(135deg, rgba(16,185,129,.12) 0%, rgba(16,185,129,.04) 100%); border: 1px solid rgba(16,185,129,.2); border-radius: 24px; padding: 60px 40px; text-align: center; }
+    .cta-banner h2 { font-size: clamp(26px, 3.5vw, 40px); font-weight: 800; color: var(--white); margin-bottom: 12px; }
+    .cta-banner p { font-size: 15px; color: var(--muted); margin-bottom: 28px; }
+
+    /* Footer */
+    footer { border-top: 1px solid var(--border); padding: 32px 24px; text-align: center; }
+    .footer-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; }
+    .footer-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; color: var(--white); }
+    .footer-logo span { color: var(--em); }
+    .footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+    .footer-links a { font-size: 13px; color: var(--muted); transition: color .2s; }
+    .footer-links a:hover { color: var(--text); }
+
+    @media (max-width: 640px) {
+      .hero-content { padding: 60px 20px; }
+      .plan-card { padding: 24px 20px; }
+      .cta-banner { padding: 40px 20px; }
+      .footer-inner { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="/" class="logo">Ledgio<span>.</span></a>
+    <div class="nav-actions">
+      <a href="/" class="nav-back">← All Sectors</a>
+      <a href="https://ledgio-fawn.vercel.app/register" class="btn btn-primary">Start Free Trial</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="sector-hero">
+  <img class="hero-img" src="https://images.unsplash.com/photo-1534723452862-4c874956499a?w=1400&auto=format&fit=crop" alt="Retail shop interior" loading="eager" />
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="badge">🛒 Retail &amp; Trading</div>
+    <h1>Accounting Built for<br><span class="em">Retail &amp; Shops</span></h1>
+    <p>From a single POS till to a multi-branch operation — Ledgio gives you real-time stock, daily cash reconciliation, and branch comparison reports without the spreadsheet chaos.</p>
+    <a href="https://ledgio-fawn.vercel.app/register" class="btn btn-primary btn-lg">Start Free Trial — No Card Needed →</a>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Everything Your Shop Needs</h2>
+      <p>Every feature was designed for how retail businesses actually work in Ghana.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card"><div class="feature-icon">🖥️</div><div><h3>Point-of-Sale (POS) Till</h3><p>Fast, offline-capable POS with receipt printing, product search, and cash drawer management.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">📦</div><div><h3>Product &amp; Stock Management</h3><p>Real-time inventory across all locations with reorder alerts, category management, and stock takes.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">📊</div><div><h3>Daily Sales Reporting</h3><p>End-of-day summary emails, weekly P&amp;L, and branch comparison — automatically.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">💵</div><div><h3>Cash Reconciliation</h3><p>Till vs sales reconciliation with shortage SMS alerts so you know the moment there's a discrepancy.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">🏪</div><div><h3>Multi-Till &amp; Branch Support</h3><p>Run multiple tills per branch, multiple branches in one account, with consolidated reporting.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">📱</div><div><h3>Mobile Money Collections</h3><p>Accept MoMo payments and reconcile them alongside cash and bank automatically.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">👥</div><div><h3>Customer Account Management</h3><p>Credit accounts, layaway / credit sales, and a full customer ledger with aged debt tracking.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">🏗️</div><div><h3>Purchase Order Management</h3><p>Raise POs to suppliers, receive stock, and auto-update your inventory and accounts payable.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">🏢</div><div><h3>Multi-Location Inventory</h3><p>Stock transfers between warehouses or branches, with movement history and audit trail.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">👨‍💼</div><div><h3>Staff Payroll</h3><p>Monthly payroll with PAYE and SSNIT calculations, pay slips, and staff ledger accounts.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">📈</div><div><h3>Advanced Sales Analytics</h3><p>Best-selling products, slow movers, margin per SKU, and customer purchase history.</p></div></div>
+      <div class="feature-card"><div class="feature-icon">🧾</div><div><h3>Delivery Notes &amp; Sales Orders</h3><p>Full order-to-delivery workflow with print-ready delivery notes and invoice matching.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="section section-alt" id="pricing">
+  <div class="container">
+    <div class="section-header">
+      <h2>Simple, Transparent Pricing</h2>
+      <p>No hidden fees. Cancel any time. All plans include a 90-day free trial.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="plan-card">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price">₵105 <span>/ month</span></div>
+        <div class="plan-seats">Up to 3 users</div>
+        <div class="plan-desc">For sole traders and very small shops.</div>
+        <ul class="plan-features">
+          <li>Point of Sale (1 till)</li>
+          <li>Basic inventory management</li>
+          <li>Invoices &amp; Bills</li>
+          <li>Expense claims</li>
+          <li>Sales reports</li>
+          <li>Dedicated database schema</li>
+        </ul>
+        <a href="https://ledgio-fawn.vercel.app/register" class="plan-cta plan-cta-outline">Start Free Trial</a>
+      </div>
+      <div class="plan-card highlight">
+        <div class="plan-badge">Most Popular</div>
+        <div class="plan-name">Standard</div>
+        <div class="plan-price">₵205 <span>/ month</span></div>
+        <div class="plan-seats">Up to 10 users</div>
+        <div class="plan-desc">For growing shops that need more features.</div>
+        <ul class="plan-features">
+          <li>Everything in Starter</li>
+          <li>Multiple POS tills</li>
+          <li>Mobile Money collections</li>
+          <li>Bank reconciliation</li>
+          <li>SMS shortage alerts</li>
+          <li>Customer &amp; supplier management</li>
+        </ul>
+        <a href="https://ledgio-fawn.vercel.app/register" class="plan-cta plan-cta-primary">Start Free Trial</a>
+      </div>
+      <div class="plan-card">
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">₵350 <span>/ month</span></div>
+        <div class="plan-seats">Unlimited users</div>
+        <div class="plan-desc">For established shops with advanced needs.</div>
+        <ul class="plan-features">
+          <li>Everything in Standard</li>
+          <li>Multi-warehouse / godown</li>
+          <li>Payroll management</li>
+          <li>Budgets &amp; variance tracking</li>
+          <li>Advanced analytics dashboard</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="https://ledgio-fawn.vercel.app/register" class="plan-cta plan-cta-outline">Start Free Trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section">
+  <div class="container">
+    <div class="cta-banner">
+      <h2>Ready to Run a Tighter Shop?</h2>
+      <p>Set up your retail workspace in under 5 minutes. No credit card required.</p>
+      <a href="https://ledgio-fawn.vercel.app/register" class="btn btn-primary btn-lg">Start Your 90-Day Free Trial →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">Ledgio<span>.</span></div>
+    <div class="footer-links">
+      <a href="/">Home</a>
+      <a href="/#pricing">All Pricing</a>
+      <a href="https://ledgio-fawn.vercel.app/login">Sign In</a>
+      <a href="/legal/terms-of-service">Terms</a>
+      <a href="/legal/privacy-policy">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
