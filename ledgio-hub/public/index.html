@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ledgio — Accounting for Every Sector</title>
+  <meta name="description" content="Purpose-built accounting for retail, hotels, schools, pharmacies, and nonprofits across Ghana and Africa. Room management, reservations, POS, payroll, fund accounting and more." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #070d0a;
+      --bg2:       #0d1510;
+      --bg3:       #111a15;
+      --card:      #131c17;
+      --border:    #1e2d24;
+      --border2:   #253323;
+      --em:        #10b981;
+      --em-dim:    #059669;
+      --em-light:  #6ee7b7;
+      --em-faint:  rgba(16,185,129,.08);
+      --text:      #e2ede8;
+      --muted:     #7a9485;
+      --muted2:    #4a6356;
+      --white:     #ffffff;
+      --amber:     #f59e0b;
+      --blue:      #3b82f6;
+      --purple:    #8b5cf6;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1,h2,h3,h4,h5 { font-family: 'Syne', sans-serif; line-height: 1.1; }
+
+    a { color: inherit; text-decoration: none; }
+
+    img { max-width: 100%; display: block; }
+
+    /* ── Utilities ── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    .container-sm { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+    .container-xs { max-width: 560px; margin: 0 auto; padding: 0 24px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 28px; border-radius: 12px;
+      font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 15px;
+      cursor: pointer; border: none; transition: all 0.2s;
+      text-decoration: none; white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--em); color: #fff;
+      box-shadow: 0 8px 24px rgba(16,185,129,.25);
+    }
+    .btn-primary:hover { background: #0ea472; transform: translateY(-1px); }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 1.5px solid var(--border2);
+    }
+    .btn-outline:hover { background: var(--bg3); border-color: var(--muted2); }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 14px; border-radius: 999px;
+      background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25);
+      color: var(--em-light); font-size: 12px; font-weight: 600;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(7,13,10,.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; max-width: 1200px; margin: 0 auto;
+    }
+    .logo {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 22px; color: var(--white); letter-spacing: -0.5px;
+    }
+    .logo span { color: var(--em); }
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .nav-link {
+      padding: 8px 16px; font-size: 14px; font-weight: 500;
+      color: var(--muted); transition: color 0.2s; cursor: pointer;
+    }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta {
+      padding: 9px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+      background: var(--em); color: #fff; transition: background 0.2s;
+    }
+    .nav-cta:hover { background: #0ea472; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 100px 0 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 900px 500px at 50% -5%, rgba(16,185,129,.12) 0%, transparent 68%);
+      pointer-events: none;
+    }
+    .hero h1 {
+      font-size: clamp(42px, 7vw, 76px);
+      font-weight: 900;
+      color: var(--white);
+      letter-spacing: -2px;
+      margin-bottom: 24px;
+    }
+    .hero h1 .em {
+      background: linear-gradient(135deg, #10b981 0%, #6ee7b7 50%, #60a5fa 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 18px; color: var(--muted); max-width: 600px;
+      margin: 0 auto 40px; line-height: 1.7;
+    }
+    .hero-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .hero-note {
+      font-size: 12px; color: var(--muted); display: flex;
+      align-items: center; justify-content: center; gap: 6px; margin-bottom: 64px;
+    }
+    .hero-note::before {
+      content: '✓'; color: var(--em); font-weight: 700;
+    }
+
+    /* Stat strip */
+    .stat-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--border); border-radius: 20px;
+      overflow: hidden; background: var(--bg2);
+    }
+    .stat-item {
+      padding: 28px 16px; text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-val { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--white); }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Section ── */
+    .section { padding: 96px 0; border-top: 1px solid var(--border); }
+    .section-alt { background: var(--bg2); }
+    .section-header { text-align: center; margin-bottom: 56px; }
+    .section-header h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 800; color: var(--white); margin-bottom: 12px; }
+    .section-header p { font-size: 15px; color: var(--muted); max-width: 520px; margin: 0 auto; }
+
+    /* ── Sectors ── */
+    .sectors-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .sector-card {
+      padding: 28px;
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      transition: border-color 0.2s, transform 0.2s;
+      cursor: default;
+    }
+    .sector-card:hover { transform: translateY(-2px); }
+    .sector-card.new { border-color: rgba(16,185,129,.35); box-shadow: 0 0 0 1px rgba(16,185,129,.1); }
+    .sector-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 16px;
+    }
+    .sector-card h3 { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .sector-card p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .new-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-top: 12px; font-size: 10px; font-weight: 700;
+      color: var(--em); text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .new-pill::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--em); animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* ── Hospitality Feature highlight ── */
+    .hosp-highlight {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+    }
+    .hosp-highlight-text h2 {
+      font-size: clamp(28px, 3.5vw, 42px); font-weight: 800;
+      color: var(--white); margin-bottom: 16px;
+    }
+    .hosp-highlight-text p { font-size: 15px; color: var(--muted); line-height: 1.7; margin-bottom: 24px; }
+    .feature-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .feature-list li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: var(--text);
+    }
+    .feature-list li::before {
+      content: '✓'; color: var(--em); font-weight: 700; flex-shrink: 0; margin-top: 1px;
+    }
+    .hosp-cards {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    .hosp-mini-card {
+      padding: 20px; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+    .hosp-mini-card .icon { font-size: 24px; margin-bottom: 10px; }
+    .hosp-mini-card h4 { font-size: 13px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+    .hosp-mini-card p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+    /* ── Pricing ── */
+    .pricing-tabs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+    .ptab {
+      padding: 8px 20px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      border: 1.5px solid var(--border); cursor: pointer; transition: all 0.2s;
+      background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif;
+    }
+    .ptab:hover { border-color: var(--muted2); color: var(--text); }
+    .ptab.active { background: var(--em); border-color: var(--em); color: #fff; }
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    }
+    .price-card {
+      padding: 32px; background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 20px; display: flex; flex-direction: column; gap: 0;
+    }
+    .price-card.highlight {
+      border-color: var(--em); box-shadow: 0 0 0 1px rgba(16,185,129,.2), 0 20px 60px rgba(16,185,129,.1);
+      position: relative;
+    }
+    .popular-badge {
+      position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+      background: var(--em); color: #fff; font-size: 10px; font-weight: 800;
+      padding: 4px 14px; border-radius: 999px; white-space: nowrap; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .plan-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
+    .plan-label.em { color: var(--em); }
+    .plan-price { font-family: 'Syne', sans-serif; font-size: 38px; font-weight: 800; color: var(--white); }
+    .plan-period { font-size: 13px; color: var(--muted); }
+    .plan-tagline { font-size: 12px; color: var(--muted); margin-top: 6px; margin-bottom: 16px; }
+    .plan-seats {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--bg3); border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 600;
+      color: var(--text); margin-bottom: 20px;
+    }
+    .plan-features { list-style: none; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+    .plan-features li { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--muted); }
+    .plan-features li::before { content: '✓'; color: var(--em); font-weight: 700; flex-shrink: 0; }
+    .plan-features li.dimmed::before { color: var(--muted2); }
+    .plan-btn {
+      margin-top: 24px; width: 100%; padding: 13px; border-radius: 11px;
+      font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px;
+      cursor: pointer; border: none; transition: all 0.2s; text-align: center;
+    }
+    .plan-btn.em { background: var(--em); color: #fff; }
+    .plan-btn.em:hover { background: #0ea472; }
+    .plan-btn.outline { background: transparent; border: 1.5px solid var(--border2); color: var(--text); }
+    .plan-btn.outline:hover { background: var(--bg3); }
+
+    /* ── Features grid ── */
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      padding: 28px; background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 20px; transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: var(--border2); }
+    .feat-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin-bottom: 14px;
+    }
+    .feature-card h3 { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .feature-card p { font-size: 12px; color: var(--muted); line-height: 1.65; }
+
+    /* ── FAQ ── */
+    .faq-list { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
+    .faq-item { border-bottom: 1px solid var(--border); }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-q {
+      width: 100%; padding: 20px 24px; display: flex; justify-content: space-between;
+      align-items: center; gap: 16px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+      color: var(--white); text-align: left; background: transparent; border: none;
+      transition: background 0.15s;
+    }
+    .faq-q:hover { background: var(--bg3); }
+    .faq-icon { flex-shrink: 0; color: var(--muted); font-size: 18px; transition: transform 0.2s; }
+    .faq-a {
+      max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+    }
+    .faq-a-inner {
+      padding: 4px 24px 20px; font-size: 13px; color: var(--muted); line-height: 1.7;
+      border-top: 1px solid var(--border); background: rgba(16,185,129,.02);
+    }
+    .faq-item.open .faq-icon { transform: rotate(45deg); }
+    .faq-item.open .faq-a { max-height: 300px; }
+
+    /* ── CTA ── */
+    .cta-section {
+      text-align: center; padding: 96px 0;
+      border-top: 1px solid var(--border);
+      background: linear-gradient(to bottom, var(--bg) 0%, var(--bg2) 100%);
+    }
+    .cta-section h2 { font-size: clamp(30px, 4vw, 48px); font-weight: 900; color: var(--white); margin-bottom: 16px; }
+    .cta-section p { font-size: 15px; color: var(--muted); margin-bottom: 36px; max-width: 440px; margin-left: auto; margin-right: auto; }
+    .cta-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border); padding: 48px 0;
+      background: var(--bg); color: var(--muted); font-size: 13px;
+    }
+    .footer-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px; flex-wrap: wrap;
+    }
+    .footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+    .footer-links a { color: var(--muted); transition: color 0.2s; }
+    .footer-links a:hover { color: var(--text); }
+
+    /* Pricing panel logic */
+    .pricing-panel { display: none; }
+    .pricing-panel.active { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .pricing-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+      .hosp-highlight { grid-template-columns: 1fr; }
+      .hosp-cards { display: none; }
+    }
+    @media (max-width: 640px) {
+      .stat-strip { grid-template-columns: 1fr 1fr; }
+      .nav-actions .nav-link { display: none; }
+      .hero { padding: 72px 0 60px; }
+      .section { padding: 64px 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <div class="nav-inner">
+    <a href="/" class="logo">Ledgio<span>.</span></a>
+    <div class="nav-actions">
+      <a href="#sectors" class="nav-link">Sectors</a>
+      <a href="#pricing" class="nav-link">Pricing</a>
+      <a href="#faq" class="nav-link">FAQ</a>
+      <a href="https://app.ledgio.app/login" class="nav-link">Sign In</a>
+      <a href="https://app.ledgio.app/register" class="nav-cta">Start Free Trial</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="container">
+    <div class="badge" style="margin-bottom:28px">
+      ✦ Multi-Sector ERP &amp; Accounting — Ghana &amp; Africa
+    </div>
+
+    <h1>
+      Built for the Way<br>
+      <span class="em">Your Business Works.</span>
+    </h1>
+
+    <p class="hero-sub">
+      Purpose-built accounting for retail shops, hotels, guest houses, schools, pharmacies, and nonprofits — each sector gets the exact tools it needs, nothing it doesn't.
+    </p>
+
+    <div class="hero-actions">
+      <a href="https://app.ledgio.app/register" class="btn btn-primary">
+        Start Free Trial — No Card Needed
+        <span>→</span>
+      </a>
+      <a href="https://app.ledgio.app/login" class="btn btn-outline">
+        Sign In to Workspace
+      </a>
+    </div>
+
+    <p class="hero-note">90-day free trial · No credit card · Workspace provisioned instantly</p>
+
+    <div class="stat-strip">
+      <div class="stat-item">
+        <div class="stat-val">Instant SMS</div>
+        <div class="stat-label">Till shortage alerts</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val">4 Sectors</div>
+        <div class="stat-label">Retail · Hotels · Schools · Pharma</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val">90 Days</div>
+        <div class="stat-label">Free trial, no card required</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val">100%</div>
+        <div class="stat-label">Schema-isolated per business</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Sectors ── -->
+<section class="section" id="sectors">
+  <div class="container">
+    <div class="section-header">
+      <h2>One Platform, Every Sector</h2>
+      <p>Register with your industry type and get a workspace tuned to exactly how your business operates.</p>
+    </div>
+
+    <div class="sectors-grid">
+      <div class="sector-card">
+        <div class="sector-icon" style="background:rgba(245,158,11,.1); color:#f59e0b">🛒</div>
+        <h3>Retail &amp; Trading</h3>
+        <p>POS, multi-warehouse inventory, cash till shortage SMS alerts, weekly P&amp;L email every Monday, and branch comparison reports.</p>
+      </div>
+
+      <div class="sector-card new">
+        <div class="sector-icon" style="background:rgba(16,185,129,.1); color:#10b981">🏨</div>
+        <h3>Hotels &amp; Guest Houses</h3>
+        <p>Room type &amp; rate management, reservation system, guest folio billing, housekeeping board, and night audit with occupancy % and RevPAR reporting.</p>
+        <div class="new-pill">New</div>
+      </div>
+
+      <div class="sector-card">
+        <div class="sector-icon" style="background:rgba(139,92,246,.1); color:#8b5cf6">🏫</div>
+        <h3>Schools, Churches &amp; NGOs</h3>
+        <p>Fund accounting with restricted and unrestricted fund tracking, fee income, donor reports, and PTA levy management — no POS.</p>
+      </div>
+
+      <div class="sector-card">
+        <div class="sector-icon" style="background:rgba(59,130,246,.1); color:#3b82f6">💊</div>
+        <h3>Pharmacies</h3>
+        <p>Batch &amp; expiry date tracking, controlled substance logs, dispensary stock management, and reorder threshold alerts.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Hospitality Feature ── -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="hosp-highlight">
+      <div class="hosp-highlight-text">
+        <div class="badge" style="margin-bottom:20px">🏨 Hotels &amp; Guest Houses</div>
+        <h2>Run Your Property. Know Every Cedi.</h2>
+        <p>Ledgio's hospitality module replaces the POS with a full property management system — reservations, room management, guest billing, housekeeping, and night audit — all connected to a real double-entry ledger.</p>
+        <ul class="feature-list">
+          <li>Room types with per-night rates, capacity, and amenity lists</li>
+          <li>Reservation system with availability checks — no double-booking</li>
+          <li>Guest folio: room nights + extra charges (F&amp;B, laundry, minibar)</li>
+          <li>Check-in / Check-out with automatic invoice generation</li>
+          <li>Housekeeping board: Dirty → Clean → Inspected status flow</li>
+          <li>Night audit: occupancy %, RevPAR, and room revenue by date</li>
+          <li>All revenue posts automatically to Room Revenue (GL 4000)</li>
+          <li>Guest deposits tracked as liabilities, cleared on check-out</li>
+        </ul>
+        <a href="https://app.ledgio.app/register" class="btn btn-primary" style="margin-top:28px">
+          Open a Hotel Workspace
+          <span>→</span>
+        </a>
+      </div>
+
+      <div class="hosp-cards">
+        <div class="hosp-mini-card">
+          <div class="icon">🛏️</div>
+          <h4>Room Management</h4>
+          <p>Visual grid of all rooms with live status: Available, Occupied, Maintenance, Housekeeping, Out of Order.</p>
+        </div>
+        <div class="hosp-mini-card">
+          <div class="icon">📅</div>
+          <h4>Reservations</h4>
+          <p>Create reservations, check availability, attach guest details, set check-in/out dates and deposit amount.</p>
+        </div>
+        <div class="hosp-mini-card">
+          <div class="icon">🧾</div>
+          <h4>Guest Folio</h4>
+          <p>Track room charges plus extras like room service, laundry, and minibar. Invoice auto-generated at check-out.</p>
+        </div>
+        <div class="hosp-mini-card">
+          <div class="icon">📊</div>
+          <h4>Night Audit</h4>
+          <p>Daily occupancy percentage, RevPAR, and total room revenue — pick any date and see the full picture.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pricing ── -->
+<section class="section" id="pricing">
+  <div class="container">
+    <div class="section-header">
+      <h2>Sector-Specific Pricing</h2>
+      <p>Each sector has tiers sized for where you are. All include a 90-day free trial.</p>
+    </div>
+
+    <div class="pricing-tabs">
+      <button class="ptab active" onclick="showPricing('retail', this)">Retail &amp; Trading</button>
+      <button class="ptab" onclick="showPricing('hospitality', this)">Hotels &amp; Guest Houses</button>
+      <button class="ptab" onclick="showPricing('school', this)">Schools &amp; NGOs</button>
+      <button class="ptab" onclick="showPricing('pharmacy', this)">Pharmacies</button>
+    </div>
+
+    <!-- Retail -->
+    <div class="pricing-panel active" id="pricing-retail">
+      <div class="pricing-grid">
+        <div class="price-card">
+          <div class="plan-label">Shop</div>
+          <div><span class="plan-price">GH₵ 105</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For single-location shops getting started.</div>
+          <div class="plan-seats">👤 Up to 3 team seats</div>
+          <ul class="plan-features">
+            <li>1 shop location &amp; cash till</li>
+            <li>POS &amp; inventory management</li>
+            <li>Invoicing, bills &amp; double-entry ledger</li>
+            <li>Instant SMS shortage alerts</li>
+            <li>Weekly P&amp;L email (Mon 8 AM)</li>
+            <li>Mobile money collections (MTN, Telecel…)</li>
+            <li>Role-based access</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn outline">Start Free Trial</a>
+        </div>
+        <div class="price-card highlight">
+          <div class="popular-badge">Most Popular</div>
+          <div class="plan-label em">Business</div>
+          <div><span class="plan-price">GH₵ 305</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For growing teams with multiple locations.</div>
+          <div class="plan-seats">👤 Up to 10 team seats</div>
+          <ul class="plan-features">
+            <li>Everything in Shop</li>
+            <li>Multi-warehouse logistics (Godowns)</li>
+            <li>Payroll management</li>
+            <li>Budgets &amp; budget tracking</li>
+            <li>Bank reconciliation &amp; feed sync</li>
+            <li>Approval workflows for expenses</li>
+            <li>Branch comparison &amp; landed cost reports</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn em">Start Free Trial</a>
+        </div>
+        <div class="price-card">
+          <div class="plan-label">Enterprise</div>
+          <div><span class="plan-price">GH₵ 510</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">Dedicated support for large organisations.</div>
+          <div class="plan-seats">👤 Unlimited team seats</div>
+          <ul class="plan-features">
+            <li>Everything in Business</li>
+            <li>Dedicated PostgreSQL schema</li>
+            <li>Unlimited custom field configurations</li>
+            <li>Priority 24/7 SLA support</li>
+            <li>Custom onboarding &amp; migration</li>
+          </ul>
+          <a href="mailto:support@ledgio.app" class="plan-btn outline">Contact Sales</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hospitality -->
+    <div class="pricing-panel" id="pricing-hospitality">
+      <div class="pricing-grid">
+        <div class="price-card">
+          <div class="plan-label">Starter</div>
+          <div><span class="plan-price">₵200</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For small guest houses and B&amp;Bs.</div>
+          <div class="plan-seats">👤 Up to 3 users</div>
+          <ul class="plan-features">
+            <li>Room &amp; rate management</li>
+            <li>Reservation system</li>
+            <li>Guest folio &amp; billing</li>
+            <li>Expense tracking</li>
+            <li>Basic revenue reports</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn outline">Start Free Trial</a>
+        </div>
+        <div class="price-card highlight">
+          <div class="popular-badge">Most Popular</div>
+          <div class="plan-label em">Standard</div>
+          <div><span class="plan-price">₵400</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For growing hotels with analytics needs.</div>
+          <div class="plan-seats">👤 Up to 10 users</div>
+          <ul class="plan-features">
+            <li>Everything in Starter</li>
+            <li>Housekeeping board</li>
+            <li>Night audit &amp; RevPAR</li>
+            <li>Guest history &amp; profiles</li>
+            <li>GRA e-VAT clearance</li>
+            <li>Bank reconciliation</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn em">Start Free Trial</a>
+        </div>
+        <div class="price-card">
+          <div class="plan-label">Pro</div>
+          <div><span class="plan-price">₵650</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For established hotels with full operations.</div>
+          <div class="plan-seats">👤 Unlimited users</div>
+          <ul class="plan-features">
+            <li>Everything in Standard</li>
+            <li>Multi-property management (soon)</li>
+            <li>Conference &amp; banquet revenue</li>
+            <li>Staff payroll</li>
+            <li>Advanced analytics</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="mailto:support@ledgio.app" class="plan-btn outline">Contact Sales</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schools -->
+    <div class="pricing-panel" id="pricing-school">
+      <div class="pricing-grid">
+        <div class="price-card">
+          <div class="plan-label">Starter</div>
+          <div><span class="plan-price">GH₵ 105</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For small schools and community churches.</div>
+          <div class="plan-seats">👤 Up to 3 users</div>
+          <ul class="plan-features">
+            <li>Fund accounting (restricted &amp; unrestricted)</li>
+            <li>Fee income tracking</li>
+            <li>Invoicing &amp; bills</li>
+            <li>Chart of accounts &amp; reports</li>
+            <li>Donor &amp; member contributions</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn outline">Start Free Trial</a>
+        </div>
+        <div class="price-card highlight">
+          <div class="popular-badge">Most Popular</div>
+          <div class="plan-label em">Standard</div>
+          <div><span class="plan-price">GH₵ 305</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For growing institutions with staff.</div>
+          <div class="plan-seats">👤 Up to 10 users</div>
+          <ul class="plan-features">
+            <li>Everything in Starter</li>
+            <li>Payroll management (PAYE, SSNIT)</li>
+            <li>Budgets &amp; budget tracking</li>
+            <li>Bank reconciliation</li>
+            <li>Approval workflows</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn em">Start Free Trial</a>
+        </div>
+        <div class="price-card">
+          <div class="plan-label">Enterprise</div>
+          <div><span class="plan-price">GH₵ 510</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">Large institutions and NGO networks.</div>
+          <div class="plan-seats">👤 Unlimited users</div>
+          <ul class="plan-features">
+            <li>Everything in Standard</li>
+            <li>Multi-campus / multi-fund</li>
+            <li>Priority SLA support</li>
+            <li>Custom onboarding</li>
+          </ul>
+          <a href="mailto:support@ledgio.app" class="plan-btn outline">Contact Sales</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pharmacy -->
+    <div class="pricing-panel" id="pricing-pharmacy">
+      <div class="pricing-grid">
+        <div class="price-card">
+          <div class="plan-label">Starter</div>
+          <div><span class="plan-price">GH₵ 105</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For small dispensaries and community pharmacies.</div>
+          <div class="plan-seats">👤 Up to 3 users</div>
+          <ul class="plan-features">
+            <li>Batch &amp; expiry date tracking</li>
+            <li>Dispensary POS &amp; stock</li>
+            <li>Reorder alerts</li>
+            <li>Invoicing &amp; ledger</li>
+            <li>Basic reports</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn outline">Start Free Trial</a>
+        </div>
+        <div class="price-card highlight">
+          <div class="popular-badge">Most Popular</div>
+          <div class="plan-label em">Business</div>
+          <div><span class="plan-price">GH₵ 305</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">For pharmacy chains with multiple branches.</div>
+          <div class="plan-seats">👤 Up to 10 users</div>
+          <ul class="plan-features">
+            <li>Everything in Starter</li>
+            <li>Controlled substance logs</li>
+            <li>Multi-branch inventory</li>
+            <li>Payroll management</li>
+            <li>Bank reconciliation</li>
+          </ul>
+          <a href="https://app.ledgio.app/register" class="plan-btn em">Start Free Trial</a>
+        </div>
+        <div class="price-card">
+          <div class="plan-label">Enterprise</div>
+          <div><span class="plan-price">GH₵ 510</span> <span class="plan-period">/ mo</span></div>
+          <div class="plan-tagline">Large chains and hospital pharmacies.</div>
+          <div class="plan-seats">👤 Unlimited users</div>
+          <ul class="plan-features">
+            <li>Everything in Business</li>
+            <li>Custom compliance reports</li>
+            <li>Priority 24/7 SLA</li>
+            <li>Custom onboarding</li>
+          </ul>
+          <a href="mailto:support@ledgio.app" class="plan-btn outline">Contact Sales</a>
+        </div>
+      </div>
+    </div>
+
+    <p style="text-align:center;margin-top:28px;font-size:12px;color:var(--muted)">
+      All plans include a 90-day free trial. No credit card required. Upgrade via Mobile Money or card from your Settings.
+    </p>
+  </div>
+</section>
+
+<!-- ── Platform Features ── -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>The Platform Behind Every Sector</h2>
+      <p>Core accounting infrastructure shared across all sector modules.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feat-icon" style="background:rgba(245,158,11,.1); font-size:20px">📱</div>
+        <h3>Instant SMS Shortage Alerts</h3>
+        <p>Whenever a shop till closes with a cash shortage, an SMS fires immediately to the owner's mobile. Available on all retail plans.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon" style="background:rgba(59,130,246,.1); font-size:20px">📧</div>
+        <h3>Automated Monday P&amp;L Email</h3>
+        <p>A Profit &amp; Loss PDF lands in your inbox every Monday at 8:00 AM automatically — review performance without logging in.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon" style="background:rgba(16,185,129,.1); font-size:20px">🏦</div>
+        <h3>Mobile Money &amp; Bank Sync</h3>
+        <p>Accept MTN Mobile Money, Telecel Cash, AirtelTigo Money, Zeepay, and G-Money, and sync your bank account automatically.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon" style="background:rgba(139,92,246,.1); font-size:20px">👥</div>
+        <h3>Role-Based Team Access</h3>
+        <p>Admin, Accountant, Auditor, HR, Shop Manager, and Cashier roles — each sees only the navigation relevant to their job.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon" style="background:rgba(239,68,68,.1); font-size:20px">🔐</div>
+        <h3>Full Audit Trail &amp; 2FA</h3>
+        <p>Every transaction is recorded to a tamper-evident audit trail. Two-factor authentication (TOTP) is available on every account.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon" style="background:rgba(16,185,129,.1); font-size:20px">📊</div>
+        <h3>Balance Sheet, Cash Flow &amp; KPIs</h3>
+        <p>Go beyond P&amp;L with a Balance Sheet, Cash Flow Statement, KPI Dashboard, Budget tracking, and Executive Reports.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ── -->
+<section class="section" id="faq">
+  <div class="container-sm">
+    <div class="section-header">
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know before your free trial.</p>
+    </div>
+
+    <div class="faq-list" id="faqList">
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Do I need a credit card to start?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">No. Registration only asks for your business name, admin email, owner mobile, and organisation type — no payment card is collected to provision your workspace and start your 90-day free trial.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Does Ledgio work for guest houses and hotels?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Yes. Choose <strong>Guest House / Hotel</strong> as your organisation type at registration to unlock the full hospitality module: room type &amp; rate management, reservation system with availability checks, guest folio billing (room nights + extra charges), housekeeping status board, and night audit with occupancy % and RevPAR reporting — all integrated with your double-entry ledger.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Is my data kept separate from other companies?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Yes. Every business is provisioned its own isolated PostgreSQL schema, so your ledgers, inventory, room data, and reports are never mixed with another tenant's data.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Does Ledgio support nonprofits, churches, and schools?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Yes. Choose <strong>Nonprofit / Church / NGO / School</strong> at signup to unlock dedicated fund accounting — restricted and unrestricted funds are tracked against every invoice, bill, and journal entry. POS and inventory are replaced with a Funds view.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Can I upgrade my plan later?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Yes. Upgrade at any time from the Subscription tab in your Settings — pay via Mobile Money or card. Your workspace moves to the new tier instantly.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Is there a setup or implementation fee?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">No. Registration provisions your dedicated workspace instantly — there is no separate implementation cost or onboarding fee on any tier.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Does Ledgio support Mobile Money and bank accounts?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Yes. Ledgio supports MTN Mobile Money, Telecel Cash, AirtelTigo Money, Zeepay, and G-Money collections, plus bank account connection for automatic transaction sync and bank reconciliation.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Final CTA ── -->
+<section class="cta-section">
+  <div class="container-xs">
+    <h2>Ready to take control?</h2>
+    <p>Register your business in under 3 minutes. No card, no setup fee — your workspace is live the moment you verify.</p>
+    <div class="cta-actions">
+      <a href="https://app.ledgio.app/register" class="btn btn-primary">
+        Register Free — 90-Day Trial
+        <span>→</span>
+      </a>
+      <a href="https://app.ledgio.app/login" class="btn btn-outline">
+        Sign In to Workspace
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div>
+        <div class="logo" style="font-size:18px;margin-bottom:6px">Ledgio<span style="color:var(--em)">.</span></div>
+        <div style="font-size:12px;color:var(--muted)">© 2026 Ledgio. All rights reserved.</div>
+      </div>
+      <div class="footer-links">
+        <a href="https://app.ledgio.app/legal/terms-of-service">Terms</a>
+        <a href="https://app.ledgio.app/legal/privacy-policy">Privacy</a>
+        <a href="https://app.ledgio.app/legal/sla">SLA</a>
+        <a href="mailto:support@ledgio.app">support@ledgio.app</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  function showPricing(sector, btn) {
+    document.querySelectorAll('.pricing-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+    document.getElementById('pricing-' + sector).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  function toggleFaq(btn) {
+    const item = btn.closest('.faq-item');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  }
+</script>
+
+</body>
+</html>
