@@ -53,7 +53,6 @@ import {
   GraduationCap,
   CalendarDays,
   MessageSquare,
-  WifiOff,
   BedDouble,
   LayoutGrid,
   Sparkles,

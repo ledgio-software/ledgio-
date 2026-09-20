@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Loader2, AlertTriangle, Plus, LogIn, LogOut, Printer } from "lucide-react";
+import { ArrowLeft, Loader2, AlertTriangle, Plus, LogIn, LogOut } from "lucide-react";
 import { api } from "../../lib/api";
 import { useNavigate, useParams } from "react-router-dom";
 

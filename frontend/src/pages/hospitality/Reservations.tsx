@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { CalendarDays, Plus, Loader2, AlertTriangle, Search } from "lucide-react";
+import { CalendarDays, Plus, Loader2, AlertTriangle } from "lucide-react";
 import { api } from "../../lib/api";
 import { useNavigate } from "react-router-dom";
 

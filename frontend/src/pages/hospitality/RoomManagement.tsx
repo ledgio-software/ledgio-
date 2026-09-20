@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { BedDouble, Plus, Loader2, AlertTriangle, WrenchIcon, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { BedDouble, Plus, Loader2, AlertTriangle, WrenchIcon, CheckCircle2, XCircle } from "lucide-react";
 import { api } from "../../lib/api";
 
 interface Room {
