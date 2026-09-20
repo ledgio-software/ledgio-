@@ -82,6 +82,28 @@
     .footer-links a { font-size: 13px; color: var(--muted); transition: color .2s; }
     .footer-links a:hover { color: var(--text); }
     @media (max-width: 640px) { .hero-content { padding: 60px 20px; } .plan-card { padding: 24px 20px; } .cta-banner { padding: 40px 20px; } .footer-inner { flex-direction: column; } }
+    /* Testimonials */
+    .testimonials-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .testimonials-grid { grid-template-columns: 1fr; } }
+    .testimonial-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px 28px 24px; }
+    .testimonial-stars { color: #f59e0b; font-size: 13px; letter-spacing: 3px; margin-bottom: 14px; }
+    .testimonial-quote { font-size: 14.5px; color: var(--text); line-height: 1.7; font-style: italic; margin-bottom: 18px; }
+    .testimonial-author { border-top: 1px solid var(--border); padding-top: 14px; }
+    .testimonial-name { font-size: 14px; font-weight: 700; color: var(--white); }
+    .testimonial-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* Integrations */
+    .integrations-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 32px; }
+    .int-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 13px; font-weight: 500; color: var(--text); }
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 4px; max-width: 760px; margin: 0 auto; }
+    .faq-item input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+    .faq-label { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--white); transition: background .2s; gap: 12px; user-select: none; }
+    .faq-label:hover { background: var(--bg3); }
+    .faq-label::after { content: '+'; font-size: 20px; color: var(--em); flex-shrink: 0; font-family: monospace; }
+    .faq-item input:checked + .faq-label { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+    .faq-item input:checked + .faq-label::after { content: '−'; }
+    .faq-body { display: none; padding: 16px 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.65; background: var(--bg3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; }
+    .faq-item input:checked + .faq-label + .faq-body { display: block; }
   </style>
 </head>
 <body>
@@ -126,6 +148,34 @@
       <div class="feature-card"><div class="feature-icon">💳</div><div><h3>Bank Reconciliation</h3><p>Match MoMo, bank transfers, and card payments to guest folios automatically.</p></div></div>
       <div class="feature-card"><div class="feature-icon">👨‍💼</div><div><h3>Staff Payroll</h3><p>Payroll for all hotel staff with PAYE and SSNIT, pay slips, and department cost allocation.</p></div></div>
       <div class="feature-card"><div class="feature-icon">📈</div><div><h3>Advanced Analytics</h3><p>Revenue by room type, seasonal trends, channel mix, and cost-per-occupied-room dashboards.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Trusted by Ghana's Hospitality Industry</h2>
+      <p>Hotels and guest houses across Ghana manage their finances with Ledgio.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">Room billing, restaurant tabs, and laundry all flow into one guest folio. Our night audits now take 20 minutes instead of 3 hours.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Abena Asante</div>
+          <div class="testimonial-role">Hotel Manager · Accra</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">Our guests get professional folios at checkout. The system handles all our room types and seasonal rate variations automatically.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Kweku Darko</div>
+          <div class="testimonial-role">Guest House Owner · Cape Coast</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -186,6 +236,63 @@
   </div>
 </section>
 
+<!-- Integrations -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Works with the Tools You Already Use</h2>
+      <p>Ledgio connects with Ghana's payment networks, tax systems, and banks right out of the box.</p>
+    </div>
+    <div class="integrations-row">
+      <span class="int-badge">📋 GRA e-VAT</span>
+      <span class="int-badge">📱 MoMo</span>
+      <span class="int-badge">🟡 MTN Mobile Money</span>
+      <span class="int-badge">🔴 Vodafone Cash</span>
+      <span class="int-badge">🟠 AirtelTigo Money</span>
+      <span class="int-badge">🏦 All Ghana Banks</span>
+      <span class="int-badge">🏨 GITTA</span>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know before getting started.</p>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <input type="checkbox" id="faq-h1">
+        <label class="faq-label" for="faq-h1">Can I manage restaurant and room billing together?</label>
+        <div class="faq-body">Yes. Ledgio links room charges, restaurant tabs, laundry, and other services to a single guest folio that closes cleanly at checkout.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-h2">
+        <label class="faq-label" for="faq-h2">Does it handle conference and event revenue?</label>
+        <div class="faq-body">Yes. You can track conference room hire, event catering, and ancillary revenue against separate cost centres for accurate P&amp;L reporting.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-h3">
+        <label class="faq-label" for="faq-h3">Is my data secure?</label>
+        <div class="faq-body">Yes. Your data is encrypted at rest and in transit, stored on secure cloud infrastructure, and never shared with third parties. Only you and the users you authorise can access your account.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-h4">
+        <label class="faq-label" for="faq-h4">Can I try it free?</label>
+        <div class="faq-body">Yes. All plans include a 90-day free trial with no credit card required. You get full access to your chosen plan's features from day one.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-h5">
+        <label class="faq-label" for="faq-h5">Can I add more users later?</label>
+        <div class="faq-body">Yes. You can upgrade your plan or add users at any time from your account settings. All your data and settings are preserved across plan changes.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
 <section class="section">
   <div class="container">
     <div class="cta-banner">

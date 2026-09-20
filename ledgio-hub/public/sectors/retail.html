@@ -103,6 +103,28 @@
       .cta-banner { padding: 40px 20px; }
       .footer-inner { flex-direction: column; text-align: center; }
     }
+    /* Testimonials */
+    .testimonials-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .testimonials-grid { grid-template-columns: 1fr; } }
+    .testimonial-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px 28px 24px; }
+    .testimonial-stars { color: #f59e0b; font-size: 13px; letter-spacing: 3px; margin-bottom: 14px; }
+    .testimonial-quote { font-size: 14.5px; color: var(--text); line-height: 1.7; font-style: italic; margin-bottom: 18px; }
+    .testimonial-author { border-top: 1px solid var(--border); padding-top: 14px; }
+    .testimonial-name { font-size: 14px; font-weight: 700; color: var(--white); }
+    .testimonial-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* Integrations */
+    .integrations-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 32px; }
+    .int-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 13px; font-weight: 500; color: var(--text); }
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 4px; max-width: 760px; margin: 0 auto; }
+    .faq-item input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+    .faq-label { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--white); transition: background .2s; gap: 12px; user-select: none; }
+    .faq-label:hover { background: var(--bg3); }
+    .faq-label::after { content: '+'; font-size: 20px; color: var(--em); flex-shrink: 0; font-family: monospace; }
+    .faq-item input:checked + .faq-label { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+    .faq-item input:checked + .faq-label::after { content: '−'; }
+    .faq-body { display: none; padding: 16px 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.65; background: var(--bg3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; }
+    .faq-item input:checked + .faq-label + .faq-body { display: block; }
   </style>
 </head>
 <body>
@@ -149,6 +171,34 @@
       <div class="feature-card"><div class="feature-icon">👨‍💼</div><div><h3>Staff Payroll</h3><p>Monthly payroll with PAYE and SSNIT calculations, pay slips, and staff ledger accounts.</p></div></div>
       <div class="feature-card"><div class="feature-icon">📈</div><div><h3>Advanced Sales Analytics</h3><p>Best-selling products, slow movers, margin per SKU, and customer purchase history.</p></div></div>
       <div class="feature-card"><div class="feature-icon">🧾</div><div><h3>Delivery Notes &amp; Sales Orders</h3><p>Full order-to-delivery workflow with print-ready delivery notes and invoice matching.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Trusted by Ghanaian Retailers</h2>
+      <p>Shops and trading businesses across Ghana use Ledgio every day.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">Ledgio transformed our stockroom. We went from weekly Excel updates to real-time inventory alerts. Shortages are spotted before they become problems.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Akosua Mensah</div>
+          <div class="testimonial-role">Shop Owner · Accra Mall Road</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">The POS and inventory link is seamless. End-of-day reconciliation now takes 10 minutes instead of an hour. My cashiers love it.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Emmanuel Boateng</div>
+          <div class="testimonial-role">Branch Manager · Kumasi</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -206,6 +256,62 @@
           <li>Priority support</li>
         </ul>
         <a href="https://ledgio-fawn.vercel.app/register" class="plan-cta plan-cta-outline">Start Free Trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Integrations -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Works with the Tools You Already Use</h2>
+      <p>Ledgio connects with Ghana's payment networks, tax systems, and banks right out of the box.</p>
+    </div>
+    <div class="integrations-row">
+      <span class="int-badge">📋 GRA e-VAT</span>
+      <span class="int-badge">📱 MoMo</span>
+      <span class="int-badge">🟡 MTN Mobile Money</span>
+      <span class="int-badge">🔴 Vodafone Cash</span>
+      <span class="int-badge">🟠 AirtelTigo Money</span>
+      <span class="int-badge">🏦 All Ghana Banks</span>
+      <span class="int-badge">🏛️ SSNIT</span>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know before getting started.</p>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <input type="checkbox" id="faq-r1">
+        <label class="faq-label" for="faq-r1">Does it support multiple till points?</label>
+        <div class="faq-body">Yes. The Standard and Pro plans support multiple POS terminals across one or more locations, each with its own till reconciliation and cash drawer management.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-r2">
+        <label class="faq-label" for="faq-r2">Can I track stock across branches?</label>
+        <div class="faq-body">Yes. The Pro plan includes multi-location inventory with inter-branch stock transfers, movement history, and a full audit trail per location.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-r3">
+        <label class="faq-label" for="faq-r3">Is my data secure?</label>
+        <div class="faq-body">Yes. Your data is encrypted at rest and in transit, stored on secure cloud infrastructure, and never shared with third parties. Only you and the users you authorise can access your account.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-r4">
+        <label class="faq-label" for="faq-r4">Can I try it free?</label>
+        <div class="faq-body">Yes. All plans include a 90-day free trial with no credit card required. You get full access to your chosen plan's features from day one.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-r5">
+        <label class="faq-label" for="faq-r5">Can I add more users later?</label>
+        <div class="faq-body">Yes. You can upgrade your plan or add users at any time from your account settings. All your data and settings are preserved across plan changes.</div>
       </div>
     </div>
   </div>
