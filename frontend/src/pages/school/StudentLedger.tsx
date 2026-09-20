@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -44,9 +44,16 @@ interface LedgerSummary {
   balance: number;
 }
 
+interface SchoolClass {
+  id: string;
+  name: string;
+}
+
 export function StudentLedger() {
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [searchResults, setSearchResults] = useState<StudentResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentResult | null>(null);
@@ -54,6 +61,14 @@ export function StudentLedger() {
   const [summary, setSummary] = useState<LedgerSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [termFilter, setTermFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  useEffect(() => {
+    api.get("/school/classes").then((res) => {
+      setClasses(res.data?.data?.classes ?? []);
+    }).catch(() => {});
+  }, []);
 
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS" }).format(n);
@@ -61,18 +76,22 @@ export function StudentLedger() {
   const fmtDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString("en-GH", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-  const doSearch = useCallback(async () => {
-    if (searchQuery.trim().length < 2) return;
+  const doSearch = useCallback(async (overrideClass?: string) => {
+    const cls = overrideClass !== undefined ? overrideClass : classFilter;
+    if (searchQuery.trim().length < 2 && !cls) return;
     setSearching(true);
     try {
-      const res = await api.get(`/school/students?search=${encodeURIComponent(searchQuery.trim())}&limit=10`);
+      const params = new URLSearchParams({ limit: "50" });
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (cls) params.set("className", cls);
+      const res = await api.get(`/school/students?${params.toString()}`);
       setSearchResults(res.data?.data?.students ?? []);
     } catch {
       showToast("Search failed", "error");
     } finally {
       setSearching(false);
     }
-  }, [searchQuery, showToast]);
+  }, [searchQuery, classFilter, showToast]);
 
   const loadLedger = useCallback(async (student: StudentResult) => {
     setSelectedStudent(student);
@@ -102,6 +121,104 @@ export function StudentLedger() {
   const methodLabel = (m: string) =>
     ({ CASH: "Cash", MOBILE_MONEY: "Mobile Money", CHEQUE: "Cheque", BANK_TRANSFER: "Bank Transfer", MANUAL: "Manual", PAYSTACK: "Paystack" }[m] ?? m);
 
+  const termOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return ledger
+      .filter((r) => { if (seen.has(r.termName)) return false; seen.add(r.termName); return true; })
+      .map((r) => ({ label: `${r.termName} ${r.academicYear}`, value: r.termName }));
+  }, [ledger]);
+
+  const filteredLedger = useMemo(() => ledger.filter((r) => {
+    if (termFilter && r.termName !== termFilter) return false;
+    if (statusFilter && r.status !== statusFilter) return false;
+    return true;
+  }), [ledger, termFilter, statusFilter]);
+
+  const filteredSummary = useMemo(() => ({
+    totalCharged: filteredLedger.reduce((s, r) => s + r.total, 0),
+    totalPaid: filteredLedger.reduce((s, r) => s + r.amountPaid, 0),
+    balance: filteredLedger.reduce((s, r) => s + r.balance, 0),
+  }), [filteredLedger]);
+
+  function handlePrint() {
+    if (!selectedStudent) return;
+    const rows = filteredLedger.length > 0 ? filteredLedger : ledger;
+    const totalCharged = rows.reduce((s, r) => s + r.total, 0);
+    const totalPaid = rows.reduce((s, r) => s + r.amountPaid, 0);
+    const balance = rows.reduce((s, r) => s + r.balance, 0);
+    const now = new Date().toLocaleDateString("en-GH", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    const rowsHtml = rows.map((r) => {
+      const payments = r.payments.map((p) =>
+        `<tr style="background:#f9fafb"><td style="padding:4px 12px 4px 28px;color:#6b7280;font-style:italic" colspan="3">${methodLabel(p.method)} — ${fmtDate(p.paidAt)}</td><td style="padding:4px 12px;text-align:right;color:#16a34a">${fmt(p.amount)}</td><td colspan="2"></td></tr>`
+      ).join("");
+      const statusColor = r.status === "PAID" ? "#15803d" : r.status === "PARTIALLY_PAID" ? "#92400e" : "#b91c1c";
+      const statusBg = r.status === "PAID" ? "#dcfce7" : r.status === "PARTIALLY_PAID" ? "#fef3c7" : "#fee2e2";
+      return `
+        <tr style="border-bottom:1px solid #e5e7eb">
+          <td style="padding:8px 12px"><strong>${r.feeName}</strong><br><small style="color:#6b7280">${r.termName} · ${r.academicYear}</small></td>
+          <td style="padding:8px 12px;text-align:center;font-size:12px">${r.invoiceNumber}</td>
+          <td style="padding:8px 12px;text-align:center;font-size:12px">${fmtDate(r.dueDate)}</td>
+          <td style="padding:8px 12px;text-align:right">${fmt(r.total)}</td>
+          <td style="padding:8px 12px;text-align:right;color:#16a34a">${fmt(r.amountPaid)}</td>
+          <td style="padding:8px 12px;text-align:right;color:${r.balance > 0 ? "#b91c1c" : "#6b7280"}">${fmt(r.balance)}</td>
+          <td style="padding:8px 12px;text-align:center"><span style="background:${statusBg};color:${statusColor};padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600">${r.status === "PARTIALLY_PAID" ? "Partial" : r.status.charAt(0) + r.status.slice(1).toLowerCase()}</span></td>
+        </tr>${payments}`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Student Ledger — ${selectedStudent.firstName} ${selectedStudent.lastName}</title>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 13px; color: #111; margin: 0; padding: 24px; }
+      h1 { font-size: 20px; margin: 0 0 2px; } h2 { font-size: 14px; font-weight: normal; color: #6b7280; margin: 0 0 16px; }
+      .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
+      .school { font-size: 11px; color: #6b7280; text-align: right; }
+      .tiles { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 16px; }
+      .tile { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; }
+      .tile-label { font-size: 11px; color: #6b7280; } .tile-value { font-size: 18px; font-weight: 700; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th { background: #f3f4f6; padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+      tr:nth-child(even) { background: #fafafa; }
+      .footer { margin-top: 24px; font-size: 11px; color: #9ca3af; text-align: center; }
+      @media print { body { padding: 0; } }
+    </style></head><body>
+    <div class="header">
+      <div>
+        <h1>${selectedStudent.firstName} ${selectedStudent.lastName}</h1>
+        <h2>${selectedStudent.studentCode} · ${selectedStudent.className} · Guardian: ${selectedStudent.guardianName} (${selectedStudent.guardianPhone})</h2>
+      </div>
+      <div class="school"><strong>Student Fee Ledger</strong><br>Printed: ${now}</div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="tile-label">Total Charged</div><div class="tile-value">${fmt(totalCharged)}</div></div>
+      <div class="tile"><div class="tile-label">Total Paid</div><div class="tile-value" style="color:#16a34a">${fmt(totalPaid)}</div></div>
+      <div class="tile"><div class="tile-label">Outstanding</div><div class="tile-value" style="color:${balance > 0 ? "#b91c1c" : "#16a34a"}">${fmt(balance)}</div></div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Fee / Term</th><th style="text-align:center">Invoice #</th><th style="text-align:center">Due Date</th>
+        <th style="text-align:right">Charged</th><th style="text-align:right">Paid</th>
+        <th style="text-align:right">Balance</th><th style="text-align:center">Status</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot><tr style="border-top:2px solid #111;font-weight:700">
+        <td colspan="3" style="padding:8px 12px">TOTAL</td>
+        <td style="padding:8px 12px;text-align:right">${fmt(totalCharged)}</td>
+        <td style="padding:8px 12px;text-align:right;color:#16a34a">${fmt(totalPaid)}</td>
+        <td style="padding:8px 12px;text-align:right;color:${balance > 0 ? "#b91c1c" : "#6b7280"}">${fmt(balance)}</td>
+        <td></td>
+      </tr></tfoot>
+    </table>
+    <div class="footer">Generated by Ledgio · ${now}</div>
+    </body></html>`;
+
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 300);
+  }
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center gap-2">
@@ -112,7 +229,24 @@ export function StudentLedger() {
       {/* Search */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
+            <select
+              className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              value={classFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setClassFilter(val);
+                setSelectedStudent(null);
+                setSearchResults([]);
+                if (val) doSearch(val);
+                else setSearchResults([]);
+              }}
+            >
+              <option value="">All Classes</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
             <Input
               placeholder="Search by name, student code…"
               value={searchQuery}
@@ -120,7 +254,7 @@ export function StudentLedger() {
               onKeyDown={(e) => e.key === "Enter" && doSearch()}
               className="max-w-sm"
             />
-            <Button variant="outline" size="sm" onClick={doSearch} disabled={searching}>
+            <Button variant="outline" size="sm" onClick={() => doSearch()} disabled={searching}>
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
           </div>
@@ -153,18 +287,55 @@ export function StudentLedger() {
                 {selectedStudent.studentCode} · {selectedStudent.className} · Guardian: {selectedStudent.guardianName} · {selectedStudent.guardianPhone}
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Printer className="h-4 w-4 mr-1" /> Print
+            <Button variant="outline" size="sm" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-1" /> Print Receipt
             </Button>
           </div>
+
+          {/* Filters */}
+          {ledger.length > 0 && (
+            <div className="flex flex-wrap gap-3 items-center">
+              <select
+                className="border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                value={termFilter}
+                onChange={(e) => setTermFilter(e.target.value)}
+              >
+                <option value="">All Terms</option>
+                {termOptions.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              <select
+                className="border rounded-md px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All Statuses</option>
+                <option value="SENT">Unpaid</option>
+                <option value="PARTIALLY_PAID">Partial</option>
+                <option value="PAID">Paid</option>
+              </select>
+              {(termFilter || statusFilter) && (
+                <button
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                  onClick={() => { setTermFilter(""); setStatusFilter(""); }}
+                >
+                  Clear filters
+                </button>
+              )}
+              {(termFilter || statusFilter) && (
+                <span className="text-xs text-muted-foreground">{filteredLedger.length} of {ledger.length} rows</span>
+              )}
+            </div>
+          )}
 
           {/* Summary tiles */}
           {summary && (
             <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Total Charged", value: fmt(summary.totalCharged), color: "text-foreground" },
-                { label: "Total Paid", value: fmt(summary.totalPaid), color: "text-green-600" },
-                { label: "Outstanding", value: fmt(summary.balance), color: summary.balance > 0 ? "text-red-600" : "text-green-600" },
+                { label: "Total Charged", value: fmt(filteredSummary.totalCharged), color: "text-foreground" },
+                { label: "Total Paid", value: fmt(filteredSummary.totalPaid), color: "text-green-600" },
+                { label: "Outstanding", value: fmt(filteredSummary.balance), color: filteredSummary.balance > 0 ? "text-red-600" : "text-green-600" },
               ].map((s) => (
                 <Card key={s.label}>
                   <CardContent className="p-4">
@@ -198,14 +369,14 @@ export function StudentLedger() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ledger.length === 0 ? (
+                      {filteredLedger.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                            No fee records found for this student.
+                            {ledger.length === 0 ? "No fee records found for this student." : "No records match the selected filters."}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        ledger.map((row) => (
+                        filteredLedger.map((row) => (
                           <>
                             <TableRow
                               key={row.invoiceId}

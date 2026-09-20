@@ -1,0 +1,348 @@
+export interface SectorData {
+  slug: string;
+  icon: string;
+  label: string;
+  tagline: string;
+  heroImage: string;
+  hero: {
+    headline: string;
+    sub: string;
+    cta: string;
+  };
+  accent: {
+    from: string;
+    to: string;
+    badge: string;
+    text: string;
+    border: string;
+    glow: string;
+  };
+  features: { title: string; description: string }[];
+  stats: { value: string; label: string }[];
+  howItWorks: { step: string; title: string; body: string }[];
+}
+
+export const SECTORS: SectorData[] = [
+  {
+    slug: 'retail',
+    icon: '🛒',
+    label: 'Small Retail & Shops',
+    tagline: 'For single-location shops, boutiques, sole traders and market sellers.',
+    heroImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&q=80&auto=format&fit=crop',
+    hero: {
+      headline: 'Run Your Shop Like a Pro',
+      sub: 'POS, inventory, invoicing, and cash management — everything a small retail business needs in one place, with zero accounting knowledge required.',
+      cta: 'Register Your Shop Free',
+    },
+    accent: {
+      from: 'from-emerald-600',
+      to: 'to-teal-600',
+      badge: 'bg-emerald-950/60 text-emerald-300 border border-emerald-700/50',
+      text: 'text-emerald-400',
+      border: 'border-emerald-700/40',
+      glow: 'shadow-emerald-950',
+    },
+    stats: [
+      { value: '< 5 min', label: 'Setup time' },
+      { value: '0', label: 'Accounting knowledge needed' },
+      { value: '24/7', label: 'SMS shortage alerts' },
+      { value: '100%', label: 'Data isolation' },
+    ],
+    features: [
+      { title: 'Point of Sale (POS)', description: 'Fast checkout with barcode scanning, product search, and multiple payment types. Force-print receipt gate prevents cashier fraud.' },
+      { title: 'Receipt Audit Log', description: 'Every transaction recorded against the cashier who processed it. Full PDF receipt history with date-range filters.' },
+      { title: 'Inventory Management', description: 'Track stock levels in real time. Low-stock alerts, stock adjustments, and periodic stock-takes built in.' },
+      { title: 'Invoicing & Bills', description: 'Issue professional invoices, record vendor bills, and track partial payments — all synced to your ledger automatically.' },
+      { title: 'Mobile Money Collections', description: 'Accept MTN, Telecel, and AirtelTigo payments natively. Every collection posts to your accounts instantly.' },
+      { title: 'SMS Shortage Alerts', description: 'When a till closes with a cash shortage, an SMS alert fires to your registered phone number immediately.' },
+      { title: 'Basic Reporting', description: 'Daily sales summaries, profit & loss, and top-selling products — no spreadsheets needed.' },
+      { title: 'Customer Management', description: 'Keep a customer list, track outstanding balances, and record payment history per customer.' },
+      { title: 'Supplier Management', description: 'Manage your vendors, track what you owe, and keep a full purchase history.' },
+      { title: 'Bank Reconciliation', description: 'Match your bank statement to your books in minutes. Mono bank feed integration available.' },
+      { title: 'Weekly P&L Email', description: 'Automated Profit & Loss PDF emailed to your admin every Monday at 8 AM — no login required.' },
+      { title: 'Role-Based Access', description: 'Give cashiers, managers, and accountants only the access they need. Full audit trail on every record.' },
+    ],
+    howItWorks: [
+      { step: '01', title: 'Register in 5 minutes', body: 'Create your account, enter your business name, and choose Retail as your sector. Your dedicated workspace is provisioned instantly.' },
+      { step: '02', title: 'Add your products', body: 'Import your product list or add items manually. Set prices, units, and reorder levels.' },
+      { step: '03', title: 'Start selling', body: 'Open the POS, scan or search products, accept payment, and print the receipt. Every sale posts to your books automatically.' },
+      { step: '04', title: 'Review your numbers', body: 'Check your dashboard daily or read the Monday P&L email. Spot shortages instantly via SMS.' },
+    ],
+  },
+  {
+    slug: 'enterprise',
+    icon: '🏢',
+    label: 'Enterprise & Multi-Branch',
+    tagline: 'For wholesalers, distributors, trading chains, and large multi-location businesses.',
+    heroImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&q=80&auto=format&fit=crop',
+    hero: {
+      headline: 'One System. Every Branch. Full Control.',
+      sub: 'Multi-warehouse logistics, approval workflows, advanced budgeting, and consolidated reporting — built for businesses that have outgrown basic accounting.',
+      cta: 'Register Your Business Free',
+    },
+    accent: {
+      from: 'from-blue-600',
+      to: 'to-indigo-600',
+      badge: 'bg-blue-950/60 text-blue-300 border border-blue-700/50',
+      text: 'text-blue-400',
+      border: 'border-blue-700/40',
+      glow: 'shadow-blue-950',
+    },
+    stats: [
+      { value: '∞', label: 'Branches / warehouses' },
+      { value: '100%', label: 'Per-tenant data isolation' },
+      { value: 'Real-time', label: 'Consolidated reporting' },
+      { value: 'Multi-level', label: 'Approval workflows' },
+    ],
+    features: [
+      { title: 'Multi-Warehouse / Godown', description: 'Manage inventory across unlimited branches and warehouses. Transfer stock between locations with full audit trail.' },
+      { title: 'Approval Workflows', description: 'Require manager or director sign-off on purchases, disbursements, and journal entries above configurable thresholds.' },
+      { title: 'Advanced Budgeting', description: 'Set budgets by department or cost centre. Track actuals vs budget in real time with variance reports.' },
+      { title: 'Multi-Branch POS', description: 'Each branch runs its own POS. All sales consolidate into one set of books automatically.' },
+      { title: 'Bank Reconciliation', description: 'Reconcile multiple bank accounts simultaneously. Mono bank feed sync keeps balances current.' },
+      { title: 'Payroll Management', description: 'Run payroll for all staff across all branches. Payslip generation, SSNIT, and income tax handled automatically.' },
+      { title: 'Consolidated Reporting', description: 'Group-level P&L, Balance Sheet, and Cash Flow across all branches — drillable to individual location.' },
+      { title: 'Recurring Transactions', description: 'Automate standing orders, rent, salaries, and regular supplier payments. Set frequency and end conditions.' },
+      { title: 'Mobile Money Collections', description: 'Accept MTN, Telecel, and AirtelTigo at every branch. All receipts post to the correct branch ledger.' },
+      { title: 'Analytics Dashboard', description: 'Revenue by branch, top customers, cost trends, and cashflow projection — all in one executive view.' },
+      { title: 'SMS Shortage Alerts', description: 'Instant SMS to the owner when any till at any branch closes short — no matter where you are.' },
+      { title: 'Role-Based Access', description: 'Branch Managers, Cashiers, Accountants, Auditors — each role sees exactly what they need. Full audit log.' },
+    ],
+    howItWorks: [
+      { step: '01', title: 'Register & configure', body: 'Sign up, select Enterprise, and configure your branches, warehouses, and approval thresholds.' },
+      { step: '02', title: 'Onboard your team', body: 'Invite branch managers, cashiers, and accountants. Each user gets role-appropriate access automatically.' },
+      { step: '03', title: 'Go live branch by branch', body: 'Activate each branch\'s POS and inventory. All data flows into the consolidated ledger from day one.' },
+      { step: '04', title: 'Monitor from the top', body: 'Use the analytics dashboard and weekly email reports to manage performance across every location.' },
+    ],
+  },
+  {
+    slug: 'schools',
+    icon: '🎓',
+    label: 'Schools',
+    tagline: 'Purpose-built for basic and secondary schools in Ghana and across Africa.',
+    heroImage: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1920&q=80&auto=format&fit=crop',
+    hero: {
+      headline: 'Financial Clarity for Every School Term',
+      sub: 'Student admissions, fee collection, health records, and fund-based accounting — all in one system designed specifically for how schools manage money.',
+      cta: 'Register Your School Free',
+    },
+    accent: {
+      from: 'from-sky-600',
+      to: 'to-blue-600',
+      badge: 'bg-sky-950/60 text-sky-300 border border-sky-700/50',
+      text: 'text-sky-400',
+      border: 'border-sky-700/40',
+      glow: 'shadow-sky-950',
+    },
+    stats: [
+      { value: 'Term-based', label: 'Fund accounting' },
+      { value: 'Auto', label: 'Weekly I&E email' },
+      { value: 'Per-pupil', label: 'Health records' },
+      { value: 'GES-aligned', label: 'Chart of accounts' },
+    ],
+    features: [
+      { title: 'Student Admissions', description: 'Enrol new students, track admission status, assign to class, and maintain a complete student register.' },
+      { title: 'Student Ledger', description: 'Full financial ledger per student with class and term filters. See outstanding fees, payments, and balances at a glance.' },
+      { title: 'Student Health Records', description: 'Medical history, allergies, vaccinations, and health notes per pupil — secure and accessible to authorised staff only.' },
+      { title: 'School Chart of Accounts', description: 'Tuition, Exam Fees, PTA Levy, Boarding Fees, Teachers\' Salaries, Library, Sports — accounts aligned to how schools actually operate.' },
+      { title: 'Income & Expenditure Report', description: 'Not a generic P&L. The I&E report uses school-appropriate labels: Fee Income, Direct Educational Costs, Net Surplus/Deficit.' },
+      { title: 'Fund Accounting by Term', description: 'Track restricted and unrestricted funds separately per term. Know exactly how much is available in each fund at any time.' },
+      { title: 'Expense Claims & Approvals', description: 'Staff submit expense claims digitally. Head teacher or bursar approves before payment is posted.' },
+      { title: 'Budgets by Department', description: 'Set budgets for departments (Sports, Library, Admin) and track spending against budget in real time.' },
+      { title: 'Approval Workflows', description: 'All purchases and disbursements above your set threshold require authorised sign-off before payment.' },
+      { title: 'Weekly I&E Email', description: 'Automated Income & Expenditure PDF emailed to the head teacher every Monday — no login required.' },
+      { title: 'Role-Based Access', description: 'Head Teacher, Bursar, Accountant, Auditor — each role sees what they need and nothing more.' },
+      { title: 'Full Audit Trail', description: 'Every financial record is stamped with who created it, who approved it, and when. Permanent and tamper-proof.' },
+    ],
+    howItWorks: [
+      { step: '01', title: 'Register as a School', body: 'Sign up, select Schools as your sector, and your workspace is provisioned with the school chart of accounts and term structure.' },
+      { step: '02', title: 'Add students & classes', body: 'Import your student register or enrol students one by one. Assign to classes and set up term fee schedules.' },
+      { step: '03', title: 'Collect fees & manage funds', body: 'Record fee payments against each student. The ledger updates instantly and fund balances stay accurate.' },
+      { step: '04', title: 'Report to stakeholders', body: 'Run the I&E report for the board, submit the weekly email to admin, and present fund statements to donors.' },
+    ],
+  },
+  {
+    slug: 'churches-ngos',
+    icon: '💜',
+    label: 'Churches & NGOs',
+    tagline: 'Transparent fund accounting for faith communities, charities, and nonprofits.',
+    heroImage: 'https://images.unsplash.com/photo-1542810634-71277d95dcbb?w=1920&q=80&auto=format&fit=crop',
+    hero: {
+      headline: 'Steward Every Offering with Confidence',
+      sub: 'Restricted donor funds, offering collections, expense approvals, and full audit trails — built so your congregation and donors always know their money is properly accounted for.',
+      cta: 'Register Your Organisation Free',
+    },
+    accent: {
+      from: 'from-purple-600',
+      to: 'to-violet-600',
+      badge: 'bg-purple-950/60 text-purple-300 border border-purple-700/50',
+      text: 'text-purple-400',
+      border: 'border-purple-700/40',
+      glow: 'shadow-purple-950',
+    },
+    stats: [
+      { value: 'Per-fund', label: 'Balance Sheet & I&E' },
+      { value: 'Auto', label: 'Weekly report email' },
+      { value: 'Mobile', label: 'Offering collections' },
+      { value: '100%', label: 'Audit trail coverage' },
+    ],
+    features: [
+      { title: 'Restricted & Unrestricted Funds', description: 'Track Building Fund, Mission Fund, General Fund, and any donor-restricted fund completely separately.' },
+      { title: 'Tag Every Transaction to a Fund', description: 'Every invoice, bill, journal entry, and offering receipt is tagged to the correct fund at the point of entry.' },
+      { title: 'Per-Fund Reporting', description: 'Generate a Balance Sheet and Income & Expenditure statement for each fund individually — essential for donor reporting.' },
+      { title: 'Expense Claims & Approvals', description: 'Ministry leaders submit expense claims digitally. Finance committee approves before any payment is posted.' },
+      { title: 'Approval Workflows', description: 'All disbursements above configurable thresholds require authorised sign-off — protects the organisation from unauthorised spending.' },
+      { title: 'Budgets per Ministry', description: 'Set budgets for Youth Ministry, Women\'s Fellowship, Missions, Admin — and track spending against each budget in real time.' },
+      { title: 'Recurring Transactions', description: 'Automate tithe reminders, pledge recordings, grant receipts, and regular supplier payments.' },
+      { title: 'Vendor Bills & Payments', description: 'Record bills from your suppliers, schedule payments, and keep a complete payables ledger.' },
+      { title: 'Mobile Money Collections', description: 'Accept MTN, Telecel, and AirtelTigo offerings and donations. Every receipt posts to the correct fund immediately.' },
+      { title: 'Bank Reconciliation', description: 'Match your church bank statement to your books every month. Mono bank feed sync keeps it effortless.' },
+      { title: 'Weekly I&E Email', description: 'Automated Income & Expenditure PDF emailed to your pastor or finance chair every Monday — no login needed.' },
+      { title: 'Full Audit Trail', description: 'Every entry, every approval, every edit — recorded permanently. Gives your congregation and donors complete confidence.' },
+    ],
+    howItWorks: [
+      { step: '01', title: 'Register your organisation', body: 'Sign up, select Churches & NGOs, and your workspace is provisioned with a nonprofit chart of accounts and fund structure.' },
+      { step: '02', title: 'Configure your funds', body: 'Set up your funds (General, Building, Missions, etc.) and assign each ministry to a budget.' },
+      { step: '03', title: 'Record offerings & expenses', body: 'Log Sunday offerings by fund, record expense claims, and approve disbursements through the workflow.' },
+      { step: '04', title: 'Report transparently', body: 'Share the per-fund I&E with your congregation, the audit trail with your board, and fund statements with donors.' },
+    ],
+  },
+  {
+    slug: 'pharmacy',
+    icon: '💊',
+    label: 'Pharmacy',
+    tagline: 'For licensed community pharmacies, hospital dispensaries, and drug stores.',
+    heroImage: 'https://images.unsplash.com/photo-1576602976047-174e57a47881?w=1920&q=80&auto=format&fit=crop',
+    hero: {
+      headline: 'Dispense Safely. Account Accurately.',
+      sub: 'Prescription management, NHIS claims, GRA e-VAT, drug interaction checks, and full pharmacy accounting — everything a modern pharmacy needs, fully integrated.',
+      cta: 'Register Your Pharmacy Free',
+    },
+    accent: {
+      from: 'from-rose-600',
+      to: 'to-pink-600',
+      badge: 'bg-rose-950/60 text-rose-300 border border-rose-700/50',
+      text: 'text-rose-400',
+      border: 'border-rose-700/40',
+      glow: 'shadow-rose-950',
+    },
+    stats: [
+      { value: 'GRA', label: 'E-VAT compliant' },
+      { value: 'NHIS', label: 'Claims management' },
+      { value: '17+', label: 'Drug interaction pairs checked' },
+      { value: 'SMS', label: 'Refill reminders' },
+    ],
+    features: [
+      { title: 'Prescription Register', description: 'Record every prescription dispensed with drug name, dosage, patient, prescriber, and billing type (Cash/NHIS/Insurance).' },
+      { title: 'Drug Interaction Checks', description: '17 Ghana-relevant drug pairs checked at the point of dispensing. Allergy cross-check against patient profile with HIGH/MODERATE alerts.' },
+      { title: 'NHIS Claims Management', description: 'Track all NHIS-billed prescriptions with line items. Generate claims summaries and CSV exports for submission.' },
+      { title: 'GRA E-VAT Integration', description: 'Every dispense generates a GRA-compliant electronic invoice reference and QR code. Stays audit-ready at all times.' },
+      { title: 'NEPP Verification', description: 'Validate National Electronic Pharmacy Platform codes at dispensing. Patient name and phone auto-fill from the NEPP registry.' },
+      { title: 'Patient Registry', description: 'Full patient profiles with allergies, chronic conditions, NHIS card number, and complete prescription history.' },
+      { title: 'Barcode Enforcement', description: 'Confirm dispense requires each drug\'s barcode to be scanned — prevents wrong-drug dispensing errors.' },
+      { title: 'SMS Refill Reminders', description: 'Send automated SMS reminders to patients when their prescription is due for a refill.' },
+      { title: 'ABC-FSN Inventory Matrix', description: 'Classify your entire stock by value (A/B/C) and movement frequency (Fast/Slow/Non-moving) for smarter ordering.' },
+      { title: 'Invoicing & Accounts', description: 'Full double-entry accounting behind every sale. Revenue, COGS, and margin tracked automatically.' },
+      { title: 'Payroll Management', description: 'Run payroll for pharmacists, dispensers, and support staff with payslip generation and tax compliance.' },
+      { title: 'Audit Trail', description: 'Every prescription, every edit, every approval — permanently logged with timestamp and user identity.' },
+    ],
+    howItWorks: [
+      { step: '01', title: 'Register your pharmacy', body: 'Sign up, select Pharmacy, and your workspace is provisioned with pharmacy-specific accounts and the prescription register.' },
+      { step: '02', title: 'Add your drug inventory', body: 'Import your formulary or add drugs manually with dosage forms, batch numbers, and expiry dates.' },
+      { step: '03', title: 'Dispense with confidence', body: 'Open the prescription register, search the patient, check interactions, scan barcodes, and confirm dispense.' },
+      { step: '04', title: 'Manage claims & compliance', body: 'Submit NHIS claims from the claims page, pull GRA e-VAT records for audits, and review your ABC-FSN matrix monthly.' },
+    ],
+  },
+  {
+    slug: 'manufacturing',
+    icon: '⚙️',
+    label: 'Manufacturing',
+    tagline: 'For manufacturers, fabricators, and job-order production businesses.',
+    heroImage: 'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1920&q=80&auto=format&fit=crop',
+    hero: {
+      headline: 'Know the True Cost of Every Job',
+      sub: 'Job costing, WIP tracking, COGS automation, and production management — built for manufacturers who need to know exactly what each product costs to make.',
+      cta: 'Register Your Factory Free',
+    },
+    accent: {
+      from: 'from-amber-600',
+      to: 'to-orange-600',
+      badge: 'bg-amber-950/60 text-amber-300 border border-amber-700/50',
+      text: 'text-amber-400',
+      border: 'border-amber-700/40',
+      glow: 'shadow-amber-950',
+    },
+    stats: [
+      { value: 'Real-time', label: 'WIP tracking' },
+      { value: 'Auto', label: 'COGS journal on completion' },
+      { value: 'Per-job', label: 'Profitability analysis' },
+      { value: 'Multi-stage', label: 'Production workflows' },
+    ],
+    features: [
+      { title: 'Job Costing', description: 'Create jobs, add materials and labour line by line. Ledgio calculates the true cost of every production run.' },
+      { title: 'WIP Tracking', description: 'Work-in-Progress value is tracked in real time as materials are consumed and labour is logged against each job.' },
+      { title: 'COGS Automation', description: 'When a job is marked complete, the COGS journal entry is generated automatically — no manual posting needed.' },
+      { title: 'Bill of Materials', description: 'Define standard BOMs for recurring products. Apply a BOM to a job and all material lines populate instantly.' },
+      { title: 'Inventory & Raw Materials', description: 'Track raw material stock levels. Material consumption on jobs deducts from inventory in real time.' },
+      { title: 'Multi-Warehouse Support', description: 'Store raw materials, WIP, and finished goods in separate warehouse locations. Transfer between locations with audit trail.' },
+      { title: 'Invoicing & Collections', description: 'Invoice customers directly from completed jobs. Track deposits, progress billings, and final payments.' },
+      { title: 'Vendor Bills', description: 'Record supplier invoices for raw materials and link them to the relevant job for accurate job-level costing.' },
+      { title: 'Payroll & Labour Costs', description: 'Run payroll for production staff. Allocate labour costs to jobs for true fully-loaded job profitability.' },
+      { title: 'Approval Workflows', description: 'Purchase requisitions and production orders above threshold require manager approval before proceeding.' },
+      { title: 'Profitability Reports', description: 'Compare job revenue against fully-loaded cost — materials, labour, overhead — for every completed job.' },
+      { title: 'Audit Trail', description: 'Every job entry, edit, and completion logged permanently with the user identity and timestamp.' },
+    ],
+    howItWorks: [
+      { step: '01', title: 'Register your business', body: 'Sign up, select Manufacturing, and your workspace is provisioned with manufacturing-specific accounts and job register.' },
+      { step: '02', title: 'Set up your products & BOMs', body: 'Define your finished products and their standard bills of materials. Set up your raw material inventory.' },
+      { step: '03', title: 'Run production jobs', body: 'Create a job for each production run, apply the BOM, record material consumption and labour, and complete the job.' },
+      { step: '04', title: 'Review profitability', body: 'Open the job profitability report to see revenue vs fully-loaded cost for every job you\'ve completed.' },
+    ],
+  },
+  {
+    slug: 'professional-services',
+    icon: '💼',
+    label: 'Professional Services',
+    tagline: 'For accounting firms, law firms, consultancies, and independent professionals.',
+    heroImage: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=1920&q=80&auto=format&fit=crop',
+    hero: {
+      headline: 'Manage Your Practice. Serve Your Clients.',
+      sub: 'Client invoicing, retainer management, payroll, expense approvals, and full double-entry accounting — built for professional service firms that need clean books and efficient billing.',
+      cta: 'Register Your Firm Free',
+    },
+    accent: {
+      from: 'from-cyan-600',
+      to: 'to-teal-600',
+      badge: 'bg-cyan-950/60 text-cyan-300 border border-cyan-700/50',
+      text: 'text-cyan-400',
+      border: 'border-cyan-700/40',
+      glow: 'shadow-cyan-950',
+    },
+    stats: [
+      { value: 'Retainer', label: 'Billing supported' },
+      { value: 'Auto', label: 'Recurring invoices' },
+      { value: 'Per-client', label: 'Ledger & history' },
+      { value: 'Full', label: 'Double-entry accounting' },
+    ],
+    features: [
+      { title: 'Client Invoicing', description: 'Generate professional invoices per client, track payment status, and send automated reminders for outstanding balances.' },
+      { title: 'Retainer Management', description: 'Set up recurring retainer invoices for clients on monthly or quarterly agreements. Ledgio handles the billing automatically.' },
+      { title: 'Expense Management', description: 'Staff submit expense claims (travel, printing, client entertainment) digitally for manager approval and reimbursement.' },
+      { title: 'Approval Workflows', description: 'All disbursements and purchases above configurable thresholds require partner or director sign-off.' },
+      { title: 'Payroll Management', description: 'Run monthly payroll for partners and staff. Payslip generation, SSNIT, and income tax handled automatically.' },
+      { title: 'Vendor Bills', description: 'Record all supplier invoices, track what you owe, and maintain a complete payables ledger.' },
+      { title: 'Bank Reconciliation', description: 'Reconcile your firm\'s bank accounts monthly. Mono bank feed sync makes it a five-minute job.' },
+      { title: 'Budgets by Department', description: 'Set budgets for departments or practice areas and track spending in real time.' },
+      { title: 'Chart of Accounts', description: 'Professional services chart of accounts — fee income, WIP, disbursements, partner drawings — set up out of the box.' },
+      { title: 'Client Ledger', description: 'View the full financial history of each client — invoices issued, payments received, outstanding balance — in one place.' },
+      { title: 'Recurring Transactions', description: 'Automate regular payments like rent, software subscriptions, and staff benefits. Set frequency and end date.' },
+      { title: 'Role-Based Access', description: 'Partners, Associates, Admin Staff, and Auditors — each with appropriate access. Full audit trail on all records.' },
+    ],
+    howItWorks: [
+      { step: '01', title: 'Register your firm', body: 'Sign up, select Professional Services, and your workspace is provisioned with a professional services chart of accounts.' },
+      { step: '02', title: 'Add your clients', body: 'Create a client record for each of your clients. Set up retainer schedules where applicable.' },
+      { step: '03', title: 'Invoice and collect', body: 'Issue invoices at project milestones or end of month. Track payments and outstanding balances per client.' },
+      { step: '04', title: 'Manage the firm', body: 'Run payroll, approve expenses, reconcile the bank, and review the P&L to keep the firm profitable.' },
+    ],
+  },
+];

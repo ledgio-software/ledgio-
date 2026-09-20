@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Briefcase, Plus, RefreshCw, AlertCircle, CheckCircle, ChevronDown, ChevronUp, DollarSign, Calendar, TrendingUp } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Briefcase, Plus, RefreshCw, AlertCircle, CheckCircle, ChevronDown, ChevronUp, DollarSign, Calendar, TrendingUp, Search } from "lucide-react";
 import { api } from "../../lib/api";
 import { confirm } from "../../components/ui/AlertDialog";
 
@@ -53,6 +53,16 @@ export function Jobs() {
   const [lineJobId, setLineJobId] = useState<string | null>(null);
   const [addingLineForJob, setAddingLineForJob] = useState<string | null>(null);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
+  const [jobSearch, setJobSearch] = useState("");
+
+  const displayedJobs = useMemo(() => {
+    const q = jobSearch.toLowerCase().trim();
+    if (!q) return jobs;
+    return jobs.filter((j) => {
+      const custName = (customers.find((c) => c.id === j.customerId)?.name ?? "").toLowerCase();
+      return j.name.toLowerCase().includes(q) || custName.includes(q);
+    });
+  }, [jobs, jobSearch, customers]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
@@ -213,10 +223,21 @@ function BudgetProgress({ job }: { job: Job }) {
         </div>
       )}
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+        <input
+          placeholder="Search job name or customer…"
+          className="w-full border rounded pl-8 pr-3 py-2 text-sm bg-white dark:bg-secondary-800 dark:border-secondary-600"
+          value={jobSearch}
+          onChange={(e) => setJobSearch(e.target.value)}
+        />
+      </div>
+
       {loading && <div className="text-center py-12 text-gray-400 text-sm">Loading…</div>}
       {!loading && jobs.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No jobs yet.</div>}
+      {!loading && jobs.length > 0 && displayedJobs.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No jobs match the search.</div>}
 
-      {jobs.map((job) => (
+      {displayedJobs.map((job) => (
         <div key={job.id} className="border rounded-lg bg-white dark:bg-secondary-800 dark:border-gray-700">
           <div className="flex items-center justify-between gap-3 p-4">
             <div className="flex items-center gap-3 min-w-0">

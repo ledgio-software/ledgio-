@@ -216,7 +216,7 @@ router.post('/verify', authRateLimiter, async (req: Request, res: Response): Pro
     if (isFullyVerified && (!user.isEmailVerified || !user.isPhoneVerified)) {
       const { EmailService } = require('../services/EmailService');
       emailSent = EmailService.isConfigured();
-      EmailService.sendWelcomePackage(updatedUser.email, updatedUser.name, user.tenant?.name).catch((err: any) => {
+      EmailService.sendWelcomePackage(updatedUser.email, updatedUser.name, user.tenant?.name, user.tenant?.orgType ?? undefined).catch((err: any) => {
         console.error('[AuthVerify] Error sending welcome package:', err);
       });
     }

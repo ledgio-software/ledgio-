@@ -46,12 +46,154 @@ function addBullet(doc: PDFKit.PDFDocument, title: string, body: string): void {
   doc.x = leftX;
 }
 
+// ── Sector-specific content ──────────────────────────────────────────────────
+
+interface SectorContent {
+  tagline: string;
+  firstSteps: Array<{ title: string; body: string }>;
+  keyFeatures: Array<{ title: string; body: string }>;
+}
+
+const SECTOR_CONTENT: Record<string, SectorContent> = {
+  NONPROFIT: {
+    tagline: 'School, Church & NGO Management Platform',
+    firstSteps: [
+      { title: '1. Add Academic Terms', body: 'Go to School > Academic Terms and create your current term (e.g. Term 1 – 2025/2026). Terms gate fee schedules and reports so everything stays organized by period.' },
+      { title: '2. Set Up Classes & Teachers', body: 'Add your class groups under School > Classes (e.g. JHS 1A, JHS 1B) and register teaching staff under School > Teachers. Assign class tutors to each class.' },
+      { title: '3. Import Students', body: 'Enrol students under School > Students. Bulk import is supported via the CSV upload button. Each student gets a unique STU-XXXX code and a linked guardian record.' },
+      { title: '4. Create Fee Schedules', body: 'Under School > Fee Schedules, define what each class owes per term (tuition, exam levy, PTA, boarding, etc.). Schedules auto-populate the demand side of every student\'s ledger.' },
+      { title: '5. Collect Your First Fee Payment', body: 'Go to School > Fee Collection, search for a student, select the invoice and record the payment (cash, MoMo, or bank transfer). A receipt is generated immediately.' },
+    ],
+    keyFeatures: [
+      { title: 'Student Ledger', body: 'Full per-student financial history: every fee charged, payment received, discount granted, and outstanding balance — printable as a parent statement.' },
+      { title: 'Fee Defaulters & Payment Plans', body: 'Identify students with overdue fees at a glance and set up instalment plans for families who need them.' },
+      { title: 'MoMo Reconciliation', body: 'Match mobile money fee payments against your MoMo statement to ensure nothing is missed or double-posted.' },
+      { title: 'Attendance & Assessments', body: 'Record daily attendance and continuous-assessment scores; generate term report cards and BECE-style academic transcripts.' },
+      { title: 'NaSIA Compliance Dashboard', body: 'Auto-populated NaSIA statistics (enrolment counts, gender ratios, teacher-pupil ratios) ready to copy into inspection returns.' },
+      { title: 'I&E Reports (Not P&L)', body: 'Income & Expenditure statements instead of Profit & Loss, matching the financial reporting language required of nonprofits and schools.' },
+    ],
+  },
+  PHARMACY: {
+    tagline: 'Licensed Pharmacy & NHIS Management Platform',
+    firstSteps: [
+      { title: '1. Add Your Drug Stock', body: 'Go to Inventory > Products and add each drug with its pack size, unit, reorder level, and selling price. Enable narcotics tracking for Schedule 2 drugs.' },
+      { title: '2. Set Up the Prescription Register', body: 'Under Pharmacy > Rx Register, configure your default prescriber list and dispensing workflow. Each Rx logs drug name, quantity, batch, prescriber, and patient.' },
+      { title: '3. Configure NHIS Codes', body: 'Under Pharmacy > NHIS Codes, map your stock items to NHIS tariff codes so claims are auto-populated when you dispense to an NHIS patient.' },
+      { title: '4. Add Patients', body: 'Register patients under Pharmacy > Patients with their NHIS member ID, chronic conditions, and allergy flags. Allergy warnings surface automatically at dispensing.' },
+      { title: '5. Record Your First Prescription Sale', body: 'Open Pharmacy > Rx Register, search for a patient, attach a prescription, dispense items, and collect payment. The sale posts to the ledger and deducts stock automatically.' },
+    ],
+    keyFeatures: [
+      { title: 'NHIS Claims Management', body: 'Batch NHIS claims by period, submit the claim register, and track approval / rejection status per claim line.' },
+      { title: 'Narcotics Register', body: 'Dedicated controlled-substance log satisfying GHS narcotics register requirements — running balance maintained automatically.' },
+      { title: 'Expiry Alerts', body: 'Automatic notifications for stock within 90 / 30 days of expiry so you can return or discount before wastage.' },
+      { title: 'ABC-FSN Inventory Matrix', body: 'Classify stock by value (A/B/C) and movement (F/S/N) to focus ordering effort on high-impact items.' },
+      { title: 'Prescription Register', body: 'Full Rx log with drug name, quantity, batch number, prescriber, and patient — every dispensing event recorded and auditable.' },
+      { title: 'Patient Records & History', body: 'Per-patient dispensing history, NHIS member ID, chronic conditions, and allergy flags — surfaces at point of dispensing.' },
+    ],
+  },
+  RETAIL: {
+    tagline: 'Retail Shop & Boutique Management Platform',
+    firstSteps: [
+      { title: '1. Add Products & Stock', body: 'Go to Inventory > Products and add each item with its cost price, selling price, and opening stock quantity. Use categories to group similar items.' },
+      { title: '2. Set Up Your Till / POS', body: 'Under POS > Cash Till, create a till for each counter and set its opening float. Each till tracks its own daily cash and sends a closeout SMS if cash is short.' },
+      { title: '3. Configure Tax Rates', body: 'Under Settings > Tax Rates, add your applicable VAT rate (e.g. 15% standard). Sales at the POS apply the rate automatically.' },
+      { title: '4. Make Your First Sale', body: 'Open POS > Sell, scan or search for products, add them to the basket, take payment (cash, card, or MoMo), and print or SMS the receipt.' },
+      { title: '5. Reconcile End-of-Day Cash', body: 'At close, go to POS > Cash Till > Close Till, count your physical cash, and submit. The variance posts to your ledger automatically.' },
+    ],
+    keyFeatures: [
+      { title: 'Point of Sale (POS)', body: 'Fast barcode/search-driven till interface with support for split payments, discounts, and layaway.' },
+      { title: 'Multi-Warehouse Inventory', body: 'Track stock across multiple shop branches; transfer stock between locations and see which branch is running low.' },
+      { title: 'Price Lists & Promotions', body: 'Set customer-group price lists (wholesale vs retail) and time-limited promotional prices per product.' },
+      { title: 'Sales & Stock Reports', body: 'Best-selling products, slow-movers, gross margin by item, and daily sales summary reports.' },
+      { title: 'Supplier Payments', body: 'Record supplier bills and payments; track what you owe each supplier and when it is due.' },
+      { title: 'Customer Loyalty', body: 'Attach customer records to sales for purchase history, credit terms, and outstanding balance tracking.' },
+    ],
+  },
+  WHOLESALE: {
+    tagline: 'Wholesale & Distribution Management Platform',
+    firstSteps: [
+      { title: '1. Add Products & Suppliers', body: 'Go to Inventory > Products to set up your catalogue with cost prices, and create supplier records under Vendors so purchase orders can reference them.' },
+      { title: '2. Create Customer Accounts', body: 'Add your retailer and trader accounts under Customers with their credit limits and payment terms (e.g. Net 30). Ledgio enforces the limit at invoice time.' },
+      { title: '3. Set Price Lists', body: 'Under Sales > Price Lists, create tier-based prices (e.g. Gold, Silver, Retail) so the right price applies automatically based on the customer.' },
+      { title: '4. Raise Your First Invoice', body: 'Go to Sales > Invoices, select a customer, add line items, and send. The invoice records the receivable and deducts stock.' },
+      { title: '5. Record a Supplier Payment', body: 'When you pay a supplier, go to Vendors > Bills, find the bill, and mark it paid. The payment posts to your ledger and clears the payable.' },
+    ],
+    keyFeatures: [
+      { title: 'Credit Control', body: 'Customer credit limits enforced at invoicing; ageing AR report shows 30/60/90/120+ day buckets.' },
+      { title: 'Purchase Orders', body: 'Raise POs to suppliers, receive goods against them (partial receipts supported), and auto-generate the supplier bill on receipt.' },
+      { title: 'Multi-Warehouse Stock', body: 'Manage inventory across multiple depots; inter-depot transfers and per-location stock valuations.' },
+      { title: 'Delivery Notes', body: 'Generate delivery notes from invoices for drivers; delivery status tracked separately from invoice payment.' },
+      { title: 'Sales Order Pipeline', body: 'Convert confirmed orders to invoices in one click; backorder tracking when stock is insufficient.' },
+      { title: 'Aged Payables & Receivables', body: 'Know exactly who owes you and who you owe, broken down by how long the balance has been outstanding.' },
+    ],
+  },
+  SERVICE: {
+    tagline: 'Service Business & Agency Management Platform',
+    firstSteps: [
+      { title: '1. Set Up Service Items', body: 'Go to Inventory > Products, set the type to "Service", and add your service catalogue (consulting, design, installation, etc.) with your standard rates.' },
+      { title: '2. Add Your Clients', body: 'Create client records under Customers with their contact details, payment terms, and any agreed price lists.' },
+      { title: '3. Issue Your First Invoice', body: 'Go to Sales > Invoices, select the client, add service line items with hours or fixed amounts, and send. The system records the receivable automatically.' },
+      { title: '4. Record Business Expenses', body: 'Log costs under Expenses (staff claims) or Vendor Bills (supplier invoices). Each expense posts to the correct ledger account.' },
+      { title: '5. Run Your Profit & Loss', body: 'Go to Reports > Profit & Loss to see revenue, direct costs, and net profit for any period. Use it to price your services correctly.' },
+    ],
+    keyFeatures: [
+      { title: 'Invoicing & Retainers', body: 'Recurring invoices for monthly retainer clients; partial payments and credit notes supported.' },
+      { title: 'Expense Claims', body: 'Staff submit out-of-pocket expenses via the app; admins approve and reimburse in bulk.' },
+      { title: 'Approval Workflows', body: 'Require sign-off before invoices, expenses, or journal entries post — keeps financial controls tight.' },
+      { title: 'Project / Job Costing', body: 'Tag transactions to a project to track revenue and costs per engagement; see profitability by client.' },
+      { title: 'Payroll (PAYE & SSNIT)', body: 'Run monthly payroll with automatic PAYE tax and SSNIT contribution calculations; payslips generated per employee.' },
+      { title: 'Withholding Tax (WHT)', body: 'Record WHT deductions on invoices and generate the WHT certificate for GRA submission.' },
+    ],
+  },
+  CONSTRUCTION: {
+    tagline: 'Construction & Contracting Management Platform',
+    firstSteps: [
+      { title: '1. Create Your First Job / Project', body: 'Go to Job Costing > Projects and create a project record with its contract value, client, start date, and estimated completion date.' },
+      { title: '2. Add Cost Categories', body: 'Under Job Costing > Cost Categories, define your cost buckets (Labour, Materials, Plant & Equipment, Subcontractors, Overheads). These map to your Chart of Accounts.' },
+      { title: '3. Set Up Site Payroll', body: 'Register site workers under HR > Employees with their daily rates. Run site payroll weekly or fortnightly and post wages directly to the project.' },
+      { title: '4. Record a Material Purchase', body: 'Raise a Purchase Order for site materials, receive the goods, and the supplier bill is auto-generated. Tag the bill to the project so it hits the job cost report.' },
+      { title: '5. Run the Job Costing Report', body: 'Go to Reports > Job Costing to see budget vs. actual cost per project, percentage complete, and estimated cost to complete.' },
+    ],
+    keyFeatures: [
+      { title: 'Job Costing', body: 'Track every cost (labour, materials, plant, sub-contractors) against each project contract; instant budget vs. actual.' },
+      { title: 'Material Purchase Orders', body: 'Raise POs for site materials, receive goods against them, and auto-generate the supplier bill on delivery — all tagged to the project.' },
+      { title: 'Site Payroll', body: 'Daily-rated and casual-labour payroll with PAYE and SSNIT; supports multiple sites with different rates.' },
+      { title: 'Fixed Assets & Equipment', body: 'Track each piece of plant and equipment, its depreciation schedule, and book value at any point in time.' },
+      { title: 'Delivery Notes', body: 'Generate delivery notes for materials dispatched to site; track delivery status separately from the supplier invoice.' },
+      { title: 'Financial Ratios & Analysis', body: 'Liquidity, profitability, and leverage ratios computed from your live accounts — useful for bonding and tender submissions.' },
+    ],
+  },
+  BUSINESS: {
+    tagline: 'Multi-Industry ERP & Accounting Platform',
+    firstSteps: [
+      { title: '1. Configure Your Chart of Accounts', body: 'Use the standard template under Accounting > Chart of Accounts as a starting point, then add or rename accounts to match your business categories.' },
+      { title: '2. Add Products & Stock', body: 'Go to Inventory > Products and enter your product catalogue with cost prices, selling prices, and opening stock quantities.' },
+      { title: '3. Make Your First Sale', body: 'Use POS > Sell for walk-in customers or Sales > Invoices for credit customers. Each sale posts to the ledger and deducts stock automatically.' },
+      { title: '4. Record a Purchase', body: 'Raise a Purchase Order under Purchasing > POs or record a direct Vendor Bill. Mark it paid when you settle the supplier.' },
+      { title: '5. Run Your Profit & Loss', body: 'Go to Reports > Profit & Loss to review income and expenses for any period. Check the Trial Balance to confirm your accounts are in balance.' },
+    ],
+    keyFeatures: [
+      { title: 'Double-Entry Bookkeeping', body: 'Full general ledger with journal entries, trial balance, and statutory reports (P&L, Balance Sheet, Cash Flow).' },
+      { title: 'Invoicing & Purchase Orders', body: 'Multi-line invoices, bills, and POs with automatic tax calculation and inventory integration.' },
+      { title: 'Point of Sale', body: 'Fast POS till with barcode scanning, split payments, daily closeouts, and shortage SMS alerts.' },
+      { title: 'Manufacturing', body: 'Bill of Materials, production orders, and finished-goods costing for businesses that assemble or manufacture products.' },
+      { title: 'Payroll (PAYE & SSNIT)', body: 'Monthly payroll with automatic statutory deductions, payslips, and GRA PAYE filing reports.' },
+      { title: 'Multi-Currency & Bank Reconciliation', body: 'Transact in any currency; reconcile bank statements via Mono Connect integration.' },
+    ],
+  },
+};
+
 /**
- * Generates the real "Quick Start Guide" PDF sent after a tenant's account is fully
- * verified. Content mirrors the platform's actual onboarding steps and current module
- * set (see STATUS.md/TASKS.md for what's live) rather than being a static placeholder.
+ * Generates a sector-specific "Quick Start Guide" PDF sent after a tenant's
+ * account is fully verified. Content (first steps + key features) is tailored
+ * to the tenant's orgType so school staff, pharmacists, and retailers each get
+ * a guide that matches their actual workflow.
  */
-export function generateQuickStartGuidePdf(businessName: string, recipientName: string): Promise<Buffer> {
+export function generateQuickStartGuidePdf(
+  businessName: string,
+  recipientName: string,
+  orgType: string = 'BUSINESS',
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 56, bufferPages: true, compress: false });
     const chunks: Buffer[] = [];
@@ -61,6 +203,7 @@ export function generateQuickStartGuidePdf(businessName: string, recipientName: 
     doc.on('error', reject);
 
     const appUrl = (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const sector = SECTOR_CONTENT[orgType] ?? SECTOR_CONTENT['BUSINESS'];
 
     // --- Cover ---
     doc.rect(0, 0, doc.page.width, 150).fill(INK);
@@ -73,7 +216,7 @@ export function generateQuickStartGuidePdf(businessName: string, recipientName: 
       .fillColor('#a7f3d0')
       .font('Helvetica')
       .fontSize(12)
-      .text('Multi-Tenant ERP & Accounting Platform', 56, 80);
+      .text(sector.tagline, 56, 80);
     doc
       .fillColor('#ffffff')
       .font('Helvetica-Bold')
@@ -89,94 +232,25 @@ export function generateQuickStartGuidePdf(businessName: string, recipientName: 
       .text(`Prepared for ${businessName}`, { continued: false });
     doc.text(`Welcome, ${recipientName} — your account is fully verified and active.`);
 
-    // --- Getting Started ---
-    addSectionHeading(doc, 'Getting Started');
-    addBullet(
-      doc,
-      '1. Set up your Chart of Accounts',
-      'Use the default standard template to get a working set of accounts immediately, or customize it under Accounting > Chart of Accounts to match how your business categorizes income and expenses.'
-    );
-    addBullet(
-      doc,
-      '2. Add your shop branches and cash tills',
-      'Register each physical location as a warehouse and open a cash till for each point-of-sale counter under Inventory > Warehouses and Cash Till. Each till tracks its own opening balance and daily closeout.'
-    );
-    addBullet(
-      doc,
-      '3. Invite your team',
-      'Add teammates under Settings > Team with role-based permissions (Admin, Accountant, Cashier, Viewer) so staff only see what their role requires.'
-    );
+    // --- Your First 5 Steps ---
+    addSectionHeading(doc, 'Your First 5 Steps');
+    for (const step of sector.firstSteps) {
+      addBullet(doc, step.title, step.body);
+    }
 
-    // --- Core Day-to-Day Features ---
-    addSectionHeading(doc, 'Core Day-to-Day Features');
-    addBullet(
-      doc,
-      'Double-entry bookkeeping',
-      'Journal entries, a full general ledger, and live Trial Balance / Profit & Loss / Balance Sheet reports.'
-    );
-    addBullet(
-      doc,
-      'Invoicing & vendor bills',
-      'Multi-line invoices and bills with automatic tax/total calculation; marking one paid posts a real journal entry to your ledger.'
-    );
-    addBullet(
-      doc,
-      'Multi-warehouse inventory',
-      'Track stock per location, transfer between warehouses, and see fast-moving vs. dead stock.'
-    );
-    addBullet(
-      doc,
-      'Cash till & point of sale',
-      'Daily closeouts compare expected vs. counted cash and send an instant SMS alert to your registered phone the moment a till comes up short.'
-    );
+    // --- Key Features for Your Business ---
+    addSectionHeading(doc, 'Key Features for Your Business');
+    for (const feature of sector.keyFeatures) {
+      addBullet(doc, feature.title, feature.body);
+    }
 
-    // --- Automation & Compliance Features ---
-    addSectionHeading(doc, 'Automation & Compliance Features');
-    addBullet(
-      doc,
-      'Tax rates',
-      'Configure your own tax rates under Settings > Tax Rates; invoices automatically apply the correct active rate for the sale date.'
-    );
-    addBullet(
-      doc,
-      'Fiscal periods & budgets',
-      'Open, close, and lock accounting periods under Settings > Fiscal Periods, and track budget vs. actual spend per account under Reports > Budgets.'
-    );
-    addBullet(
-      doc,
-      'Recurring transactions',
-      'Set up recurring journal entries for rent, subscriptions, or payroll accruals under Settings > Recurring Transactions and they post automatically on schedule.'
-    );
-    addBullet(
-      doc,
-      'Approval workflows',
-      'Require sign-off before a journal entry, invoice, or bill posts by requesting an approval under Approvals in the sidebar.'
-    );
-    addBullet(
-      doc,
-      'Multi-currency support',
-      'Set your business\'s base currency at signup; transactions entered in other currencies convert automatically once live exchange rates are configured.'
-    );
-    addBullet(
-      doc,
-      'Bank reconciliation',
-      'Link a real bank account via Mono Connect to pull statement transactions automatically once your Mono API credentials are configured.'
-    );
-    addBullet(
-      doc,
-      'Automated executive reports',
-      'Enable a schedule under Settings > Reports to receive weekly Profit & Loss summaries by email automatically.'
-    );
-    addBullet(
-      doc,
-      'AI-assisted categorization',
-      'Get smart category suggestions while building journal entries to speed up everyday bookkeeping.'
-    );
-    addBullet(
-      doc,
-      'Custom fields',
-      'Extend Ledgers, Invoices, and other records with your own custom fields under Settings (availability depends on your subscription tier).'
-    );
+    // --- Common Platform Features ---
+    addSectionHeading(doc, 'Platform-Wide Features');
+    addBullet(doc, 'Invite your team', 'Add teammates under Settings > Team with role-based permissions (Admin, Accountant, Cashier, Viewer) so staff only see what their role requires.');
+    addBullet(doc, 'Approval workflows', 'Require sign-off before transactions post by requesting an approval under Approvals in the sidebar.');
+    addBullet(doc, 'Fiscal periods & budgets', 'Open, close, and lock accounting periods under Settings > Fiscal Periods, and track budget vs. actual under Reports > Budgets.');
+    addBullet(doc, 'Automated reports', 'Enable a schedule under Settings > Reports to receive weekly summaries by email automatically.');
+    addBullet(doc, 'Multi-currency support', 'Transactions in any currency convert at live rates once configured under Settings > Currencies.');
 
     // --- Next steps / links ---
     addSectionHeading(doc, 'Need Help?');

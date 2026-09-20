@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { CalendarDays, Plus, Pencil, CheckCircle, XCircle, Ban } from "lucide-react";
+import { CalendarDays, Plus, Pencil, CheckCircle, XCircle, Ban, Search } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -61,6 +61,7 @@ export function Leave() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("PENDING");
+  const [leaveSearch, setLeaveSearch] = useState("");
 
   // Modals
   const [showTypeModal, setShowTypeModal] = useState(false);
@@ -95,6 +96,16 @@ export function Leave() {
     const e = employees.find((em) => em.id === id);
     return e ? `${e.firstName} ${e.lastName} (${e.employeeNumber})` : id;
   }
+
+  const displayedRequests = useMemo(() => {
+    const q = leaveSearch.toLowerCase().trim();
+    if (!q) return requests;
+    return requests.filter((req) => {
+      const name = empName(req.employeeId).toLowerCase();
+      const type = (req.leaveTypeName ?? "").toLowerCase();
+      return name.includes(q) || type.includes(q);
+    });
+  }, [requests, leaveSearch, employees]);
 
   // ── Leave Types ──────────────────────────────────────────────────────────
 
@@ -218,6 +229,17 @@ export function Leave() {
 
       {tab === "requests" && (
         <>
+          {/* Search */}
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+            <Input
+              placeholder="Search employee or leave type…"
+              className="pl-8"
+              value={leaveSearch}
+              onChange={(e) => setLeaveSearch(e.target.value)}
+            />
+          </div>
+
           {/* Status filter */}
           <div className="flex gap-2 flex-wrap">
             {["PENDING", "APPROVED", "REJECTED", "CANCELLED", "ALL"].map((s) => (
@@ -241,6 +263,8 @@ export function Leave() {
                 <div className="p-8 text-center text-secondary-400 text-sm">Loading…</div>
               ) : requests.length === 0 ? (
                 <div className="p-8 text-center text-secondary-400 text-sm">No leave requests found.</div>
+              ) : displayedRequests.length === 0 ? (
+                <div className="p-8 text-center text-secondary-400 text-sm">No requests match the search.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -255,7 +279,7 @@ export function Leave() {
                       </tr>
                     </thead>
                     <tbody>
-                      {requests.map((req) => (
+                      {displayedRequests.map((req) => (
                         <tr key={req.id} className="border-b border-secondary-100 dark:border-secondary-800 hover:bg-secondary-50 dark:hover:bg-secondary-800/30">
                           <td className="px-4 py-3 font-medium text-secondary-900 dark:text-secondary-100">{empName(req.employeeId)}</td>
                           <td className="px-4 py-3 text-secondary-600 dark:text-secondary-400">

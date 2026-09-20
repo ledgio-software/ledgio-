@@ -2,6 +2,283 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-19] - Sector Onboarding: Route audit, test fix, NONPROFIT highlights (feature/sector-onboarding-quick-guide)
+
+**What/Why:**
+Continuation of PR #93 (sector-specific Quick Start Guides + in-app onboarding checklist). Three fixes pushed to get CI green and correct the in-app checklist routes.
+
+**Changes:**
+
+1. **`backend/src/tests/pdfGenerationService.test.ts`** — Updated two failing test assertions that referenced old generic PDF content (`'Getting Started'`, `'Bank reconciliation'`) with strings present in the new sector-aware BUSINESS PDF (`'Your First 5 Steps'`, `'Double-Entry Bookkeeping'`). Also removed three other stale assertions (`'Tax rates'`, `'Recurring transactions'`, `'Custom fields'`) that no longer appear in the PDF output. This was the only failing test blocking CI green on PR #93.
+
+2. **`frontend/src/constants/sectorFeatureHighlights.ts`** — Fixed two misleading NONPROFIT tier labels:
+   - Business tier: `'Multi-Term Fee Schedules'` → `'Parent Comms (SMS/Email/WhatsApp)'` (fee schedules exist on all tiers)
+   - Professional tier: `'Automated Fee Reminders (SMS)'` → `'Advanced Analytics Dashboard'` (SMS reminders via ParentComms.tsx are not gated to Pro)
+
+3. **`frontend/src/constants/sectorChecklists.ts`** — Full route audit across all 7 sectors against App.tsx. Fixed 18 broken routes that would have navigated users to 404 pages. Key corrections:
+   - `/inventory/products` → `/inventory` (no such sub-route)
+   - `/pos/cash-sales`, `/pos/tills`, `/pos/reconciliation` → `/pos` or `/banking`
+   - `/pharmacy/rx-register` → `/pharmacy/prescriptions`
+   - `/pharmacy/nhis` → `/pharmacy/nhis-claims`
+   - `/invoices/new` → `/invoices`
+   - `/reports/profit-loss` → `/reports/pnl`
+   - `/inventory/price-lists` → `/settings/price-lists`
+   - `/projects` → `/manufacturing/jobs`
+   - `/projects/cost-categories` → `/cost-categories`
+   - `/payroll` → `/payroll/runs`
+   - `/accounting/chart-of-accounts` → `/accounts`
+   - NONPROFIT school routes were already correct.
+
+**Files changed:**
+- `backend/src/tests/pdfGenerationService.test.ts`
+- `frontend/src/constants/sectorFeatureHighlights.ts`
+- `frontend/src/constants/sectorChecklists.ts`
+- `STATUS.md`
+
+---
+
+## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 1.5 — Budget Burn Prediction (feature/ledgio-ai-budget-burn)
+
+**What/Why:**
+Adds budget burn prediction for Pro tier tenants. For each open fiscal period, the nightly intelligence worker checks every budgeted account and emits an insight when the current burn rate projects a budget overrun. Severity is `warning` (≥90% projected) or `critical` (≥100% projected or already over). Insights render automatically in the existing `AiInsightsBanner`.
+
+**Architecture:**
+- `ledgio-ai/worker/modules/budget_burn.py` — new module; queries `budgets JOIN accounts JOIN fiscal_periods` for open periods; computes burn rate (actual/elapsed days), projects to period end via linear extrapolation; emits one insight per at-risk account with full chart-ready data payload
+- `ledgio-ai/worker/main.py` — `MODULE_MAP` extended with `"budget_burn": "modules.budget_burn"`
+- `backend/prisma/migrations/20260918000003_add_budget_burn_module/migration.sql` — drops and recreates `ai_tenant_insights_module_check` to include `'budget_burn'`
+
+**Tier gating:** Pro tier only (`tier_config.py` already gates this; no change needed).
+
+**Files changed:**
+- `ledgio-ai/worker/modules/budget_burn.py` (new)
+- `ledgio-ai/worker/main.py`
+- `backend/prisma/migrations/20260918000003_add_budget_burn_module/migration.sql` (new)
+- `STATUS.md`
+
+---
+
+## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 2 — Behavioral Telemetry & Next-Action Prediction (feature/ledgio-ai-phase2)
+
+**What/Why:**
+Phase 2 of the Intelligence Engine adds a behavioral learning pipeline on top of Phase 1's statistical ML foundation. An hourly Python script transforms `audit_logs` into structured `behavior_events`, and a nightly next-action predictor builds a per-tenant Markov transition matrix to predict each active user's most likely next step. Predictions surface as dismissible action chips in a new `QuickSuggestionsBar` in the app header.
+
+**Architecture:**
+- `ledgio-ai/worker/behavioral_telemetry.py` — standalone hourly collector; watermarks per-tenant so only new `audit_logs` rows are processed; maps `(action, entity)` pairs to typed `event_type` strings (22 event types); bulk-inserts into `behavior_events` with ON CONFLICT DO NOTHING
+- `ledgio-ai/worker/modules/next_action_prediction.py` — runs as part of the nightly intelligence worker; reads last 90 days of `behavior_events`; builds first-order Markov transition matrix pooled across all users in the tenant; emits top-3 next-action suggestions per active user (users with events in last 7 days, ≥3 total transitions); results go into `ai_tenant_insights` with `module='next_action'`
+- `backend/prisma/migrations/20260918000002_add_behavioral_module/migration.sql` — extends the `ai_tenant_insights_module_check` constraint to include `'next_action'`
+- `backend/src/index.ts` — new hourly `Behavioral Telemetry Collector` cron job (pg-boss, `0 * * * *`)
+- `backend/src/routes/aiInsights.ts` — `MODULES_BY_TIER` updated to include `'next_action'` for all tiers (Starter through Pro)
+- `frontend/src/components/QuickSuggestionsBar.tsx` — thin action-chip bar; reads `next_action` insights from `useAiInsights()`; each chip navigates to the suggested route; entire bar is dismissible
+- `frontend/src/components/layout/MainLayout.tsx` — `<QuickSuggestionsBar />` inserted after `<AiInsightsBanner />`
+
+**Tier gating:** `next_action` insights are enabled for all tiers (Starter, Standard, Pro) since behavioral learning adds value regardless of financial tier.
+
+**Files Affected:** `ledgio-ai/worker/behavioral_telemetry.py`, `ledgio-ai/worker/modules/next_action_prediction.py`, `ledgio-ai/worker/main.py`, `ledgio-ai/worker/tier_config.py`, `backend/prisma/migrations/20260918000002_add_behavioral_module/migration.sql`, `backend/src/routes/aiInsights.ts`, `backend/src/index.ts`, `frontend/src/components/QuickSuggestionsBar.tsx`, `frontend/src/components/layout/MainLayout.tsx`, `TASKS.md`, `STATUS.md`.
+
+## [Date: 2026-09-18] - Ledgio Intelligence Engine: Phase 1 (feature/ledgio-ai-scaffold)
+
+**What/Why:**
+Built the Ledgio Intelligence Worker — a background Python AI engine that runs nightly per tenant, computes financial insights using statistical ML algorithms, and surfaces them automatically in the frontend. No LLM or API cost. Phase 1 ships 4 insight modules; schema wired for Phase 2 (behavioral learning) and Phase 3 (federated learning).
+
+**Changes:**
+- `ledgio-ai/worker/main.py` — Entry point: `--all` or `--tenant-id` modes; loops tenants via asyncpg pool
+- `ledgio-ai/worker/db.py` — Async pool + RLS activation helper (`set_config('app.tenant_id', ...)`)
+- `ledgio-ai/worker/writer.py` — Upserts insight rows to `ai_tenant_insights` (delete-then-insert per module)
+- `ledgio-ai/worker/tier_config.py` — Maps tier 1/2/3 to enabled module list and feature flags
+- `ledgio-ai/worker/modules/cash_flow_forecast.py` — Prophet time-series: 90-day cash projection + danger day
+- `ledgio-ai/worker/modules/invoice_risk_score.py` — Logistic regression: per-invoice payment risk 0–100
+- `ledgio-ai/worker/modules/inventory_demand.py` — SimpleExpSmoothing + rolling velocity: stockout prediction
+- `ledgio-ai/worker/modules/anomaly_detection.py` — Isolation Forest (all tiers) + Autoencoder (Pro tier)
+- `ledgio-ai/worker/requirements.txt` — prophet, scikit-learn, torch, statsmodels, numpy, pandas, asyncpg
+- `backend/prisma/migrations/20260918000001_add_ai_insights/migration.sql` — `ai_tenant_insights` + `behavior_events` tables
+- `backend/prisma/schema.prisma` — Added `AiTenantInsight` and `BehaviorEvent` Prisma models
+- `backend/src/routes/aiInsights.ts` — `GET /api/v1/ai/insights` (tier-filtered) + `POST /:id/dismiss`
+- `backend/src/app.ts` — Mounted `aiInsightsRouter` at `/api/v1/ai/insights`
+- `backend/src/index.ts` — Registered `Ledgio Intelligence Worker` cron job at `0 1 * * *`
+- `frontend/src/hooks/useAiInsights.ts` — React hook fetching insights, auto-refresh 60s, optimistic dismiss
+- `frontend/src/components/AiInsightsBanner.tsx` — Dismissible severity-coded banners (critical/warning/info)
+- `frontend/src/components/layout/MainLayout.tsx` — Added `<AiInsightsBanner>` after `<OverdueInvoiceAlertBanner>`
+- `frontend/src/pages/reports/FraudAlerts.tsx` — Added "AI Anomaly" tab showing anomaly_detection insights
+
+**Tech decisions:**
+- Phase 1: pure statistical ML (no API cost, runs on existing infra)
+- Hybrid anomaly: Isolation Forest layer 1 (all tiers) + Autoencoder layer 2 (Pro), score = 0.4×iso + 0.6×recon
+- `behavior_events` table created now (empty) so Phase 2 BERT4Rec pipeline can populate it without a migration
+- Worker spawned as a child process by the pg-boss cron handler to isolate Python from the Node.js process
+- Tier isolation: Starter (inventory only), Standard (+ cash/invoice/anomaly), Pro (+ autoencoder + budget)
+
+## [Date: 2026-09-18] - Ledgio AI: Initial Scaffold (feature/ledgio-ai-scaffold)
+
+**What/Why:**
+Created the `ledgio-ai/` module — a Claude Sonnet 4.6-powered financial assistant that embeds into the Ledgio accounting platform. The architecture is based on research into AI-driven ERP for African SMEs and uses MCP-style tool orchestration, PostgreSQL Row-Level Security for tenant isolation, and Anthropic Prompt Caching for cost efficiency.
+
+**Changes:**
+- `ledgio-ai/backend/app/main.py` — FastAPI entry point; CORS + router wiring
+- `ledgio-ai/backend/app/routes/chat.py` — `POST /api/ai/chat` and conversation history endpoint
+- `ledgio-ai/backend/app/routes/health.py` — health check
+- `ledgio-ai/backend/app/middleware/tenant_auth.py` — JWT decode → TenantContext (tenant_id, sector, tier)
+- `ledgio-ai/backend/app/services/claude_service.py` — Claude Sonnet 4.6 integration with full agentic tool-use loop + prompt caching
+- `ledgio-ai/backend/app/services/conversation_service.py` — PostgreSQL-backed conversation history (RLS-scoped)
+- `ledgio-ai/backend/app/tools/definitions.py` — 7 tool schemas: cash position, invoices, inventory alerts, P&L, VAT, payroll, search
+- `ledgio-ai/backend/app/tools/executor.py` — Tool query implementations using asyncpg with RLS activation
+- `ledgio-ai/backend/app/prompts/base_system_prompt.py` — Sector-aware, Ghana-compliance-aware system prompt
+- `ledgio-ai/backend/app/migrations/001_ai_conversations.sql` — Tables + RLS policies for conversation storage
+- `ledgio-ai/backend/requirements.txt` — Python dependencies
+- `ledgio-ai/backend/.env.example` — Environment variable template
+- `ledgio-ai/frontend/src/hooks/useLedgioAI.ts` — React hook: chat state, API calls, conversation management
+- `ledgio-ai/frontend/src/components/LedgioAIChat.tsx` — Chat UI widget (dark theme, suggested prompts, loading state)
+- `ledgio-ai/README.md` — Architecture overview and local dev instructions
+
+**Tech decisions:**
+- Python (FastAPI) chosen as backend language per project tech stack
+- Prompt Caching: system prompt sent with `cache_control: ephemeral` — up to 90% token cost reduction
+- RLS: every DB query sets `app.tenant_id` so PostgreSQL enforces data isolation at DB level
+- JWT passthrough: AI service never stores credentials, decodes token from main Ledgio auth
+
+---
+
+## [Date: 2026-09-17] - Ledgio Hub: Professional Icons (merged PR #79)
+
+**What/Why:**
+Emoji icons (🛒 🏢 🎓 💜 💊 ⚙️ 💼) in the sector scroll bar, sector solutions grid, sector hero badge, and sector CTA sections looked unprofessional. Replaced with Lucide SVG icon components, sized and colour-themed to context.
+
+**Changes:**
+- `ledgio-hub/src/lib/sectorIcons.tsx` — new file: `SectorIcon` component; maps sector slug to lucide icon (`ShoppingCart`, `Building2`, `GraduationCap`, `Heart`, `Pill`, `Factory`, `Briefcase`)
+- `ledgio-hub/src/pages/SectorPage.tsx` — hero badge and CTA block now use `<SectorIcon>`
+- `ledgio-hub/src/pages/Home.tsx` — sector scroll bar and solutions grid now use `<SectorIcon>` with accent-coloured badge wrapper on the grid cards
+
+---
+
+## [Date: 2026-09-17] - System Hardening Phase 6: Observability & Load Testing
+
+**What/Why:**
+Completing the observability stack and establishing load-test baselines before production traffic scales up.
+
+The backend already had: OpenTelemetry SDK with auto-instrumentations + OTLP export (`telemetry.ts`), W3C traceparent propagation in `requestLoggerMiddleware.ts`, structured JSON logging with requestId/traceId/spanId, and an in-memory time-series metrics middleware (`metricsMiddleware.ts` + `adminMetrics.ts`). Two gaps remained:
+
+1. **Alerting webhook** — `alertingService.ts` sends a Slack-compatible payload to `ALERT_WEBHOOK_URL` (no-op when unset). `alertJobFailure` is called from `wrapCronTick` on any cron error, so engineers get paged without polling the dashboard. `alertSlaBreach` is available for future integration with the metrics middleware. Set `ALERT_WEBHOOK_URL` to any Slack incoming-webhook URL or generic HTTP endpoint.
+
+2. **k6 load test suite** — four scripts covering every latency budget:
+   - `smoke.js` — 1 VU, 1 iteration: health check + login + `/me`; confirms target is reachable before a load run.
+   - `invoices.js` — ramp to 20 VUs: list invoices (p95 < 400 ms) + create (p95 < 600 ms); validates OLTP write path under steady-state concurrency.
+   - `reports.js` — ramp to 6 VUs: trial balance, P&L, AR aging (p95 < 5/8 s); validates the Phase 4 report pool doesn't starve OLTP under concurrent aggregation.
+   - `full-suite.js` — three parallel scenarios (20 cashier, 10 accountant, 5 manager VUs) with per-scenario trends; the realistic mixed-workload baseline for capacity planning. Errors must stay below 1 %, overall p99 < 3 000 ms.
+
+**Files changed:**
+- `backend/src/services/alertingService.ts` — new; Slack-compatible webhook alerter
+- `backend/src/services/cronJobRegistry.ts` — added `alertJobFailure` call in `wrapCronTick` error path
+- `backend/load-tests/helpers/auth.js` — shared k6 auth helper (login + header builder)
+- `backend/load-tests/smoke.js` — smoke test
+- `backend/load-tests/invoices.js` — invoice CRUD load test
+- `backend/load-tests/reports.js` — report aggregation load test
+- `backend/load-tests/full-suite.js` — full mixed-workload load test
+
+---
+
+## [Date: 2026-09-17] - System Hardening Phase 4: Report Pool Separation
+
+**What/Why:**
+Heavy aggregation queries (aging, stock movement, sales/purchase registers, trial balance, P&L, etc.) were running on the same 50-connection OLTP pool as invoice writes and POS sales. Under reporting load, connection exhaustion could delay transactional operations. Phase 4 separates concerns:
+
+- New `backend/src/config/reportDb.ts` creates a dedicated `reportPrisma` PrismaClient reading from `REPORT_DATABASE_URL` (falls back to `DATABASE_URL`). When `REPORT_DATABASE_URL` points to a read replica, all reporting load moves there automatically.
+- `reportPrisma` has a 55-second ORM timeout (heavy cross-table aggregations need the longer window vs the 25 s on OLTP), the same IDOR guard middleware (tenant isolation preserved), and a 500 ms slow-query log threshold.
+- `reports.ts` now uses `reportPrisma` for all heavy reads: 10 `withCurrentTenantDb` call sites, 2 `$queryRawUnsafe` stock-movement queries, direct `invoice.count/findMany` and `vendorBill.count/findMany` calls. The one remaining OLTP call — `prisma.tenant.findUnique` for currency metadata — stays on the OLTP client (it's a fast point lookup, not a reporting query).
+
+**Files changed:**
+- `backend/src/config/reportDb.ts` — new; dedicated report PrismaClient
+- `backend/src/routes/reports.ts` — imports `reportPrisma`; all heavy reads switched from `prisma` to `reportPrisma`
+
+---
+
+## [Date: 2026-09-17] - System Hardening Phase 3: Offline Sync Robustness
+
+**What/Why:**
+Closed three sync correctness gaps that could cause data loss or duplicate charges on unreliable connections:
+
+1. **PAY_INVOICE idempotency** — The outbox's `PAY_INVOICE` entry was not passing `clientTxnId` as `idempotencyKey` to the backend payment endpoint. A device replaying a failed payment could charge twice. Fixed: `processOutboxEntry` now sends `idempotencyKey: entry.clientTxnId` so the backend's Phase 1 dedup guard applies.
+
+2. **Conflict resolution** — `applyChangeEntry` previously overwrote any local record unconditionally, including records with `_pending: true` (unsent local edits). A catch-up sweep after reconnect would silently discard edits queued while offline. Fixed: `applyChangeEntry` now skips UPDATE for Accounts and Invoices when the local record is `_pending` — the outbox flush will reconcile the real state once the write goes through.
+
+3. **Server-side sync failure audit log** — When `markEntityFailed` flagged a failed write, the failure was recorded only in the device's IndexedDB (not visible to operators). Fixed: `markEntityFailed` now calls `POST /api/v1/sync/failures` (fire-and-forget) to persist the failure metadata server-side for audit.
+
+**Files changed:**
+- `backend/prisma/schema.prisma` — new `SyncFailureLog` model (`sync_failure_logs` table)
+- `backend/prisma/migrations/20260917000001_add_sync_failure_log/migration.sql` — migration
+- `backend/src/routes/sync.ts` — new `POST /sync/failures` endpoint (writes `SyncFailureLog`)
+- `frontend/src/lib/syncEngine.ts` — PAY_INVOICE idempotency fix; conflict-resolution guard in `applyChangeEntry`; `markEntityFailed` now logs to server; `flushOutbox` passes HTTP status to `markEntityFailed`
+
+---
+
+## [Date: 2026-09-17] - Feature: Overdue Invoice Alert System (in-app notifications + API + cron)
+
+**What/Why:**
+Added a two-part overdue invoice alert system so the internal team is proactively notified when AR invoices cross 30/60/90-day overdue thresholds — complementing the existing dunning service that emails customers.
+
+**Backend changes:**
+- `backend/src/services/overdueInvoiceAlertService.ts` (new) — `OverdueInvoiceAlertCronService`: daily 8:30 AM UTC sweep across all tenants; creates an in-app `Notification` (type `INVOICE_OVERDUE`, link `/reports/aging`) the first time an invoice enters each aging bucket (30/60/90+ days). Uses Redis to remember the last alerted bucket per invoice (`overdue-alert-bucket:{tenantId}:{invoiceId}`, TTL 180 days) so each threshold transition fires exactly once.
+- `backend/src/index.ts` — registers and initialises `OverdueInvoiceAlertCronService` at startup (`30 8 * * *`).
+- `backend/src/routes/reports.ts` — new `GET /api/v1/reports/overdue-invoice-summary` endpoint: returns per-bucket (1–30 / 31–60 / 61–90 / 90+) invoice counts and total balance-due, used by the frontend banner. Result is cached via `setCachedReport`.
+
+**Frontend changes:**
+- `frontend/src/components/OverdueInvoiceAlertBanner.tsx` (new) — dismissible banner shown in the main layout when any AR invoice is overdue. Amber for 1–60 day overdue, red for 61–90+ day overdue. Links directly to `/reports/aging`. Shows a per-bucket breakdown in the message.
+- `frontend/src/components/layout/MainLayout.tsx` — mounts `<OverdueInvoiceAlertBanner />` below `<SubscriptionBanner />`.
+
+---
+
+## [Date: 2026-09-15] - Bug fix: Blank print preview when printing POS receipts and receipt log PDFs
+
+**What/Why:**
+Opening a receipt PDF worked correctly (new tab, PDF visible), but clicking Print in the browser print dialog showed a blank page. Root cause: `URL.revokeObjectURL` was called on the window `load` event. The browser's PDF viewer re-reads the blob URL internally when the user opens the print dialog, but the blob had already been revoked by that point. Fix: removed the `revokeObjectURL` call entirely. Browsers automatically release blob memory when the owning tab is closed, so this change does not leak memory. Applied to both `PointOfSale.tsx` (POS receipt) and `ReceiptLog.tsx` (receipt log viewer).
+
+**Files Affected:**
+- `frontend/src/pages/pos/PointOfSale.tsx` — removed `URL.revokeObjectURL` call from `openReceipt`
+- `frontend/src/pages/reports/ReceiptLog.tsx` — removed `URL.revokeObjectURL` call from `openPdf`
+## [Date: 2026-09-15] - School-specific Chart of Accounts & P&L Labels (PR #62)
+
+**What/Why:**
+P&L report for NONPROFIT (school) tenants was displaying generic business labels ("Sales Revenue", "Cost of Goods Sold", "Net Profit"). Added a school-specific chart of accounts template and org-type-aware P&L section labels so school tenants see appropriate terminology. Business/shop tenants are completely unaffected.
+
+**Backend changes:**
+- `backend/src/data/ghanaSmeChartOfAccountsTemplate.ts` — added `GHANA_SCHOOL_CHART_OF_ACCOUNTS_TEMPLATE` (Tuition/Exam/PTA/Boarding Fee Income, School Fees Receivable, Fees Received in Advance, Teachers' Salaries, Sports & Activities, Library, Student Welfare, no VAT/NHIL/GETFund lines) and `getTemplateForOrgType()` dispatcher.
+- `backend/src/services/onboardingWizardService.ts` — `getChartOfAccountsTemplate()` now accepts and forwards `orgType`.
+- `backend/src/routes/onboardingWizard.ts` — `GET /api/v1/onboarding/chart-of-accounts-template` fetches tenant `orgType` and passes it to the service.
+
+**Frontend changes:**
+- `frontend/src/pages/reports/ProfitAndLoss.tsx` — reads `user.orgType` via `useAuth()`; for `NONPROFIT` tenants shows "Income & Expenditure Statement", "Fee Income", "Direct Educational Costs", "Gross Surplus", "Net Surplus"/"Net Deficit" in both single-period and compare-periods views.
+
+---
+
+## [Date: 2026-09-15] - Student Health Records: Name/Code Search (PR #61)
+
+**What/Why:**
+Student Health Records page had a class filter but no text search. Added a name/code search input with client-side `useMemo` filtering so staff can quickly locate individual students without scrolling.
+
+**Files affected:**
+- `frontend/src/pages/school/StudentHealth.tsx` — added `search` state, `displayed` useMemo filtering on student name and code, Search icon input in the header toolbar; table now renders `displayed` instead of `records`; empty state message distinguishes "no students" from "no match".
+
+---
+
+## [Date: 2026-09-15] - School Student Ledger: Class Filter + Backend isActive Fix (PR #60 merged)
+
+**What/Why:**
+User reported the class filter dropdown was missing from the Student Ledger page. Added a class filter to both backend and frontend so users can browse and search students by class without typing a search query.
+
+**Backend changes:**
+- `backend/src/routes/schoolStudents.ts` — `GET /school/students` now accepts optional `className` query param and applies it as a Prisma `where` filter; also added `isActive: true` so only enrolled students are returned.
+
+**Frontend changes:**
+- `frontend/src/pages/school/StudentLedger.tsx` — added `SchoolClass` interface, `classFilter`/`classes` state, `useEffect` loading `/school/classes` on mount, class filter dropdown rendered before the search input, `doSearch` updated with `overrideClass` param to avoid stale closure when called from `onChange`.
+
+---
+
+## [Date: 2026-09-15] - CI Fix: useMemo hooks-of-rules violation in PurchaseOrders
+
+**What/Why:**
+PR #59 (feature/search-filter-all-modules) had a failing CI check due to `react-hooks/rules-of-hooks` oxlint error. The `displayedPOs` useMemo was placed after a conditional early return (`UpgradeRequired` guard) in `PurchaseOrders.tsx`, causing oxlint to flag it as a conditionally-called hook.
+
+**Files affected:**
+- `frontend/src/pages/purchaseorders/PurchaseOrders.tsx` — moved `displayedPOs` useMemo to before the `UpgradeRequired` early return (alongside other state declarations), then removed the duplicate that remained after the guard. TypeScript (`tsc --noEmit`) and oxlint both pass clean.
+
 ## [Date: 2026-09-14] - School Module: 5 ERP Gap Features (Complete)
 
 **What/Why:**

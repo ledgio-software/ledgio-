@@ -255,7 +255,7 @@ export class EmailService {
   /**
    * Sends "Welcome to Ledgio" sequence with attached Quick Start Guide PDF payload.
    */
-  public static async sendWelcomePackage(to: string, name: string, businessName?: string): Promise<boolean> {
+  public static async sendWelcomePackage(to: string, name: string, businessName?: string, orgType?: string): Promise<boolean> {
     const subject = '🎉 Welcome to Ledgio - Quick Start Guide Included';
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -279,7 +279,7 @@ export class EmailService {
       </div>
     `;
 
-    const guidePdfBuffer = await generateQuickStartGuidePdf(businessName || name, name);
+    const guidePdfBuffer = await generateQuickStartGuidePdf(businessName || name, name, orgType);
 
     const attachments: EmailAttachment[] = [
       {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Download, Printer, FileText, FileType, Columns2 } from "lucide-react";
 import { useProfitAndLoss } from "../../hooks/useProfitAndLoss";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
+import { useAuth } from "../../contexts/AuthContext";
 import { Button } from "../../components/ui/Button";
 import { exportToCsv } from "../../lib/exportCsv";
 import { api } from "../../lib/api";
@@ -85,7 +86,32 @@ function CompareRow({ label, p1, p2, currency, isBold, isTotal, isProfit }: Comp
 
 export function ProfitAndLoss() {
   const { settings } = useTenantSettings();
+  const { user } = useAuth();
   const { showToast } = useToast();
+  const isSchool = user?.orgType === 'NONPROFIT';
+
+  // School-specific label overrides
+  const labels = isSchool ? {
+    reportTitle: 'Income & Expenditure Statement',
+    incomeSection: 'Fee Income',
+    totalIncome: 'Total Fee Income',
+    costOfSalesSection: 'Direct Educational Costs',
+    totalCostOfSales: 'Total Direct Costs',
+    grossProfit: 'Gross Surplus',
+    expensesSection: 'Expenses',
+    totalExpenses: 'Total Expenses',
+    netSurplus: (n: number) => n >= 0 ? 'Net Surplus' : 'Net Deficit',
+  } : {
+    reportTitle: 'Profit and Loss Statement',
+    incomeSection: 'Income',
+    totalIncome: 'Total Income',
+    costOfSalesSection: 'Cost of Sales',
+    totalCostOfSales: 'Total Cost of Sales',
+    grossProfit: 'Gross Profit',
+    expensesSection: 'Expenses',
+    totalExpenses: 'Total Expenses',
+    netSurplus: (n: number) => n >= 0 ? 'Net Profit' : 'Net Loss',
+  };
   const [isExporting, setIsExporting] = useState<"pdf" | "docx" | null>(null);
   const [funds, setFunds] = useState<FundOption[]>([]);
   const [selectedFundId, setSelectedFundId] = useState<string>("");
@@ -152,11 +178,11 @@ export function ProfitAndLoss() {
 
   const handleExport = () => {
     const exportData = [
-      ...revenueAccounts.map(r => ({ Category: 'Income', Account: r.account.name, Balance: r.balance })),
-      ...costOfSalesAccounts.map(c => ({ Category: 'Cost of Sales', Account: c.account.name, Balance: c.balance })),
-      { Category: 'Total', Account: 'Gross Profit', Balance: grossProfit },
-      ...expenseAccounts.map(e => ({ Category: 'Expense', Account: e.account.name, Balance: e.balance })),
-      { Category: 'Total', Account: 'Net Income', Balance: netIncome }
+      ...revenueAccounts.map(r => ({ Category: labels.incomeSection, Account: r.account.name, Balance: r.balance })),
+      ...costOfSalesAccounts.map(c => ({ Category: labels.costOfSalesSection, Account: c.account.name, Balance: c.balance })),
+      { Category: 'Total', Account: labels.grossProfit, Balance: grossProfit },
+      ...expenseAccounts.map(e => ({ Category: labels.expensesSection, Account: e.account.name, Balance: e.balance })),
+      { Category: 'Total', Account: labels.netSurplus(netIncome), Balance: netIncome }
     ];
     exportToCsv(`profit_and_loss_${new Date().toISOString().split('T')[0]}`, exportData);
   };
@@ -306,7 +332,7 @@ export function ProfitAndLoss() {
 
               <div className="space-y-1">
                 {/* Income */}
-                <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-3 mb-1">Income</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-3 mb-1">{labels.incomeSection}</p>
                 {compareData.p1.revenues.map((r) => {
                   const p2row = compareData.p2.revenues.find((x) => x.id === r.id);
                   return <CompareRow key={r.id} label={r.name} p1={r.amount} p2={p2row?.amount ?? 0} currency={settings.baseCurrency} />;
@@ -314,12 +340,12 @@ export function ProfitAndLoss() {
                 {compareData.p2.revenues.filter((r) => !compareData.p1.revenues.find((x) => x.id === r.id)).map((r) => (
                   <CompareRow key={r.id} label={r.name} p1={0} p2={r.amount} currency={settings.baseCurrency} />
                 ))}
-                <CompareRow label="Total Income" p1={compareData.p1.totalRevenue} p2={compareData.p2.totalRevenue} currency={settings.baseCurrency} isTotal isBold />
+                <CompareRow label={labels.totalIncome} p1={compareData.p1.totalRevenue} p2={compareData.p2.totalRevenue} currency={settings.baseCurrency} isTotal isBold />
 
                 {/* Cost of Sales */}
                 {(compareData.p1.costOfSales.length > 0 || compareData.p2.costOfSales.length > 0) && (
                   <>
-                    <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-4 mb-1">Cost of Sales</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-4 mb-1">{labels.costOfSalesSection}</p>
                     {compareData.p1.costOfSales.map((r) => {
                       const p2row = compareData.p2.costOfSales.find((x) => x.id === r.id);
                       return <CompareRow key={r.id} label={r.name} p1={r.amount} p2={p2row?.amount ?? 0} currency={settings.baseCurrency} />;
@@ -327,12 +353,12 @@ export function ProfitAndLoss() {
                     {compareData.p2.costOfSales.filter((r) => !compareData.p1.costOfSales.find((x) => x.id === r.id)).map((r) => (
                       <CompareRow key={r.id} label={r.name} p1={0} p2={r.amount} currency={settings.baseCurrency} />
                     ))}
-                    <CompareRow label="Gross Profit" p1={compareData.p1.grossProfit} p2={compareData.p2.grossProfit} currency={settings.baseCurrency} isTotal isBold />
+                    <CompareRow label={labels.grossProfit} p1={compareData.p1.grossProfit} p2={compareData.p2.grossProfit} currency={settings.baseCurrency} isTotal isBold />
                   </>
                 )}
 
                 {/* Expenses */}
-                <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-4 mb-1">Expenses</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-secondary-500 mt-4 mb-1">{labels.expensesSection}</p>
                 {compareData.p1.expenses.map((r) => {
                   const p2row = compareData.p2.expenses.find((x) => x.id === r.id);
                   return <CompareRow key={r.id} label={r.name} p1={r.amount} p2={p2row?.amount ?? 0} currency={settings.baseCurrency} />;
@@ -340,10 +366,10 @@ export function ProfitAndLoss() {
                 {compareData.p2.expenses.filter((r) => !compareData.p1.expenses.find((x) => x.id === r.id)).map((r) => (
                   <CompareRow key={r.id} label={r.name} p1={0} p2={r.amount} currency={settings.baseCurrency} />
                 ))}
-                <CompareRow label="Total Expenses" p1={compareData.p1.totalExpenses} p2={compareData.p2.totalExpenses} currency={settings.baseCurrency} isTotal isBold />
+                <CompareRow label={labels.totalExpenses} p1={compareData.p1.totalExpenses} p2={compareData.p2.totalExpenses} currency={settings.baseCurrency} isTotal isBold />
 
                 {/* Net Profit */}
-                <CompareRow label={compareData.p1.netProfit >= 0 ? "Net Profit" : "Net Loss"} p1={compareData.p1.netProfit} p2={compareData.p2.netProfit} currency={settings.baseCurrency} isProfit />
+                <CompareRow label={labels.netSurplus(compareData.p1.netProfit)} p1={compareData.p1.netProfit} p2={compareData.p2.netProfit} currency={settings.baseCurrency} isProfit />
               </div>
             </div>
           )}
@@ -358,7 +384,7 @@ export function ProfitAndLoss() {
             {settings.companyName}
           </h1>
           <h2 className="text-xl text-secondary-600 dark:text-secondary-400 mt-1">
-            Profit and Loss Statement
+            {labels.reportTitle}
           </h2>
           <p className="text-sm text-secondary-500 dark:text-secondary-500 mt-2">
             As of {today}
@@ -374,7 +400,7 @@ export function ProfitAndLoss() {
           {/* Income Section */}
           <section>
             <h3 className="font-bold text-lg text-secondary-900 dark:text-secondary-50 border-b border-secondary-200 dark:border-secondary-800 pb-2 mb-4">
-              Income
+              {labels.incomeSection}
             </h3>
             <div className="space-y-3 pl-4">
               {revenueAccounts.length === 0 ? (
@@ -389,7 +415,7 @@ export function ProfitAndLoss() {
               )}
             </div>
             <div className="flex justify-between items-center mt-4 pt-4 border-t border-secondary-200 dark:border-secondary-800 font-bold text-secondary-900 dark:text-secondary-50 pl-4">
-              <span className="flex-1 uppercase tracking-wider text-xs">Total Income</span>
+              <span className="flex-1 uppercase tracking-wider text-xs">{labels.totalIncome}</span>
               <span className="w-32 text-right tabular-nums">{formatCurrency(totalRevenue)}</span>
             </div>
           </section>
@@ -398,7 +424,7 @@ export function ProfitAndLoss() {
           {costOfSalesAccounts.length > 0 && (
             <section>
               <h3 className="font-bold text-lg text-secondary-900 dark:text-secondary-50 border-b border-secondary-200 dark:border-secondary-800 pb-2 mb-4">
-                Cost of Sales
+                {labels.costOfSalesSection}
               </h3>
               <div className="space-y-3 pl-4">
                 {costOfSalesAccounts.map((row) => (
@@ -409,7 +435,7 @@ export function ProfitAndLoss() {
                 ))}
               </div>
               <div className="flex justify-between items-center mt-4 pt-4 border-t border-secondary-200 dark:border-secondary-800 font-bold text-secondary-900 dark:text-secondary-50 pl-4">
-                <span className="flex-1 uppercase tracking-wider text-xs">Total Cost of Sales</span>
+                <span className="flex-1 uppercase tracking-wider text-xs">{labels.totalCostOfSales}</span>
                 <span className="w-32 text-right tabular-nums">{formatCurrency(totalCostOfSales)}</span>
               </div>
             </section>
@@ -420,7 +446,7 @@ export function ProfitAndLoss() {
           {costOfSalesAccounts.length > 0 && (
             <section className="pt-2">
               <div className="flex justify-between items-center text-base font-bold text-secondary-900 dark:text-secondary-50 border-t-2 border-secondary-300 dark:border-secondary-700 pt-3">
-                <span className="flex-1 uppercase tracking-wider text-xs">Gross Profit</span>
+                <span className="flex-1 uppercase tracking-wider text-xs">{labels.grossProfit}</span>
                 <span className="w-32 text-right tabular-nums">{formatCurrency(grossProfit)}</span>
               </div>
             </section>
@@ -429,7 +455,7 @@ export function ProfitAndLoss() {
           {/* Expenses Section */}
           <section>
             <h3 className="font-bold text-lg text-secondary-900 dark:text-secondary-50 border-b border-secondary-200 dark:border-secondary-800 pb-2 mb-4">
-              Expenses
+              {labels.expensesSection}
             </h3>
             <div className="space-y-3 pl-4">
               {expenseAccounts.length === 0 ? (
@@ -444,7 +470,7 @@ export function ProfitAndLoss() {
               )}
             </div>
             <div className="flex justify-between items-center mt-4 pt-4 border-t border-secondary-200 dark:border-secondary-800 font-bold text-secondary-900 dark:text-secondary-50 pl-4">
-              <span className="flex-1 uppercase tracking-wider text-xs">Total Expenses</span>
+              <span className="flex-1 uppercase tracking-wider text-xs">{labels.totalExpenses}</span>
               <span className="w-32 text-right tabular-nums">{formatCurrency(totalExpense)}</span>
             </div>
           </section>
@@ -452,7 +478,7 @@ export function ProfitAndLoss() {
           {/* Net Income Section */}
           <section className="pt-8 mt-8 border-t-2 border-secondary-900 dark:border-secondary-50">
             <div className={`flex justify-between items-center text-xl font-black ${netIncome >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
-              <span className="flex-1 uppercase tracking-widest">{netIncome >= 0 ? 'Net Profit' : 'Net Loss'}</span>
+              <span className="flex-1 uppercase tracking-widest">{labels.netSurplus(netIncome)}</span>
               <span className="w-48 text-right tabular-nums double-underline decoration-double border-b-4 border-double pb-1">
                 {formatCurrency(netIncome)}
               </span>

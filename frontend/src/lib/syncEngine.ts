@@ -244,12 +244,20 @@ async function applyChangeEntry(entry: {
     if (entry.operation === 'DELETE') {
       await syncDb.accounts.delete(entry.entityId);
     } else {
+      // Conflict resolution: never overwrite a locally-pending record with
+      // a change-log entry — the outbox will reconcile the real state when
+      // it flushes. Without this guard a catch-up sweep would silently discard
+      // an unsent local edit.
+      const local = await syncDb.accounts.get(entry.entityId);
+      if (local?._pending) return;
       await syncDb.accounts.put(entry.payload as LocalAccount);
     }
   } else if (entry.entityType === 'Invoice') {
     if (entry.operation === 'DELETE') {
       await syncDb.invoices.delete(entry.entityId);
     } else {
+      const local = await syncDb.invoices.get(entry.entityId);
+      if (local?._pending) return;
       await syncDb.invoices.put(entry.payload as LocalInvoice);
     }
   } else if (entry.entityType === 'Customer') {
@@ -561,11 +569,13 @@ export async function flushOutbox(): Promise<void> {
           // nothing after this would fare any better right now.
           break;
         }
+        const failureReason = err.response?.data?.error || 'Sync failed - server rejected this change.';
+        const httpStatus = err.response?.status as number | undefined;
         await syncDb.outbox.update(entry.localId!, {
           status: 'failed',
-          failureReason: err.response?.data?.error || 'Sync failed - server rejected this change.',
+          failureReason,
         });
-        await markEntityFailed(entry, err.response?.data?.error);
+        await markEntityFailed(entry, failureReason, httpStatus);
       }
     }
   } finally {
@@ -594,13 +604,15 @@ async function processOutboxEntry(entry: OutboxEntry): Promise<void> {
       await syncDb.invoices.put(warnings ? { ...real, _stockWarnings: warnings } : real);
     });
   } else if (entry.kind === 'PAY_INVOICE') {
-    const res = await api.post(`/invoices/${entry.invoiceId}/pay`, entry.amount !== undefined ? { amount: entry.amount } : {});
+    const body: Record<string, unknown> = { idempotencyKey: entry.clientTxnId };
+    if (entry.amount !== undefined) body.amount = entry.amount;
+    const res = await api.post(`/invoices/${entry.invoiceId}/pay`, body);
     const real: LocalInvoice = res.data.data.invoice;
     await syncDb.invoices.put(real);
   }
 }
 
-async function markEntityFailed(entry: OutboxEntry, reason?: string): Promise<void> {
+async function markEntityFailed(entry: OutboxEntry, reason?: string, httpStatus?: number): Promise<void> {
   if (entry.kind === 'CREATE_ACCOUNT') {
     const row = await syncDb.accounts.get(entry.tempId);
     if (row) await syncDb.accounts.put({ ...row, _pending: false, _failed: true, _failureReason: reason });
@@ -614,6 +626,23 @@ async function markEntityFailed(entry: OutboxEntry, reason?: string): Promise<vo
     const row = await syncDb.invoices.get(entry.invoiceId);
     if (row) await syncDb.invoices.put({ ...row, _pending: false, _failed: true, _failureReason: reason });
   }
+
+  const entityType =
+    entry.kind === 'CREATE_ACCOUNT' || entry.kind === 'UPDATE_ACCOUNT' ? 'Account' : 'Invoice';
+  const entityId =
+    entry.kind === 'CREATE_ACCOUNT' ? entry.tempId :
+    entry.kind === 'UPDATE_ACCOUNT' ? entry.accountId :
+    entry.kind === 'CREATE_INVOICE' ? entry.tempId :
+    entry.invoiceId;
+
+  api.post('/sync/failures', {
+    entityType,
+    entityId,
+    operationKind: entry.kind,
+    clientTxnId: entry.clientTxnId,
+    failureReason: reason,
+    httpStatus,
+  }).catch(() => {});
 }
 
 /**

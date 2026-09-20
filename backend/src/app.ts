@@ -129,6 +129,7 @@ import interestPolicyRouter from './routes/interestPolicy';
 import apiKeysRouter from './routes/apiKeys';
 import externalApiRouter from './routes/externalApi';
 import honeypotProbesRouter from './routes/honeypotProbes';
+import aiInsightsRouter from './routes/aiInsights';
 
 dotenv.config();
 
@@ -182,7 +183,7 @@ app.use(
   })
 );
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 // ── Observability ──────────────────────────────────────────────────────────────
 // Inject X-Request-ID and structured HTTP request/latency logs on every request
@@ -209,6 +210,7 @@ app.use('/api/v1/admin/totp', adminRateLimiter, adminTotpRouter);
 // POST /login are public (used by the team login page). CRUD routes inside the
 // router self-protect via isMasterAdmin(), so no global gate is needed here.
 app.use('/api/v1/admin/team', adminRateLimiter, adminTeamAuthRouter);
+
 
 // Strict admin rate limiter (10 req/min per IP) — applied before any admin
 // handler so brute-forcing the master passcode is not feasible.
@@ -241,6 +243,77 @@ app.use('/api/v1/health', healthRouter);
 // protection and could 429 a legitimate user mid-session (e.g. enabling MFA,
 // logging out, logging back in, then disabling it all within one minute).
 app.use('/api/v1/auth', authRouter);
+
+// Public referral code verification — used by the registration page to
+// validate a code before form submission. No admin auth required.
+// The full adminReferralsRouter is also mounted under /api/v1/admin/referrals
+// (behind the passcode gate) for all other CRUD operations.
+app.post('/api/v1/referrals/verify', async (req, res): Promise<void> => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      res.status(400).json({ success: false, error: 'code is required.' });
+      return;
+    }
+    const { prisma } = await import('./config/db');
+    const partner = await prisma.referralPartner.findUnique({
+      where: { code: String(code).trim().toUpperCase() },
+      select: { id: true, name: true, isActive: true },
+    });
+    if (!partner || !partner.isActive) {
+      res.status(404).json({ success: false, error: 'Invalid or inactive referral code.' });
+      return;
+    }
+    res.json({ success: true, data: { valid: true, partnerName: partner.name } });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to verify referral code.' });
+  }
+});
+
+// Public partner portal — secured by partner UUID (hard to guess, no password).
+// Returns the list of referred tenants for that partner.
+app.get('/api/v1/referrals/portal/:partnerId', async (req, res): Promise<void> => {
+  try {
+    const { prisma } = await import('./config/db');
+    const partner = await prisma.referralPartner.findUnique({
+      where: { id: req.params.partnerId },
+      select: { id: true, name: true, code: true, commissionRate: true, isActive: true },
+    });
+    if (!partner || !partner.isActive) {
+      res.status(404).json({ success: false, error: 'Partner not found.' });
+      return;
+    }
+    const tenants = await prisma.tenant.findMany({
+      where: { referralCode: partner.code },
+      select: {
+        id: true,
+        name: true,
+        orgType: true,
+        tier: true,
+        subscriptionStatus: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const TIER_LABEL: Record<number, string> = { 0: 'Free', 1: 'Starter', 2: 'Professional', 3: 'Enterprise' };
+    res.json({
+      success: true,
+      data: {
+        partner: { name: partner.name, code: partner.code, commissionRate: Number(partner.commissionRate) },
+        tenants: tenants.map(t => ({
+          id: t.id,
+          name: t.name,
+          orgType: t.orgType,
+          tier: TIER_LABEL[t.tier] ?? `Tier ${t.tier}`,
+          subscriptionStatus: t.subscriptionStatus,
+          joinedAt: t.createdAt,
+        })),
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to load portal data.' });
+  }
+});
 
 // Tenant onboarding & management endpoints. The strict 5-req/min onboarding
 // limiter is applied per-route (POST /onboard, POST /admin-onboard) inside
@@ -449,6 +522,8 @@ app.use('/api/v1/ocr', ocrRouter);
 // be able to reach the payment endpoints (enforcement is applied inside
 // tenantContextMiddleware for all other tenant-scoped routes).
 app.use('/api/v1/subscription', subscriptionRouter);
+
+app.use('/api/v1/ai/insights', aiInsightsRouter);
 
 // Rejected CORS requests otherwise fall through to Express's default HTML
 // error handler, which leaks a stack trace and breaks the API's JSON contract.

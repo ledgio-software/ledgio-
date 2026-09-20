@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -8,7 +8,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { useAccounts } from "../../hooks/useAccounts";
 import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
-import { Plus, Landmark } from "lucide-react";
+import { Plus, Landmark, Search } from "lucide-react";
 
 interface DepreciationEntry {
   id: string;
@@ -79,6 +79,16 @@ export function FixedAssets() {
   const [disposalDate, setDisposalDate] = useState(new Date().toISOString().split("T")[0]);
   const [disposalNotes, setDisposalNotes] = useState("");
   const [isDisposing, setIsDisposing] = useState(false);
+  const [assetSearch, setAssetSearch] = useState("");
+
+  const displayedAssets = useMemo(() => {
+    const q = assetSearch.toLowerCase().trim();
+    if (!q) return assets;
+    return assets.filter((a) =>
+      a.name.toLowerCase().includes(q) ||
+      (a.category ?? "").toLowerCase().includes(q)
+    );
+  }, [assets, assetSearch]);
 
   const fetchAssets = useCallback(async () => {
     setIsLoading(true);
@@ -183,10 +193,21 @@ export function FixedAssets() {
           <CardDescription>Depreciation posts automatically each month a due asset is checked (daily sweep).</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="relative max-w-xs mb-4">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+            <Input
+              placeholder="Search name or category…"
+              className="pl-8"
+              value={assetSearch}
+              onChange={(e) => setAssetSearch(e.target.value)}
+            />
+          </div>
           {isLoading ? (
             <div className="text-xs text-secondary-500 py-4 text-center">Loading...</div>
           ) : assets.length === 0 ? (
             <div className="text-xs text-secondary-500 py-4 text-center">No fixed assets registered yet.</div>
+          ) : displayedAssets.length === 0 ? (
+            <div className="text-xs text-secondary-500 py-4 text-center">No assets match the search.</div>
           ) : (
             <table className="w-full text-xs">
               <thead>
@@ -202,7 +223,7 @@ export function FixedAssets() {
                 </tr>
               </thead>
               <tbody>
-                {assets.map((a) => (
+                {displayedAssets.map((a) => (
                   <tr key={a.id} className="border-b border-secondary-100 dark:border-secondary-800">
                     <td className="py-2">
                       <button className="text-primary-600 hover:underline" onClick={() => openDetail(a)}>{a.name}</button>

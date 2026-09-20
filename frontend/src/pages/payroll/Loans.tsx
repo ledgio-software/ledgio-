@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { Landmark, Plus, Pencil } from "lucide-react";
+import { Landmark, Plus, Pencil, Search } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -47,6 +47,7 @@ export function Loans() {
   const [editLoan, setEditLoan] = useState<Loan | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loanSearch, setLoanSearch] = useState("");
 
   const fetchLoans = useCallback(async () => {
     setIsLoading(true);
@@ -118,6 +119,15 @@ export function Loans() {
     return emp ? `${emp.firstName} ${emp.lastName} (${emp.employeeNumber})` : id;
   }
 
+  const displayedLoans = useMemo(() => {
+    const q = loanSearch.toLowerCase().trim();
+    if (!q) return loans;
+    return loans.filter((loan) =>
+      employeeName(loan.employeeId).toLowerCase().includes(q) ||
+      (loan.description ?? "").toLowerCase().includes(q)
+    );
+  }, [loans, loanSearch, employees]);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -139,12 +149,24 @@ export function Loans() {
         </div>
       </div>
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+        <Input
+          placeholder="Search employee or description…"
+          className="pl-8"
+          value={loanSearch}
+          onChange={(e) => setLoanSearch(e.target.value)}
+        />
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-8 text-center text-secondary-400 text-sm">Loading loans…</div>
           ) : loans.length === 0 ? (
             <div className="p-8 text-center text-secondary-400 text-sm">No loans yet. Create a salary advance to start deducting from payroll.</div>
+          ) : displayedLoans.length === 0 ? (
+            <div className="p-8 text-center text-secondary-400 text-sm">No loans match the search.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -160,7 +182,7 @@ export function Loans() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loans.map((loan) => (
+                  {displayedLoans.map((loan) => (
                     <tr key={loan.id} className="border-b border-secondary-100 dark:border-secondary-800 hover:bg-secondary-50 dark:hover:bg-secondary-800/30">
                       <td className="px-4 py-3 text-secondary-900 dark:text-secondary-100 font-medium">{employeeName(loan.employeeId)}</td>
                       <td className="px-4 py-3 text-secondary-600 dark:text-secondary-400 text-xs">{loan.description}</td>

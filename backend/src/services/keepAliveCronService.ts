@@ -15,32 +15,33 @@ import https from 'https';
 export class KeepAliveCronService {
   private static task: ScheduledTask | null = null;
 
+  public static async ping(): Promise<void> {
+    const base = (process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`).replace(/\/$/, '');
+    const url = `${base}/health`;
+    const client = url.startsWith('https') ? https : http;
+
+    await new Promise<void>((resolve) => {
+      const req = client.get(url, (res) => {
+        res.resume();
+        console.log(`[KeepAlive] Pinged ${url} → ${res.statusCode}`);
+        resolve();
+      });
+      req.on('error', (err) => {
+        console.warn(`[KeepAlive] Ping failed: ${err.message}`);
+        resolve();
+      });
+      req.setTimeout(10_000, () => {
+        req.destroy();
+        console.warn('[KeepAlive] Ping timed out.');
+        resolve();
+      });
+    });
+  }
+
+  /** @deprecated Scheduling is now handled by pg-boss via queueService.scheduleJob(). */
   public static init(): void {
     if (this.task) return;
-
-    this.task = cron.schedule('*/10 * * * *', wrapCronTick('Keep-Alive Ping', async () => {
-      const base = (process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`).replace(/\/$/, '');
-      const url = `${base}/health`;
-      const client = url.startsWith('https') ? https : http;
-
-      await new Promise<void>((resolve) => {
-        const req = client.get(url, (res) => {
-          res.resume();
-          console.log(`[KeepAlive] Pinged ${url} → ${res.statusCode}`);
-          resolve();
-        });
-        req.on('error', (err) => {
-          console.warn(`[KeepAlive] Ping failed: ${err.message}`);
-          resolve();
-        });
-        req.setTimeout(10_000, () => {
-          req.destroy();
-          console.warn('[KeepAlive] Ping timed out.');
-          resolve();
-        });
-      });
-    }));
-
+    this.task = cron.schedule('*/10 * * * *', wrapCronTick('Keep-Alive Ping', () => KeepAliveCronService.ping()));
     console.log('[KeepAlive] Keep-alive ping cron initialized (every 10 minutes).');
   }
 }

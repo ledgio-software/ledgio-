@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Repeat, PlusCircle, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Repeat, PlusCircle, Trash2, Search } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/ui/Card";
@@ -48,6 +48,16 @@ export function RecurringInvoices() {
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [riSearch, setRiSearch] = useState("");
+
+  const displayedItems = useMemo(() => {
+    const q = riSearch.toLowerCase().trim();
+    if (!q) return items;
+    return items.filter((item) =>
+      item.name.toLowerCase().includes(q) ||
+      (item.customer?.name ?? "").toLowerCase().includes(q)
+    );
+  }, [items, riSearch]);
 
   const [form, setForm] = useState({
     customerId: "",
@@ -158,10 +168,21 @@ export function RecurringInvoices() {
           <CardDescription>Checked daily - a due row automatically issues a real invoice to the customer.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="relative max-w-xs mb-4">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-secondary-400" />
+            <Input
+              placeholder="Search name or customer…"
+              className="pl-8"
+              value={riSearch}
+              onChange={(e) => setRiSearch(e.target.value)}
+            />
+          </div>
           {isLoading ? (
             <div className="text-xs text-secondary-500 py-4 text-center">Loading...</div>
           ) : items.length === 0 ? (
             <div className="text-xs text-secondary-500 py-4 text-center">No recurring invoices set up yet.</div>
+          ) : displayedItems.length === 0 ? (
+            <div className="text-xs text-secondary-500 py-4 text-center">No items match the search.</div>
           ) : (
             <table className="w-full text-xs">
               <thead>
@@ -176,7 +197,7 @@ export function RecurringInvoices() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {displayedItems.map((item) => (
                   <tr key={item.id} className="border-b border-secondary-100 dark:border-secondary-800">
                     <td className="py-2">{item.name}</td>
                     <td className="py-2">{item.customer?.name}</td>

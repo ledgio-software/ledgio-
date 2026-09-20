@@ -147,6 +147,114 @@ router.delete('/prune', requireRole('Admin'), async (req: Request, res: Response
 });
 
 /**
+ * GET /api/v1/sync/failures
+ * Paginated list of sync outbox failures for the active tenant.
+ * Supports optional filters: entityType (substring), operationKind (substring),
+ * userId (exact), dateFrom/dateTo (YYYY-MM-DD, inclusive).
+ * Access: Admin or Auditor role.
+ */
+const FAILURES_DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
+
+router.get('/failures', requireRole('Auditor'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const { limit = '50', page = '1', entityType, operationKind, userId, dateFrom, dateTo } = req.query;
+
+    const take = Math.min(parseInt(limit as string, 10) || 50, 200);
+    const skip = (Math.max(parseInt(page as string, 10) || 1, 1) - 1) * take;
+
+    if (dateFrom && !FAILURES_DATE_FORMAT.test(String(dateFrom))) {
+      res.status(400).json({ success: false, error: 'Invalid dateFrom format. Expected YYYY-MM-DD.' });
+      return;
+    }
+    if (dateTo && !FAILURES_DATE_FORMAT.test(String(dateTo))) {
+      res.status(400).json({ success: false, error: 'Invalid dateTo format. Expected YYYY-MM-DD.' });
+      return;
+    }
+
+    const where: Record<string, any> = { tenantId };
+    if (entityType) where.entityType = { contains: String(entityType), mode: 'insensitive' };
+    if (operationKind) where.operationKind = { contains: String(operationKind), mode: 'insensitive' };
+    if (userId) where.userId = String(userId);
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(`${dateFrom}T00:00:00.000Z`);
+      if (dateTo) where.createdAt.lte = new Date(`${dateTo}T23:59:59.999Z`);
+    }
+
+    const [failures, total] = await withCurrentTenantDb(prisma, (client) =>
+      Promise.all([
+        (client as any).syncFailureLog.findMany({ where, take, skip, orderBy: { createdAt: 'desc' } }),
+        (client as any).syncFailureLog.count({ where }),
+      ])
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        failures,
+        pagination: {
+          total,
+          page: Math.max(parseInt(page as string, 10) || 1, 1),
+          limit: take,
+          totalPages: Math.ceil(total / take),
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Sync] Error fetching sync failure logs:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve sync failure logs.' });
+  }
+});
+
+/**
+ * POST /api/v1/sync/failures
+ * Records a client-side sync outbox failure so operators can audit what went
+ * wrong on which device. Accepts the failure metadata from the frontend's
+ * markEntityFailed path; intentionally fire-and-forget from the client's
+ * perspective (a 5xx here must never surface to the user).
+ */
+router.post('/failures', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { tenantId } = requireTenantContext();
+    const user = (req as any).user;
+    const {
+      entityType,
+      entityId,
+      operationKind,
+      clientTxnId,
+      failureReason,
+      httpStatus,
+    } = req.body || {};
+
+    if (!entityType || !operationKind) {
+      res.status(400).json({ success: false, error: 'entityType and operationKind are required.' });
+      return;
+    }
+
+    await withCurrentTenantDb(prisma, (client) =>
+      (client as any).syncFailureLog.create({
+        data: {
+          tenantId,
+          userId: user?.id ?? null,
+          entityType: String(entityType),
+          entityId: entityId ? String(entityId) : null,
+          operationKind: String(operationKind),
+          clientTxnId: clientTxnId ? String(clientTxnId) : null,
+          failureReason: failureReason ? String(failureReason).slice(0, 2000) : null,
+          httpStatus: typeof httpStatus === 'number' ? httpStatus : null,
+        },
+      })
+    );
+
+    res.status(201).json({ success: true });
+  } catch (error: any) {
+    console.error('[Sync] Error recording sync failure log:', error);
+    res.status(500).json({ success: false, error: 'Failed to record sync failure.' });
+  }
+});
+
+/**
  * POST /api/v1/sync/ticket
  * Exchanges a valid JWT session for a 30-second single-use WebSocket ticket.
  * The ticket goes in the WS URL (?ticket=...) instead of the raw JWT, keeping

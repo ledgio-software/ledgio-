@@ -11,6 +11,9 @@ import {
   Users,
   Zap,
   Building2,
+  GraduationCap,
+  Heart,
+  ShoppingCart,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { useInstallPrompt } from "../../hooks/useInstallPrompt";
@@ -149,6 +152,69 @@ const PRICING_PLANS = [
       "Unlimited custom field configurations",
       "Priority 24/7 SLA support",
       "Custom onboarding & migration assistance",
+    ],
+  },
+];
+
+const ORG_TYPES = [
+  {
+    icon: ShoppingCart,
+    label: "Retail & Trading",
+    tagline: "For shops, wholesalers, and multi-branch businesses.",
+    accent: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/30", badge: "bg-emerald-950/60 text-emerald-300 border-emerald-500/30" },
+    features: [
+      "Point of Sale (POS) with force-print receipt gate",
+      "Receipt Audit Log — every transaction, every cashier",
+      "Inventory management, stock takes & adjustments",
+      "Multi-warehouse / godown logistics & transfers",
+      "Invoicing, vendor bills & partial payments",
+      "Payroll management & payslip generation",
+      "Bank reconciliation & Mono bank feed sync",
+      "Budgets, budget tracking & variance reports",
+      "Recurring transactions & approval workflows",
+      "Mobile Money collections (MTN, Telecel, AirtelTigo…)",
+      "Instant SMS shortage alerts when a till closes short",
+      "Analytics dashboard — revenue, costs, top customers",
+    ],
+  },
+  {
+    icon: GraduationCap,
+    label: "Schools",
+    tagline: "Purpose-built for basic and secondary schools.",
+    accent: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30", badge: "bg-blue-950/60 text-blue-300 border-blue-500/30" },
+    features: [
+      "Student Admissions — enrol, track status & class",
+      "Student Ledger with class & term filters",
+      "Student Health Records — medical history per pupil",
+      "School Chart of Accounts (Tuition, Exam, PTA, Boarding…)",
+      "Income & Expenditure Statement — not a generic P&L",
+      "Restricted & unrestricted Fund Accounting per term",
+      "Expense Claims, approvals & reimbursement journal",
+      "Budgets by fund or department",
+      "Approval workflows for purchases & disbursements",
+      "Weekly Income & Expenditure PDF emailed to admin",
+      "Role-based access — Admin, Accountant, Auditor",
+      "Audit trail on every financial record",
+    ],
+  },
+  {
+    icon: Heart,
+    label: "Churches & NGOs",
+    tagline: "Transparent fund accounting for faith communities and nonprofits.",
+    accent: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/30", badge: "bg-purple-950/60 text-purple-300 border-purple-500/30" },
+    features: [
+      "Restricted & unrestricted Donor Fund tracking",
+      "Tag every invoice, bill & journal entry to a fund",
+      "Balance Sheet & Income & Expenditure per fund",
+      "Expense Claims — submit, approve & reimburse",
+      "Approval workflows for all disbursements",
+      "Budgets per fund or ministry department",
+      "Recurring transactions (tithes, pledges, grants)",
+      "Vendor bills & supplier payment management",
+      "Mobile Money collections for offerings & donations",
+      "Bank reconciliation & transaction feed sync",
+      "Weekly Income & Expenditure PDF emailed to admin",
+      "Full audit trail — every entry, every approver",
     ],
   },
 ];
@@ -348,6 +414,56 @@ export function LandingPage() {
               <ChevronRight className="h-4 w-4 ml-1" />
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Built for Your Organisation */}
+      <section id="solutions" className="py-24 border-t border-secondary-800/60 bg-secondary-900/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Built for Your Organisation</h2>
+            <p className="mt-3 text-secondary-400 text-sm">
+              One platform, three tailored modes — pick your organisation type at registration and unlock the features built for you.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {ORG_TYPES.map((org) => {
+              const Icon = org.icon;
+              return (
+                <div
+                  key={org.label}
+                  className={`flex flex-col rounded-2xl bg-secondary-900 border ${org.accent.border} p-8`}
+                >
+                  <div className={`p-3 ${org.accent.bg} rounded-xl ${org.accent.text} w-fit mb-5`}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div className={`inline-flex items-center self-start px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest mb-3 ${org.accent.badge}`}>
+                    {org.label}
+                  </div>
+                  <p className="text-xs text-secondary-400 mb-6 leading-relaxed">{org.tagline}</p>
+                  <ul className="space-y-2.5 flex-1">
+                    {org.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-xs text-secondary-300">
+                        <CheckCircle2 className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${org.accent.text}`} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={() => window.location.href = '/register'}
+                    className={`mt-8 w-full py-3 rounded-xl text-sm font-bold border transition-colors ${org.accent.border} ${org.accent.text} hover:bg-secondary-800`}
+                  >
+                    Register as {org.label.split(' ')[0]}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="mt-8 text-center text-xs text-secondary-500">
+            Organisation type is chosen once during registration and drives your entire workspace experience — chart of accounts, navigation, reports, and feature visibility.
+          </p>
         </div>
       </section>
 
