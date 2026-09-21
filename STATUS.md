@@ -2,6 +2,19 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Fix: missing onboarding checklists for SCHOOL, CHURCH, NGO, HOSPITALITY (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+After splitting NONPROFIT into SCHOOL/CHURCH/NGO org types, the onboarding checklist component fell back to the generic BUSINESS checklist for all three ("Add Products", "Make First Sale") — completely wrong for a church or NGO. HOSPITALITY also had no checklist. Added dedicated checklist steps for each sector.
+
+**Changes:**
+- **`frontend/src/constants/sectorChecklists.ts`** — Added `SCHOOL`, `CHURCH`, `NGO`, `HOSPITALITY` entries with appropriate setup steps for each sector.
+
+**Files changed:**
+- `frontend/src/constants/sectorChecklists.ts`
+
+---
+
 ## [Date: 2026-09-21] - Fix: subscription page showing wrong sector features for CHURCH/NGO/SCHOOL (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**
