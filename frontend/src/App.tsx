@@ -920,6 +920,12 @@ function ShopManagerDashboard() {
   );
 }
 
+function DashboardRoute() {
+  const { user } = useAuth();
+  if (user?.orgType === "CHURCH") return <Navigate to="/church/dashboard" replace />;
+  return <MainLayout><Dashboard /></MainLayout>;
+}
+
 function ProtectedRoute({ children, blockedRoles, allowedOrgTypes }: { children: React.ReactNode; blockedRoles?: Set<string>; allowedOrgTypes?: string[] }) {
   const { token, isLoading, user } = useAuth();
   // Also wait on tenant settings (only once a token exists - no point waiting
@@ -1060,7 +1066,7 @@ function App() {
               <Route path="/agod/console" element={<AgodTeamConsole />} />
 
               {/* Protected Routes */}
-              <Route path="/dashboard" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><DashboardRoute /></ProtectedRoute>} />
               <Route path="/accounts" element={<ProtectedRoute><MainLayout><ChartOfAccounts /></MainLayout></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><OnboardingWizard /></MainLayout></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute blockedRoles={SETTINGS_RESTRICTED_ROLES}><MainLayout><Settings /></MainLayout></ProtectedRoute>} />
