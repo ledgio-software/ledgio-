@@ -27,7 +27,7 @@ const router = Router();
 export const SUBSCRIPTION_PLANS = [
   {
     tier: 1,
-    name: 'Shop',
+    name: 'Starter',
     priceGhs: 105,
     seatLimit: 3,
     features: ['Point of Sale', 'Invoices & Bills', 'Inventory', 'Expense Claims', 'Sales Reports'],
@@ -37,11 +37,11 @@ export const SUBSCRIPTION_PLANS = [
     name: 'Business',
     priceGhs: 305,
     seatLimit: 10,
-    features: ['Everything in Shop', 'Payroll (PAYE & SSNIT)', 'Bank Reconciliation', 'Approval Workflows', 'Budgets & Analytics'],
+    features: ['Everything in Starter', 'Payroll (PAYE & SSNIT)', 'Bank Reconciliation', 'Approval Workflows', 'Budgets & Analytics'],
   },
   {
     tier: 3,
-    name: 'Enterprise',
+    name: 'Professional',
     priceGhs: 510,
     seatLimit: Infinity,
     features: ['Everything in Business', 'Unlimited team members', 'Custom Fields', 'Full Audit Trail', 'Priority Support'],

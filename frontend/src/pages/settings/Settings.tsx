@@ -461,7 +461,11 @@ export function Settings() {
           }));
         }
       })
-      .catch((err) => console.error("Failed to load schedule settings:", err));
+      .catch((err) => {
+        if (err?.response?.status !== 403) {
+          console.error("Failed to load schedule settings:", err);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -814,7 +818,7 @@ export function Settings() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary-600" />
-                Plan: {TIER_NAMES[settings.tier] || "Shop"}
+                Plan: {TIER_NAMES[settings.tier] || "Starter"}
               </CardTitle>
               <CardDescription>
                 {settings.tier >= 3

@@ -70,7 +70,7 @@ export class SubscriptionAutoRenewCronService {
     console.log(`[AutoRenewCron] Found ${candidates.length} tenant(s) eligible for auto-renewal.`);
 
     const SUBSCRIPTION_PRICES: Record<number, number> = { 1: 105, 2: 305, 3: 510 };
-    const PLAN_NAMES: Record<number, string> = { 1: 'Shop', 2: 'Business', 3: 'Enterprise' };
+    const PLAN_NAMES: Record<number, string> = { 1: 'Starter', 2: 'Business', 3: 'Professional' };
 
     for (const tenant of candidates) {
       const admin = tenant.users[0];
@@ -80,7 +80,7 @@ export class SubscriptionAutoRenewCronService {
       }
 
       const amount = SUBSCRIPTION_PRICES[tenant.tier] ?? 105;
-      const planName = PLAN_NAMES[tenant.tier] ?? 'Shop';
+      const planName = PLAN_NAMES[tenant.tier] ?? 'Starter';
       const reference = `autorenew_${tenant.id}_${tenant.tier}_${Date.now()}`;
 
       try {

@@ -157,7 +157,7 @@ describe('Legal Policy & Customization Enforcement API', () => {
       expect(res.status).toBe(403);
       expect(res.body.success).toBe(false);
       expect(res.body.upgradeRequired).toBe(true);
-      expect(res.body.error).toContain('Custom Fields requires the Enterprise plan or higher');
+      expect(res.body.error).toContain('Custom Fields requires the Professional plan or higher');
       expect(res.body.currentTier).toBe(1);
       expect(res.body.requiredTier).toBe(3);
     });

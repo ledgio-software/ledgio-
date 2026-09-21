@@ -1,12 +1,12 @@
-// 1=Shop, 2=Business, 3=Enterprise - see backend/src/middleware/tierEnforcementMiddleware.ts.
+// 1=Starter, 2=Business, 3=Professional - see backend/src/middleware/tierEnforcementMiddleware.ts.
 // Not editable via PUT /tenants/current - set only by a platform admin
 // through the Admin Core Engine console until self-serve billing exists.
 export type TenantTier = 1 | 2 | 3;
 
 export const TIER_NAMES: Record<TenantTier, string> = {
-  1: 'Shop',
+  1: 'Starter',
   2: 'Business',
-  3: 'Enterprise',
+  3: 'Professional',
 };
 
 export interface TenantSettings {

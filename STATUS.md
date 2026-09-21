@@ -2,6 +2,37 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Fix: plan names "Shop"/"Enterprise" → "Starter"/"Professional" across frontend and backend (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Church and other new tenants saw "SHOP PLAN" badge in the sidebar and "Plan: Shop" in Settings because the backend subscription API and the frontend `TIER_NAMES` constant still used the old names. Renamed tier 1 from "Shop" → "Starter" and tier 3 from "Enterprise" → "Professional" everywhere. Also suppressed the 403 console error when a tier-1 tenant loads the Scheduled Reports settings panel (the 403 is correct behaviour — it's a Business-plan feature — but shouldn't pollute the console).
+
+**Changes:**
+- **`backend/src/routes/subscription.ts`** — `SUBSCRIPTION_PLANS[0].name` "Shop"→"Starter", `[2].name` "Enterprise"→"Professional", feature list "Everything in Shop"→"Everything in Starter".
+- **`backend/src/middleware/tierEnforcementMiddleware.ts`** — `TENANT_PLANS[1].name` "Shop"→"Starter", `[3].name` "Enterprise"→"Professional".
+- **`backend/src/services/subscriptionAutoRenewCronService.ts`** — `PLAN_NAMES` map updated; fallback "Shop"→"Starter".
+- **`backend/src/routes/adminRevenue.ts`** — `nameForTier` fallback "Shop"→"Starter".
+- **`backend/src/data/helpAssistantKnowledge.ts`** — Plan Tiers section updated to Starter/Professional.
+- **`frontend/src/types/tenant.ts`** — `TIER_NAMES` record updated; comment updated.
+- **`frontend/src/pages/settings/Settings.tsx`** — Fallback "Shop"→"Starter"; 403 on schedule fetch suppressed gracefully.
+- **`frontend/src/pages/admin/AdminCoreEngine.tsx`** — Toast message updated.
+- **`frontend/src/pages/landing/LandingPage.tsx`** — Stats label updated.
+- **`frontend/src/lib/navigation.ts`** — Comment updated.
+
+**Files changed:**
+- `backend/src/routes/subscription.ts`
+- `backend/src/middleware/tierEnforcementMiddleware.ts`
+- `backend/src/services/subscriptionAutoRenewCronService.ts`
+- `backend/src/routes/adminRevenue.ts`
+- `backend/src/data/helpAssistantKnowledge.ts`
+- `frontend/src/types/tenant.ts`
+- `frontend/src/pages/settings/Settings.tsx`
+- `frontend/src/pages/admin/AdminCoreEngine.tsx`
+- `frontend/src/pages/landing/LandingPage.tsx`
+- `frontend/src/lib/navigation.ts`
+
+---
+
 ## [Date: 2026-09-21] - Fix: missing onboarding checklists for SCHOOL, CHURCH, NGO, HOSPITALITY (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**

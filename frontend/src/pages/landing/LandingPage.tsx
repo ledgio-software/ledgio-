@@ -296,7 +296,7 @@ export function LandingPage() {
             {[
               { value: "Instant SMS", label: "Till shortage alerts" },
               { value: "Mon 8 AM", label: "Weekly P&L email delivery" },
-              { value: "3 Plans", label: "Shop · Business · Enterprise" },
+              { value: "3 Plans", label: "Starter · Business · Professional" },
               { value: "100%", label: "Schema-isolated per business" },
             ].map((s) => (
               <div key={s.label} className="py-6 px-4 text-center">
