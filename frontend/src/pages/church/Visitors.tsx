@@ -178,35 +178,35 @@ export function ChurchVisitors() {
       {/* Add modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-lg font-semibold">Log Visitor</h2>
             <div className="grid grid-cols-2 gap-3">
               {[["First Name *", "firstName"], ["Last Name *", "lastName"], ["Phone", "phone"], ["Email", "email"]].map(([label, key]) => (
                 <div key={key}>
                   <label className="block text-xs text-muted-foreground mb-1">{label}</label>
-                  <input type="text" value={(form as Record<string, string>)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                  <input type="text" value={(form as Record<string, string>)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
                 </div>
               ))}
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Visit Date *</label>
-                <input type="date" value={form.visitDate} onChange={e => setForm(f => ({ ...f, visitDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="date" value={form.visitDate} onChange={e => setForm(f => ({ ...f, visitDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Service Type</label>
-                <select value={form.serviceType} onChange={e => setForm(f => ({ ...f, serviceType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background">
+                <select value={form.serviceType} onChange={e => setForm(f => ({ ...f, serviceType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                   {SERVICE_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
                 </select>
               </div>
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">How They Heard About Us</label>
-                <select value={form.howTheyHeard} onChange={e => setForm(f => ({ ...f, howTheyHeard: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background">
+                <select value={form.howTheyHeard} onChange={e => setForm(f => ({ ...f, howTheyHeard: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                   <option value="">Select…</option>
                   {HOW_HEARD.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">Notes</label>
-                <input type="text" value={form.followUpNotes} onChange={e => setForm(f => ({ ...f, followUpNotes: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder="Optional" />
+                <input type="text" value={form.followUpNotes} onChange={e => setForm(f => ({ ...f, followUpNotes: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="Optional" />
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -220,17 +220,17 @@ export function ChurchVisitors() {
       {/* Follow-up modal */}
       {followUpId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-semibold">Update Follow-up</h2>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Status</label>
-              <select value={followUpStatus} onChange={e => setFollowUpStatus(e.target.value)} className="w-full border rounded px-3 py-2 text-sm bg-background">
+              <select value={followUpStatus} onChange={e => setFollowUpStatus(e.target.value)} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                 {STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Notes</label>
-              <textarea value={followUpNotes} onChange={e => setFollowUpNotes(e.target.value)} rows={3} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder="Optional" />
+              <textarea value={followUpNotes} onChange={e => setFollowUpNotes(e.target.value)} rows={3} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="Optional" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setFollowUpId(null)} className="px-4 py-2 border rounded text-sm hover:bg-muted">Cancel</button>

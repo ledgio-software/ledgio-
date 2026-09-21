@@ -920,7 +920,7 @@ function ShopManagerDashboard() {
   );
 }
 
-function ProtectedRoute({ children, blockedRoles }: { children: React.ReactNode; blockedRoles?: Set<string> }) {
+function ProtectedRoute({ children, blockedRoles, allowedOrgTypes }: { children: React.ReactNode; blockedRoles?: Set<string>; allowedOrgTypes?: string[] }) {
   const { token, isLoading, user } = useAuth();
   // Also wait on tenant settings (only once a token exists - no point waiting
   // when we're about to redirect to /login anyway) so pages never paint the
@@ -939,6 +939,10 @@ function ProtectedRoute({ children, blockedRoles }: { children: React.ReactNode;
   const role = (user?.role || "").toLowerCase().trim();
 
   if (blockedRoles && blockedRoles.has(role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (allowedOrgTypes && !allowedOrgTypes.includes(user?.orgType ?? "")) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -1136,16 +1140,16 @@ function App() {
               <Route path="/hospitality/reservations/:id" element={<ProtectedRoute><MainLayout><HospitalityReservationDetail /></MainLayout></ProtectedRoute>} />
               <Route path="/hospitality/housekeeping" element={<ProtectedRoute><MainLayout><HospitalityHousekeeping /></MainLayout></ProtectedRoute>} />
               <Route path="/hospitality/night-audit" element={<ProtectedRoute><MainLayout><HospitalityNightAudit /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/dashboard" element={<ProtectedRoute><MainLayout><ChurchDashboard /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/members" element={<ProtectedRoute><MainLayout><ChurchMembers /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/cell-groups" element={<ProtectedRoute><MainLayout><ChurchCellGroups /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/attendance" element={<ProtectedRoute><MainLayout><ChurchAttendance /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/pledges" element={<ProtectedRoute><MainLayout><ChurchPledges /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/giving" element={<ProtectedRoute><MainLayout><ChurchGiving /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/visitors" element={<ProtectedRoute><MainLayout><ChurchVisitors /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/ministries" element={<ProtectedRoute><MainLayout><ChurchMinistries /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/events" element={<ProtectedRoute><MainLayout><ChurchEvents /></MainLayout></ProtectedRoute>} />
-              <Route path="/church/branches" element={<ProtectedRoute><MainLayout><ChurchBranches /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/dashboard" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchDashboard /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/members" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchMembers /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/cell-groups" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchCellGroups /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/attendance" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchAttendance /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/pledges" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchPledges /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/giving" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchGiving /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/visitors" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchVisitors /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/ministries" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchMinistries /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/events" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchEvents /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/branches" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchBranches /></MainLayout></ProtectedRoute>} />
               <Route path="/school/teachers" element={<ProtectedRoute><MainLayout><SchoolTeachers /></MainLayout></ProtectedRoute>} />
               <Route path="/school/classes" element={<ProtectedRoute><MainLayout><SchoolClasses /></MainLayout></ProtectedRoute>} />
               <Route path="/school/momo-reconciliation" element={<ProtectedRoute><MainLayout><MomoReconciliation /></MainLayout></ProtectedRoute>} />

@@ -195,38 +195,38 @@ export function ChurchEvents() {
       {/* Add event modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-lg font-semibold">New Event</h2>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">Title *</label>
-                <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Type</label>
-                <select value={form.eventType} onChange={e => setForm(f => ({ ...f, eventType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background">
+                <select value={form.eventType} onChange={e => setForm(f => ({ ...f, eventType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                   {EVENT_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Event Date *</label>
-                <input type="date" value={form.eventDate} onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="date" value={form.eventDate} onChange={e => setForm(f => ({ ...f, eventDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">End Date</label>
-                <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Expected Attendance</label>
-                <input type="number" min="0" value={form.expectedAttendance} onChange={e => setForm(f => ({ ...f, expectedAttendance: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="number" min="0" value={form.expectedAttendance} onChange={e => setForm(f => ({ ...f, expectedAttendance: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">Venue</label>
-                <input type="text" value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="text" value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">Description</label>
-                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -240,15 +240,15 @@ export function ChurchEvents() {
       {/* Register modal */}
       {showRegister && selected && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-semibold">Register for {selected.title}</h2>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Name *</label>
-              <input type="text" value={regForm.visitorName} onChange={e => setRegForm(f => ({ ...f, visitorName: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+              <input type="text" value={regForm.visitorName} onChange={e => setRegForm(f => ({ ...f, visitorName: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
             </div>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Phone</label>
-              <input type="text" value={regForm.phone} onChange={e => setRegForm(f => ({ ...f, phone: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+              <input type="text" value={regForm.phone} onChange={e => setRegForm(f => ({ ...f, phone: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowRegister(false)} className="px-4 py-2 border rounded text-sm hover:bg-muted">Cancel</button>

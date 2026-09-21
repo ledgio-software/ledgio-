@@ -200,12 +200,12 @@ export function ChurchMinistries() {
       {/* Add ministry modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-semibold">New Ministry / Department</h2>
             {[["Name *", "name"], ["Description", "description"], ["Meeting Schedule", "meetingSchedule"]].map(([label, key]) => (
               <div key={key}>
                 <label className="block text-xs text-muted-foreground mb-1">{label}</label>
-                <input type="text" value={(form as Record<string, string>)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder={key === "meetingSchedule" ? "e.g. Every Saturday 3pm" : ""} />
+                <input type="text" value={(form as Record<string, string>)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder={key === "meetingSchedule" ? "e.g. Every Saturday 3pm" : ""} />
               </div>
             ))}
             <div className="flex justify-end gap-2 pt-2">
@@ -219,18 +219,18 @@ export function ChurchMinistries() {
       {/* Assign member modal */}
       {showAssign && selected && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4">
             <h2 className="text-lg font-semibold">Assign Member to {selected.name}</h2>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Member</label>
-              <select value={assignMemberId} onChange={e => setAssignMemberId(e.target.value)} className="w-full border rounded px-3 py-2 text-sm bg-background">
+              <select value={assignMemberId} onChange={e => setAssignMemberId(e.target.value)} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                 <option value="">Select member…</option>
                 {allMembers.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Role</label>
-              <input type="text" value={assignRole} onChange={e => setAssignRole(e.target.value)} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder="e.g. Leader, Secretary, Member" />
+              <input type="text" value={assignRole} onChange={e => setAssignRole(e.target.value)} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="e.g. Leader, Secretary, Member" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowAssign(false)} className="px-4 py-2 border rounded text-sm hover:bg-muted">Cancel</button>

@@ -170,35 +170,35 @@ export function ChurchBranches() {
       {/* Add/Edit modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-lg font-semibold">{editing ? "Edit Branch" : "Add Branch"}</h2>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">Branch Name *</label>
-                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder="e.g. Accra Central Branch" />
+                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="e.g. Accra Central Branch" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Pastor / Leader</label>
-                <select value={form.pastorId} onChange={e => setForm(f => ({ ...f, pastorId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background">
+                <select value={form.pastorId} onChange={e => setForm(f => ({ ...f, pastorId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                   <option value="">Select…</option>
                   {allMembers.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Phone</label>
-                <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Email</label>
-                <input type="text" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="text" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Established Date</label>
-                <input type="date" value={form.establishedDate} onChange={e => setForm(f => ({ ...f, establishedDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="date" value={form.establishedDate} onChange={e => setForm(f => ({ ...f, establishedDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">Address</label>
-                <input type="text" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="text" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               {editing && (
                 <div className="col-span-2 flex items-center gap-2">
