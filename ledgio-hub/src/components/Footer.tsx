@@ -5,12 +5,13 @@ import { Logo, Wordmark } from './Logo';
 
 const SOLUTIONS = [
   { label: 'Small Retail & Shops', to: '/for/retail' },
-  { label: 'Enterprise & Multi-Branch', to: '/for/enterprise' },
-  { label: 'Schools', to: '/for/schools' },
-  { label: 'Churches & NGOs', to: '/for/churches-ngos' },
+  { label: 'Hotels & Guest Houses', to: '/for/hospitality' },
+  { label: 'Schools, Churches & NGOs', to: '/for/schools' },
   { label: 'Pharmacy', to: '/for/pharmacy' },
-  { label: 'Manufacturing', to: '/for/manufacturing' },
+  { label: 'Wholesale & Distribution', to: '/for/wholesale' },
   { label: 'Professional Services', to: '/for/professional-services' },
+  { label: 'Construction & Contractors', to: '/for/construction' },
+  { label: 'Manufacturing', to: '/for/manufacturing' },
 ];
 
 const PRODUCT = [
@@ -91,7 +92,7 @@ export function Footer() {
               ))}
               <div className="flex items-center gap-2 text-xs text-ink-500 mt-1">
                 <Mail className="h-3.5 w-3.5 text-brand-600 flex-shrink-0" />
-                <a href="mailto:ledgioapp@gmail.com" className="hover:text-brand-400 transition-colors">ledgioapp@gmail.com</a>
+                <a href="mailto:support@ledgio.app" className="hover:text-brand-400 transition-colors">support@ledgio.app</a>
               </div>
             </div>
           </div>

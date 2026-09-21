@@ -6,12 +6,13 @@ import { useOnboarding } from '../lib/onboardingContext';
 
 const SECTORS = [
   { label: 'Small Retail & Shops', to: '/for/retail' },
-  { label: 'Enterprise & Multi-Branch', to: '/for/enterprise' },
-  { label: 'Schools', to: '/for/schools' },
-  { label: 'Churches & NGOs', to: '/for/churches-ngos' },
+  { label: 'Hotels & Guest Houses', to: '/for/hospitality' },
+  { label: 'Schools, Churches & NGOs', to: '/for/schools' },
   { label: 'Pharmacy', to: '/for/pharmacy' },
-  { label: 'Manufacturing', to: '/for/manufacturing' },
+  { label: 'Wholesale & Distribution', to: '/for/wholesale' },
   { label: 'Professional Services', to: '/for/professional-services' },
+  { label: 'Construction & Contractors', to: '/for/construction' },
+  { label: 'Manufacturing', to: '/for/manufacturing' },
 ];
 
 const NAV = [
