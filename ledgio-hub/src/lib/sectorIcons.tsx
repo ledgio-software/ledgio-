@@ -6,6 +6,9 @@ import {
   Pill,
   Factory,
   Briefcase,
+  Hotel,
+  HardHat,
+  Package,
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
@@ -17,6 +20,9 @@ const ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   pharmacy: Pill,
   manufacturing: Factory,
   'professional-services': Briefcase,
+  hospitality: Hotel,
+  construction: HardHat,
+  wholesale: Package,
 };
 
 interface SectorIconProps extends LucideProps {

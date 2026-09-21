@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
@@ -23,9 +24,30 @@ function SectorRoute() {
   return <SectorPage sector={sector} />;
 }
 
+function AnnounceBanner() {
+  const [visible, setVisible] = useState(true);
+  if (!visible) return null;
+  return (
+    <div className="bg-emerald-950 border-b border-emerald-700/40 px-4 py-2.5 flex items-center justify-center gap-3 text-xs text-emerald-200">
+      <span>🚀 Construction &amp; Manufacturing sectors now live — purpose-built accounting for every business type</span>
+      <a href="/for/construction" className="font-bold text-emerald-400 underline underline-offset-2 hover:text-emerald-300 whitespace-nowrap">
+        Explore all 8 solutions →
+      </a>
+      <button
+        onClick={() => setVisible(false)}
+        className="ml-2 text-emerald-500 hover:text-emerald-200 transition-colors flex-shrink-0"
+        aria-label="Dismiss"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
+      <AnnounceBanner />
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

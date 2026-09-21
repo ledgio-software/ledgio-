@@ -61,16 +61,16 @@ const CAPABILITY_CARDS = [
 
 const WHY_STATS = [
   {
-    value: '7',
-    label: 'Sectors served',
-    body: 'Purpose-built solutions for retail, schools, churches, pharmacies, manufacturers, enterprise businesses, and professional service firms.',
+    value: '8',
+    label: 'Sectors covered',
+    body: 'Retail · Hotels · Schools · Pharmacies · Wholesale · Services · Construction · Manufacturing — each with its own purpose-built workspace.',
     link: { label: 'Explore sector solutions', to: '/for/retail' },
   },
   {
-    value: '15+',
-    label: 'Core modules',
-    body: 'Every workspace ships with invoicing, payroll, Mobile Money, inventory, bank reconciliation, and full double-entry accounting — out of the box.',
-    link: { label: 'See all features', to: '/features' },
+    value: '90',
+    label: 'Day free trial',
+    body: 'No credit card required. Full access to your plan from the very first day. Your workspace is live the moment you verify your business email.',
+    link: { label: 'Start free trial', to: '/pricing' },
   },
   {
     value: 'GH₵0',
@@ -88,37 +88,48 @@ const WHY_STATS = [
 
 const TESTIMONIALS = [
   {
-    quote: 'With Ledgio, we can see our Mobile Money collections, stock levels, and daily P&L all in one place. My Monday morning report lands in my inbox automatically — I haven\'t had to log in just to check the numbers.',
-    name: 'Abena M.',
-    role: 'Owner, Supermarket',
-    location: 'Greater Accra',
+    quote: 'Job costing per site gave us visibility we never had before. We caught a 15% budget overrun early enough to recover it. Ledgio paid for itself in the first month.',
+    name: 'Yaw Darko',
+    role: 'Construction Manager',
+    location: 'Accra',
+    sector: 'Construction & Contractors',
     stars: 5,
   },
   {
-    quote: 'Our school bursar used to spend two days every term just reconciling fee receipts. With Ledgio\'s student ledger and fund accounting, that\'s down to a single morning. The income & expenditure report is exactly what our board expects.',
-    name: 'Emmanuel K.',
-    role: 'Head Teacher',
-    location: 'Ashanti Region',
+    quote: 'Ledgio transformed our stockroom. We went from weekly Excel updates to real-time inventory alerts. Shortages are spotted before they become problems for customers.',
+    name: 'Akosua Mensah',
+    role: 'Shop Owner',
+    location: 'Accra Mall Road',
+    sector: 'Retail & Shops',
     stars: 5,
   },
   {
-    quote: 'The NHIS claims module alone paid for the subscription in the first month. We no longer lose track of billed prescriptions. Every claim is itemised, ready to submit, and tied back to the prescription register.',
-    name: 'Adwoa O.',
-    role: 'Pharmacy Manager',
-    location: 'Western Region',
+    quote: 'Room billing, restaurant tabs, and laundry all flow into one guest folio. Our night audits now take 20 minutes instead of 3 hours. The whole team loves it.',
+    name: 'Abena Asante',
+    role: 'Hotel Manager',
+    location: 'Accra',
+    sector: 'Hotels & Guest Houses',
+    stars: 5,
+  },
+  {
+    quote: 'NHIS claim tracking and drug expiry alerts have saved us thousands in write-offs. FDA inspections used to stress me out — now I print a complete narcotics log in seconds.',
+    name: 'Dr. Ama Boateng',
+    role: 'Pharmacist',
+    location: 'Tema',
+    sector: 'Pharmacy',
     stars: 5,
   },
 ];
 
 const INTEGRATIONS = [
-  { name: 'MTN MoMo', desc: 'Collections & disbursements', color: 'bg-yellow-500/10 border-yellow-600/30 text-yellow-300', emoji: '📱' },
-  { name: 'Telecel Ghana', desc: 'Mobile Money payments', color: 'bg-red-500/10 border-red-600/30 text-red-300', emoji: '📡' },
-  { name: 'AirtelTigo', desc: 'Mobile Money collections', color: 'bg-orange-500/10 border-orange-600/30 text-orange-300', emoji: '🔗' },
   { name: 'GRA e-VAT', desc: 'Electronic invoice compliance', color: 'bg-blue-500/10 border-blue-600/30 text-blue-300', emoji: '🏛️' },
-  { name: 'NHIS', desc: 'Claims management', color: 'bg-green-500/10 border-green-600/30 text-green-300', emoji: '🏥' },
+  { name: 'MTN MoMo', desc: 'Collections & disbursements', color: 'bg-yellow-500/10 border-yellow-600/30 text-yellow-300', emoji: '📱' },
+  { name: 'Vodafone Cash', desc: 'Mobile Money payments', color: 'bg-red-500/10 border-red-600/30 text-red-300', emoji: '📡' },
+  { name: 'AirtelTigo', desc: 'Mobile Money collections', color: 'bg-orange-500/10 border-orange-600/30 text-orange-300', emoji: '🔗' },
+  { name: 'All Ghana Banks', desc: 'Bank feed & reconciliation', color: 'bg-cyan-500/10 border-cyan-600/30 text-cyan-300', emoji: '🏦' },
   { name: 'SSNIT', desc: 'Payroll deductions', color: 'bg-purple-500/10 border-purple-600/30 text-purple-300', emoji: '🛡️' },
-  { name: 'Mono Bank Feed', desc: 'Automated bank reconciliation', color: 'bg-cyan-500/10 border-cyan-600/30 text-cyan-300', emoji: '🏦' },
-  { name: 'NEPP', desc: 'Pharmacy e-prescriptions', color: 'bg-rose-500/10 border-rose-600/30 text-rose-300', emoji: '💊' },
+  { name: 'NHIS', desc: 'Claims management', color: 'bg-green-500/10 border-green-600/30 text-green-300', emoji: '🏥' },
+  { name: 'GRA WHT', desc: 'Withholding tax tracking', color: 'bg-rose-500/10 border-rose-600/30 text-rose-300', emoji: '📄' },
 ];
 
 const COMPARISON = [
@@ -248,14 +259,14 @@ export function Home() {
           </button>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white leading-[1.08] tracking-tight mb-6">
-            Accounting software built{' '}
-            <span className="bg-gradient-to-r from-brand-400 to-blue-400 bg-clip-text text-transparent">
-              for Africa
+            Accounting Built for{' '}
+            <span className="bg-gradient-to-r from-brand-400 via-emerald-300 to-blue-400 bg-clip-text text-transparent">
+              How Ghana Does Business.
             </span>
           </h1>
 
           <p className="text-lg sm:text-xl text-ink-300 leading-relaxed max-w-2xl mx-auto mb-10">
-            One platform for every type of African business — retail shops, schools, pharmacies, churches, manufacturers, and enterprises. Real-time accounting, GRA compliance, and Mobile Money, all in one place.
+            Purpose-built books for retail shops, hotels, schools, pharmacies, and 4 more sectors — each one gets the exact tools it needs, nothing it doesn't.
           </p>
 
           <div className="flex flex-wrap justify-center gap-4 mb-12">
@@ -263,7 +274,7 @@ export function Home() {
               onClick={() => openOnboarding()}
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-950/60 transition-colors"
             >
-              Start free — no credit card <ArrowRight className="h-4 w-4" />
+              Start Free — 90-Day Trial <ArrowRight className="h-4 w-4" />
             </button>
             <Link
               to="/features"
@@ -274,10 +285,10 @@ export function Home() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-6 text-xs text-ink-500">
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> GH₵0 setup fee</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> Ready in under 5 minutes</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> 90-day free trial</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> No credit card required</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> GRA e-VAT compliant</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> NHIS & SSNIT ready</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> Workspace live in minutes</span>
           </div>
         </div>
 
@@ -492,21 +503,26 @@ export function Home() {
               Business owners, school administrators, and pharmacy managers across Ghana rely on Ledgio every day.
             </p>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="bg-ink-900/60 border border-ink-800/60 rounded-2xl p-7 flex flex-col">
-                <div className="flex items-center gap-0.5 mb-5">
+              <div key={i} className="bg-ink-900/60 border border-ink-800/60 rounded-2xl p-6 flex flex-col">
+                <div className="flex items-center gap-0.5 mb-4">
                   {Array.from({ length: t.stars }).map((_, j) => (
-                    <Star key={j} className="h-4 w-4 fill-brand-400 text-brand-400" />
+                    <Star key={j} className="h-3.5 w-3.5 fill-brand-400 text-brand-400" />
                   ))}
                 </div>
-                <Quote className="h-7 w-7 text-brand-700/50 mb-4 flex-shrink-0" />
-                <blockquote className="text-sm text-ink-300 leading-relaxed flex-1 mb-6">
+                <Quote className="h-6 w-6 text-brand-700/50 mb-3 flex-shrink-0" />
+                <blockquote className="text-sm text-ink-300 leading-relaxed flex-1 mb-5">
                   "{t.quote}"
                 </blockquote>
                 <div>
                   <div className="text-sm font-bold text-white">{t.name}</div>
                   <div className="text-xs text-ink-500 mt-0.5">{t.role} · {t.location}</div>
+                  {'sector' in t && (
+                    <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full bg-brand-950/60 border border-brand-700/30 text-[10px] font-bold text-brand-400">
+                      {(t as typeof t & { sector: string }).sector}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -683,6 +699,98 @@ export function Home() {
         </div>
       </section>
 
+      {/* ── News & Updates ── */}
+      <section className="py-24 border-b border-ink-800/60 bg-ink-900/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-brand-950/60 border border-brand-700/40 text-brand-300 text-[10px] font-black uppercase tracking-widest mb-6">
+              News &amp; Updates
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Insights for Ghana's business owners</h2>
+            <p className="text-ink-400 text-sm leading-relaxed">Practical guides on accounting, compliance, and running a tighter business.</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-ink-900/60 border border-ink-800/60 rounded-2xl overflow-hidden flex flex-col">
+              <div className="relative h-52 overflow-hidden">
+                <img
+                  src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&auto=format&fit=crop"
+                  alt="Construction site"
+                  className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink-950/60 to-transparent" />
+              </div>
+              <div className="p-7 flex flex-col flex-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-brand-400 mb-3">Product Update</span>
+                <h3 className="text-lg font-bold text-white mb-3 leading-snug">
+                  Ledgio now supports Construction &amp; Manufacturing — sector-specific job costing, WIP tracking, and BOM accounting
+                </h3>
+                <p className="text-sm text-ink-400 leading-relaxed flex-1 mb-4">
+                  Two of Ghana's most complex accounting sectors now have a dedicated Ledgio solution — built from the ground up for how contractors and manufacturers actually track costs.
+                </p>
+                <Link to="/for/construction" className="inline-flex items-center gap-1.5 text-sm font-bold text-brand-400 hover:text-brand-300 transition-colors">
+                  Read more <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+            <div className="flex flex-col gap-4">
+              {[
+                { tag: 'Pharmacy', title: 'How Ghanaian pharmacies are staying NHIS-compliant with Ledgio', to: '/for/pharmacy' },
+                { tag: 'Retail', title: 'Why retail shops need sector-specific POS, not generic accounting software', to: '/for/retail' },
+                { tag: 'Compliance', title: 'Understanding the GRA e-VAT mandate: what it means for your business in 2026', to: '/features' },
+                { tag: 'Schools', title: 'School fee collection & NaSIA reporting — done right with fund accounting', to: '/for/schools' },
+              ].map((item) => (
+                <div key={item.title} className="bg-ink-900/60 border border-ink-800/60 rounded-xl px-5 py-4 hover:border-ink-700 transition-colors">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-brand-400 mb-2 block">{item.tag}</span>
+                  <h4 className="text-sm font-bold text-white leading-snug mb-2">{item.title}</h4>
+                  <Link to={item.to} className="inline-flex items-center gap-1 text-xs font-bold text-brand-400 hover:text-brand-300 transition-colors">
+                    Read more <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Customer Stories ── */}
+      <section className="py-24 border-b border-ink-800/60">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-brand-950/60 border border-brand-700/40 text-brand-300 text-[10px] font-black uppercase tracking-widest mb-6">
+              Customer Stories
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Used across every sector in Ghana</h2>
+            <p className="text-ink-400 text-sm leading-relaxed">
+              From Accra market shops to Kumasi hotels to Tema factories — Ledgio works where Ghana works.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { to: '/for/retail', img: 'https://images.unsplash.com/photo-1534723452862-4c874956499a?w=400&auto=format&fit=crop', alt: 'Retail shop', label: 'Retail & Shops' },
+              { to: '/for/hospitality', img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&auto=format&fit=crop', alt: 'Hotel', label: 'Hotels & Guest Houses' },
+              { to: '/for/pharmacy', img: 'https://images.unsplash.com/photo-1576602976047-174e57a47881?w=400&auto=format&fit=crop', alt: 'Pharmacy', label: 'Pharmacies' },
+              { to: '/for/schools', img: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400&auto=format&fit=crop', alt: 'School', label: 'Schools & NGOs' },
+              { to: '/for/wholesale', img: 'https://images.unsplash.com/photo-1553413077-190dd305871c?w=400&auto=format&fit=crop', alt: 'Wholesale warehouse', label: 'Wholesale & Distribution' },
+              { to: '/for/professional-services', img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&auto=format&fit=crop', alt: 'Professional services', label: 'Professional Services' },
+              { to: '/for/construction', img: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&auto=format&fit=crop', alt: 'Construction site', label: 'Construction' },
+              { to: '/for/manufacturing', img: 'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=400&auto=format&fit=crop', alt: 'Manufacturing', label: 'Manufacturing' },
+            ].map((s) => (
+              <Link key={s.to} to={s.to} className="group relative rounded-2xl overflow-hidden aspect-[3/4] block">
+                <img
+                  src={s.img}
+                  alt={s.alt}
+                  className="w-full h-full object-cover transition-transform duration-400 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-ink-950/10 to-transparent" />
+                <span className="absolute bottom-3 left-3 right-3 font-bold text-xs text-white">{s.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Final CTA ── */}
       <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -696,17 +804,17 @@ export function Home() {
             />
             <div className="relative max-w-2xl mx-auto text-center">
               <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
-                Find your sector and get started today
+                Ready to take control of your business finances?
               </h2>
               <p className="text-white/80 text-sm leading-relaxed mb-8">
-                No credit card. No setup fee. Your workspace is provisioned in under 5 minutes — with the chart of accounts, reports, and workflows already configured for your type of business.
+                Register your business in under 3 minutes. No card, no setup fee — your workspace is live the moment you verify your business email.
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <button
                   onClick={() => openOnboarding()}
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm bg-white text-ink-900 hover:bg-ink-100 transition-colors shadow-lg"
                 >
-                  Get Started Free <ArrowRight className="h-4 w-4" />
+                  Register Free — 90-Day Trial <ArrowRight className="h-4 w-4" />
                 </button>
                 <Link
                   to="/demo"
@@ -716,7 +824,7 @@ export function Home() {
                 </Link>
               </div>
               <div className="mt-8 flex flex-wrap justify-center gap-6 text-xs text-white/60">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> GH₵0 setup fee</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> 90-day free trial</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> No credit card required</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> Cancel anytime</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> Your data, your export</span>
