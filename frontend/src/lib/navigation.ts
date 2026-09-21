@@ -403,10 +403,12 @@ export const navigationGroups: NavGroup[] = [
     sectionTitle: "CHURCH",
     orgTypeOnly: "CHURCH",
     items: [
+      { name: "Dashboard",   href: "/church/dashboard",   icon: LayoutDashboard },
       { name: "Members",     href: "/church/members",     icon: Users },
       { name: "Cell Groups", href: "/church/cell-groups", icon: Users2 },
       { name: "Attendance",  href: "/church/attendance",  icon: CalendarCheck },
       { name: "Pledges",     href: "/church/pledges",     icon: Heart },
+      { name: "Giving",      href: "/church/giving",      icon: TrendingUp },
     ],
   },
 ];

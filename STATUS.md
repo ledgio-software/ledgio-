@@ -2,6 +2,21 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Feature: Church Dashboard + Giving Module (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Extended the Church management module with a Dashboard overview and Offerings/Giving tracker, completing the full church feature set before pushing.
+
+**Changes:**
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration 028: `church_givings` table (giving_date, giving_type, amount, currency, member_id, payment_method, reference, service_type).
+- **`backend/src/routes/churchGiving.ts`** *(new)* — GET `/summary`, GET `/`, POST `/`, DELETE `/:id` for offering records.
+- **`backend/src/routes/churchDashboard.ts`** *(new)* — GET `/` aggregates: members, last Sunday, pledges, giving this month, 8-week trend, giving by type, cell group count.
+- **`backend/src/app.ts`** — Registers `churchGivingRouter` and `churchDashboardRouter`.
+- **`frontend/src/pages/church/Dashboard.tsx`** *(new)* — 4 stat cards, attendance trend bar chart, pledge progress, giving by type.
+- **`frontend/src/pages/church/Giving.tsx`** *(new)* — Filterable giving records table, monthly trend chart, record giving modal.
+- **`frontend/src/lib/navigation.ts`** — Dashboard and Giving added to CHURCH section.
+- **`frontend/src/App.tsx`** — Lazy imports and routes for `ChurchDashboard` (/church/dashboard) and `ChurchGiving` (/church/giving).
+
 ## [Date: 2026-09-21] - Feature: Church Management Module — Members, Cell Groups, Attendance, Pledges (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**

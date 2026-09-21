@@ -1022,6 +1022,32 @@ CREATE INDEX IF NOT EXISTS idx_church_attendance_records_session ON church_atten
 CREATE INDEX IF NOT EXISTS idx_church_attendance_records_member ON church_attendance_records(member_id);
 CREATE INDEX IF NOT EXISTS idx_church_pledges_member ON church_pledges(member_id);
     `
+  },
+  {
+    version: 28,
+    name: '028_add_church_giving_table',
+    sql: `
+CREATE TABLE IF NOT EXISTS church_givings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  giving_date DATE NOT NULL,
+  service_type VARCHAR(50) NOT NULL DEFAULT 'SUNDAY_SERVICE',
+  giving_type VARCHAR(100) NOT NULL,
+  amount NUMERIC(15,2) NOT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+  member_id UUID REFERENCES church_members(id) ON DELETE SET NULL,
+  payment_method VARCHAR(50) NOT NULL DEFAULT 'CASH',
+  reference VARCHAR(100),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_giving_service CHECK (service_type IN ('SUNDAY_SERVICE','MIDWEEK','CELL_GROUP','SPECIAL_SERVICE')),
+  CONSTRAINT chk_giving_payment CHECK (payment_method IN ('CASH','MOBILE_MONEY','CHEQUE','BANK_TRANSFER','OTHER'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_church_givings_date ON church_givings(giving_date);
+CREATE INDEX IF NOT EXISTS idx_church_givings_member ON church_givings(member_id);
+CREATE INDEX IF NOT EXISTS idx_church_givings_type ON church_givings(giving_type);
+    `
   }
 ];
 
