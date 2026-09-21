@@ -2302,7 +2302,10 @@ export function AdminCoreEngine() {
                           className="w-full h-10 px-3 rounded-lg border border-secondary-700 bg-secondary-950 text-white text-xs"
                         >
                           <option value="BUSINESS">Business</option>
-                          <option value="NONPROFIT">Nonprofit / Church / NGO / School</option>
+                          <option value="SCHOOL">School / College</option>
+                          <option value="CHURCH">Church / Faith Organisation</option>
+                          <option value="NGO">NGO / Non-Profit</option>
+                          <option value="NONPROFIT">Nonprofit (legacy)</option>
                         </select>
                       </div>
                       <div className="space-y-1.5">

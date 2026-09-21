@@ -88,7 +88,7 @@ export function ProfitAndLoss() {
   const { settings } = useTenantSettings();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const isSchool = user?.orgType === 'NONPROFIT';
+  const isSchool = user?.orgType === 'NONPROFIT' || user?.orgType === 'SCHOOL';
 
   // School-specific label overrides
   const labels = isSchool ? {

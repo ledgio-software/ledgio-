@@ -87,7 +87,7 @@ export function OnboardingWizard() {
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  const isNonprofit = user?.orgType === "NONPROFIT";
+  const isNonprofit = user?.orgType === "NONPROFIT" || user?.orgType === "SCHOOL" || user?.orgType === "CHURCH" || user?.orgType === "NGO";
   const steps = STEPS_ALL;
 
   const [status, setStatus] = useState<OnboardingStatus | null>(null);

@@ -176,7 +176,7 @@ export const GHANA_HOSPITALITY_CHART_OF_ACCOUNTS_TEMPLATE: ChartOfAccountsTempla
 ];
 
 export function getTemplateForOrgType(orgType?: string | null): ChartOfAccountsTemplateEntry[] {
-  if (orgType === 'NONPROFIT') return GHANA_SCHOOL_CHART_OF_ACCOUNTS_TEMPLATE;
+  if (orgType === 'NONPROFIT' || orgType === 'SCHOOL') return GHANA_SCHOOL_CHART_OF_ACCOUNTS_TEMPLATE;
   if (orgType === 'HOSPITALITY') return GHANA_HOSPITALITY_CHART_OF_ACCOUNTS_TEMPLATE;
   return GHANA_SME_CHART_OF_ACCOUNTS_TEMPLATE;
 }

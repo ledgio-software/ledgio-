@@ -226,7 +226,7 @@ const Dashboard = () => {
   // hooks' own catch/console.error, so just skip rendering these cards rather
   // than showing stale/zeroed figures.
   const isRestrictedRole = getVisibleHrefs((user?.role || "").toLowerCase().trim()) !== null;
-  const isSchool = user?.orgType === 'NONPROFIT';
+  const isSchool = user?.orgType === 'NONPROFIT' || user?.orgType === 'SCHOOL';
   const role = (user?.role || '').toLowerCase().trim();
   const isSchoolRestrictedRole = isSchool && (role === 'teacher' || role === 'class teacher');
 
