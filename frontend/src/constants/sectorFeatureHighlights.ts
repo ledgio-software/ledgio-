@@ -10,14 +10,14 @@ export interface SectorHighlight {
 }
 
 export const SECTOR_FEATURE_HIGHLIGHTS: Record<string, SectorHighlight> = {
-  NONPROFIT: {
-    tagline: 'Built for Schools, Churches & NGOs',
+  SCHOOL: {
+    tagline: 'Built for Schools & Colleges',
     planFeatures: {
       starter: [
         'Student Ledger & Fee Collection',
         'Class & Teacher Management',
         'Income & Expenditure Reports',
-        'Donor & Grant Tracking',
+        'Expense Claims & Petty Cash',
         'MoMo / Bank Reconciliation',
       ],
       business: [
@@ -32,6 +32,90 @@ export const SECTOR_FEATURE_HIGHLIGHTS: Record<string, SectorHighlight> = {
         'Everything in Business',
         'Multi-Campus / Branch Management',
         'Budgeting & Fund Accounting',
+        'Custom Financial Statements',
+        'Advanced Analytics Dashboard',
+        'Priority Support',
+      ],
+    },
+  },
+  CHURCH: {
+    tagline: 'Built for Churches & Faith Organisations',
+    planFeatures: {
+      starter: [
+        'Tithes & Offerings Tracking',
+        'Restricted & Unrestricted Funds',
+        'Income & Expenditure Reports',
+        'Supplier Bills & Expenses',
+        'MoMo / Bank Reconciliation',
+      ],
+      business: [
+        'Everything in Starter',
+        'Donor & Member Contribution Records',
+        'Per-Fund Balance Sheet',
+        'Approval Workflows',
+        'Budgeting per Department / Fund',
+        'SMS / Email Notifications',
+      ],
+      professional: [
+        'Everything in Business',
+        'Multi-Branch / District Management',
+        'Grant & Project Fund Tracking',
+        'Custom Financial Statements',
+        'Advanced Reporting Dashboard',
+        'Priority Support',
+      ],
+    },
+  },
+  NGO: {
+    tagline: 'Built for NGOs & Non-Profits',
+    planFeatures: {
+      starter: [
+        'Donor & Grant Tracking',
+        'Restricted Fund Accounting',
+        'Income & Expenditure Reports',
+        'Supplier Bills & Expenses',
+        'MoMo / Bank Reconciliation',
+      ],
+      business: [
+        'Everything in Starter',
+        'Project Expenditure Tagging',
+        'Per-Fund Balance Sheet',
+        'Approval Workflows',
+        'Budgeting per Project / Fund',
+        'Donor Receipt Generation',
+      ],
+      professional: [
+        'Everything in Business',
+        'Multi-Office / Country Management',
+        'Grant Compliance Reporting',
+        'Custom Financial Statements',
+        'Advanced Analytics Dashboard',
+        'Priority Support',
+      ],
+    },
+  },
+  NONPROFIT: {
+    tagline: 'Built for Schools, Churches & NGOs',
+    planFeatures: {
+      starter: [
+        'Fund Accounting',
+        'Income & Expenditure Reports',
+        'Donor & Grant Tracking',
+        'Supplier Bills & Expenses',
+        'MoMo / Bank Reconciliation',
+      ],
+      business: [
+        'Everything in Starter',
+        'Per-Fund Balance Sheet',
+        'Approval Workflows',
+        'Budgeting per Department / Fund',
+        'SMS / Email Notifications',
+        'Donor Receipt Generation',
+      ],
+      professional: [
+        'Everything in Business',
+        'Multi-Branch / Office Management',
+        'Grant & Project Fund Tracking',
         'Custom Financial Statements',
         'Advanced Analytics Dashboard',
         'Priority Support',
