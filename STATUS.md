@@ -2,6 +2,61 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Feature: Church Visitors, Ministries, Events & Branches (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Completed the Church module with four new sub-modules: first-timer/visitor tracking with follow-up pipeline, departments/ministries with member assignment, events & programs with attendance registration, and multi-branch management.
+
+**Changes:**
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migrations 029–032: `church_visitors`, `church_ministries`, `church_ministry_members`, `church_events`, `church_event_registrations`, `church_branches` tables; added `branch_id` FK column to `church_members`, `church_attendance_sessions`, `church_givings`.
+- **`backend/src/routes/churchVisitors.ts`** *(new)* — GET (filter by status/date), POST, PATCH `/:id/follow-up`, POST `/:id/convert`, DELETE `/:id`.
+- **`backend/src/routes/churchMinistries.ts`** *(new)* — Ministry CRUD + GET `/:id/members`, POST/DELETE `/:id/members/:memberId`.
+- **`backend/src/routes/churchEvents.ts`** *(new)* — Event CRUD + registrations + `PATCH /:id/registrations/:regId/attended`.
+- **`backend/src/routes/churchBranches.ts`** *(new)* — Branch CRUD with pastor name JOIN and member count.
+- **`backend/src/app.ts`** — Registers all 4 new routers at `/api/v1/church/{visitors,ministries,events,branches}`.
+- **`frontend/src/pages/church/Visitors.tsx`** *(new)* — Visitor log table, follow-up status badges/filters, add and follow-up modals.
+- **`frontend/src/pages/church/Ministries.tsx`** *(new)* — Ministry list + member assignment panel.
+- **`frontend/src/pages/church/Events.tsx`** *(new)* — Event list + registration panel with attendance toggle.
+- **`frontend/src/pages/church/Branches.tsx`** *(new)* — Branch cards grid with summary stats, add/edit modal.
+- **`frontend/src/lib/navigation.ts`** — Added Visitors, Ministries, Events, Branches to CHURCH section.
+- **`frontend/src/App.tsx`** — Lazy imports and routes for all 4 new church pages.
+- **`frontend/src/pages/church/Attendance.tsx`** — Removed unused `Plus` import (CI fix).
+- **`frontend/src/pages/church/Members.tsx`** — Removed unused `MEETING_DAYS` constant (CI fix).
+
+## [Date: 2026-09-21] - Feature: Church Dashboard + Giving Module (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Extended the Church management module with a Dashboard overview and Offerings/Giving tracker, completing the full church feature set before pushing.
+
+**Changes:**
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration 028: `church_givings` table (giving_date, giving_type, amount, currency, member_id, payment_method, reference, service_type).
+- **`backend/src/routes/churchGiving.ts`** *(new)* — GET `/summary`, GET `/`, POST `/`, DELETE `/:id` for offering records.
+- **`backend/src/routes/churchDashboard.ts`** *(new)* — GET `/` aggregates: members, last Sunday, pledges, giving this month, 8-week trend, giving by type, cell group count.
+- **`backend/src/app.ts`** — Registers `churchGivingRouter` and `churchDashboardRouter`.
+- **`frontend/src/pages/church/Dashboard.tsx`** *(new)* — 4 stat cards, attendance trend bar chart, pledge progress, giving by type.
+- **`frontend/src/pages/church/Giving.tsx`** *(new)* — Filterable giving records table, monthly trend chart, record giving modal.
+- **`frontend/src/lib/navigation.ts`** — Dashboard and Giving added to CHURCH section.
+- **`frontend/src/App.tsx`** — Lazy imports and routes for `ChurchDashboard` (/church/dashboard) and `ChurchGiving` (/church/giving).
+
+## [Date: 2026-09-21] - Feature: Church Management Module — Members, Cell Groups, Attendance, Pledges (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+CHURCH org-type tenants lacked any church-specific features (membership management, cell group tracking, attendance recording, pledge management). Built a complete church management module from DB to UI.
+
+**Changes:**
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration 027: `church_cell_groups`, `church_members`, `church_attendance_sessions`, `church_attendance_records`, `church_pledges` tables.
+- **`backend/src/routes/churchMembers.ts`** *(new)* — CRUD for church members with cell-group lookup.
+- **`backend/src/routes/churchCellGroups.ts`** *(new)* — CRUD for cell groups with member count.
+- **`backend/src/routes/churchAttendance.ts`** *(new)* — Attendance sessions (bulk + per-member), summary stats.
+- **`backend/src/routes/churchPledges.ts`** *(new)* — Pledge recording with fulfillment tracking.
+- **`backend/src/app.ts`** — Registers 4 new church routes under `/api/v1/church/*`.
+- **`frontend/src/pages/church/Members.tsx`** *(new)* — Member list, search, add/edit modal.
+- **`frontend/src/pages/church/CellGroups.tsx`** *(new)* — Cell group cards, add/edit/delete.
+- **`frontend/src/pages/church/Attendance.tsx`** *(new)* — Record/bulk attendance, session list, summary with trend chart.
+- **`frontend/src/pages/church/Pledges.tsx`** *(new)* — Pledge list with payment recording, summary totals.
+- **`frontend/src/lib/navigation.ts`** — CHURCH section added (Members, Cell Groups, Attendance, Pledges), shown only for CHURCH orgType.
+- **`frontend/src/App.tsx`** — Lazy imports and routes for all 4 church pages.
+
 ## [Date: 2026-09-21] - Fix: plan names "Shop"/"Enterprise" → "Starter"/"Professional" across frontend and backend (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**
