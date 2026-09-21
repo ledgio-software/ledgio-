@@ -126,7 +126,7 @@ describe('Plan tiers (Shop/Business/Enterprise) - feature gating, admin upgrade,
 
       expect(res.status).toBe(403);
       expect(res.body.upgradeRequired).toBe(true);
-      expect(res.body.error).toContain('Shop plan is limited to 3');
+      expect(res.body.error).toContain('Starter plan is limited to 3');
     });
   });
 });
