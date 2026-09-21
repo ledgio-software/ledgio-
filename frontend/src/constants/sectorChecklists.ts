@@ -20,6 +20,46 @@ export const SECTOR_CHECKLISTS: Record<string, SectorChecklist> = {
       { id: 'first-payment', label: 'Collect First Fee Payment', route: '/school/fee-collection' },
     ],
   },
+  SCHOOL: {
+    title: 'School Setup',
+    steps: [
+      { id: 'academic-terms', label: 'Add Academic Terms', route: '/school/terms' },
+      { id: 'classes-teachers', label: 'Set Up Classes & Teachers', route: '/school/classes' },
+      { id: 'import-students', label: 'Import Students', route: '/school/students' },
+      { id: 'fee-schedules', label: 'Create Fee Schedules', route: '/school/fee-schedules' },
+      { id: 'first-payment', label: 'Collect First Fee Payment', route: '/school/fee-collection' },
+    ],
+  },
+  CHURCH: {
+    title: 'Church Setup',
+    steps: [
+      { id: 'fund-accounts', label: 'Set Up Fund Accounts (Tithes, Offerings)', route: '/accounts' },
+      { id: 'add-members', label: 'Add Members / Donors', route: '/customers' },
+      { id: 'first-offering', label: 'Record First Tithe or Offering', route: '/invoices' },
+      { id: 'expense-categories', label: 'Configure Expense Categories', route: '/accounts' },
+      { id: 'ie-report', label: 'Run Income & Expenditure Report', route: '/reports/pnl' },
+    ],
+  },
+  NGO: {
+    title: 'NGO Setup',
+    steps: [
+      { id: 'fund-accounts', label: 'Create Restricted Fund Accounts', route: '/accounts' },
+      { id: 'donors-grants', label: 'Add Donors & Grants', route: '/customers' },
+      { id: 'first-donation', label: 'Record First Donation', route: '/invoices' },
+      { id: 'project-tagging', label: 'Tag Project Expenditures', route: '/expenses' },
+      { id: 'fund-report', label: 'Run Per-Fund Balance Report', route: '/reports/pnl' },
+    ],
+  },
+  HOSPITALITY: {
+    title: 'Hotel / Guest House Setup',
+    steps: [
+      { id: 'room-types', label: 'Set Up Room Types & Rates', route: '/hospitality/rooms' },
+      { id: 'first-reservation', label: 'Create First Reservation', route: '/hospitality/reservations' },
+      { id: 'guest-folio', label: 'Post Charges to Guest Folio', route: '/hospitality/folios' },
+      { id: 'expenses', label: 'Record Operating Expenses', route: '/expenses' },
+      { id: 'revenue-report', label: 'Run Revenue Report', route: '/reports/pnl' },
+    ],
+  },
   PHARMACY: {
     title: 'Pharmacy Setup',
     steps: [
