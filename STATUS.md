@@ -2,6 +2,51 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - ledgio-hub React sync: 3 new sectors, updated messaging, new homepage sections (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Synced all updated content from the standalone HTML prototype (`ledgio-hub/public/index.html`) into the live React app. Added 3 missing sector pages, updated marketing copy for 90-day free trial positioning, added News & Updates and Customer Stories sections to the homepage, updated integrations list and testimonials, and added a dismissible announcement banner.
+
+**Changes:**
+
+1. **`ledgio-hub/src/lib/sectors.ts`** — Added 3 new sectors: `hospitality` (Hotels & Guest Houses, amber accent), `construction` (Construction & Contractors, orange/red accent), `wholesale` (Wholesale & Distribution, indigo accent). Each with full `SectorData` shape: slug, icon, label, tagline, heroImage, hero CTA, accent colors, stats, features, howItWorks.
+
+2. **`ledgio-hub/src/lib/sectorIcons.tsx`** — Added Lucide React icon mappings for the 3 new sectors: `Hotel`, `HardHat`, `Package`.
+
+3. **`ledgio-hub/src/lib/sectorPricing.ts`** — Added pricing tiers for `construction` (₵250/₵450/₵750) and `wholesale` (₵200/₵400/₵700). Hospitality pricing was already present. Fixed duplicate `];` array closure bug introduced during insertion.
+
+4. **`ledgio-hub/src/components/Header.tsx`** — Updated Solutions dropdown from 7 to 8 sectors. Replaced `Enterprise & Multi-Branch` with `Hotels & Guest Houses`; added `Wholesale & Distribution` and `Construction & Contractors`.
+
+5. **`ledgio-hub/src/components/Footer.tsx`** — Updated Solutions list to match 8 sectors. Updated support email: `ledgioapp@gmail.com` → `support@ledgio.app`.
+
+6. **`ledgio-hub/src/App.tsx`** — Added dismissible `AnnounceBanner` component announcing Construction & Manufacturing sector launch. Renders above the main Header.
+
+7. **`ledgio-hub/src/pages/Home.tsx`** — Multiple updates:
+   - WHY_STATS: 8 sectors, 90-day free trial, GH₵0 setup, 100% isolation
+   - TESTIMONIALS: expanded to 4 with sector badges (Construction, Retail, Hospitality, Pharmacy)
+   - INTEGRATIONS: updated to 8 items (GRA e-VAT, MTN MoMo, Vodafone Cash, AirtelTigo, All Ghana Banks, SSNIT, NHIS, GRA WHT)
+   - Hero headline: "Accounting Built for How Ghana Does Business."
+   - Hero CTA: "Start Free — 90-Day Trial"
+   - Trust notes: "90-day free trial", "GRA e-VAT compliant", "Workspace live in minutes"
+   - Added **News & Updates section** (featured article + 4 news items)
+   - Added **Customer Stories section** (8-photo grid linking to all sector pages)
+   - Final CTA updated: "Register Free — 90-Day Trial"
+
+**Files changed:**
+- `ledgio-hub/src/lib/sectors.ts`
+- `ledgio-hub/src/lib/sectorIcons.tsx`
+- `ledgio-hub/src/lib/sectorPricing.ts`
+- `ledgio-hub/src/components/Header.tsx`
+- `ledgio-hub/src/components/Footer.tsx`
+- `ledgio-hub/src/App.tsx`
+- `ledgio-hub/src/pages/Home.tsx`
+- `STATUS.md`
+- `TASKS.md`
+
+**PR:** #104 (draft) — Vercel preview deployed ✅
+
+---
+
 ## [Date: 2026-09-19] - Sector Onboarding: Route audit, test fix, NONPROFIT highlights (feature/sector-onboarding-quick-guide)
 
 **What/Why:**
