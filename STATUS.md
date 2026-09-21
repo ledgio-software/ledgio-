@@ -2,6 +2,21 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Fix: subscription page showing wrong sector features for CHURCH/NGO/SCHOOL (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+The "Subscribe / Upgrade Plan" page in Settings showed "Student Ledger & Fee Collection" and "Class & Teacher Management" to all nonprofit org types including churches and NGOs. `SECTOR_FEATURE_HIGHLIGHTS` only had a generic `NONPROFIT` entry; Settings.tsx fell back to `BUSINESS` for CHURCH/NGO/SCHOOL. Added dedicated entries for all three types so the subscription card shows the correct features and correct tagline ("Built for Churches & Faith Organisations", etc.).
+
+**Changes:**
+- **`frontend/src/constants/sectorFeatureHighlights.ts`** — Added `SCHOOL`, `CHURCH`, `NGO` entries with appropriate starter/business/professional feature lists. Updated `NONPROFIT` (legacy) to a generic fund-accounting list.
+
+**Files changed:**
+- `frontend/src/constants/sectorFeatureHighlights.ts`
+
+**PR:** #111 (draft)
+
+---
+
 ## [Date: 2026-09-21] - Fix: CHURCH/NGO seeing school features — split NONPROFIT into SCHOOL/CHURCH/NGO org types + Pricing hero image (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**
