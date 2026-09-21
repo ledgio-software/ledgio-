@@ -92,7 +92,7 @@ export function Footer() {
               ))}
               <div className="flex items-center gap-2 text-xs text-ink-500 mt-1">
                 <Mail className="h-3.5 w-3.5 text-brand-600 flex-shrink-0" />
-                <a href="mailto:support@ledgio.app" className="hover:text-brand-400 transition-colors">support@ledgio.app</a>
+                <a href="mailto:ledgioapp@gmail.com" className="hover:text-brand-400 transition-colors">ledgioapp@gmail.com</a>
               </div>
             </div>
           </div>
