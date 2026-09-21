@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Modal } from "../../components/ui/Modal";
 import { useAuth } from "../../contexts/AuthContext";
 import { api } from "../../lib/api";
-import { FileText, ShoppingBag, Package, Briefcase, Heart, Building2, Pill, HardHat, BedDouble, GraduationCap, Church, Users } from "lucide-react";
+import { FileText, ShoppingBag, Package, Briefcase, Building2, Pill, HardHat, BedDouble, GraduationCap, Church, Users } from "lucide-react";
 import { AuthSplitLayout } from "../../components/layout/AuthSplitLayout";
 
 const BUSINESS_PROFILES = [
