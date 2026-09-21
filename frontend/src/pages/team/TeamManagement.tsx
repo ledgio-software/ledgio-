@@ -285,7 +285,7 @@ export function TeamManagement() {
   };
 
   const isAdmin = user?.role === "Admin";
-  const isSchool = (user?.orgType ?? "").toUpperCase() === "NONPROFIT";
+  const isSchool = user?.orgType === "NONPROFIT" || user?.orgType === "SCHOOL";
   const roleOptions = isSchool ? SCHOOL_ROLE_OPTIONS : ROLE_OPTIONS;
 
   return (

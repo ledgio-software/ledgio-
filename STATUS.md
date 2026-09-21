@@ -2,6 +2,52 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Fix: CHURCH/NGO seeing school features — split NONPROFIT into SCHOOL/CHURCH/NGO org types + Pricing hero image (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Two fixes in one push: (1) Church tenants who registered as NONPROFIT were seeing Students, Teachers, Fee Collection, and Timetable — the full school module — because the SCHOOL nav section was gated to `orgTypeOnly: "NONPROFIT"`, a type shared by all nonprofit orgs. Fixed by splitting the single NONPROFIT card into three distinct org types (SCHOOL, CHURCH, NGO), each with its own nav filtering rules. (2) The Pricing page hero section had no background image; added an Unsplash finance photo with a thin translucent scrim.
+
+**Changes:**
+
+1. **`frontend/src/lib/navigation.ts`** — Changed SCHOOL nav section `orgTypeOnly` from `"NONPROFIT"` to `"SCHOOL"`. Added `SCHOOL`, `CHURCH`, `NGO` entries to `ORG_TYPE_HIDDEN` map (SCHOOL hides invoices/customers/POS/inventory; CHURCH/NGO hide POS/inventory but keep invoices/customers/purchase-orders for donation receipts and donor tracking). Added `NONPROFIT_FAMILY` set (`NONPROFIT`, `SCHOOL`, `CHURCH`, `NGO`) and widened fund-accounting block and POS toggle to use it.
+
+2. **`frontend/src/pages/auth/Register.tsx`** — Split single "NGO / School / Church" card (NONPROFIT) into three separate cards: School/College (SCHOOL, GraduationCap icon), Church/Faith Organisation (CHURCH, Church icon), NGO/Non-Profit (NGO, Users icon).
+
+3. **`frontend/src/pages/admin/AdminCoreEngine.tsx`** — Added SCHOOL, CHURCH, NGO options to org-type dropdown; kept NONPROFIT as legacy option.
+
+4. **`frontend/src/pages/onboarding/OnboardingWizard.tsx`** — Widened `isNonprofit` check to include CHURCH and NGO.
+
+5. **`frontend/src/pages/team/TeamManagement.tsx`** — Widened `isSchool` check to `NONPROFIT || SCHOOL`.
+
+6. **`frontend/src/pages/reports/ProfitAndLoss.tsx`** — Widened `isSchool` check to `NONPROFIT || SCHOOL`.
+
+7. **`frontend/src/App.tsx`** — Widened `isSchool` check to `NONPROFIT || SCHOOL`.
+
+8. **`backend/src/services/tenantService.ts`** — Added SCHOOL, CHURCH, NGO to `VALID_ORG_TYPES`.
+
+9. **`backend/src/data/ghanaSmeChartOfAccountsTemplate.ts`** — Extended school COA template to apply to both `NONPROFIT` (legacy) and `SCHOOL` org types.
+
+10. **`backend/src/services/pdfGenerationService.ts`** — Added dedicated onboarding PDF content (tagline, firstSteps, keyFeatures) for SCHOOL, CHURCH, and NGO before the generic NONPROFIT entry.
+
+11. **`ledgio-hub/src/pages/Pricing.tsx`** — Added Unsplash finance background image (`photo-1554224155-8d04cb21cd6c`) with thin `from-ink-950/40 via-transparent to-ink-950/70` scrim to the previously plain hero section.
+
+**Files changed:**
+- `frontend/src/lib/navigation.ts`
+- `frontend/src/pages/auth/Register.tsx`
+- `frontend/src/pages/admin/AdminCoreEngine.tsx`
+- `frontend/src/pages/onboarding/OnboardingWizard.tsx`
+- `frontend/src/pages/team/TeamManagement.tsx`
+- `frontend/src/pages/reports/ProfitAndLoss.tsx`
+- `frontend/src/App.tsx`
+- `backend/src/services/tenantService.ts`
+- `backend/src/data/ghanaSmeChartOfAccountsTemplate.ts`
+- `backend/src/services/pdfGenerationService.ts`
+- `ledgio-hub/src/pages/Pricing.tsx`
+
+**PR:** #110 (pending) ← branch `claude/sharp-wozniak-xf9fkl`, commit `2e23bb5` + `e452dfe`
+
+---
+
 ## [Date: 2026-09-21] - ledgio-hub UX polish: scroll fix, email unification, hero visibility, CTA background (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**

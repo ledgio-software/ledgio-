@@ -55,6 +55,57 @@ interface SectorContent {
 }
 
 const SECTOR_CONTENT: Record<string, SectorContent> = {
+  SCHOOL: {
+    tagline: 'School Management & Fee Collection Platform',
+    firstSteps: [
+      { title: '1. Add Academic Terms', body: 'Go to School > Academic Terms and create your current term (e.g. Term 1 – 2025/2026). Terms gate fee schedules and reports so everything stays organized by period.' },
+      { title: '2. Set Up Classes & Teachers', body: 'Add your class groups under School > Classes and register teaching staff under School > Teachers.' },
+      { title: '3. Import Students', body: 'Enrol students under School > Students. Bulk import is supported via the CSV upload button.' },
+      { title: '4. Create Fee Schedules', body: 'Under School > Fee Schedules, define what each class owes per term (tuition, exam levy, PTA, boarding, etc.).' },
+      { title: '5. Collect Your First Fee Payment', body: 'Go to School > Fee Collection, search for a student and record the payment. A receipt is generated immediately.' },
+    ],
+    keyFeatures: [
+      { title: 'Student Ledger', body: 'Full per-student financial history: every fee charged, payment received, discount granted, and outstanding balance.' },
+      { title: 'Fee Defaulters & Payment Plans', body: 'Identify students with overdue fees and set up instalment plans.' },
+      { title: 'Attendance & Assessments', body: 'Record daily attendance and continuous-assessment scores; generate term report cards.' },
+      { title: 'NaSIA Compliance Dashboard', body: 'Auto-populated NaSIA statistics ready to copy into inspection returns.' },
+      { title: 'I&E Reports (Not P&L)', body: 'Income & Expenditure statements instead of Profit & Loss.' },
+    ],
+  },
+  CHURCH: {
+    tagline: 'Church & Faith Organisation Management Platform',
+    firstSteps: [
+      { title: '1. Set Up Your Chart of Accounts', body: 'Go to Settings > Chart of Accounts and customise account names to match your church structure (e.g. Tithe Income, Offering Income, Building Fund).' },
+      { title: '2. Create Donor Funds', body: 'Under Finance > Funds, create your restricted and unrestricted funds (e.g. Building Fund, Welfare Fund, General Fund).' },
+      { title: '3. Record Weekly Offerings', body: 'Post each Sunday\'s tithe and offering collections as a Journal Entry or Sales Invoice tagged to the appropriate fund.' },
+      { title: '4. Manage Expenses', body: 'Record all church expenditure — salaries, utilities, outreach costs — under Expenses or Supplier Bills.' },
+      { title: '5. Run Your First I&E Report', body: 'Go to Reports > Income & Expenditure to see your monthly financial position at a glance.' },
+    ],
+    keyFeatures: [
+      { title: 'Fund Accounting', body: 'Track restricted and unrestricted funds separately so donor money always goes where it was intended.' },
+      { title: 'Tithe & Offering Records', body: 'Post and reconcile weekly collections by service, pledge campaign, or special drive.' },
+      { title: 'Donor Receipts', body: 'Issue acknowledgement receipts for donations and track each donor\'s giving history.' },
+      { title: 'Expense Approval Workflow', body: 'Route spending requests through an approval chain before they hit the books.' },
+      { title: 'I&E Reports (Not P&L)', body: 'Income & Expenditure statements in the language of church finance, not commerce.' },
+    ],
+  },
+  NGO: {
+    tagline: 'NGO & Non-Profit Financial Management Platform',
+    firstSteps: [
+      { title: '1. Set Up Your Chart of Accounts', body: 'Customise account names to match your NGO structure (e.g. Grant Income, Project Expenditure, Admin & Overheads).' },
+      { title: '2. Create Donor Funds', body: 'Under Finance > Funds, create one fund per donor or project so restricted grants are tracked separately.' },
+      { title: '3. Record Grant Receipts', body: 'Post donor receipts as invoices or journal entries tagged to the appropriate fund.' },
+      { title: '4. Record Project Expenditure', body: 'Tag every expense to a fund or project code so you can report back to donors accurately.' },
+      { title: '5. Run Your First I&E Report', body: 'Go to Reports > Income & Expenditure for a per-fund or consolidated view of your financial position.' },
+    ],
+    keyFeatures: [
+      { title: 'Fund Accounting', body: 'Separate tracking for each restricted grant or donor fund — never mix project money.' },
+      { title: 'Donor Receipts & Invoices', body: 'Issue official receipts for donations and track outstanding pledges.' },
+      { title: 'Project Expense Tagging', body: 'Tag every bill and journal entry to a project or cost centre for granular donor reporting.' },
+      { title: 'Expense Approval Workflow', body: 'Route spending requests through an approval chain before they hit the books.' },
+      { title: 'I&E Reports (Not P&L)', body: 'Income & Expenditure statements instead of Profit & Loss — the standard for non-profit reporting.' },
+    ],
+  },
   NONPROFIT: {
     tagline: 'School, Church & NGO Management Platform',
     firstSteps: [

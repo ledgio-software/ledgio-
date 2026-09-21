@@ -135,41 +135,69 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/reports/stock-aging', '/reports/sales-channel', '/reports/monthly-sales-ledger',
     '/sales-orders', '/delivery-notes', '/recurring-invoices',
   ]),
+  // SCHOOL: Fee Collection replaces Invoices; Students replaces Customers
   NONPROFIT: new Set([
-    // No product sales or stock
     '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
     '/inventory', '/inventory/serial-numbers', '/analytics/inventory',
-    // No manufacturing or job costing
     '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
     '/cost-categories',
-    // Schools use Fee Collection for income — not generic AR invoicing
     '/invoices',
-    // Schools rarely raise formal purchase orders; no payment matching workflow
     '/purchase-orders', '/payment-matching',
-    // No interest charges or product price lists
     '/reports/interest-charges', '/settings/price-lists',
-    // WHT is a GRA obligation for commercial entities; schools are typically exempt
     '/settings/wht-rates',
-    // Advanced accounting features not used in school context
     '/settings/scenarios', '/settings/voucher-classes', '/pdc',
-    // Reports irrelevant to schools
     '/reports/monthly-sales-ledger', '/reports/sales-channel',
     '/reports/landed-costs', '/reports/stock-movement',
     '/reports/stock-aging', '/reports/registers',
-    // Multi-campus comparison not relevant (single-campus schools)
     '/reports/branch-comparison',
-    // Schools typically VAT-exempt on educational services
     '/reports/vat-return',
-    // Analytics Dashboard replaced by MIS Dashboard in School section
     '/reports/analytics',
-    // Too specialised for school finance team
     '/reports/benford-analysis',
-    // No customer CRM (schools use Students module)
     '/customers',
-    // Retail POS executive report (shops, tills, till closeouts) — not applicable to schools
     '/reports/executive',
-    // Tax Rates configure VAT/NHIL on sales invoices; educational services are VAT-exempt under GRA
     '/settings/tax-rates',
+  ]),
+  SCHOOL: new Set([
+    '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
+    '/inventory', '/inventory/serial-numbers', '/analytics/inventory',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/cost-categories',
+    '/invoices',
+    '/purchase-orders', '/payment-matching',
+    '/reports/interest-charges', '/settings/price-lists',
+    '/settings/wht-rates',
+    '/settings/scenarios', '/settings/voucher-classes', '/pdc',
+    '/reports/monthly-sales-ledger', '/reports/sales-channel',
+    '/reports/landed-costs', '/reports/stock-movement',
+    '/reports/stock-aging', '/reports/registers',
+    '/reports/branch-comparison',
+    '/reports/vat-return',
+    '/reports/analytics',
+    '/reports/benford-analysis',
+    '/customers',
+    '/reports/executive',
+    '/settings/tax-rates',
+  ]),
+  // CHURCH / NGO: Keep invoices (donation receipts), customers (donors), purchase orders
+  CHURCH: new Set([
+    '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
+    '/inventory', '/inventory/serial-numbers', '/analytics/inventory',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/cost-categories',
+    '/reports/monthly-sales-ledger', '/reports/sales-channel',
+    '/reports/landed-costs', '/reports/stock-movement',
+    '/reports/stock-aging', '/reports/registers',
+    '/reports/executive',
+  ]),
+  NGO: new Set([
+    '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
+    '/inventory', '/inventory/serial-numbers', '/analytics/inventory',
+    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/cost-categories',
+    '/reports/monthly-sales-ledger', '/reports/sales-channel',
+    '/reports/landed-costs', '/reports/stock-movement',
+    '/reports/stock-aging', '/reports/registers',
+    '/reports/executive',
   ]),
 };
 
@@ -318,7 +346,7 @@ export const navigationGroups: NavGroup[] = [
   },
   {
     sectionTitle: "SCHOOL",
-    orgTypeOnly: "NONPROFIT",
+    orgTypeOnly: "SCHOOL",
     items: [
       { name: "Teachers", href: "/school/teachers", icon: GraduationCap },
       { name: "Classes", href: "/school/classes", icon: Layers },
@@ -531,12 +559,13 @@ export function getVisibleNavGroups(
     (group) => !group.orgTypeOnly || group.orgTypeOnly === orgType
   );
 
-  if (orgType === "NONPROFIT") {
+  const NONPROFIT_FAMILY = new Set(["NONPROFIT", "SCHOOL", "CHURCH", "NGO"]);
+  if (NONPROFIT_FAMILY.has(orgType ?? "")) {
     groups = groups
       .map((group) => {
-        // INVENTORY section is entirely irrelevant for schools (handled by ORG_TYPE_HIDDEN too, belt-and-suspenders)
+        // Inventory irrelevant for all nonprofit types
         if (group.sectionTitle === "INVENTORY & GODOWNS") return null;
-        // Add Funds to Finance & Banking for grant/endowment tracking
+        // Add Funds to Finance & Banking for grant/endowment/donor-fund tracking
         if (group.sectionTitle === "FINANCE & BANKING") {
           return { ...group, items: [...group.items, { name: "Funds", href: "/settings/funds", icon: Landmark }] };
         }
@@ -559,8 +588,8 @@ export function getVisibleNavGroups(
   }
 
   // POS toggle: when posEnabled is false, hide /pos from BUSINESS tenants.
-  // Types that already hide POS via ORG_TYPE_HIDDEN or NONPROFIT block are unaffected.
-  if (!posEnabled && orgType !== "NONPROFIT") {
+  // Types that already hide POS via ORG_TYPE_HIDDEN or NONPROFIT_FAMILY block are unaffected.
+  if (!posEnabled && !NONPROFIT_FAMILY.has(orgType ?? "")) {
     groups = groups
       .map((group) =>
         group.sectionTitle === "SALES & PURCHASES"
