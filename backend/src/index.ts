@@ -153,24 +153,41 @@ const startServer = async () => {
       async () => { await KeepAliveCronService.ping(); },
       'Self-ping every 10 min to prevent Render cold starts');
 
+    // Helper: spawn a Python worker, skipping gracefully when python3 or the
+    // script is not present on this deployment (ENOENT → log + resolve).
+    const spawnPython = (workerPath: string, args: string[] = [], label: string) =>
+      new Promise<void>((resolve, reject) => {
+        const { spawn } = require('child_process');
+        const fs = require('fs');
+        if (!fs.existsSync(workerPath)) {
+          console.warn(`[${label}] Worker script not found at ${workerPath} — skipping`);
+          return resolve();
+        }
+        const proc = spawn('python3', [workerPath, ...args], {
+          env: { ...process.env },
+          stdio: 'inherit',
+        });
+        proc.on('close', (code: number) => {
+          if (code === 0) resolve();
+          else reject(new Error(`${label} exited with code ${code}`));
+        });
+        proc.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'ENOENT') {
+            console.warn(`[${label}] python3 not available on this server — skipping`);
+            resolve();
+          } else {
+            reject(err);
+          }
+        });
+      });
+
     // Nightly intelligence worker: cash forecast, invoice risk, inventory demand, anomaly detection
     await scheduleJob(
       'Ledgio Intelligence Worker',
       '0 1 * * *',
       async () => {
-        const { spawn } = require('child_process');
-        await new Promise<void>((resolve, reject) => {
-          const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/main.py');
-          const proc = spawn('python3', [workerPath, '--all'], {
-            env: { ...process.env },
-            stdio: 'inherit',
-          });
-          proc.on('close', (code: number) => {
-            if (code === 0) resolve();
-            else reject(new Error(`Intelligence worker exited with code ${code}`));
-          });
-          proc.on('error', reject);
-        });
+        const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/main.py');
+        await spawnPython(workerPath, ['--all'], 'Ledgio Intelligence Worker');
       },
       'Nightly AI insight computation: cash forecast, invoice risk, inventory demand, anomaly detection',
     );
@@ -180,19 +197,8 @@ const startServer = async () => {
       'Behavioral Telemetry Collector',
       '0 * * * *',
       async () => {
-        const { spawn } = require('child_process');
-        await new Promise<void>((resolve, reject) => {
-          const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/behavioral_telemetry.py');
-          const proc = spawn('python3', [workerPath], {
-            env: { ...process.env },
-            stdio: 'inherit',
-          });
-          proc.on('close', (code: number) => {
-            if (code === 0) resolve();
-            else reject(new Error(`Behavioral telemetry exited with code ${code}`));
-          });
-          proc.on('error', reject);
-        });
+        const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/behavioral_telemetry.py');
+        await spawnPython(workerPath, [], 'Behavioral Telemetry Collector');
       },
       'Hourly: transform audit_logs into behavior_events for all active tenants',
     );
@@ -202,19 +208,8 @@ const startServer = async () => {
       'Federated Learning Round',
       '30 1 * * *',
       async () => {
-        const { spawn } = require('child_process');
-        await new Promise<void>((resolve, reject) => {
-          const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/federated_round.py');
-          const proc = spawn('python3', [workerPath], {
-            env: { ...process.env },
-            stdio: 'inherit',
-          });
-          proc.on('close', (code: number) => {
-            if (code === 0) resolve();
-            else reject(new Error(`Federated round exited with code ${code}`));
-          });
-          proc.on('error', reject);
-        });
+        const workerPath = require('path').resolve(__dirname, '../../ledgio-ai/worker/federated_round.py');
+        await spawnPython(workerPath, [], 'Federated Learning Round');
       },
       'Nightly federated learning round: noised gradient aggregation across tenants for invoice risk model',
     );
