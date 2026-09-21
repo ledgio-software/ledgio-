@@ -2,6 +2,36 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - ledgio-hub UX polish: scroll fix, email unification, hero visibility, CTA background (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Four UX polish changes to the ledgio-hub marketing site: (1) Footer links now scroll to the top of the destination page instead of landing mid-scroll. (2) Contact email unified — footer had `support@ledgio.app` while every other page used `ledgioapp@gmail.com`. (3) All hero section background images made fully visible — they were nearly hidden behind heavy dark overlays (opacity 0.08–0.22 + multiple stacked ink-950 gradients). (4) "Ready to get started?" CTA cards given depth by adding an office background photo blended with mix-blend-overlay.
+
+**Changes:**
+
+1. **`ledgio-hub/src/App.tsx`** — Added `ScrollToTop` component (uses `useLocation` + `useEffect` to call `window.scrollTo(0, 0)` on every `pathname` change). Mounted above `<Layout>` inside `AppInner`.
+
+2. **`ledgio-hub/src/components/Footer.tsx`** — Changed contact email from `support@ledgio.app` to `ledgioapp@gmail.com` to match the address used on Demo, FAQ, Blog, and About pages.
+
+3. **`ledgio-hub/src/pages/Home.tsx`** — Hero: removed `opacity-[0.15]` from image; replaced heavy `from-ink-950/60 via-ink-950/80 to-ink-950` + radial-green-gradient overlay stack with a thin `from-ink-950/30 via-transparent to-ink-950/80` scrim. CTA section: bumped background image from `opacity-[0.08]` to `mix-blend-overlay opacity-30`.
+
+4. **`ledgio-hub/src/pages/SectorPage.tsx`** — Hero: removed `opacity-[0.22]` from image and dual-gradient overlay stack; replaced with `from-ink-950/80 via-transparent to-ink-950/30` scrim. CTA card: added office background photo (`photo-1497366216548-37526070297c`) with `mix-blend-overlay opacity-30` inside the `rounded-3xl` gradient card.
+
+5. **`ledgio-hub/src/pages/About.tsx`** — Hero: removed `opacity-[0.08]` from image and heavy `to-ink-950` gradient + radial overlay; replaced with `from-ink-950/30 via-transparent to-ink-950/80` scrim.
+
+**Files changed:**
+- `ledgio-hub/src/App.tsx`
+- `ledgio-hub/src/components/Footer.tsx`
+- `ledgio-hub/src/pages/Home.tsx`
+- `ledgio-hub/src/pages/SectorPage.tsx`
+- `ledgio-hub/src/pages/About.tsx`
+- `STATUS.md`
+- `TASKS.md`
+
+**PRs:** #107 (scroll + email fix), #108 (hero visibility + CTA background) — both merged ✅
+
+---
+
 ## [Date: 2026-09-21] - ledgio-hub React sync: 3 new sectors, updated messaging, new homepage sections (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**
