@@ -99,16 +99,15 @@ export function hasRequiredRole(userRole: string, allowedRoles: string[]): boole
   const uLower = userRole.toLowerCase().trim();
   const allowedLower = allowedRoles.map((r) => r.toLowerCase());
 
-  // 1. Admin-only check — Owner is the real-world equivalent of Admin
-  if (allowedLower.includes('admin')) {
-    return uLower === 'admin' || uLower === 'owner';
-  }
-
-  // 2. Exact match
-  if (allowedLower.includes(uLower)) return true;
-
-  // 3. Admin / Owner always pass non-Admin-only routes
+  // 1. Admin / Owner always pass any route that lists them
   if (uLower === 'admin' || uLower === 'owner') return true;
+
+  // 2. Admin-only route — when 'admin' is the sole allowed role only admin/owner pass (step 1 above).
+  // When 'admin' appears alongside other roles the route is not admin-only, so fall through.
+  if (allowedLower.length === 1 && allowedLower[0] === 'admin') return false;
+
+  // 3. Exact match
+  if (allowedLower.includes(uLower)) return true;
 
   // 4. Operational roles pass all non-Admin-only routes
   if (OPERATIONAL_ROLES.has(uLower)) return true;

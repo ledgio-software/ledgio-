@@ -2,6 +2,14 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Fix: RBAC bug — requireRole('Admin', 'Accountant') was blocking Accountants (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+`hasRequiredRole` treated any presence of 'Admin' in the allowed-roles list as admin-only, causing early return and blocking Accountants. This meant all church POST routes (`/church/members`, `/church/giving`, etc.) rejected Accountant-role users with 403. Fixed by moving the admin/owner pass-through first, and only applying the strict admin-only short-circuit when 'Admin' is the *sole* allowed role.
+
+**Changes:**
+- **`backend/src/middleware/rbacMiddleware.ts`** — Restructured steps 1-3 of `hasRequiredRole`: admin/owner now always pass first; admin-only guard now fires only when allowedRoles = ['Admin']; exact-match check is step 3.
+
 ## [Date: 2026-09-21] - Fix: Remove duplicate Dashboard entry for CHURCH tenants (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**
