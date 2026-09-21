@@ -39,10 +39,36 @@
     .btn-lg { padding: 14px 32px; font-size: 16px; }
     .badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25); color: var(--em-light); font-size: 12px; font-weight: 600; }
 
-    /* Hero */
+
+    /* Hero carousel */
     .sector-hero { position: relative; min-height: 520px; display: flex; align-items: center; overflow: hidden; }
-    .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
-    .hero-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(7,13,10,.92) 0%, rgba(7,13,10,.65) 60%, rgba(7,13,10,.4) 100%); }
+    .hc-track { position: absolute; inset: 0; display: flex; transition: none; }
+    .hc-slide { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
+    .hc-slide.active { opacity: 1; }
+    .hc-slide img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+    .hero-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(7,13,10,.92) 0%, rgba(7,13,10,.65) 60%, rgba(7,13,10,.4) 100%); z-index: 1; pointer-events: none; }
+    .hc-btn { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(7,13,10,.55); border: 1px solid rgba(255,255,255,.15); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: background .2s; padding: 0; line-height: 1; }
+    .hc-btn:hover { background: rgba(16,185,129,.35); }
+    .hc-prev { left: 16px; }
+    .hc-next { right: 16px; }
+    .hc-dots { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 8px; }
+    .hc-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.35); border: none; cursor: pointer; padding: 0; transition: background .2s; }
+    .hc-dot.active { background: var(--em); }
+    /* Who / How sections */
+    .who-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .who-grid { grid-template-columns: 1fr; } }
+    .who-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; text-align: center; }
+    .who-icon { font-size: 32px; margin-bottom: 14px; }
+    .who-role { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .who-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; position: relative; }
+    @media (max-width: 640px) { .how-steps { grid-template-columns: 1fr; gap: 16px; } }
+    .how-step { position: relative; padding: 0 24px; text-align: center; }
+    .how-step:not(:last-child)::after { content: ''; position: absolute; top: 28px; right: -1px; width: calc(100% - 60px); height: 2px; background: linear-gradient(90deg, var(--em), transparent); transform: translateX(50%); pointer-events: none; }
+    @media (max-width: 640px) { .how-step::after { display: none; } }
+    .how-num { width: 56px; height: 56px; border-radius: 50%; background: rgba(16,185,129,.12); border: 2px solid var(--em); display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 900; font-size: 18px; color: var(--em); margin: 0 auto 16px; }
+    .how-title { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .how-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
     .hero-content { position: relative; z-index: 2; padding: 80px 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
     .hero-content .badge { margin-bottom: 20px; }
     .hero-content h1 { font-size: clamp(36px, 5vw, 62px); font-weight: 900; color: var(--white); letter-spacing: -1.5px; margin-bottom: 18px; max-width: 680px; }
@@ -139,15 +165,80 @@
   </div>
 </nav>
 
-<!-- Hero -->
+<!-- Hero Carousel -->
 <section class="sector-hero">
-  <img class="hero-img" src="https://images.unsplash.com/photo-1534723452862-4c874956499a?w=1400&auto=format&fit=crop" alt="Retail shop interior" loading="eager" />
+  <div class="hc-slide active">
+    <img src="https://images.unsplash.com/photo-1534723452862-4c874956499a?w=1400&auto=format&fit=crop" alt="Retail shop interior" loading="eager" />
+  </div>
+  <div class="hc-slide">
+    <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1400&auto=format&fit=crop" alt="Retail checkout counter" loading="lazy" />
+  </div>
+  <div class="hc-slide">
+    <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1400&auto=format&fit=crop" alt="Shop products display" loading="lazy" />
+  </div>
   <div class="hero-overlay"></div>
+  <button class="hc-btn hc-prev" aria-label="Previous slide">&#8249;</button>
+  <button class="hc-btn hc-next" aria-label="Next slide">&#8250;</button>
+  <div class="hc-dots"><button class="hc-dot active" aria-label="Slide 1"></button><button class="hc-dot" aria-label="Slide 2"></button><button class="hc-dot" aria-label="Slide 3"></button></div>
   <div class="hero-content">
     <div class="badge">🛒 Retail &amp; Trading</div>
     <h1>Accounting Built for<br><span class="em">Retail &amp; Shops</span></h1>
     <p>From a single POS till to a multi-branch operation — Ledgio gives you real-time stock, daily cash reconciliation, and branch comparison reports without the spreadsheet chaos.</p>
     <a href="https://ledgio-fawn.vercel.app/register" class="btn btn-primary btn-lg">Start Free Trial — No Card Needed →</a>
+  </div>
+</section>
+
+<!-- Who this is for -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Who This Is For</h2>
+      <p>Built for every role that touches your business's finances.</p>
+    </div>
+    <div class="who-grid">
+      <div class="who-card">
+        <div class="who-icon">🏪</div>
+        <div class="who-role">Shop Owner</div>
+        <p class="who-desc">Needs real-time stock visibility and daily cash reconciliation without spreadsheets.</p>
+      </div>
+      <div class="who-card">
+        <div class="who-icon">📊</div>
+        <div class="who-role">Branch Manager</div>
+        <p class="who-desc">Needs cross-branch sales comparison and consolidated reports in one view.</p>
+      </div>
+      <div class="who-card">
+        <div class="who-icon">🧾</div>
+        <div class="who-role">Accountant</div>
+        <p class="who-desc">Needs tax-ready P&L, VAT returns, and payroll data at month-end.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>How It Works</h2>
+      <p>Three steps from setup to fully automated books.</p>
+    </div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-num">01</div>
+        <div class="how-title">Set up your store & products</div>
+        <p class="how-desc">Import your product catalogue, set opening stock levels, and configure your till points in under 10 minutes.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">02</div>
+        <div class="how-title">Record daily sales via POS or invoice</div>
+        <p class="how-desc">Each sale posts automatically to inventory, cash, and your daily reconciliation — no double entry.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">03</div>
+        <div class="how-title">Get automated P&L & stock alerts</div>
+        <p class="how-desc">Every Monday you receive a P&L summary email; low-stock SMS alerts fire the moment thresholds are crossed.</p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -341,5 +432,28 @@
   </div>
 </footer>
 
+<script>
+(function() {{
+  var slides = document.querySelectorAll('.hc-slide');
+  var dots = document.querySelectorAll('.hc-dot');
+  var cur = 0;
+  var timer;
+  function go(n) {{
+    slides[cur].classList.remove('active');
+    dots[cur].classList.remove('active');
+    cur = (n + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    dots[cur].classList.add('active');
+  }}
+  function start() {{ timer = setInterval(function(){{ go(cur+1); }}, 5000); }}
+  function stop() {{ clearInterval(timer); }}
+  document.querySelector('.sector-hero').addEventListener('mouseenter', stop);
+  document.querySelector('.sector-hero').addEventListener('mouseleave', start);
+  document.querySelector('.hc-prev').addEventListener('click', function(){{ stop(); go(cur-1); start(); }});
+  document.querySelector('.hc-next').addEventListener('click', function(){{ stop(); go(cur+1); start(); }});
+  dots.forEach(function(d,i){{ d.addEventListener('click', function(){{ stop(); go(i); start(); }}); }});
+  start();
+}})();
+</script>
 </body>
 </html>
