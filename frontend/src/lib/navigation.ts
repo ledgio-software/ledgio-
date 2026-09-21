@@ -540,7 +540,7 @@ export function getVisibleHrefs(role: string | undefined): Set<string> | null {
  *
  * Priority order:
  * 1. Org-type filtering (NONPROFIT hides POS/Inventory, adds Funds).
- * 2. Plan tier filtering (tier 1 = Shop plan hides items with minTier > 1).
+ * 2. Plan tier filtering (tier 1 = Starter plan hides items with minTier > 1).
  * 3. Role-based filtering (restricted roles like Cashier/Shop Manager/HR/
  *    Auditor see a fixed allowlist from RESTRICTED_ROLE_NAV — workspace mode
  *    is ignored for these roles since their nav is already minimal).

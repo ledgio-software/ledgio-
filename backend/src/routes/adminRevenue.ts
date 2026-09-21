@@ -8,7 +8,7 @@ const router = Router();
 
 const PLAN_MAP = new Map(SUBSCRIPTION_PLANS.map((p) => [p.tier, p]));
 const priceForTier = (tier: number): number => PLAN_MAP.get(tier)?.priceGhs ?? 105;
-const nameForTier = (tier: number): string => PLAN_MAP.get(tier)?.name ?? 'Shop';
+const nameForTier = (tier: number): string => PLAN_MAP.get(tier)?.name ?? 'Starter';
 
 /**
  * GET /api/v1/admin/revenue

@@ -61,9 +61,9 @@ Ledgio is a multi-tenant accounting platform. Revenue and expenses are recognize
 - Add tenant-specific extra fields to core entities.
 
 ## Plan Tiers
-- **Shop** (default for new signups): POS, Invoicing, Inventory, Expense Claims, core Reports, Chart of Accounts, Journal Vouchers - up to 3 team seats.
-- **Business**: everything in Shop, plus Bank Reconciliation, Recurring Transactions, Budgets, Approval Workflows, Custom Fields - up to 10 seats.
-- **Enterprise**: everything in Business, plus unlimited team seats.
+- **Starter** (default for new signups): POS, Invoicing, Inventory, Expense Claims, core Reports, Chart of Accounts, Journal Vouchers - up to 3 team seats.
+- **Business**: everything in Starter, plus Bank Reconciliation, Recurring Transactions, Budgets, Approval Workflows, Custom Fields - up to 10 seats.
+- **Professional**: everything in Business, plus unlimited team seats.
 - There is no self-serve billing yet - upgrading/downgrading a tenant's plan is done by a platform admin. A tenant on a lower plan sees a clear "requires the X plan" message (not a raw error) when they try to reach a locked feature, with a note to contact support.
 - Fund Accounting (restricted/unrestricted donor funds) is available to nonprofit-type tenants (churches/NGOs/schools) regardless of plan - it's driven by organization type, not business size.
 

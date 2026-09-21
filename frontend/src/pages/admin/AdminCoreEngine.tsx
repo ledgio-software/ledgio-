@@ -536,7 +536,7 @@ export function AdminCoreEngine() {
     try {
       const res = await api.put(`/tenants/${tenantId}/tier`, { tier }, { headers: adminHeaders });
       if (res.data.success) {
-        showToast(`Plan updated to ${res.data.data.tenant.tier === 1 ? "Shop" : res.data.data.tenant.tier === 2 ? "Business" : "Enterprise"}.`, "success");
+        showToast(`Plan updated to ${res.data.data.tenant.tier === 1 ? "Starter" : res.data.data.tenant.tier === 2 ? "Business" : "Professional"}.`, "success");
         fetchTenants();
       }
     } catch (err: any) {

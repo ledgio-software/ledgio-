@@ -16,9 +16,9 @@ import { logger } from '../utils/logger';
  * processor is wired up.
  */
 export const TENANT_PLANS: Record<number, { name: string; seatLimit: number }> = {
-  1: { name: 'Shop', seatLimit: 3 },
+  1: { name: 'Starter', seatLimit: 3 },
   2: { name: 'Business', seatLimit: 10 },
-  3: { name: 'Enterprise', seatLimit: Infinity },
+  3: { name: 'Professional', seatLimit: Infinity },
 };
 
 export function planName(tier: number): string {
