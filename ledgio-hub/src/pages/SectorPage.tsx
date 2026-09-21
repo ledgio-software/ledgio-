@@ -116,6 +116,12 @@ export function SectorPage({ sector }: Props) {
       <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={`relative rounded-3xl bg-gradient-to-br ${sector.accent.from} ${sector.accent.to} p-12 sm:p-16 overflow-hidden`}>
+            <img
+              src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=1600&q=80&auto=format&fit=crop"
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-30 rounded-3xl"
+            />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(0,0,0,0.3)_0%,transparent_70%)]" />
             <div className="relative max-w-2xl">
               <div className="mb-4">
