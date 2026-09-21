@@ -198,19 +198,19 @@ export function ChurchGiving() {
                 type="date"
                 value={filters.from}
                 onChange={e => setFilters(f => ({ ...f, from: e.target.value }))}
-                className="border rounded px-2 py-1 text-sm bg-background"
+                className="border rounded px-2 py-1 text-sm bg-white dark:bg-secondary-800"
               />
               <span className="text-muted-foreground text-sm">to</span>
               <input
                 type="date"
                 value={filters.to}
                 onChange={e => setFilters(f => ({ ...f, to: e.target.value }))}
-                className="border rounded px-2 py-1 text-sm bg-background"
+                className="border rounded px-2 py-1 text-sm bg-white dark:bg-secondary-800"
               />
               <select
                 value={filters.type}
                 onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}
-                className="border rounded px-2 py-1 text-sm bg-background"
+                className="border rounded px-2 py-1 text-sm bg-white dark:bg-secondary-800"
               >
                 <option value="">All Types</option>
                 {GIVING_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
@@ -264,42 +264,42 @@ export function ChurchGiving() {
       {/* Add modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white dark:bg-secondary-900 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-lg font-semibold">Record Giving</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Date *</label>
-                <input type="date" value={form.givingDate} onChange={e => setForm(f => ({ ...f, givingDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" />
+                <input type="date" value={form.givingDate} onChange={e => setForm(f => ({ ...f, givingDate: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Amount (GHS) *</label>
-                <input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder="0.00" />
+                <input type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="0.00" />
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Giving Type *</label>
-                <select value={form.givingType} onChange={e => setForm(f => ({ ...f, givingType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background">
+                <select value={form.givingType} onChange={e => setForm(f => ({ ...f, givingType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                   {GIVING_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Service Type</label>
-                <select value={form.serviceType} onChange={e => setForm(f => ({ ...f, serviceType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background">
+                <select value={form.serviceType} onChange={e => setForm(f => ({ ...f, serviceType: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                   {SERVICE_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Payment Method</label>
-                <select value={form.paymentMethod} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background">
+                <select value={form.paymentMethod} onChange={e => setForm(f => ({ ...f, paymentMethod: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
                   {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Reference</label>
-                <input type="text" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder="Optional" />
+                <input type="text" value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="Optional" />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs text-muted-foreground mb-1">Notes</label>
-                <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-background" placeholder="Optional" />
+                <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="Optional" />
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
