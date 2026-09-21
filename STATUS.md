@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-21] - Feature: Church Management Module — Members, Cell Groups, Attendance, Pledges (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+CHURCH org-type tenants lacked any church-specific features (membership management, cell group tracking, attendance recording, pledge management). Built a complete church management module from DB to UI.
+
+**Changes:**
+- **`backend/src/database/migrations/tenantMigrations.ts`** — Migration 027: `church_cell_groups`, `church_members`, `church_attendance_sessions`, `church_attendance_records`, `church_pledges` tables.
+- **`backend/src/routes/churchMembers.ts`** *(new)* — CRUD for church members with cell-group lookup.
+- **`backend/src/routes/churchCellGroups.ts`** *(new)* — CRUD for cell groups with member count.
+- **`backend/src/routes/churchAttendance.ts`** *(new)* — Attendance sessions (bulk + per-member), summary stats.
+- **`backend/src/routes/churchPledges.ts`** *(new)* — Pledge recording with fulfillment tracking.
+- **`backend/src/app.ts`** — Registers 4 new church routes under `/api/v1/church/*`.
+- **`frontend/src/pages/church/Members.tsx`** *(new)* — Member list, search, add/edit modal.
+- **`frontend/src/pages/church/CellGroups.tsx`** *(new)* — Cell group cards, add/edit/delete.
+- **`frontend/src/pages/church/Attendance.tsx`** *(new)* — Record/bulk attendance, session list, summary with trend chart.
+- **`frontend/src/pages/church/Pledges.tsx`** *(new)* — Pledge list with payment recording, summary totals.
+- **`frontend/src/lib/navigation.ts`** — CHURCH section added (Members, Cell Groups, Attendance, Pledges), shown only for CHURCH orgType.
+- **`frontend/src/App.tsx`** — Lazy imports and routes for all 4 church pages.
+
 ## [Date: 2026-09-21] - Fix: plan names "Shop"/"Enterprise" → "Starter"/"Professional" across frontend and backend (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**

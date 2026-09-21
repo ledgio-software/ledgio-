@@ -58,6 +58,8 @@ import {
   Sparkles,
   Moon,
   WifiOff,
+  Heart,
+  Users2,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -395,6 +397,16 @@ export const navigationGroups: NavGroup[] = [
       { name: "Inventory Matrix", href: "/pharmacy/inventory-matrix", icon: BarChart3 },
       { name: "Narcotics Register", href: "/pharmacy/narcotics", icon: ShieldAlert },
       { name: "Expiry Alerts", href: "/pharmacy/expiry", icon: AlertTriangle },
+    ],
+  },
+  {
+    sectionTitle: "CHURCH",
+    orgTypeOnly: "CHURCH",
+    items: [
+      { name: "Members",     href: "/church/members",     icon: Users },
+      { name: "Cell Groups", href: "/church/cell-groups", icon: Users2 },
+      { name: "Attendance",  href: "/church/attendance",  icon: CalendarCheck },
+      { name: "Pledges",     href: "/church/pledges",     icon: Heart },
     ],
   },
 ];

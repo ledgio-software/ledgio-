@@ -937,6 +937,91 @@ export const TENANT_MIGRATIONS: TenantMigration[] = [
       );
       CREATE INDEX IF NOT EXISTS idx_folio_charges_reservation ON folio_charges(reservation_id);
     `
+  },
+  {
+    version: 27,
+    name: '027_add_church_management_tables',
+    sql: `
+CREATE TABLE IF NOT EXISTS church_cell_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(200) NOT NULL,
+  leader_name VARCHAR(200),
+  meeting_day VARCHAR(20),
+  meeting_time VARCHAR(20),
+  location VARCHAR(200),
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS church_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  first_name VARCHAR(100) NOT NULL,
+  last_name VARCHAR(100) NOT NULL,
+  email VARCHAR(255),
+  phone VARCHAR(50),
+  gender VARCHAR(20),
+  date_of_birth DATE,
+  membership_date DATE,
+  membership_status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+  cell_group_id UUID REFERENCES church_cell_groups(id) ON DELETE SET NULL,
+  department VARCHAR(100),
+  address TEXT,
+  occupation VARCHAR(100),
+  marital_status VARCHAR(50),
+  baptism_date DATE,
+  notes TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_member_status CHECK (membership_status IN ('ACTIVE','INACTIVE','TRANSFERRED','DECEASED'))
+);
+
+CREATE TABLE IF NOT EXISTS church_attendance_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(200) NOT NULL,
+  session_date DATE NOT NULL,
+  session_type VARCHAR(50) NOT NULL DEFAULT 'SUNDAY_SERVICE',
+  cell_group_id UUID REFERENCES church_cell_groups(id) ON DELETE SET NULL,
+  total_count INTEGER,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_session_type CHECK (session_type IN ('SUNDAY_SERVICE','MIDWEEK','CELL_GROUP','SPECIAL_SERVICE'))
+);
+
+CREATE TABLE IF NOT EXISTS church_attendance_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES church_attendance_sessions(id) ON DELETE CASCADE,
+  member_id UUID NOT NULL REFERENCES church_members(id) ON DELETE CASCADE,
+  present BOOLEAN NOT NULL DEFAULT true,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(session_id, member_id)
+);
+
+CREATE TABLE IF NOT EXISTS church_pledges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id UUID NOT NULL REFERENCES church_members(id) ON DELETE CASCADE,
+  pledge_type VARCHAR(100) NOT NULL,
+  amount NUMERIC(15,2) NOT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+  pledge_date DATE NOT NULL,
+  due_date DATE,
+  fulfilled_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_pledge_status CHECK (status IN ('ACTIVE','FULFILLED','CANCELLED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_church_members_cell_group ON church_members(cell_group_id);
+CREATE INDEX IF NOT EXISTS idx_church_attendance_records_session ON church_attendance_records(session_id);
+CREATE INDEX IF NOT EXISTS idx_church_attendance_records_member ON church_attendance_records(member_id);
+CREATE INDEX IF NOT EXISTS idx_church_pledges_member ON church_pledges(member_id);
+    `
   }
 ];
 

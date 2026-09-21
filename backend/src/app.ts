@@ -117,6 +117,10 @@ import schoolNasiaRouter from './routes/schoolNasia';
 import schoolFeePaymentPlansRouter from './routes/schoolFeePaymentPlans';
 import schoolTransportRouter from './routes/schoolTransport';
 import schoolParentCommsRouter from './routes/schoolParentComms';
+import churchMembersRouter from './routes/churchMembers';
+import churchCellGroupsRouter from './routes/churchCellGroups';
+import churchAttendanceRouter from './routes/churchAttendance';
+import churchPledgesRouter from './routes/churchPledges';
 import ssnitRouter from './routes/ssnit';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
@@ -358,6 +362,12 @@ app.use('/api/v1/tills', cashTillRouter);
 // Pharmacy module (PHARMACY org-type tenants only - gated inside the router)
 app.use('/api/v1/pharmacy', pharmacyRouter);
 app.use('/api/v1/hospitality', hospitalityRouter);
+
+// Church module (CHURCH org-type tenants)
+app.use('/api/v1/church/members', churchMembersRouter);
+app.use('/api/v1/church/cell-groups', churchCellGroupsRouter);
+app.use('/api/v1/church/attendance', churchAttendanceRouter);
+app.use('/api/v1/church/pledges', churchPledgesRouter);
 
 // School module (NONPROFIT/SCHOOL org-type tenants)
 app.use('/api/v1/school/classes', schoolClassesRouter);
