@@ -799,7 +799,7 @@ export function Home() {
               src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=70&auto=format&fit=crop"
               alt=""
               aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover opacity-[0.08]"
+              className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-30"
             />
             <div className="relative max-w-2xl mx-auto text-center">
               <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">
