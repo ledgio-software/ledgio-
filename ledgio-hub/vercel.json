@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "outputDirectory": "public",
-  "buildCommand": null,
-  "installCommand": null,
-  "framework": null,
+  "outputDirectory": "dist",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "vite",
   "headers": [
     {
       "source": "/(.*)",
