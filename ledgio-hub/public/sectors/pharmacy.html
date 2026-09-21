@@ -77,6 +77,58 @@
     .footer-links a { font-size: 13px; color: var(--muted); transition: color .2s; }
     .footer-links a:hover { color: var(--text); }
     @media (max-width: 640px) { .hero-content { padding: 60px 20px; } .cta-banner { padding: 40px 20px; } .footer-inner { flex-direction: column; } }
+    /* Testimonials */
+    .testimonials-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .testimonials-grid { grid-template-columns: 1fr; } }
+    .testimonial-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px 28px 24px; }
+    .testimonial-stars { color: #f59e0b; font-size: 13px; letter-spacing: 3px; margin-bottom: 14px; }
+    .testimonial-quote { font-size: 14.5px; color: var(--text); line-height: 1.7; font-style: italic; margin-bottom: 18px; }
+    .testimonial-author { border-top: 1px solid var(--border); padding-top: 14px; }
+    .testimonial-name { font-size: 14px; font-weight: 700; color: var(--white); }
+    .testimonial-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* Integrations */
+    .integrations-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 32px; }
+    .int-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 13px; font-weight: 500; color: var(--text); }
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 4px; max-width: 760px; margin: 0 auto; }
+    .faq-item input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+    .faq-label { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--white); transition: background .2s; gap: 12px; user-select: none; }
+    .faq-label:hover { background: var(--bg3); }
+    .faq-label::after { content: '+'; font-size: 20px; color: var(--em); flex-shrink: 0; font-family: monospace; }
+    .faq-item input:checked + .faq-label { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+    .faq-item input:checked + .faq-label::after { content: '−'; }
+    .faq-body { display: none; padding: 16px 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.65; background: var(--bg3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; }
+    .faq-item input:checked + .faq-label + .faq-body { display: block; }
+
+    /* Hero carousel */
+    .sector-hero { position: relative; min-height: 520px; display: flex; align-items: center; overflow: hidden; }
+    .hc-track { position: absolute; inset: 0; display: flex; transition: none; }
+    .hc-slide { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
+    .hc-slide.active { opacity: 1; }
+    .hc-slide img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+    .hero-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(7,13,10,.92) 0%, rgba(7,13,10,.65) 60%, rgba(7,13,10,.4) 100%); z-index: 1; pointer-events: none; }
+    .hc-btn { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(7,13,10,.55); border: 1px solid rgba(255,255,255,.15); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: background .2s; padding: 0; line-height: 1; }
+    .hc-btn:hover { background: rgba(16,185,129,.35); }
+    .hc-prev { left: 16px; }
+    .hc-next { right: 16px; }
+    .hc-dots { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 8px; }
+    .hc-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.35); border: none; cursor: pointer; padding: 0; transition: background .2s; }
+    .hc-dot.active { background: var(--em); }
+    /* Who / How sections */
+    .who-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .who-grid { grid-template-columns: 1fr; } }
+    .who-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; text-align: center; }
+    .who-icon { font-size: 32px; margin-bottom: 14px; }
+    .who-role { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .who-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; position: relative; }
+    @media (max-width: 640px) { .how-steps { grid-template-columns: 1fr; gap: 16px; } }
+    .how-step { position: relative; padding: 0 24px; text-align: center; }
+    .how-step:not(:last-child)::after { content: ''; position: absolute; top: 28px; right: -1px; width: calc(100% - 60px); height: 2px; background: linear-gradient(90deg, var(--em), transparent); transform: translateX(50%); pointer-events: none; }
+    @media (max-width: 640px) { .how-step::after { display: none; } }
+    .how-num { width: 56px; height: 56px; border-radius: 50%; background: rgba(16,185,129,.12); border: 2px solid var(--em); display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 900; font-size: 18px; color: var(--em); margin: 0 auto 16px; }
+    .how-title { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .how-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -90,14 +142,80 @@
   </div>
 </nav>
 
+<!-- Hero Carousel -->
 <section class="sector-hero">
-  <img class="hero-img" src="https://images.unsplash.com/photo-1576602976047-174e57a47881?w=1400&auto=format&fit=crop" alt="Pharmacist at dispensary counter" loading="eager" />
+  <div class="hc-slide active">
+    <img src="https://images.unsplash.com/photo-1576602976047-174e57a47881?w=1400&auto=format&fit=crop" alt="Pharmacy interior" loading="eager" />
+  </div>
+  <div class="hc-slide">
+    <img src="https://images.unsplash.com/photo-1584308666744-5b4e2e67d9a0?w=1400&auto=format&fit=crop" alt="Pharmaceutical medicines" loading="lazy" />
+  </div>
+  <div class="hc-slide">
+    <img src="https://images.unsplash.com/photo-1585435557343-3b929b3cbad7?w=1400&auto=format&fit=crop" alt="Pharmacist at work" loading="lazy" />
+  </div>
   <div class="hero-overlay"></div>
+  <button class="hc-btn hc-prev" aria-label="Previous slide">&#8249;</button>
+  <button class="hc-btn hc-next" aria-label="Next slide">&#8250;</button>
+  <div class="hc-dots"><button class="hc-dot active" aria-label="Slide 1"></button><button class="hc-dot" aria-label="Slide 2"></button><button class="hc-dot" aria-label="Slide 3"></button></div>
   <div class="hero-content">
     <div class="badge">💊 Pharmacies</div>
     <h1>Compliance &amp; Control<br><span class="em">for Every Dispensary.</span></h1>
     <p>Prescription register, NHIS claims management, batch and expiry tracking, controlled substance logs, and GRA e-VAT integration — built for licensed pharmacies in Ghana.</p>
     <a href="https://ledgio-fawn.vercel.app/register" class="btn btn-primary btn-lg">Start Free Trial — No Card Needed →</a>
+  </div>
+</section>
+
+<!-- Who this is for -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Who This Is For</h2>
+      <p>Built for every role that touches your business's finances.</p>
+    </div>
+    <div class="who-grid">
+      <div class="who-card">
+        <div class="who-icon">💊</div>
+        <div class="who-role">Pharmacist Owner</div>
+        <p class="who-desc">Needs NHIS billing, drug expiry tracking, and daily cash reconciliation in one system.</p>
+      </div>
+      <div class="who-card">
+        <div class="who-icon">🧑‍⚕️</div>
+        <div class="who-role">Dispenser</div>
+        <p class="who-desc">Needs instant stock visibility to avoid dispensing out-of-stock or expired items.</p>
+      </div>
+      <div class="who-card">
+        <div class="who-icon">📋</div>
+        <div class="who-role">Accounts Officer</div>
+        <p class="who-desc">Needs NHIS claim reports, reorder alerts, and a full audit trail for FDA Ghana compliance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>How It Works</h2>
+      <p>Three steps from setup to fully automated books.</p>
+    </div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-num">01</div>
+        <div class="how-title">Load your drug inventory & NHIS prices</div>
+        <p class="how-desc">Import your formulary with NHIS reimbursement rates, pack sizes, and expiry batches — ready for day-one dispensing.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">02</div>
+        <div class="how-title">Dispense drugs & capture payments</div>
+        <p class="how-desc">Cash and NHIS claims post in one step; expiry batches are consumed oldest-first automatically.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">03</div>
+        <div class="how-title">Track expiry, reorder & submit NHIS claims</div>
+        <p class="how-desc">Expiry alerts fire 60 days before the date; reorder triggers hit your phone; monthly NHIS claim reports are print-ready.</p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -120,6 +238,34 @@
       <div class="feature-card"><div class="feature-icon">📱</div><div><h3>SMS Refill Reminders</h3><p>Automated SMS to patients when chronic medication refill is due — reduces lost revenue.</p></div></div>
       <div class="feature-card"><div class="feature-icon">📊</div><div><h3>ABC-FSN Inventory Matrix</h3><p>Classify stock by value and movement to optimise reorder quantities and working capital.</p></div></div>
       <div class="feature-card"><div class="feature-icon">🏪</div><div><h3>Multi-Location Dispensing</h3><p>Manage multiple pharmacy branches from one account with consolidated stock and compliance reports.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Trusted by Ghanaian Pharmacists</h2>
+      <p>Licensed pharmacies managing compliance and profitability with Ledgio.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">NHIS claim tracking and drug expiry alerts have saved us thousands in write-offs. The narcotics register is always audit-ready when FDA visits.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Dr. Ama Boateng</div>
+          <div class="testimonial-role">Pharmacist · Tema</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">FDA inspections used to stress me out. Now I print a complete narcotics log in seconds and every controlled drug is fully accounted for.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Kofi Adu</div>
+          <div class="testimonial-role">Pharmacy Owner · Accra</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -180,6 +326,62 @@
   </div>
 </section>
 
+<!-- Integrations -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Works with the Tools You Already Use</h2>
+      <p>Ledgio connects with Ghana's payment networks, tax systems, and health regulators right out of the box.</p>
+    </div>
+    <div class="integrations-row">
+      <span class="int-badge">🏛️ GRA e-VAT</span>
+      <span class="int-badge">📱 MoMo</span>
+      <span class="int-badge">📶 MTN Mobile Money</span>
+      <span class="int-badge">💧 Vodafone Cash</span>
+      <span class="int-badge">🏦 All Ghana Banks</span>
+      <span class="int-badge">🏥 NHIS</span>
+      <span class="int-badge">💊 FDA Ghana</span>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know before getting started.</p>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p1">
+        <label class="faq-label" for="faq-p1">Does Ledgio handle NHIS billing and claims?</label>
+        <div class="faq-body">Yes. Ledgio supports NHIS claim tracking, so you can record NHIS dispensing separately from cash sales and monitor reimbursement cycles without double-entry.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p2">
+        <label class="faq-label" for="faq-p2">Can I track drug expiry dates automatically?</label>
+        <div class="faq-body">Yes. Each stock item can carry an expiry date. Ledgio flags items nearing expiry and prevents dispensing of expired stock, keeping your pharmacy compliant and reducing waste.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p3">
+        <label class="faq-label" for="faq-p3">Is my data secure?</label>
+        <div class="faq-body">Absolutely. Your data is encrypted in transit and at rest, hosted on enterprise-grade cloud infrastructure with daily backups. Only authorised users can access your workspace.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p4">
+        <label class="faq-label" for="faq-p4">Can I try it free?</label>
+        <div class="faq-body">Yes — every plan starts with a 90-day free trial. No credit card required. You get full access to all features so you can see the value before committing.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-p5">
+        <label class="faq-label" for="faq-p5">Can I add more users later?</label>
+        <div class="faq-body">Yes. You can add staff accounts at any time. Different roles (admin, accountant, cashier) can be assigned with custom permissions so everyone only sees what they need to.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="section">
   <div class="container">
     <div class="cta-banner">
@@ -202,5 +404,28 @@
     </div>
   </div>
 </footer>
+<script>
+(function() {{
+  var slides = document.querySelectorAll('.hc-slide');
+  var dots = document.querySelectorAll('.hc-dot');
+  var cur = 0;
+  var timer;
+  function go(n) {{
+    slides[cur].classList.remove('active');
+    dots[cur].classList.remove('active');
+    cur = (n + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    dots[cur].classList.add('active');
+  }}
+  function start() {{ timer = setInterval(function(){{ go(cur+1); }}, 5000); }}
+  function stop() {{ clearInterval(timer); }}
+  document.querySelector('.sector-hero').addEventListener('mouseenter', stop);
+  document.querySelector('.sector-hero').addEventListener('mouseleave', start);
+  document.querySelector('.hc-prev').addEventListener('click', function(){{ stop(); go(cur-1); start(); }});
+  document.querySelector('.hc-next').addEventListener('click', function(){{ stop(); go(cur+1); start(); }});
+  dots.forEach(function(d,i){{ d.addEventListener('click', function(){{ stop(); go(i); start(); }}); }});
+  start();
+}})();
+</script>
 </body>
 </html>

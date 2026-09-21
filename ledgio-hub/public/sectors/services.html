@@ -77,6 +77,58 @@
     .footer-links a { font-size: 13px; color: var(--muted); transition: color .2s; }
     .footer-links a:hover { color: var(--text); }
     @media (max-width: 640px) { .hero-content { padding: 60px 20px; } .cta-banner { padding: 40px 20px; } .footer-inner { flex-direction: column; } }
+    /* Testimonials */
+    .testimonials-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .testimonials-grid { grid-template-columns: 1fr; } }
+    .testimonial-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px 28px 24px; }
+    .testimonial-stars { color: #f59e0b; font-size: 13px; letter-spacing: 3px; margin-bottom: 14px; }
+    .testimonial-quote { font-size: 14.5px; color: var(--text); line-height: 1.7; font-style: italic; margin-bottom: 18px; }
+    .testimonial-author { border-top: 1px solid var(--border); padding-top: 14px; }
+    .testimonial-name { font-size: 14px; font-weight: 700; color: var(--white); }
+    .testimonial-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    /* Integrations */
+    .integrations-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 32px; }
+    .int-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 13px; font-weight: 500; color: var(--text); }
+    /* FAQ */
+    .faq-list { display: flex; flex-direction: column; gap: 4px; max-width: 760px; margin: 0 auto; }
+    .faq-item input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+    .faq-label { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--white); transition: background .2s; gap: 12px; user-select: none; }
+    .faq-label:hover { background: var(--bg3); }
+    .faq-label::after { content: '+'; font-size: 20px; color: var(--em); flex-shrink: 0; font-family: monospace; }
+    .faq-item input:checked + .faq-label { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+    .faq-item input:checked + .faq-label::after { content: '−'; }
+    .faq-body { display: none; padding: 16px 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.65; background: var(--bg3); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; }
+    .faq-item input:checked + .faq-label + .faq-body { display: block; }
+
+    /* Hero carousel */
+    .sector-hero { position: relative; min-height: 520px; display: flex; align-items: center; overflow: hidden; }
+    .hc-track { position: absolute; inset: 0; display: flex; transition: none; }
+    .hc-slide { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
+    .hc-slide.active { opacity: 1; }
+    .hc-slide img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+    .hero-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(7,13,10,.92) 0%, rgba(7,13,10,.65) 60%, rgba(7,13,10,.4) 100%); z-index: 1; pointer-events: none; }
+    .hc-btn { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(7,13,10,.55); border: 1px solid rgba(255,255,255,.15); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: background .2s; padding: 0; line-height: 1; }
+    .hc-btn:hover { background: rgba(16,185,129,.35); }
+    .hc-prev { left: 16px; }
+    .hc-next { right: 16px; }
+    .hc-dots { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 8px; }
+    .hc-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.35); border: none; cursor: pointer; padding: 0; transition: background .2s; }
+    .hc-dot.active { background: var(--em); }
+    /* Who / How sections */
+    .who-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    @media (max-width: 640px) { .who-grid { grid-template-columns: 1fr; } }
+    .who-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; text-align: center; }
+    .who-icon { font-size: 32px; margin-bottom: 14px; }
+    .who-role { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .who-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; position: relative; }
+    @media (max-width: 640px) { .how-steps { grid-template-columns: 1fr; gap: 16px; } }
+    .how-step { position: relative; padding: 0 24px; text-align: center; }
+    .how-step:not(:last-child)::after { content: ''; position: absolute; top: 28px; right: -1px; width: calc(100% - 60px); height: 2px; background: linear-gradient(90deg, var(--em), transparent); transform: translateX(50%); pointer-events: none; }
+    @media (max-width: 640px) { .how-step::after { display: none; } }
+    .how-num { width: 56px; height: 56px; border-radius: 50%; background: rgba(16,185,129,.12); border: 2px solid var(--em); display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 900; font-size: 18px; color: var(--em); margin: 0 auto 16px; }
+    .how-title { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+    .how-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -90,14 +142,80 @@
   </div>
 </nav>
 
+<!-- Hero Carousel -->
 <section class="sector-hero">
-  <img class="hero-img" src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1400&auto=format&fit=crop" alt="Professional working at a desk" loading="eager" />
+  <div class="hc-slide active">
+    <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1400&auto=format&fit=crop" alt="Professional services office" loading="eager" />
+  </div>
+  <div class="hc-slide">
+    <img src="https://images.unsplash.com/photo-1521737604082-3f74498f6fc8?w=1400&auto=format&fit=crop" alt="Business meeting" loading="lazy" />
+  </div>
+  <div class="hc-slide">
+    <img src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1400&auto=format&fit=crop" alt="Professional at work" loading="lazy" />
+  </div>
   <div class="hero-overlay"></div>
+  <button class="hc-btn hc-prev" aria-label="Previous slide">&#8249;</button>
+  <button class="hc-btn hc-next" aria-label="Next slide">&#8250;</button>
+  <div class="hc-dots"><button class="hc-dot active" aria-label="Slide 1"></button><button class="hc-dot" aria-label="Slide 2"></button><button class="hc-dot" aria-label="Slide 3"></button></div>
   <div class="hero-content">
     <div class="badge">💼 Professional Services</div>
     <h1>Invoice Clients.<br><span class="em">Manage Cash Flow.</span></h1>
     <p>Client invoicing, retainer management, project tracking, payroll, and WHT certificate generation — built for Ghanaian consultants, agencies, and professional service firms.</p>
     <a href="https://ledgio-fawn.vercel.app/register" class="btn btn-primary btn-lg">Start Free Trial — No Card Needed →</a>
+  </div>
+</section>
+
+<!-- Who this is for -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Who This Is For</h2>
+      <p>Built for every role that touches your business's finances.</p>
+    </div>
+    <div class="who-grid">
+      <div class="who-card">
+        <div class="who-icon">💼</div>
+        <div class="who-role">Firm Partner</div>
+        <p class="who-desc">Needs retainer billing, project cost tracking, and partner profit distribution in one place.</p>
+      </div>
+      <div class="who-card">
+        <div class="who-icon">🗂️</div>
+        <div class="who-role">Office Manager</div>
+        <p class="who-desc">Needs expense claims, payroll, and staff timesheets managed without a separate HR system.</p>
+      </div>
+      <div class="who-card">
+        <div class="who-icon">🤝</div>
+        <div class="who-role">Client Services Lead</div>
+        <p class="who-desc">Needs professional invoices with withholding tax pre-calculated and WHT certificates on demand.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>How It Works</h2>
+      <p>Three steps from setup to fully automated books.</p>
+    </div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-num">01</div>
+        <div class="how-title">Set up your services & fee schedules</div>
+        <p class="how-desc">Define retainer rates, hourly fees, and project milestones — the system handles recurring billing automatically.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">02</div>
+        <div class="how-title">Raise invoices & record time and expenses</div>
+        <p class="how-desc">Invoice clients in seconds; post time and disbursements against each engagement for accurate profitability.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">03</div>
+        <div class="how-title">Review monthly P&L & compliance reports</div>
+        <p class="how-desc">Monthly management accounts, WHT certificates for clients, and payroll summaries ready for GRA filing.</p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -120,6 +238,34 @@
       <div class="feature-card"><div class="feature-icon">✅</div><div><h3>Approval Workflows</h3><p>Multi-level approval for expense claims, bills, and payment runs — with full audit trail.</p></div></div>
       <div class="feature-card"><div class="feature-icon">🏢</div><div><h3>Multi-Office / Department</h3><p>Departmental P&amp;L reporting and consolidated financials across offices or practice areas.</p></div></div>
       <div class="feature-card"><div class="feature-icon">📈</div><div><h3>Budget vs Actual Reports</h3><p>Set annual budgets by department and track actuals versus budget every month.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Trusted by Ghanaian Professionals</h2>
+      <p>Consultants, lawyers, accountants, and agencies managing their billing with ease.</p>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">Client billing and WHT certificates used to be my accounting nightmare. Ledgio handles both, and my clients get professional invoices every time.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Kwame Acheampong</div>
+          <div class="testimonial-role">Management Consultant · Accra</div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-quote">Retainer billing is set up once and the system raises invoices automatically each month. I'm no longer chasing my own admin at month-end.</p>
+        <div class="testimonial-author">
+          <div class="testimonial-name">Abena Frimpong</div>
+          <div class="testimonial-role">Lawyer · Kumasi</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -180,6 +326,62 @@
   </div>
 </section>
 
+<!-- Integrations -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Works with the Tools You Already Use</h2>
+      <p>Ledgio connects with Ghana's payment networks, tax systems, and banks right out of the box.</p>
+    </div>
+    <div class="integrations-row">
+      <span class="int-badge">🏛️ GRA e-VAT</span>
+      <span class="int-badge">📱 MoMo</span>
+      <span class="int-badge">📶 MTN Mobile Money</span>
+      <span class="int-badge">💧 Vodafone Cash</span>
+      <span class="int-badge">🏦 All Ghana Banks</span>
+      <span class="int-badge">🏗️ SSNIT</span>
+      <span class="int-badge">📄 GRA WHT</span>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know before getting started.</p>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <input type="checkbox" id="faq-sv1">
+        <label class="faq-label" for="faq-sv1">Can I bill clients on a retainer basis?</label>
+        <div class="faq-body">Yes. Ledgio supports recurring retainer invoices that auto-generate monthly and track against each client's outstanding balance, reducing manual billing effort for your team.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-sv2">
+        <label class="faq-label" for="faq-sv2">Does Ledgio generate WHT certificates for clients?</label>
+        <div class="faq-body">Yes. Ledgio tracks Withholding Tax deductions per client and can produce WHT certificates that you can share with clients for their own tax filings, keeping everyone compliant with GRA requirements.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-sv3">
+        <label class="faq-label" for="faq-sv3">Is my data secure?</label>
+        <div class="faq-body">Absolutely. Your data is encrypted in transit and at rest, hosted on enterprise-grade cloud infrastructure with daily backups. Only authorised users can access your workspace.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-sv4">
+        <label class="faq-label" for="faq-sv4">Can I try it free?</label>
+        <div class="faq-body">Yes — every plan starts with a 90-day free trial. No credit card required. You get full access to all features so you can see the value before committing.</div>
+      </div>
+      <div class="faq-item">
+        <input type="checkbox" id="faq-sv5">
+        <label class="faq-label" for="faq-sv5">Can I add more users later?</label>
+        <div class="faq-body">Yes. You can add staff accounts at any time. Different roles (admin, accountant, cashier) can be assigned with custom permissions so everyone only sees what they need to.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="section">
   <div class="container">
     <div class="cta-banner">
@@ -202,5 +404,28 @@
     </div>
   </div>
 </footer>
+<script>
+(function() {{
+  var slides = document.querySelectorAll('.hc-slide');
+  var dots = document.querySelectorAll('.hc-dot');
+  var cur = 0;
+  var timer;
+  function go(n) {{
+    slides[cur].classList.remove('active');
+    dots[cur].classList.remove('active');
+    cur = (n + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    dots[cur].classList.add('active');
+  }}
+  function start() {{ timer = setInterval(function(){{ go(cur+1); }}, 5000); }}
+  function stop() {{ clearInterval(timer); }}
+  document.querySelector('.sector-hero').addEventListener('mouseenter', stop);
+  document.querySelector('.sector-hero').addEventListener('mouseleave', start);
+  document.querySelector('.hc-prev').addEventListener('click', function(){{ stop(); go(cur-1); start(); }});
+  document.querySelector('.hc-next').addEventListener('click', function(){{ stop(); go(cur+1); start(); }});
+  dots.forEach(function(d,i){{ d.addEventListener('click', function(){{ stop(); go(i); start(); }}); }});
+  start();
+}})();
+</script>
 </body>
 </html>
