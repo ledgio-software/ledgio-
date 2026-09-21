@@ -189,7 +189,7 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/reports/monthly-sales-ledger', '/reports/sales-channel',
     '/reports/landed-costs', '/reports/stock-movement',
     '/reports/stock-aging', '/reports/registers',
-    '/reports/executive',
+    '/reports/executive', '/reports/receipt-log',
   ]),
   NGO: new Set([
     '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
