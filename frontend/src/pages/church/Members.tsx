@@ -46,7 +46,6 @@ const STATUS_BADGE: Record<MembershipStatus, "success" | "secondary" | "default"
 
 const GENDERS = ["Male", "Female"];
 const MARITAL_STATUSES = ["Single", "Married", "Divorced", "Widowed"];
-const MEETING_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 interface MemberForm {
   firstName: string;

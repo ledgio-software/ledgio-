@@ -409,6 +409,10 @@ export const navigationGroups: NavGroup[] = [
       { name: "Attendance",  href: "/church/attendance",  icon: CalendarCheck },
       { name: "Pledges",     href: "/church/pledges",     icon: Heart },
       { name: "Giving",      href: "/church/giving",      icon: TrendingUp },
+      { name: "Visitors",    href: "/church/visitors",    icon: UserPlus },
+      { name: "Ministries",  href: "/church/ministries",  icon: Layers },
+      { name: "Events",      href: "/church/events",      icon: CalendarDays },
+      { name: "Branches",    href: "/church/branches",    icon: GitBranch },
     ],
   },
 ];

@@ -5,7 +5,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../../components/ui/Table";
 import { api } from "../../lib/api";
 import { useToast } from "../../contexts/ToastContext";
-import { CalendarCheck, Users, BarChart2, Save, Plus, Loader2 } from "lucide-react";
+import { CalendarCheck, Users, BarChart2, Save, Loader2 } from "lucide-react";
 
 interface AttendanceSession {
   id: string;

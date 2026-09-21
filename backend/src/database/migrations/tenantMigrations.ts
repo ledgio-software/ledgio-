@@ -1048,6 +1048,117 @@ CREATE INDEX IF NOT EXISTS idx_church_givings_date ON church_givings(giving_date
 CREATE INDEX IF NOT EXISTS idx_church_givings_member ON church_givings(member_id);
 CREATE INDEX IF NOT EXISTS idx_church_givings_type ON church_givings(giving_type);
     `
+  },
+  {
+    version: 29,
+    name: '029_add_church_visitors_table',
+    sql: `
+CREATE TABLE IF NOT EXISTS church_visitors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  first_name VARCHAR(100) NOT NULL,
+  last_name VARCHAR(100) NOT NULL,
+  phone VARCHAR(30),
+  email VARCHAR(150),
+  address TEXT,
+  visit_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  service_type VARCHAR(50) NOT NULL DEFAULT 'SUNDAY_SERVICE',
+  how_they_heard VARCHAR(100),
+  follow_up_status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+  follow_up_notes TEXT,
+  converted_to_member_id UUID REFERENCES church_members(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_visitor_followup CHECK (follow_up_status IN ('PENDING','CONTACTED','VISITED','CONVERTED','NOT_INTERESTED'))
+);
+CREATE INDEX IF NOT EXISTS idx_church_visitors_date ON church_visitors(visit_date);
+CREATE INDEX IF NOT EXISTS idx_church_visitors_status ON church_visitors(follow_up_status);
+    `
+  },
+  {
+    version: 30,
+    name: '030_add_church_ministries_tables',
+    sql: `
+CREATE TABLE IF NOT EXISTS church_ministries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(150) NOT NULL,
+  description TEXT,
+  leader_id UUID REFERENCES church_members(id) ON DELETE SET NULL,
+  meeting_schedule VARCHAR(200),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS church_ministry_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ministry_id UUID NOT NULL REFERENCES church_ministries(id) ON DELETE CASCADE,
+  member_id UUID NOT NULL REFERENCES church_members(id) ON DELETE CASCADE,
+  role VARCHAR(100) NOT NULL DEFAULT 'Member',
+  joined_at DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_ministry_member UNIQUE (ministry_id, member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_church_ministry_members_ministry ON church_ministry_members(ministry_id);
+CREATE INDEX IF NOT EXISTS idx_church_ministry_members_member ON church_ministry_members(member_id);
+    `
+  },
+  {
+    version: 31,
+    name: '031_add_church_events_tables',
+    sql: `
+CREATE TABLE IF NOT EXISTS church_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(200) NOT NULL,
+  event_type VARCHAR(100) NOT NULL DEFAULT 'GENERAL',
+  description TEXT,
+  event_date DATE NOT NULL,
+  end_date DATE,
+  venue VARCHAR(200),
+  expected_attendance INT,
+  actual_attendance INT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS church_event_registrations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES church_events(id) ON DELETE CASCADE,
+  member_id UUID REFERENCES church_members(id) ON DELETE SET NULL,
+  visitor_name VARCHAR(200),
+  phone VARCHAR(30),
+  registered_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  attended BOOLEAN NOT NULL DEFAULT false,
+  CONSTRAINT chk_event_reg_identity CHECK (member_id IS NOT NULL OR visitor_name IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_church_events_date ON church_events(event_date);
+CREATE INDEX IF NOT EXISTS idx_church_event_regs_event ON church_event_registrations(event_id);
+    `
+  },
+  {
+    version: 32,
+    name: '032_add_church_branches_table',
+    sql: `
+CREATE TABLE IF NOT EXISTS church_branches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(200) NOT NULL,
+  address TEXT,
+  pastor_id UUID REFERENCES church_members(id) ON DELETE SET NULL,
+  phone VARCHAR(30),
+  email VARCHAR(150),
+  established_date DATE,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE church_members ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES church_branches(id) ON DELETE SET NULL;
+ALTER TABLE church_attendance_sessions ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES church_branches(id) ON DELETE SET NULL;
+ALTER TABLE church_givings ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES church_branches(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_church_branches_active ON church_branches(is_active);
+CREATE INDEX IF NOT EXISTS idx_church_members_branch ON church_members(branch_id);
+    `
   }
 ];
 

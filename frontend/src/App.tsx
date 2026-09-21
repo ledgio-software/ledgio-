@@ -139,6 +139,10 @@ const ChurchCellGroups = lazy(() => import("./pages/church/CellGroups").then(m =
 const ChurchAttendance = lazy(() => import("./pages/church/Attendance").then(m => ({ default: m.Attendance })));
 const ChurchPledges = lazy(() => import("./pages/church/Pledges").then(m => ({ default: m.Pledges })));
 const ChurchGiving = lazy(() => import("./pages/church/Giving").then(m => ({ default: m.ChurchGiving })));
+const ChurchVisitors = lazy(() => import("./pages/church/Visitors").then(m => ({ default: m.ChurchVisitors })));
+const ChurchMinistries = lazy(() => import("./pages/church/Ministries").then(m => ({ default: m.ChurchMinistries })));
+const ChurchEvents = lazy(() => import("./pages/church/Events").then(m => ({ default: m.ChurchEvents })));
+const ChurchBranches = lazy(() => import("./pages/church/Branches").then(m => ({ default: m.ChurchBranches })));
 const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m => ({ default: m.CostCentres })));
 const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
 const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ default: m.VatReturn })));
@@ -1138,6 +1142,10 @@ function App() {
               <Route path="/church/attendance" element={<ProtectedRoute><MainLayout><ChurchAttendance /></MainLayout></ProtectedRoute>} />
               <Route path="/church/pledges" element={<ProtectedRoute><MainLayout><ChurchPledges /></MainLayout></ProtectedRoute>} />
               <Route path="/church/giving" element={<ProtectedRoute><MainLayout><ChurchGiving /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/visitors" element={<ProtectedRoute><MainLayout><ChurchVisitors /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/ministries" element={<ProtectedRoute><MainLayout><ChurchMinistries /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/events" element={<ProtectedRoute><MainLayout><ChurchEvents /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/branches" element={<ProtectedRoute><MainLayout><ChurchBranches /></MainLayout></ProtectedRoute>} />
               <Route path="/school/teachers" element={<ProtectedRoute><MainLayout><SchoolTeachers /></MainLayout></ProtectedRoute>} />
               <Route path="/school/classes" element={<ProtectedRoute><MainLayout><SchoolClasses /></MainLayout></ProtectedRoute>} />
               <Route path="/school/momo-reconciliation" element={<ProtectedRoute><MainLayout><MomoReconciliation /></MainLayout></ProtectedRoute>} />

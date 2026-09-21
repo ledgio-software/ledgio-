@@ -123,6 +123,10 @@ import churchAttendanceRouter from './routes/churchAttendance';
 import churchPledgesRouter from './routes/churchPledges';
 import churchGivingRouter from './routes/churchGiving';
 import churchDashboardRouter from './routes/churchDashboard';
+import churchVisitorsRouter from './routes/churchVisitors';
+import churchMinistriesRouter from './routes/churchMinistries';
+import churchEventsRouter from './routes/churchEvents';
+import churchBranchesRouter from './routes/churchBranches';
 import ssnitRouter from './routes/ssnit';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
@@ -372,6 +376,10 @@ app.use('/api/v1/church/cell-groups', churchCellGroupsRouter);
 app.use('/api/v1/church/attendance', churchAttendanceRouter);
 app.use('/api/v1/church/pledges', churchPledgesRouter);
 app.use('/api/v1/church/giving', churchGivingRouter);
+app.use('/api/v1/church/visitors', churchVisitorsRouter);
+app.use('/api/v1/church/ministries', churchMinistriesRouter);
+app.use('/api/v1/church/events', churchEventsRouter);
+app.use('/api/v1/church/branches', churchBranchesRouter);
 
 // School module (NONPROFIT/SCHOOL org-type tenants)
 app.use('/api/v1/school/classes', schoolClassesRouter);
