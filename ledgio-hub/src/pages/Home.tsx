@@ -238,10 +238,9 @@ export function Home() {
           src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1920&q=80&auto=format&fit=crop"
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover opacity-[0.15]"
+          className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink-950/60 via-ink-950/80 to-ink-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(5,150,105,0.15)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink-950/30 via-transparent to-ink-950/80" />
 
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
 
