@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -16,6 +16,12 @@ import { PartnerPortal } from './pages/PartnerPortal';
 import { SECTORS } from './lib/sectors';
 import { OnboardingContext } from './lib/onboardingContext';
 import { OnboardingModal } from './components/OnboardingModal';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
 
 function SectorRoute() {
   const { slug } = useParams<{ slug: string }>();
@@ -66,6 +72,7 @@ function AppInner() {
 
   return (
     <OnboardingContext.Provider value={{ open: openOnboarding }}>
+      <ScrollToTop />
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
