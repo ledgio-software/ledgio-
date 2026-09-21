@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface AiInsight {
   id: string;
@@ -12,10 +13,15 @@ export interface AiInsight {
 }
 
 export function useAiInsights() {
+  const { user } = useAuth();
   const [insights, setInsights] = useState<AiInsight[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetch = useCallback(async () => {
+    if (!user?.tenantId) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get<{ success: boolean; data: AiInsight[] }>('/ai/insights');
       if (res.data.success) setInsights(res.data.data);
@@ -24,7 +30,7 @@ export function useAiInsights() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.tenantId]);
 
   const dismiss = useCallback(async (id: string) => {
     setInsights((prev) => prev.filter((i) => i.id !== id));

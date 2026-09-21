@@ -32,6 +32,7 @@ export function Header() {
   const profileRef = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = useCallback(async () => {
+    if (!user?.tenantId) return;
     try {
       const res = await api.get("/notifications");
       if (res.data.success) {
@@ -41,7 +42,7 @@ export function Header() {
     } catch (err) {
       console.error("Failed to fetch notifications:", err);
     }
-  }, []);
+  }, [user?.tenantId]);
 
   useEffect(() => {
     fetchNotifications();
