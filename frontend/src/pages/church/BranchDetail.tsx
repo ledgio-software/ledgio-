@@ -473,7 +473,7 @@ export function ChurchBranchDetail() {
                   </div>
 
                   {/* Giving summary */}
-                  {reportData.giving && (
+                  {!!reportData.giving && (
                     <div>
                       <h3 className="font-semibold text-sm mb-2 border-b pb-1">Giving Summary</h3>
                       {(() => {
@@ -495,7 +495,7 @@ export function ChurchBranchDetail() {
                   )}
 
                   {/* Attendance summary */}
-                  {reportData.attendance && (
+                  {!!reportData.attendance && (
                     <div>
                       <h3 className="font-semibold text-sm mb-2 border-b pb-1">Attendance Summary</h3>
                       {(() => {
@@ -512,7 +512,7 @@ export function ChurchBranchDetail() {
                   )}
 
                   {/* Members summary */}
-                  {reportData.members && (
+                  {!!reportData.members && (
                     <div>
                       <h3 className="font-semibold text-sm mb-2 border-b pb-1">Members Summary</h3>
                       {(() => {
@@ -529,7 +529,7 @@ export function ChurchBranchDetail() {
                   )}
 
                   {/* Visitors summary */}
-                  {reportData.visitors && (
+                  {!!reportData.visitors && (
                     <div>
                       <h3 className="font-semibold text-sm mb-2 border-b pb-1">Visitors Summary</h3>
                       {(() => {
