@@ -16,7 +16,10 @@ export type UserRole =
   | 'Cashier'
   | 'Viewer'
   | 'External Accountant'
-  | 'Branch Manager';
+  | 'Branch Manager'
+  | 'Deacon'
+  | 'Youth Executive'
+  | 'Bible Studies Leader';
 
 export const USER_ROLES: Record<UserRole, UserRole> = {
   Admin: 'Admin',
@@ -34,6 +37,9 @@ export const USER_ROLES: Record<UserRole, UserRole> = {
   Viewer: 'Viewer',
   'External Accountant': 'External Accountant',
   'Branch Manager': 'Branch Manager',
+  'Deacon': 'Deacon',
+  'Youth Executive': 'Youth Executive',
+  'Bible Studies Leader': 'Bible Studies Leader',
 };
 
 // Every recognized role. Anything outside this set is denied by default —
@@ -71,6 +77,11 @@ const ROLE_IMPLIES: Record<string, string[]> = {
   // (e.g. WHT rates) must name them explicitly in requireRole().
   'accounts payable clerk': ['viewer'],
   'accounts receivable clerk': ['viewer'],
+  // Church leadership roles — read access to all church data (JWT-gated routes),
+  // blocked from financial posting (requireRole('Accountant') routes).
+  'deacon': ['viewer'],
+  'youth executive': ['viewer'],
+  'bible studies leader': ['viewer'],
 };
 
 // Extend Express Request interface to include user payload
