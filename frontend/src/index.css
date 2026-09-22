@@ -52,3 +52,20 @@
     @apply bg-white dark:bg-secondary-800 text-secondary-900 dark:text-secondary-100;
   }
 }
+
+@media print {
+  /* Prevent table rows and cards from splitting across page breaks */
+  tr, .card { break-inside: avoid; }
+
+  /* Let overflow-x-auto wrappers expand fully so table content isn't clipped */
+  .overflow-x-auto { overflow: visible !important; }
+
+  /* Force black text and white background for legibility */
+  body { background: white !important; color: black !important; }
+
+  /* Remove hover and focus ring styles that look odd in print */
+  * { box-shadow: none !important; }
+
+  /* Ensure borders on table cells are visible in print */
+  th, td { border-color: #cbd5e1 !important; }
+}

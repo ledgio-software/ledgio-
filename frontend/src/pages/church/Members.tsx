@@ -13,6 +13,11 @@ interface CellGroup {
   name: string;
 }
 
+interface Branch {
+  id: string;
+  name: string;
+}
+
 interface ChurchMember {
   id: string;
   first_name: string;
@@ -25,6 +30,8 @@ interface ChurchMember {
   membership_status: string;
   cell_group_id: string | null;
   cell_group_name: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
   department: string | null;
   address: string | null;
   occupation: string | null;
@@ -56,6 +63,7 @@ interface MemberForm {
   dateOfBirth: string;
   membershipDate: string;
   membershipStatus: string;
+  branchId: string;
   cellGroupId: string;
   department: string;
   address: string;
@@ -68,7 +76,7 @@ interface MemberForm {
 const emptyForm: MemberForm = {
   firstName: "", lastName: "", email: "", phone: "", gender: "",
   dateOfBirth: "", membershipDate: "", membershipStatus: "ACTIVE",
-  cellGroupId: "", department: "", address: "", occupation: "",
+  branchId: "", cellGroupId: "", department: "", address: "", occupation: "",
   maritalStatus: "", baptismDate: "", notes: "",
 };
 
@@ -76,6 +84,7 @@ export function Members() {
   const { showToast } = useToast();
   const [members, setMembers] = useState<ChurchMember[]>([]);
   const [cellGroups, setCellGroups] = useState<CellGroup[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -102,6 +111,7 @@ export function Members() {
   useEffect(() => {
     loadMembers();
     api.get("/church/cell-groups").then((r) => setCellGroups(r.data?.data ?? []));
+    api.get("/church/branches").then((r) => setBranches(r.data?.data ?? []));
   }, [loadMembers]);
 
   function openAdd() {
@@ -121,6 +131,7 @@ export function Members() {
       dateOfBirth: m.date_of_birth ? m.date_of_birth.slice(0, 10) : "",
       membershipDate: m.membership_date ? m.membership_date.slice(0, 10) : "",
       membershipStatus: m.membership_status,
+      branchId: m.branch_id ?? "",
       cellGroupId: m.cell_group_id ?? "",
       department: m.department ?? "",
       address: m.address ?? "",
@@ -148,6 +159,7 @@ export function Members() {
         dateOfBirth: form.dateOfBirth || null,
         membershipDate: form.membershipDate || null,
         membershipStatus: form.membershipStatus,
+        branchId: form.branchId || null,
         cellGroupId: form.cellGroupId || null,
         department: form.department || null,
         address: form.address || null,
@@ -165,8 +177,9 @@ export function Members() {
       }
       setShowModal(false);
       loadMembers();
-    } catch {
-      showToast("Failed to save member.", "error");
+    } catch (err: unknown) {
+      const apiErr = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      showToast(apiErr ?? "Failed to save member.", "error");
     } finally {
       setSaving(false);
     }
@@ -353,6 +366,20 @@ export function Members() {
               {MEMBERSHIP_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+
+          {branches.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-secondary-600 dark:text-secondary-400 mb-1">Branch</label>
+              <select
+                value={form.branchId}
+                onChange={(e) => f("branchId", e.target.value)}
+                className="w-full rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900 text-sm px-3 py-2 text-secondary-900 dark:text-secondary-100"
+              >
+                <option value="">No specific branch</option>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-secondary-600 dark:text-secondary-400 mb-1">Cell Group</label>

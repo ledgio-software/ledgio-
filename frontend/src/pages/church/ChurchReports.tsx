@@ -99,8 +99,18 @@ export function ChurchReports() {
     { key: "comparison", label: "Branch Comparison", icon: BarChart2 },
   ];
 
+  const activeTab = REPORT_TABS.find((t) => t.key === activeReport);
+
   return (
     <div className="p-6 space-y-6 print:p-4">
+      {/* Print-only header — hidden on screen, shown when printing */}
+      <div className="hidden print:block mb-4 border-b pb-3">
+        <h1 className="text-lg font-bold">{activeTab?.label ?? "Church Report"}</h1>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {dateFrom} – {dateTo} &nbsp;·&nbsp; Printed {new Date().toLocaleDateString()}
+        </p>
+      </div>
+
       <div className="flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
           <FileText className="h-6 w-6 text-primary" />
