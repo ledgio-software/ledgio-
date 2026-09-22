@@ -55,7 +55,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
     const b = req.body as {
       firstName: string; lastName: string; phone?: string; email?: string;
       address?: string; visitDate: string; serviceType?: string;
-      howTheyHeard?: string; followUpNotes?: string;
+      howTheyHeard?: string; followUpNotes?: string; branchId?: string;
     };
     if (!b.firstName || !b.lastName || !b.visitDate) {
       res.status(400).json({ success: false, error: 'firstName, lastName, and visitDate are required.' });
@@ -64,10 +64,11 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
     const rows = await withCurrentTenantDb(prisma, (client) =>
       client.$queryRawUnsafe<Visitor[]>(
         `INSERT INTO church_visitors
-           (first_name, last_name, phone, email, address, visit_date, service_type, how_they_heard, follow_up_notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+           (first_name, last_name, phone, email, address, visit_date, service_type, how_they_heard, follow_up_notes, branch_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
         b.firstName, b.lastName, b.phone ?? null, b.email ?? null, b.address ?? null,
         b.visitDate, b.serviceType ?? 'SUNDAY_SERVICE', b.howTheyHeard ?? null, b.followUpNotes ?? null,
+        b.branchId ?? null,
       )
     );
     res.status(201).json({ success: true, data: rows[0] });

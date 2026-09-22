@@ -15,7 +15,8 @@ export type UserRole =
   | 'Shop Manager'
   | 'Cashier'
   | 'Viewer'
-  | 'External Accountant';
+  | 'External Accountant'
+  | 'Branch Manager';
 
 export const USER_ROLES: Record<UserRole, UserRole> = {
   Admin: 'Admin',
@@ -32,6 +33,7 @@ export const USER_ROLES: Record<UserRole, UserRole> = {
   Cashier: 'Cashier',
   Viewer: 'Viewer',
   'External Accountant': 'External Accountant',
+  'Branch Manager': 'Branch Manager',
 };
 
 // Every recognized role. Anything outside this set is denied by default —
@@ -43,7 +45,7 @@ const ALL_KNOWN_ROLES = new Set(
 // Roles with blanket operational access to all non-Admin-only routes when
 // not restricted by a requireRole() call. Other roles are default-deny:
 // they must be named explicitly in requireRole() or covered by ROLE_IMPLIES.
-const OPERATIONAL_ROLES = new Set(['admin', 'owner', 'accountant', 'finance controller']);
+const OPERATIONAL_ROLES = new Set(['admin', 'owner', 'accountant', 'finance controller', 'branch manager']);
 
 // Role implication: a user with role X also satisfies a requireRole check for
 // role Y. This lets us keep route definitions stable while new roles inherit

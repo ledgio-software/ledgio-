@@ -60,6 +60,7 @@ import {
   WifiOff,
   Heart,
   Users2,
+  Settings,
 } from "lucide-react";
 
 export type WorkspaceMode = 'operations' | 'business' | 'professional';
@@ -415,6 +416,8 @@ export const navigationGroups: NavGroup[] = [
       { name: "Ministries",  href: "/church/ministries",  icon: Layers },
       { name: "Events",      href: "/church/events",      icon: CalendarDays },
       { name: "Branches",    href: "/church/branches",    icon: GitBranch },
+      { name: "Reports",     href: "/church/reports",     icon: BarChart3 },
+      { name: "Settings",    href: "/church/settings",    icon: Settings },
     ],
   },
 ];

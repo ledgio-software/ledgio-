@@ -119,6 +119,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
       paymentMethod?: string;
       reference?: string;
       notes?: string;
+      branchId?: string;
     };
 
     if (!b.givingDate || !b.givingType || b.amount == null) {
@@ -129,8 +130,8 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<Giving[]>(
         `INSERT INTO church_givings
-           (giving_date, service_type, giving_type, amount, currency, member_id, payment_method, reference, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           (giving_date, service_type, giving_type, amount, currency, member_id, payment_method, reference, notes, branch_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          RETURNING *`,
         b.givingDate,
         b.serviceType ?? 'SUNDAY_SERVICE',
@@ -141,6 +142,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
         b.paymentMethod ?? 'CASH',
         b.reference ?? null,
         b.notes ?? null,
+        b.branchId ?? null,
       );
     });
 

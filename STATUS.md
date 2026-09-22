@@ -2,6 +2,36 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-22] - Feature: Comprehensive Church Branch Management System (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Built the full church branch management feature set: branch detail view, leaderboard, branch comparison, org-wide event visibility, church customization settings, and branch-scoped report generation.
+
+**Backend Changes:**
+- **`backend/src/app.ts`** — Registered `churchSettingsRouter` on `/api/v1/church/settings`.
+- **`backend/src/routes/churchSettings.ts`** — NEW: GET (returns all settings as key/value map) and PUT (upsert, Admin-only) for church customization settings.
+- **`backend/src/routes/churchGiving.ts`** — POST now accepts optional `branchId`, saves to `branch_id` column.
+- **`backend/src/routes/churchAttendance.ts`** — POST `/sessions` now accepts optional `branchId`, saves to `branch_id` column.
+- **`backend/src/routes/churchEvents.ts`** — POST now accepts optional `branchId` (null = org-wide event visible to all branches).
+- **`backend/src/routes/churchVisitors.ts`** — POST now accepts optional `branchId`, saves to `branch_id` column.
+- **`backend/src/routes/churchPledges.ts`** — POST now accepts optional `branchId`, saves to `branch_id` column.
+
+**Frontend Changes:**
+- **`frontend/src/pages/church/Branches.tsx`** — Updated with leaderboard tab, top-performing banner, click-to-navigate to branch detail, branch comparison scores.
+- **`frontend/src/pages/church/BranchDetail.tsx`** — NEW: Branch detail page with tabs (Overview, Members, Giving, Attendance, Events, Visitors, Report). Shows all branch activity in one place. Events tab shows branch-specific + org-wide events.
+- **`frontend/src/pages/church/ChurchSettings.tsx`** — NEW: Church customization settings page — branding (logo, colors, motto, website), report header/footer/display options, general settings.
+- **`frontend/src/pages/church/ChurchReports.tsx`** — NEW: Reports page with giving report, attendance report, members report, branch comparison (with bar chart visualization). Print/PDF export via browser print.
+- **`frontend/src/pages/church/Giving.tsx`** — Added optional branch selector to record giving form.
+- **`frontend/src/pages/church/Attendance.tsx`** — Added optional branch selector to record attendance form.
+- **`frontend/src/pages/church/Events.tsx`** — Added optional branch selector (blank = org-wide) to create event form.
+- **`frontend/src/pages/church/Visitors.tsx`** — Added optional branch selector to log visitor form.
+- **`frontend/src/App.tsx`** — Added lazy imports and routes for `/church/branches/:id`, `/church/settings`, `/church/reports`.
+- **`frontend/src/lib/navigation.ts`** — Added "Reports" and "Settings" nav items to CHURCH section.
+
+**Status:** Complete. TypeScript checks pass on both frontend and backend.
+
+---
+
 ## [Date: 2026-09-22] - Fix: PostgreSQL type-cast errors on all church routes (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**

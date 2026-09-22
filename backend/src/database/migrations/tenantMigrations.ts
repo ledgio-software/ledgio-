@@ -1159,6 +1159,50 @@ ALTER TABLE church_givings ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES ch
 CREATE INDEX IF NOT EXISTS idx_church_branches_active ON church_branches(is_active);
 CREATE INDEX IF NOT EXISTS idx_church_members_branch ON church_members(branch_id);
     `
+  },
+  {
+    version: 33,
+    name: '033_church_branch_expansion',
+    sql: `
+-- Extend remaining church tables with branch_id
+ALTER TABLE church_events      ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES church_branches(id) ON DELETE SET NULL;
+ALTER TABLE church_visitors    ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES church_branches(id) ON DELETE SET NULL;
+ALTER TABLE church_pledges     ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES church_branches(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_church_events_branch   ON church_events(branch_id);
+CREATE INDEX IF NOT EXISTS idx_church_visitors_branch ON church_visitors(branch_id);
+CREATE INDEX IF NOT EXISTS idx_church_pledges_branch  ON church_pledges(branch_id);
+
+-- Church-wide settings / customization
+CREATE TABLE IF NOT EXISTS church_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key VARCHAR(100) NOT NULL UNIQUE,
+  value TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed default keys so they always exist
+INSERT INTO church_settings (key, value) VALUES
+  ('church_name',          NULL),
+  ('church_motto',         NULL),
+  ('church_address',       NULL),
+  ('church_phone',         NULL),
+  ('church_email',         NULL),
+  ('church_website',       NULL),
+  ('logo_url',             NULL),
+  ('primary_color',        '#6366f1'),
+  ('accent_color',         '#10b981'),
+  ('report_header',        NULL),
+  ('report_footer',        NULL),
+  ('report_show_giving',   'true'),
+  ('report_show_members',  'true'),
+  ('report_show_attendance','true'),
+  ('report_show_visitors', 'true'),
+  ('report_show_events',   'true'),
+  ('report_show_pledges',  'true'),
+  ('currency_symbol',      'GHS')
+ON CONFLICT (key) DO NOTHING;
+    `
   }
 ];
 

@@ -43,18 +43,23 @@ export function ChurchVisitors() {
   const [followUpNotes, setFollowUpNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({
     firstName: "", lastName: "", phone: "", email: "",
     visitDate: today, serviceType: "SUNDAY_SERVICE",
-    howTheyHeard: "", followUpNotes: "",
+    howTheyHeard: "", followUpNotes: "", branchId: "",
   });
 
   const load = useCallback(async () => {
     setLoading(true);
     const params = filterStatus ? `?status=${filterStatus}` : "";
     try {
-      const r = await api.get(`/church/visitors${params}`);
-      setVisitors(r.data.data);
+      const [visRes, brRes] = await Promise.all([
+        api.get(`/church/visitors${params}`),
+        api.get("/church/branches").catch(() => ({ data: { data: [] } })),
+      ]);
+      setVisitors(visRes.data.data);
+      setBranches(brRes.data?.data ?? []);
     } catch {
       showToast("Failed to load visitors", "error");
     } finally {
@@ -74,10 +79,11 @@ export function ChurchVisitors() {
         visitDate: form.visitDate, serviceType: form.serviceType,
         howTheyHeard: form.howTheyHeard || undefined,
         followUpNotes: form.followUpNotes || undefined,
+        branchId: form.branchId || undefined,
       });
       showToast("Visitor added", "success");
       setShowAdd(false);
-      setForm({ firstName: "", lastName: "", phone: "", email: "", visitDate: today, serviceType: "SUNDAY_SERVICE", howTheyHeard: "", followUpNotes: "" });
+      setForm({ firstName: "", lastName: "", phone: "", email: "", visitDate: today, serviceType: "SUNDAY_SERVICE", howTheyHeard: "", followUpNotes: "", branchId: "" });
       load();
     } catch { showToast("Failed to save", "error"); }
     finally { setSaving(false); }
@@ -208,6 +214,15 @@ export function ChurchVisitors() {
                 <label className="block text-xs text-muted-foreground mb-1">Notes</label>
                 <input type="text" value={form.followUpNotes} onChange={e => setForm(f => ({ ...f, followUpNotes: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="Optional" />
               </div>
+              {branches.length > 0 && (
+                <div className="col-span-2">
+                  <label className="block text-xs text-muted-foreground mb-1">Branch (optional)</label>
+                  <select value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
+                    <option value="">Main Church / All Branches</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowAdd(false)} className="px-4 py-2 border rounded text-sm hover:bg-muted">Cancel</button>

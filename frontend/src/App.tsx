@@ -143,6 +143,9 @@ const ChurchVisitors = lazy(() => import("./pages/church/Visitors").then(m => ({
 const ChurchMinistries = lazy(() => import("./pages/church/Ministries").then(m => ({ default: m.ChurchMinistries })));
 const ChurchEvents = lazy(() => import("./pages/church/Events").then(m => ({ default: m.ChurchEvents })));
 const ChurchBranches = lazy(() => import("./pages/church/Branches").then(m => ({ default: m.ChurchBranches })));
+const ChurchBranchDetail = lazy(() => import("./pages/church/BranchDetail").then(m => ({ default: m.ChurchBranchDetail })));
+const ChurchSettings = lazy(() => import("./pages/church/ChurchSettings").then(m => ({ default: m.ChurchSettings })));
+const ChurchReports = lazy(() => import("./pages/church/ChurchReports").then(m => ({ default: m.ChurchReports })));
 const CostCentres = lazy(() => import("./pages/costcentres/CostCentres").then(m => ({ default: m.CostCentres })));
 const Manufacturing = lazy(() => import("./pages/manufacturing/Manufacturing").then(m => ({ default: m.Manufacturing })));
 const VatReturn = lazy(() => import("./pages/reports/VatReturn").then(m => ({ default: m.VatReturn })));
@@ -1156,6 +1159,9 @@ function App() {
               <Route path="/church/ministries" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchMinistries /></MainLayout></ProtectedRoute>} />
               <Route path="/church/events" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchEvents /></MainLayout></ProtectedRoute>} />
               <Route path="/church/branches" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchBranches /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/branches/:id" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchBranchDetail /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/settings" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchSettings /></MainLayout></ProtectedRoute>} />
+              <Route path="/church/reports" element={<ProtectedRoute allowedOrgTypes={["CHURCH"]}><MainLayout><ChurchReports /></MainLayout></ProtectedRoute>} />
               <Route path="/school/teachers" element={<ProtectedRoute><MainLayout><SchoolTeachers /></MainLayout></ProtectedRoute>} />
               <Route path="/school/classes" element={<ProtectedRoute><MainLayout><SchoolClasses /></MainLayout></ProtectedRoute>} />
               <Route path="/school/momo-reconciliation" element={<ProtectedRoute><MainLayout><MomoReconciliation /></MainLayout></ProtectedRoute>} />

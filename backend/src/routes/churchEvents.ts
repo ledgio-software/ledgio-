@@ -81,7 +81,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
     const b = req.body as {
       title: string; eventType?: string; description?: string;
       eventDate: string; endDate?: string; venue?: string;
-      expectedAttendance?: number;
+      expectedAttendance?: number; branchId?: string;
     };
     if (!b.title || !b.eventDate) {
       res.status(400).json({ success: false, error: 'title and eventDate are required.' });
@@ -89,10 +89,10 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
     }
     const rows = await withCurrentTenantDb(prisma, (client) =>
       client.$queryRawUnsafe<ChurchEvent[]>(
-        `INSERT INTO church_events (title, event_type, description, event_date, end_date, venue, expected_attendance)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        `INSERT INTO church_events (title, event_type, description, event_date, end_date, venue, expected_attendance, branch_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         b.title, b.eventType ?? 'GENERAL', b.description ?? null, b.eventDate,
-        b.endDate ?? null, b.venue ?? null, b.expectedAttendance ?? null,
+        b.endDate ?? null, b.venue ?? null, b.expectedAttendance ?? null, b.branchId ?? null,
       )
     );
     res.status(201).json({ success: true, data: rows[0] });
