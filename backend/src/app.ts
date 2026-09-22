@@ -127,6 +127,7 @@ import churchVisitorsRouter from './routes/churchVisitors';
 import churchMinistriesRouter from './routes/churchMinistries';
 import churchEventsRouter from './routes/churchEvents';
 import churchBranchesRouter from './routes/churchBranches';
+import churchSettingsRouter from './routes/churchSettings';
 import ssnitRouter from './routes/ssnit';
 import costCentresRouter from './routes/costCentres';
 import costCategoriesRouter from './routes/costCategories';
@@ -380,6 +381,7 @@ app.use('/api/v1/church/visitors', churchVisitorsRouter);
 app.use('/api/v1/church/ministries', churchMinistriesRouter);
 app.use('/api/v1/church/events', churchEventsRouter);
 app.use('/api/v1/church/branches', churchBranchesRouter);
+app.use('/api/v1/church/settings', churchSettingsRouter);
 
 // School module (NONPROFIT/SCHOOL org-type tenants)
 app.use('/api/v1/school/classes', schoolClassesRouter);

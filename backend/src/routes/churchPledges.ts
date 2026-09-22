@@ -75,6 +75,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
       pledgeDate: string;
       dueDate?: string;
       notes?: string;
+      branchId?: string;
     };
 
     if (!b.memberId || !b.pledgeType || b.amount == null || !b.pledgeDate) {
@@ -84,8 +85,8 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<ChurchPledge[]>(
-        `INSERT INTO church_pledges (member_id, pledge_type, amount, currency, pledge_date, due_date, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO church_pledges (member_id, pledge_type, amount, currency, pledge_date, due_date, notes, branch_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         b.memberId,
         b.pledgeType,
@@ -94,6 +95,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
         b.pledgeDate,
         b.dueDate ?? null,
         b.notes ?? null,
+        b.branchId ?? null,
       );
     });
 

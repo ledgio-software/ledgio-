@@ -62,6 +62,8 @@ export function Attendance() {
   const [sessionTitle, setSessionTitle] = useState("Sunday Service");
   const [bulkCount, setBulkCount] = useState("");
   const [sessionNotes, setSessionNotes] = useState("");
+  const [sessionBranchId, setSessionBranchId] = useState("");
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
   const [recordMode, setRecordMode] = useState<"individual" | "bulk">("bulk");
@@ -80,9 +82,13 @@ export function Attendance() {
   const loadMembers = useCallback(async () => {
     setMembersLoading(true);
     try {
-      const r = await api.get("/church/members");
-      const list: Member[] = r.data?.data ?? [];
+      const [memRes, brRes] = await Promise.all([
+        api.get("/church/members"),
+        api.get("/church/branches").catch(() => ({ data: { data: [] } })),
+      ]);
+      const list: Member[] = memRes.data?.data ?? [];
       setMembers(list);
+      setBranches(brRes.data?.data ?? []);
       const map: Record<string, boolean> = {};
       list.forEach((m) => { map[m.id] = true; });
       setAttendance(map);
@@ -139,6 +145,7 @@ export function Attendance() {
         sessionType,
         totalCount: recordMode === "bulk" && bulkCount ? parseInt(bulkCount, 10) : undefined,
         notes: sessionNotes || undefined,
+        branchId: sessionBranchId || undefined,
       };
       const r = await api.post("/church/attendance/sessions", sessionPayload);
       const newSessionId: string = r.data?.data?.id;
@@ -293,6 +300,16 @@ export function Attendance() {
                   className="w-full rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900 text-sm px-3 py-2 text-secondary-900 dark:text-secondary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
+              {branches.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-secondary-600 dark:text-secondary-400 mb-1">Branch (optional)</label>
+                  <select value={sessionBranchId} onChange={(e) => setSessionBranchId(e.target.value)}
+                    className="w-full rounded-lg border border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900 text-sm px-3 py-2 text-secondary-900 dark:text-secondary-100">
+                    <option value="">Main Church / All Branches</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
             </CardContent>
           </Card>
 

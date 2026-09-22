@@ -124,6 +124,7 @@ router.post('/sessions', requireRole('Admin', 'Accountant') as never, async (req
       cellGroupId?: string;
       totalCount?: number;
       notes?: string;
+      branchId?: string;
     };
 
     if (!b.title || !b.sessionDate) {
@@ -133,8 +134,8 @@ router.post('/sessions', requireRole('Admin', 'Accountant') as never, async (req
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<AttendanceSession[]>(
-        `INSERT INTO church_attendance_sessions (title, session_date, session_type, cell_group_id, total_count, notes)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO church_attendance_sessions (title, session_date, session_type, cell_group_id, total_count, notes, branch_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
         b.title,
         b.sessionDate,
@@ -142,6 +143,7 @@ router.post('/sessions', requireRole('Admin', 'Accountant') as never, async (req
         b.cellGroupId ?? null,
         b.totalCount ?? null,
         b.notes ?? null,
+        b.branchId ?? null,
       );
     });
 

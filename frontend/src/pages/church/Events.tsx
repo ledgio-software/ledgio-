@@ -41,14 +41,19 @@ export function ChurchEvents() {
   const [saving, setSaving] = useState(false);
   const [upcoming, setUpcoming] = useState(false);
 
-  const [form, setForm] = useState({ title: "", eventType: "GENERAL", description: "", eventDate: today, endDate: "", venue: "", expectedAttendance: "" });
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  const [form, setForm] = useState({ title: "", eventType: "GENERAL", description: "", eventDate: today, endDate: "", venue: "", expectedAttendance: "", branchId: "" });
   const [regForm, setRegForm] = useState({ visitorName: "", phone: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await api.get(`/church/events${upcoming ? "?upcoming=true" : ""}`);
-      setEvents(r.data.data);
+      const [evRes, brRes] = await Promise.all([
+        api.get(`/church/events${upcoming ? "?upcoming=true" : ""}`),
+        api.get("/church/branches").catch(() => ({ data: { data: [] } })),
+      ]);
+      setEvents(evRes.data.data);
+      setBranches(brRes.data?.data ?? []);
     } catch { showToast("Failed to load events", "error"); }
     finally { setLoading(false); }
   }, [upcoming, showToast]);
@@ -76,10 +81,11 @@ export function ChurchEvents() {
         description: form.description || undefined, eventDate: form.eventDate,
         endDate: form.endDate || undefined, venue: form.venue || undefined,
         expectedAttendance: form.expectedAttendance ? Number(form.expectedAttendance) : undefined,
+        branchId: form.branchId || undefined,
       });
       showToast("Event created", "success");
       setShowAdd(false);
-      setForm({ title: "", eventType: "GENERAL", description: "", eventDate: today, endDate: "", venue: "", expectedAttendance: "" });
+      setForm({ title: "", eventType: "GENERAL", description: "", eventDate: today, endDate: "", venue: "", expectedAttendance: "", branchId: "" });
       load();
     } catch { showToast("Failed to save", "error"); }
     finally { setSaving(false); }
@@ -228,6 +234,15 @@ export function ChurchEvents() {
                 <label className="block text-xs text-muted-foreground mb-1">Description</label>
                 <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" />
               </div>
+              {branches.length > 0 && (
+                <div className="col-span-2">
+                  <label className="block text-xs text-muted-foreground mb-1">Branch (leave blank for org-wide event)</label>
+                  <select value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
+                    <option value="">All Branches (org-wide)</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowAdd(false)} className="px-4 py-2 border rounded text-sm hover:bg-muted">Cancel</button>

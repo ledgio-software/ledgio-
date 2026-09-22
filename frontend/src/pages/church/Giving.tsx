@@ -25,6 +25,8 @@ interface Summary {
   grandTotal: { total: number; count: number };
 }
 
+interface Branch { id: string; name: string }
+
 function fmt(n: number) {
   return `GHS ${Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }
@@ -40,6 +42,7 @@ export function ChurchGiving() {
   const { showToast } = useToast();
   const [records, setRecords] = useState<GivingRecord[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -56,6 +59,7 @@ export function ChurchGiving() {
     paymentMethod: "CASH",
     reference: "",
     notes: "",
+    branchId: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -67,12 +71,14 @@ export function ChurchGiving() {
     if (filters.type) params.set("type", filters.type);
 
     try {
-      const [recs, summ] = await Promise.all([
+      const [recs, summ, br] = await Promise.all([
         api.get(`/church/giving?${params}`),
         api.get(`/church/giving/summary?${params}`),
+        api.get("/church/branches"),
       ]);
       setRecords(recs.data.data);
       setSummary(summ.data.data);
+      setBranches(br.data.data ?? []);
     } catch {
       showToast("Failed to load giving records", "error");
     } finally {
@@ -99,10 +105,11 @@ export function ChurchGiving() {
         paymentMethod: form.paymentMethod,
         reference: form.reference || undefined,
         notes: form.notes || undefined,
+        branchId: form.branchId || undefined,
       });
       showToast("Giving recorded", "success");
       setShowAdd(false);
-      setForm({ givingDate: today, serviceType: "SUNDAY_SERVICE", givingType: "TITHE", amount: "", currency: "GHS", memberId: "", paymentMethod: "CASH", reference: "", notes: "" });
+      setForm({ givingDate: today, serviceType: "SUNDAY_SERVICE", givingType: "TITHE", amount: "", currency: "GHS", memberId: "", paymentMethod: "CASH", reference: "", notes: "", branchId: "" });
       load();
     } catch {
       showToast("Failed to save", "error");
@@ -301,6 +308,15 @@ export function ChurchGiving() {
                 <label className="block text-xs text-muted-foreground mb-1">Notes</label>
                 <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800" placeholder="Optional" />
               </div>
+              {branches.length > 0 && (
+                <div className="col-span-2">
+                  <label className="block text-xs text-muted-foreground mb-1">Branch (optional)</label>
+                  <select value={form.branchId} onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))} className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-secondary-800">
+                    <option value="">Main Church / All Branches</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowAdd(false)} className="px-4 py-2 border rounded text-sm hover:bg-muted">Cancel</button>
