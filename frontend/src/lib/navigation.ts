@@ -181,7 +181,9 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
     '/settings/tax-rates',
   ]),
   // CHURCH / NGO: Keep invoices (donation receipts), customers (donors), purchase orders
+  // /dashboard and /onboarding hidden — church tenants land on /church/dashboard instead
   CHURCH: new Set([
+    '/dashboard', '/onboarding',
     '/pos', '/sales-orders', '/delivery-notes', '/recurring-invoices',
     '/inventory', '/inventory/serial-numbers', '/analytics/inventory',
     '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
