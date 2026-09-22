@@ -115,7 +115,7 @@ export function MobileBottomNav() {
 
       {/* Fixed bottom bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white dark:bg-secondary-900 border-t border-secondary-200 dark:border-secondary-800"
+        className="fixed bottom-0 left-0 right-0 z-40 md:hidden print:hidden bg-white dark:bg-secondary-900 border-t border-secondary-200 dark:border-secondary-800"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="flex items-stretch h-14">
