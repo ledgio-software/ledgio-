@@ -2,6 +2,24 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-22] - Fix: Church member form — add Branch field, surface real API errors
+
+**What/Why:**
+The member form was missing a Branch selector even though `branch_id` exists in the `church_members` table (added in migration 032). Every member was saved with `branch_id = NULL`. Also the catch block in `handleSave` swallowed the actual API error and showed a generic toast, making it impossible to diagnose save failures. Fixed both.
+
+**Files Changed:**
+- **`frontend/src/pages/church/Members.tsx`** — Added `Branch` interface, `branchId` to `MemberForm`/`emptyForm`, branch state + fetch, Branch select in modal, `branchId` in save payload, `branch_id`/`branch_name` on `ChurchMember`, improved error handling in catch.
+- **`backend/src/routes/churchMembers.ts`** — Added `branchId` to POST body type and INSERT (`$16`), added `branchId: 'branch_id'` to PUT fieldMap, added `branch_id`/`branch_name` to `ChurchMember` interface, updated GET query to LEFT JOIN `church_branches` for `branch_name`.
+
+## [Date: 2026-09-22] - Improvement: Enhanced print layout — print header, page breaks, overflow fix
+
+**What/Why:**
+Follow-up to the initial print chrome fix. Added global `@media print` rules to prevent table rows splitting across page breaks, removed `overflow-x-auto` clipping that hides table content on some browsers, forced legible black-on-white colors, and added a print-only header to `ChurchReports` showing the report name and date range so printed pages are self-identifying without the app header.
+
+**Files Changed:**
+- **`frontend/src/index.css`** — Added `@media print` block with `break-inside: avoid`, `overflow: visible`, border color enforcement, and background/text color reset.
+- **`frontend/src/pages/church/ChurchReports.tsx`** — Added `hidden print:block` header div with report title and date range; derived `activeTab` before return.
+
 ## [Date: 2026-09-22] - Fix: Clean print layout for all report pages
 
 **What/Why:**

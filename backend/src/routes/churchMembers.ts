@@ -22,6 +22,8 @@ interface ChurchMember {
   membership_status: string;
   cell_group_id: string | null;
   cell_group_name: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
   department: string | null;
   address: string | null;
   occupation: string | null;
@@ -66,9 +68,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<ChurchMember[]>(
-        `SELECT m.*, cg.name AS cell_group_name
+        `SELECT m.*, cg.name AS cell_group_name, br.name AS branch_name
          FROM church_members m
          LEFT JOIN church_cell_groups cg ON cg.id = m.cell_group_id
+         LEFT JOIN church_branches br ON br.id = m.branch_id
          ${where}
          ORDER BY m.last_name, m.first_name`,
         ...values,
@@ -93,6 +96,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
       dateOfBirth?: string;
       membershipDate?: string;
       membershipStatus?: string;
+      branchId?: string;
       cellGroupId?: string;
       department?: string;
       address?: string;
@@ -111,9 +115,9 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
       return client.$queryRawUnsafe<ChurchMember[]>(
         `INSERT INTO church_members
            (first_name, last_name, email, phone, gender, date_of_birth, membership_date,
-            membership_status, cell_group_id, department, address, occupation,
+            membership_status, branch_id, cell_group_id, department, address, occupation,
             marital_status, baptism_date, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING *`,
         b.firstName,
         b.lastName,
@@ -123,6 +127,7 @@ router.post('/', requireRole('Admin', 'Accountant') as never, async (req: Reques
         b.dateOfBirth ?? null,
         b.membershipDate ?? null,
         b.membershipStatus ?? 'ACTIVE',
+        b.branchId ?? null,
         b.cellGroupId ?? null,
         b.department ?? null,
         b.address ?? null,
@@ -178,6 +183,7 @@ router.put('/:id', requireRole('Admin', 'Accountant') as never, async (req: Requ
       dateOfBirth: 'date_of_birth',
       membershipDate: 'membership_date',
       membershipStatus: 'membership_status',
+      branchId: 'branch_id',
       cellGroupId: 'cell_group_id',
       department: 'department',
       address: 'address',
