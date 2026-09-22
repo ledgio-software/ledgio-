@@ -37,7 +37,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     let idx = 1;
 
     if (memberId) {
-      conditions.push(`p.member_id = $${idx++}`);
+      conditions.push(`p.member_id = $${idx++}::uuid`);
       values.push(memberId);
     }
     if (status) {
@@ -148,7 +148,7 @@ router.put('/:id', requireRole('Admin', 'Accountant') as never, async (req: Requ
             WHEN fulfilled_amount < amount AND status = 'FULFILLED' THEN 'ACTIVE'
             ELSE status
           END
-      WHERE id = $${idx}
+      WHERE id = $${idx}::uuid
       RETURNING *`;
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {

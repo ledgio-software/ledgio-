@@ -33,8 +33,8 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const values: unknown[] = [];
     let idx = 1;
     if (status) { conditions.push(`follow_up_status = $${idx++}`); values.push(status); }
-    if (from)   { conditions.push(`visit_date >= $${idx++}`); values.push(from); }
-    if (to)     { conditions.push(`visit_date <= $${idx++}`); values.push(to); }
+    if (from)   { conditions.push(`visit_date >= $${idx++}::date`); values.push(from); }
+    if (to)     { conditions.push(`visit_date <= $${idx++}::date`); values.push(to); }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const rows = await withCurrentTenantDb(prisma, (client) =>
@@ -84,7 +84,7 @@ router.patch('/:id/follow-up', requireRole('Admin', 'Accountant') as never, asyn
     const rows = await withCurrentTenantDb(prisma, (client) =>
       client.$queryRawUnsafe<Visitor[]>(
         `UPDATE church_visitors SET follow_up_status=$1, follow_up_notes=COALESCE($2, follow_up_notes), updated_at=NOW()
-         WHERE id=$3 RETURNING *`,
+         WHERE id=$3::uuid RETURNING *`,
         status, notes ?? null, id,
       )
     );
@@ -103,7 +103,7 @@ router.post('/:id/convert', requireRole('Admin') as never, async (req: Request, 
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       const visitors = await client.$queryRawUnsafe<Visitor[]>(
-        `SELECT * FROM church_visitors WHERE id=$1`, id,
+        `SELECT * FROM church_visitors WHERE id=$1::uuid`, id,
       );
       if (!visitors.length) return null;
       const v = visitors[0];
@@ -119,7 +119,7 @@ router.post('/:id/convert', requireRole('Admin') as never, async (req: Request, 
       const memberId = members[0].id;
 
       await client.$executeRawUnsafe(
-        `UPDATE church_visitors SET converted_to_member_id=$1, follow_up_status='CONVERTED', updated_at=NOW() WHERE id=$2`,
+        `UPDATE church_visitors SET converted_to_member_id=$1, follow_up_status='CONVERTED', updated_at=NOW() WHERE id=$2::uuid`,
         memberId, id,
       );
       return memberId;
@@ -137,7 +137,7 @@ router.delete('/:id', requireRole('Admin') as never, async (req: Request, res: R
   try {
     const { id } = req.params;
     const rows = await withCurrentTenantDb(prisma, (client) =>
-      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_visitors WHERE id=$1 RETURNING id`, id)
+      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_visitors WHERE id=$1::uuid RETURNING id`, id)
     );
     if (!rows.length) { res.status(404).json({ success: false, error: 'Not found.' }); return; }
     res.json({ success: true });

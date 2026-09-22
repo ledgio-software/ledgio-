@@ -160,7 +160,7 @@ router.get('/sessions/:id/records', async (req: Request, res: Response): Promise
         `SELECT ar.*, m.first_name, m.last_name
          FROM church_attendance_records ar
          JOIN church_members m ON m.id = ar.member_id
-         WHERE ar.session_id = $1
+         WHERE ar.session_id = $1::uuid
          ORDER BY m.last_name, m.first_name`,
         id,
       );
@@ -184,7 +184,7 @@ router.post('/sessions/:id/records', requireRole('Admin', 'Accountant') as never
 
     await withCurrentTenantDb(prisma, async (client) => {
       const sessions = await client.$queryRawUnsafe<{ id: string }[]>(
-        `SELECT id FROM church_attendance_sessions WHERE id = $1`,
+        `SELECT id FROM church_attendance_sessions WHERE id = $1::uuid`,
         sessionId,
       );
       if (sessions.length === 0) {

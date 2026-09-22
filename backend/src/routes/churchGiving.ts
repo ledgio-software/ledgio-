@@ -34,8 +34,8 @@ router.get('/summary', async (req: Request, res: Response): Promise<void> => {
     const values: unknown[] = [];
     let idx = 1;
 
-    if (from) { conditions.push(`g.giving_date >= $${idx++}`); values.push(from); }
-    if (to)   { conditions.push(`g.giving_date <= $${idx++}`); values.push(to); }
+    if (from) { conditions.push(`g.giving_date >= $${idx++}::date`); values.push(from); }
+    if (to)   { conditions.push(`g.giving_date <= $${idx++}::date`); values.push(to); }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -80,10 +80,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const values: unknown[] = [];
     let idx = 1;
 
-    if (from)     { conditions.push(`g.giving_date >= $${idx++}`); values.push(from); }
-    if (to)       { conditions.push(`g.giving_date <= $${idx++}`); values.push(to); }
+    if (from)     { conditions.push(`g.giving_date >= $${idx++}::date`); values.push(from); }
+    if (to)       { conditions.push(`g.giving_date <= $${idx++}::date`); values.push(to); }
     if (type)     { conditions.push(`g.giving_type = $${idx++}`); values.push(type); }
-    if (memberId) { conditions.push(`g.member_id = $${idx++}`); values.push(memberId); }
+    if (memberId) { conditions.push(`g.member_id = $${idx++}::uuid`); values.push(memberId); }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -156,7 +156,7 @@ router.delete('/:id', requireRole('Admin') as never, async (req: Request, res: R
     const { id } = req.params;
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<{ id: string }[]>(
-        `DELETE FROM church_givings WHERE id = $1 RETURNING id`,
+        `DELETE FROM church_givings WHERE id = $1::uuid RETURNING id`,
         id,
       );
     });

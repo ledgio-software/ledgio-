@@ -2,6 +2,52 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-22] - Fix: PostgreSQL type-cast errors on all church routes (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+The Node.js `pg` driver sends query parameters as text strings. PostgreSQL does not implicitly cast `text → uuid` or `text → date` in parameterized queries, causing 500 errors on every church route that filtered by UUID or date columns. Added explicit `::uuid` and `::date` casts to all affected WHERE clauses across all church backend routes.
+
+**Changes:**
+- **`backend/src/routes/churchGiving.ts`** — Added `::date` cast to `giving_date >=/$<=` conditions (both GET `/` and GET `/summary`); `::uuid` to `member_id` filter; `::uuid` to DELETE `WHERE id`.
+- **`backend/src/routes/churchMinistries.ts`** — Added `::uuid` to `ministry_id` and `member_id` in GET `/:id/members` and DELETE `/:id/members/:memberId`; `::uuid` to PUT `WHERE id` and DELETE `WHERE id`.
+- **`backend/src/routes/churchAttendance.ts`** — Added `::uuid` to `session_id` in GET `/sessions/:id/records` and to `id` in the session-existence check.
+- **`backend/src/routes/churchVisitors.ts`** — Added `::date` to `visit_date >=/$<=`; `::uuid` to PATCH/DELETE/convert `WHERE id`.
+- **`backend/src/routes/churchPledges.ts`** — Added `::uuid` to `member_id` filter and PUT `WHERE id`.
+- **`backend/src/routes/churchMembers.ts`** — Added `::uuid` to GET `/:id`, PUT, DELETE `WHERE id`; `::uuid` to `cell_group_id` list filter.
+- **`backend/src/routes/churchEvents.ts`** — Added `::uuid` to GET `/:id/registrations`, PUT `WHERE id`, PATCH registration `WHERE id`, DELETE `WHERE id`.
+- **`backend/src/routes/churchBranches.ts`** — Added `::uuid` to PUT and DELETE `WHERE id`.
+- **`backend/src/routes/churchCellGroups.ts`** — Added `::uuid` to PUT and DELETE (soft-delete) `WHERE id`.
+
+## [Date: 2026-09-21] - Fix: RBAC bug — requireRole('Admin', 'Accountant') was blocking Accountants (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+`hasRequiredRole` treated any presence of 'Admin' in the allowed-roles list as admin-only, causing early return and blocking Accountants. This meant all church POST routes (`/church/members`, `/church/giving`, etc.) rejected Accountant-role users with 403. Fixed by moving the admin/owner pass-through first, and only applying the strict admin-only short-circuit when 'Admin' is the *sole* allowed role.
+
+**Changes:**
+- **`backend/src/middleware/rbacMiddleware.ts`** — Restructured steps 1-3 of `hasRequiredRole`: admin/owner now always pass first; admin-only guard now fires only when allowedRoles = ['Admin']; exact-match check is step 3.
+
+## [Date: 2026-09-21] - Fix: Remove duplicate Dashboard entry for CHURCH tenants (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+CHURCH tenants saw two Dashboard links — one under OVERVIEW (`/dashboard`) and one under CHURCH (`/church/dashboard`). Fixed by hiding the generic dashboard from the CHURCH sidebar and redirecting any direct `/dashboard` URL access to `/church/dashboard`.
+
+**Changes:**
+- **`frontend/src/lib/navigation.ts`** — Added `/dashboard` and `/onboarding` to `ORG_TYPE_HIDDEN["CHURCH"]`; CHURCH tenants no longer see the OVERVIEW Dashboard or Guided Setup links.
+- **`frontend/src/App.tsx`** — Added `DashboardRoute` component that calls `useAuth()` and redirects CHURCH tenants from `/dashboard` → `/church/dashboard`; updated the `/dashboard` route to render it.
+
+**PR:** [#116](https://github.com/ledgio-software/ledgio-/pull/116)
+
+## [Date: 2026-09-21] - Fix: Hide Receipt Audit Log from CHURCH nav + modal transparency (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+Receipt Audit Log is a POS till feature irrelevant to churches. Church modal/dialog backgrounds were transparent due to `bg-background` having no CSS variable in TailwindCSS v4.
+
+**Changes:**
+- **`frontend/src/lib/navigation.ts`** — Added `/reports/receipt-log` to `ORG_TYPE_HIDDEN["CHURCH"]`.
+- **`frontend/src/pages/church/Visitors.tsx`**, **`Events.tsx`**, **`Ministries.tsx`**, **`Branches.tsx`**, **`Giving.tsx`** — Replaced `bg-background` with `bg-white dark:bg-secondary-900` (modal containers) and `bg-white dark:bg-secondary-800` (inputs/selects) to fix transparent modals.
+
+**PR:** [#115](https://github.com/ledgio-software/ledgio-/pull/115) (merged)
+
 ## [Date: 2026-09-21] - Feature: Church Visitors, Ministries, Events & Branches (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**
