@@ -43,6 +43,22 @@ const SCHOOL_ROLE_OPTIONS: { value: string; label: string; description: string }
   { value: "Viewer", label: "Viewer (School Board / Governor)", description: "Read-only dashboards and approved reports" },
 ];
 
+// Church / NGO-specific roles shown when the tenant is a church or NGO.
+const CHURCH_ROLE_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: "Admin", label: "Admin (Pastor / Executive Director)", description: "Full access — user management, settings, all church modules" },
+  { value: "Finance Controller", label: "Finance Controller / Treasurer", description: "Financial oversight, period close, fund management, budget approval" },
+  { value: "Accountant", label: "Accountant", description: "Post entries, reconcile funds, prepare financial reports — no self-approval" },
+  { value: "Branch Manager", label: "Branch Manager", description: "Branch-scoped management — members, giving, attendance, events, and visitors for their branch" },
+  { value: "Payroll Officer", label: "Payroll Officer", description: "Prepare staff payroll runs — cannot post/release (requires Payroll Approver)" },
+  { value: "Payroll Approver", label: "Payroll Approver", description: "Approve and release staff payroll — separate from Payroll Officer" },
+  { value: "Auditor", label: "Auditor", description: "Read-only access to financial records, fund balances, and audit logs" },
+  { value: "Deacon", label: "Deacon / Deaconess", description: "View member directory, attendance records, events, and giving reports — cannot post financial entries" },
+  { value: "Youth Executive", label: "Youth Executive", description: "View and track youth ministry members, events, and attendance records" },
+  { value: "Bible Studies Leader", label: "Bible Studies Leader", description: "View and track their study group's members, sessions, and attendance" },
+  { value: "Viewer", label: "Viewer (Church Board)", description: "Read-only dashboards and approved financial reports" },
+  { value: "External Accountant", label: "External Accountant", description: "Time-limited read-only accounting access — no user management or payments" },
+];
+
 const LOCATION_SCOPED_ROLES = new Set(["shop manager", "cashier", "warehouse manager"]);
 
 function isLocationScopedRole(role: string): boolean {
@@ -286,7 +302,8 @@ export function TeamManagement() {
 
   const isAdmin = user?.role === "Admin";
   const isSchool = user?.orgType === "NONPROFIT" || user?.orgType === "SCHOOL";
-  const roleOptions = isSchool ? SCHOOL_ROLE_OPTIONS : ROLE_OPTIONS;
+  const isChurch = user?.orgType === "CHURCH" || user?.orgType === "NGO";
+  const roleOptions = isSchool ? SCHOOL_ROLE_OPTIONS : isChurch ? CHURCH_ROLE_OPTIONS : ROLE_OPTIONS;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
