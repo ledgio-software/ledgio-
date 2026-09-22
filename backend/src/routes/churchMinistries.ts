@@ -51,7 +51,7 @@ router.get('/:id/members', async (req: Request, res: Response): Promise<void> =>
         SELECT mm.id, mm.member_id, CONCAT(m.first_name,' ',m.last_name) AS member_name, mm.role, mm.joined_at
         FROM church_ministry_members mm
         JOIN church_members m ON m.id = mm.member_id
-        WHERE mm.ministry_id = $1
+        WHERE mm.ministry_id = $1::uuid
         ORDER BY m.first_name, m.last_name
       `, id)
     );
@@ -90,7 +90,7 @@ router.put('/:id', requireRole('Admin') as never, async (req: Request, res: Resp
            name=COALESCE($1,name), description=COALESCE($2,description),
            leader_id=COALESCE($3,leader_id), meeting_schedule=COALESCE($4,meeting_schedule),
            is_active=COALESCE($5,is_active), updated_at=NOW()
-         WHERE id=$6 RETURNING *`,
+         WHERE id=$6::uuid RETURNING *`,
         b.name ?? null, b.description ?? null, b.leaderId ?? null, b.meetingSchedule ?? null,
         b.isActive ?? null, id,
       )
@@ -129,7 +129,7 @@ router.delete('/:id/members/:memberId', requireRole('Admin') as never, async (re
     const { id, memberId } = req.params;
     await withCurrentTenantDb(prisma, (client) =>
       client.$executeRawUnsafe(
-        `DELETE FROM church_ministry_members WHERE ministry_id=$1 AND member_id=$2`, id, memberId,
+        `DELETE FROM church_ministry_members WHERE ministry_id=$1::uuid AND member_id=$2::uuid`, id, memberId,
       )
     );
     res.json({ success: true });
@@ -143,7 +143,7 @@ router.delete('/:id', requireRole('Admin') as never, async (req: Request, res: R
   try {
     const { id } = req.params;
     const rows = await withCurrentTenantDb(prisma, (client) =>
-      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_ministries WHERE id=$1 RETURNING id`, id)
+      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_ministries WHERE id=$1::uuid RETURNING id`, id)
     );
     if (!rows.length) { res.status(404).json({ success: false, error: 'Not found.' }); return; }
     res.json({ success: true });

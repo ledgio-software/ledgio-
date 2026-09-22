@@ -64,7 +64,7 @@ router.get('/:id/registrations', async (req: Request, res: Response): Promise<vo
                 r.attended, r.registered_at
          FROM church_event_registrations r
          LEFT JOIN church_members m ON m.id = r.member_id
-         WHERE r.event_id = $1
+         WHERE r.event_id = $1::uuid
          ORDER BY r.registered_at`,
         id,
       )
@@ -119,7 +119,7 @@ router.put('/:id', requireRole('Admin', 'Accountant') as never, async (req: Requ
            expected_attendance=COALESCE($7,expected_attendance),
            actual_attendance=COALESCE($8,actual_attendance),
            is_active=COALESCE($9,is_active), updated_at=NOW()
-         WHERE id=$10 RETURNING *`,
+         WHERE id=$10::uuid RETURNING *`,
         b.title ?? null, b.eventType ?? null, b.description ?? null, b.eventDate ?? null,
         b.endDate ?? null, b.venue ?? null, b.expectedAttendance ?? null,
         b.actualAttendance ?? null, b.isActive ?? null, id,
@@ -161,7 +161,7 @@ router.patch('/:id/registrations/:regId/attended', requireRole('Admin', 'Account
     const { attended } = req.body as { attended: boolean };
     await withCurrentTenantDb(prisma, (client) =>
       client.$executeRawUnsafe(
-        `UPDATE church_event_registrations SET attended=$1 WHERE id=$2`, attended, regId,
+        `UPDATE church_event_registrations SET attended=$1 WHERE id=$2::uuid`, attended, regId,
       )
     );
     res.json({ success: true });
@@ -175,7 +175,7 @@ router.delete('/:id', requireRole('Admin') as never, async (req: Request, res: R
   try {
     const { id } = req.params;
     const rows = await withCurrentTenantDb(prisma, (client) =>
-      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_events WHERE id=$1 RETURNING id`, id)
+      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_events WHERE id=$1::uuid RETURNING id`, id)
     );
     if (!rows.length) { res.status(404).json({ success: false, error: 'Not found.' }); return; }
     res.json({ success: true });

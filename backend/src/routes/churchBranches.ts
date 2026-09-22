@@ -81,7 +81,7 @@ router.put('/:id', requireRole('Admin') as never, async (req: Request, res: Resp
            pastor_id=COALESCE($3,pastor_id), phone=COALESCE($4,phone),
            email=COALESCE($5,email), established_date=COALESCE($6,established_date),
            is_active=COALESCE($7,is_active), updated_at=NOW()
-         WHERE id=$8 RETURNING *`,
+         WHERE id=$8::uuid RETURNING *`,
         b.name ?? null, b.address ?? null, b.pastorId ?? null, b.phone ?? null,
         b.email ?? null, b.establishedDate ?? null, b.isActive ?? null, id,
       )
@@ -98,7 +98,7 @@ router.delete('/:id', requireRole('Admin') as never, async (req: Request, res: R
   try {
     const { id } = req.params;
     const rows = await withCurrentTenantDb(prisma, (client) =>
-      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_branches WHERE id=$1 RETURNING id`, id)
+      client.$queryRawUnsafe<{ id: string }[]>(`DELETE FROM church_branches WHERE id=$1::uuid RETURNING id`, id)
     );
     if (!rows.length) { res.status(404).json({ success: false, error: 'Not found.' }); return; }
     res.json({ success: true });

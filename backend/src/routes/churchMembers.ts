@@ -58,7 +58,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       values.push(status);
     }
     if (cellGroupId) {
-      conditions.push(`m.cell_group_id = $${idx++}`);
+      conditions.push(`m.cell_group_id = $${idx++}::uuid`);
       values.push(cellGroupId);
     }
 
@@ -148,7 +148,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         `SELECT m.*, cg.name AS cell_group_name
          FROM church_members m
          LEFT JOIN church_cell_groups cg ON cg.id = m.cell_group_id
-         WHERE m.id = $1`,
+         WHERE m.id = $1::uuid`,
         id,
       );
     });
@@ -209,7 +209,7 @@ router.put('/:id', requireRole('Admin', 'Accountant') as never, async (req: Requ
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<ChurchMember[]>(
-        `UPDATE church_members SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+        `UPDATE church_members SET ${setClauses.join(', ')} WHERE id = $${idx}::uuid RETURNING *`,
         ...values,
       );
     });
@@ -230,7 +230,7 @@ router.delete('/:id', requireRole('Admin', 'Accountant') as never, async (req: R
     const { id } = req.params;
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<{ id: string }[]>(
-        `UPDATE church_members SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING id`,
+        `UPDATE church_members SET is_active = false, updated_at = NOW() WHERE id = $1::uuid RETURNING id`,
         id,
       );
     });

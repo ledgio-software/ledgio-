@@ -2,6 +2,22 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-22] - Fix: PostgreSQL type-cast errors on all church routes (claude/sharp-wozniak-xf9fkl)
+
+**What/Why:**
+The Node.js `pg` driver sends query parameters as text strings. PostgreSQL does not implicitly cast `text → uuid` or `text → date` in parameterized queries, causing 500 errors on every church route that filtered by UUID or date columns. Added explicit `::uuid` and `::date` casts to all affected WHERE clauses across all church backend routes.
+
+**Changes:**
+- **`backend/src/routes/churchGiving.ts`** — Added `::date` cast to `giving_date >=/$<=` conditions (both GET `/` and GET `/summary`); `::uuid` to `member_id` filter; `::uuid` to DELETE `WHERE id`.
+- **`backend/src/routes/churchMinistries.ts`** — Added `::uuid` to `ministry_id` and `member_id` in GET `/:id/members` and DELETE `/:id/members/:memberId`; `::uuid` to PUT `WHERE id` and DELETE `WHERE id`.
+- **`backend/src/routes/churchAttendance.ts`** — Added `::uuid` to `session_id` in GET `/sessions/:id/records` and to `id` in the session-existence check.
+- **`backend/src/routes/churchVisitors.ts`** — Added `::date` to `visit_date >=/$<=`; `::uuid` to PATCH/DELETE/convert `WHERE id`.
+- **`backend/src/routes/churchPledges.ts`** — Added `::uuid` to `member_id` filter and PUT `WHERE id`.
+- **`backend/src/routes/churchMembers.ts`** — Added `::uuid` to GET `/:id`, PUT, DELETE `WHERE id`; `::uuid` to `cell_group_id` list filter.
+- **`backend/src/routes/churchEvents.ts`** — Added `::uuid` to GET `/:id/registrations`, PUT `WHERE id`, PATCH registration `WHERE id`, DELETE `WHERE id`.
+- **`backend/src/routes/churchBranches.ts`** — Added `::uuid` to PUT and DELETE `WHERE id`.
+- **`backend/src/routes/churchCellGroups.ts`** — Added `::uuid` to PUT and DELETE (soft-delete) `WHERE id`.
+
 ## [Date: 2026-09-21] - Fix: RBAC bug — requireRole('Admin', 'Accountant') was blocking Accountants (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**
