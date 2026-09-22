@@ -30,7 +30,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<CellGroup[]>(
         `SELECT cg.*,
-                COUNT(m.id) FILTER (WHERE m.is_active = true) AS member_count
+                COUNT(m.id) FILTER (WHERE m.is_active = true)::int AS member_count
          FROM church_cell_groups cg
          LEFT JOIN church_members m ON m.cell_group_id = cg.id
          WHERE cg.is_active = true
