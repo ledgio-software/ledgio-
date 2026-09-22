@@ -2,6 +2,17 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-09-22] - Fix: Clean print layout for all report pages
+
+**What/Why:**
+Reports were printing with the app shell (top header, sidebar, mobile bottom nav, banners, floating widgets) visible, wasting space and looking unprofessional. Added `print:hidden` to all chrome elements and `print:max-w-none print:p-0` to the content wrapper so reports use the full page width when printed.
+
+**Files Changed:**
+- **`frontend/src/components/layout/Header.tsx`** — Added `print:hidden` to `<header>`.
+- **`frontend/src/components/layout/Sidebar.tsx`** — Added `print:hidden` to `<aside>`.
+- **`frontend/src/components/layout/MobileBottomNav.tsx`** — Added `print:hidden` to the bottom `<nav>`.
+- **`frontend/src/components/layout/MainLayout.tsx`** — Wrapped banners/widgets in `print:hidden` div; added `print:max-w-none print:p-0 print:pb-0` to content wrapper.
+
 ## [Date: 2026-09-22] - Feature: Comprehensive Church Branch Management System (claude/sharp-wozniak-xf9fkl)
 
 **What/Why:**

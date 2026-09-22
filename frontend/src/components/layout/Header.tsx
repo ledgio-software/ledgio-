@@ -111,7 +111,7 @@ export function Header() {
   };
 
   return (
-    <header className="h-14 md:h-16 flex items-center justify-between px-4 md:px-6 bg-white dark:bg-secondary-900 border-b border-secondary-200 dark:border-secondary-800 transition-colors duration-200 z-10 relative">
+    <header className="h-14 md:h-16 flex items-center justify-between px-4 md:px-6 bg-white dark:bg-secondary-900 border-b border-secondary-200 dark:border-secondary-800 transition-colors duration-200 z-10 relative print:hidden">
       {/* Mobile: app name; Desktop: global search */}
       <div className="flex flex-1 items-center space-x-4">
         <h1 className="text-xl font-bold bg-gradient-to-r from-primary-500 to-primary-700 bg-clip-text text-transparent md:hidden">

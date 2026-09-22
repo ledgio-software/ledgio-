@@ -35,21 +35,25 @@ export function MainLayout({ children }: { children: ReactNode }) {
         <Sidebar />
         <div className="flex flex-col flex-1 w-0 overflow-hidden">
           <Header />
-          <OfflineBanner />
-          <SubscriptionBanner />
-          <OverdueInvoiceAlertBanner />
-          <AiInsightsBanner />
-          <SectorChecklist />
-          <QuickSuggestionsBar />
+          <div className="print:hidden">
+            <OfflineBanner />
+            <SubscriptionBanner />
+            <OverdueInvoiceAlertBanner />
+            <AiInsightsBanner />
+            <SectorChecklist />
+            <QuickSuggestionsBar />
+          </div>
           <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
             {/* pb-20 on mobile leaves room above the fixed bottom nav bar */}
-            <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full pb-20 md:pb-6">
+            <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full pb-20 md:pb-6 print:max-w-none print:p-0 print:pb-0">
               {children}
             </div>
           </main>
         </div>
-        <HelpAssistantWidget />
-        <FeedbackWidget />
+        <div className="print:hidden">
+          <HelpAssistantWidget />
+          <FeedbackWidget />
+        </div>
         <MobileBottomNav />
       </div>
     </WorkspaceModeProvider>
