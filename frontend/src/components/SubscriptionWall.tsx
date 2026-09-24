@@ -1,29 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CreditCard, Check, Loader2, Smartphone, AlertTriangle } from "lucide-react";
 import { api } from "../lib/api";
 import { Button } from "./ui/Button";
 
-const PLANS = [
-  {
-    tier: 1,
-    name: "Shop",
-    priceGhs: 105,
-    features: ["Point of Sale", "Invoices & Bills", "Inventory Management", "Expense Claims", "Sales Reports"],
-  },
-  {
-    tier: 2,
-    name: "Business",
-    priceGhs: 305,
-    features: ["Everything in Shop", "Payroll (PAYE & SSNIT)", "Bank Reconciliation", "Approval Workflows", "Budgets & Analytics"],
-    popular: true,
-  },
-  {
-    tier: 3,
-    name: "Enterprise",
-    priceGhs: 510,
-    features: ["Everything in Business", "Unlimited team members", "Custom Fields", "Full Audit Trail", "Priority Support"],
-  },
-];
+interface Plan {
+  tier: number;
+  name: string;
+  priceGhs: number;
+  seatLimit: number;
+  features: string[];
+}
 
 interface Props {
   currentTier: number;
@@ -31,8 +17,22 @@ interface Props {
 }
 
 export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedTier, setSelectedTier] = useState<number>(Math.max(currentTier, 1));
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    api.get<{ success: boolean; plans: Plan[] }>("/subscription/plans")
+      .then((r) => setPlans(r.data.plans))
+      .catch(() => {
+        // Fallback to generic plans if fetch fails
+        setPlans([
+          { tier: 1, name: "Starter", priceGhs: 105, seatLimit: 3, features: ["Point of Sale", "Invoices & Bills", "Inventory", "Expense Claims", "Sales Reports"] },
+          { tier: 2, name: "Business", priceGhs: 305, seatLimit: 10, features: ["Everything in Starter", "Payroll (PAYE & SSNIT)", "Bank Reconciliation", "Approval Workflows", "Budgets & Analytics"] },
+          { tier: 3, name: "Professional", priceGhs: 510, seatLimit: Infinity, features: ["Everything in Business", "Unlimited team members", "Custom Fields", "Full Audit Trail", "Priority Support"] },
+        ]);
+      });
+  }, []);
   const [isVerifying, setIsVerifying] = useState(false);
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,9 +90,15 @@ export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
         </div>
 
         {/* Plan cards */}
+        {plans.length === 0 && (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {PLANS.map((plan) => {
+          {plans.map((plan) => {
             const isSelected = selectedTier === plan.tier;
+            const isPopular = plan.tier === 2;
             return (
               <button
                 key={plan.tier}
@@ -103,7 +109,7 @@ export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
                     : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
               >
-                {plan.popular && (
+                {isPopular && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-semibold px-3 py-0.5 rounded-full">
                     Most Popular
                   </span>
@@ -153,7 +159,7 @@ export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
               {isLoading ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Opening payment…</>
               ) : (
-                <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {PLANS.find((p) => p.tier === selectedTier)?.priceGhs} / month</>
+                <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {plans.find((p) => p.tier === selectedTier)?.priceGhs} / month</>
               )}
             </Button>
           </div>
