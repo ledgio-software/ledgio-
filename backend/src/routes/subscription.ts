@@ -48,6 +48,30 @@ export const SUBSCRIPTION_PLANS = [
   },
 ];
 
+export const HOSPITALITY_SUBSCRIPTION_PLANS = [
+  {
+    tier: 1,
+    name: 'Starter',
+    priceGhs: 200,
+    seatLimit: 3,
+    features: ['Room & rate management', 'Reservation system', 'Guest folio & billing', 'Expense tracking', 'Basic revenue reports'],
+  },
+  {
+    tier: 2,
+    name: 'Standard',
+    priceGhs: 400,
+    seatLimit: 10,
+    features: ['Everything in Starter', 'Housekeeping board', 'Night audit & RevPAR', 'Guest history & profiles', 'GRA e-VAT clearance', 'Bank reconciliation'],
+  },
+  {
+    tier: 3,
+    name: 'Pro',
+    priceGhs: 650,
+    seatLimit: Infinity,
+    features: ['Everything in Standard', 'Multi-property management (coming soon)', 'Conference & banquet revenue', 'Staff payroll', 'Advanced analytics', 'Priority support'],
+  },
+];
+
 export const SCHOOL_SUBSCRIPTION_PLANS = [
   {
     tier: 1,
@@ -73,7 +97,9 @@ export const SCHOOL_SUBSCRIPTION_PLANS = [
 ];
 
 function getPlansForOrgType(orgType?: string | null) {
-  return orgType === 'SCHOOL' || orgType === 'NONPROFIT' ? SCHOOL_SUBSCRIPTION_PLANS : SUBSCRIPTION_PLANS;
+  if (orgType === 'SCHOOL' || orgType === 'NONPROFIT') return SCHOOL_SUBSCRIPTION_PLANS;
+  if (orgType === 'HOSPITALITY') return HOSPITALITY_SUBSCRIPTION_PLANS;
+  return SUBSCRIPTION_PLANS;
 }
 
 // Public plans endpoint — returns generic plans (used by marketing/public pages)

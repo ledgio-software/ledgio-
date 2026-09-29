@@ -55,7 +55,7 @@ export const SECTOR_CHECKLISTS: Record<string, SectorChecklist> = {
     steps: [
       { id: 'room-types', label: 'Set Up Room Types & Rates', route: '/hospitality/rooms' },
       { id: 'first-reservation', label: 'Create First Reservation', route: '/hospitality/reservations' },
-      { id: 'guest-folio', label: 'Post Charges to Guest Folio', route: '/hospitality/folios' },
+      { id: 'guest-folio', label: 'Post Charges to Guest Folio', route: '/hospitality/reservations' },
       { id: 'expenses', label: 'Record Operating Expenses', route: '/expenses' },
       { id: 'revenue-report', label: 'Run Revenue Report', route: '/reports/pnl' },
     ],
