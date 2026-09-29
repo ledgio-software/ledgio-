@@ -48,8 +48,36 @@ export const SUBSCRIPTION_PLANS = [
   },
 ];
 
-// Status + plans endpoint (no enforcement middleware applied — always accessible)
-router.get('/plans', (_req: Request, res: Response): void => {
+export const SCHOOL_SUBSCRIPTION_PLANS = [
+  {
+    tier: 1,
+    name: 'Starter',
+    priceGhs: 250,
+    seatLimit: 3,
+    features: ['Student admissions & register', 'Student ledger & fee collection', 'GES-aligned chart of accounts', 'Income & Expenditure report', 'Weekly I&E email'],
+  },
+  {
+    tier: 2,
+    name: 'Standard',
+    priceGhs: 450,
+    seatLimit: 10,
+    features: ['Everything in Starter', 'Student health records', 'Fund accounting by term', 'Budgets by department', 'Expense claims & approvals', 'Approval workflows'],
+  },
+  {
+    tier: 3,
+    name: 'Pro',
+    priceGhs: 700,
+    seatLimit: Infinity,
+    features: ['Everything in Standard', 'Multi-campus management', 'Payroll for all staff', 'Full audit trail', 'Advanced analytics', 'Priority support'],
+  },
+];
+
+function getPlansForOrgType(orgType?: string | null) {
+  return orgType === 'SCHOOL' || orgType === 'NONPROFIT' ? SCHOOL_SUBSCRIPTION_PLANS : SUBSCRIPTION_PLANS;
+}
+
+// Public plans endpoint — returns generic plans (used by marketing/public pages)
+router.get('/plans/public', (_req: Request, res: Response): void => {
   res.json({ success: true, plans: SUBSCRIPTION_PLANS });
 });
 
@@ -57,6 +85,24 @@ router.get('/plans', (_req: Request, res: Response): void => {
 // Subscription enforcement is intentionally NOT applied here so expired tenants can pay.
 router.use(authenticateJwt);
 router.use(tenantContextMiddleware);
+
+/**
+ * GET /api/v1/subscription/plans
+ * Returns the plans for this tenant's org type (school vs generic).
+ */
+router.get('/plans', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const context = req.tenantContext!;
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: context.tenantId },
+      select: { orgType: true },
+    });
+    const plans = getPlansForOrgType(tenant?.orgType);
+    res.json({ success: true, plans });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * GET /api/v1/subscription/status
@@ -69,6 +115,7 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
       where: { id: context.tenantId },
       select: {
         tier: true,
+        orgType: true,
         subscriptionStatus: true,
         trialEndsAt: true,
         subscriptionPaidUntil: true,
@@ -104,7 +151,8 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
         ? Math.max(0, Math.ceil((tenant.subscriptionPaidUntil.getTime() - now) / 86_400_000))
         : null;
 
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === tenant.tier) ?? SUBSCRIPTION_PLANS[0];
+    const plans = getPlansForOrgType(tenant.orgType);
+    const plan = plans.find((p) => p.tier === tenant.tier) ?? plans[0];
 
     res.json({
       success: true,
@@ -141,19 +189,21 @@ router.post('/initialize', requireRole('Admin'), validateBody(initializeSchema),
     }
 
     const { planTier } = req.body as { planTier: number };
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === planTier);
-    if (!plan) {
-      res.status(400).json({ success: false, error: 'Invalid plan tier. Must be 1, 2, or 3.' });
-      return;
-    }
 
     const context = requireTenantContext();
     const tenant = await prisma.tenant.findUnique({
       where: { id: context.tenantId },
-      select: { id: true },
+      select: { id: true, orgType: true },
     });
     if (!tenant) {
       res.status(404).json({ success: false, error: 'Tenant not found.' });
+      return;
+    }
+
+    const plans = getPlansForOrgType(tenant.orgType);
+    const plan = plans.find((p) => p.tier === planTier);
+    if (!plan) {
+      res.status(400).json({ success: false, error: 'Invalid plan tier. Must be 1, 2, or 3.' });
       return;
     }
 
@@ -195,12 +245,6 @@ router.post('/verify', requireRole('Admin'), validateBody(verifySchema), async (
 
     const { reference, planTier } = req.body as { reference: string; planTier: number };
 
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === planTier);
-    if (!plan) {
-      res.status(400).json({ success: false, error: 'Invalid plan tier.' });
-      return;
-    }
-
     const verification = await paystackService.verifyTransaction(reference);
     if (verification.status !== 'success') {
       res.status(400).json({ success: false, error: `Payment not successful. Status: ${verification.status}.` });
@@ -210,7 +254,13 @@ router.post('/verify', requireRole('Admin'), validateBody(verifySchema), async (
     const context = requireTenantContext();
     const subscriptionPaidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    const tenant = await prisma.tenant.findUnique({ where: { id: context.tenantId }, select: { tier: true } });
+    const tenant = await prisma.tenant.findUnique({ where: { id: context.tenantId }, select: { tier: true, orgType: true } });
+    const plans = getPlansForOrgType(tenant?.orgType);
+    const plan = plans.find((p) => p.tier === planTier);
+    if (!plan) {
+      res.status(400).json({ success: false, error: 'Invalid plan tier.' });
+      return;
+    }
     const newTier = plan.tier > (tenant?.tier ?? 1) ? plan.tier : (tenant?.tier ?? 1);
 
     // Capture the reusable authorization so auto-renewal can charge it later
