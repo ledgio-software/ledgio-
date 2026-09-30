@@ -449,6 +449,46 @@ router.post('/reservations/:id/folio-charges', requireRole('Admin', 'Manager', '
   }
 });
 
+// ─── Cancel / No-Show ─────────────────────────────────────────────────────────
+
+router.patch('/reservations/:id/cancel', requireRole('Admin', 'Manager') as any, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { reason, noShow } = req.body as { reason?: string; noShow?: boolean };
+    const newStatus = noShow ? 'NO_SHOW' : 'CANCELLED';
+
+    const result = await withCurrentTenantDb(prisma, async (client) => {
+      const resRows = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1`, id);
+      if (resRows.length === 0) throw Object.assign(new Error('Reservation not found.'), { status: 404 });
+      const reservation = resRows[0];
+      if (!['CONFIRMED'].includes(reservation.status)) {
+        throw Object.assign(
+          new Error(`Cannot cancel a reservation with status ${reservation.status}. Only CONFIRMED reservations can be cancelled.`),
+          { status: 400 }
+        );
+      }
+
+      const notePrefix = `[${newStatus}]${reason ? ': ' + reason : ''}`;
+      await client.$executeRawUnsafe(
+        `UPDATE reservations SET status = $2, special_requests = CASE WHEN special_requests IS NULL OR special_requests = '' THEN $3 ELSE special_requests || ' | ' || $3 END, updated_at = NOW() WHERE id = $1`,
+        id, newStatus, notePrefix
+      );
+
+      // Free up the room
+      await client.$executeRawUnsafe(
+        `UPDATE rooms SET status = 'AVAILABLE', updated_at = NOW() WHERE id = $1`,
+        reservation.room_id
+      );
+
+      const updated = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1`, id);
+      return updated[0];
+    });
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status((err as any).status ?? 500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── Night Audit ──────────────────────────────────────────────────────────────
 
 router.get('/reports/night-audit', async (req: Request, res: Response): Promise<void> => {
