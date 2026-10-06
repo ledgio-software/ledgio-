@@ -500,12 +500,12 @@ router.get('/reports/night-audit', async (req: Request, res: Response): Promise<
         client.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS total FROM rooms WHERE is_active = TRUE`),
         client.$queryRawUnsafe<any[]>(
           `SELECT COUNT(*)::int AS occupied FROM reservations
-           WHERE status = 'CHECKED_IN' AND check_in_date <= $1 AND check_out_date > $1`, date),
+           WHERE status = 'CHECKED_IN' AND check_in_date <= $1::date AND check_out_date > $1::date`, date),
         client.$queryRawUnsafe<any[]>(
           `SELECT COALESCE(SUM(rate_per_night), 0)::numeric AS room_revenue
            FROM reservations
            WHERE status IN ('CHECKED_IN', 'CHECKED_OUT')
-             AND check_in_date <= $1 AND check_out_date > $1`, date),
+             AND check_in_date <= $1::date AND check_out_date > $1::date`, date),
       ]);
       const total = Number(totalRow[0]?.total ?? 0);
       const occupied = Number(occupiedRow[0]?.occupied ?? 0);
@@ -538,7 +538,7 @@ router.get('/reports/occupancy', async (req: Request, res: Response): Promise<vo
            (SELECT COUNT(*)::int FROM rooms WHERE is_active = TRUE) AS total_rooms,
            (SELECT COUNT(*)::int FROM reservations
             WHERE status IN ('CHECKED_IN','CHECKED_OUT')
-              AND check_in_date <= gs::date AND check_out_date > gs::date) AS occupied_rooms
+              AND check_in_date <= gs AND check_out_date > gs) AS occupied_rooms
          FROM generate_series($1::date, $2::date, '1 day'::interval) gs
          ORDER BY gs`,
         from, to
