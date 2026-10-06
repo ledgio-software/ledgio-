@@ -117,7 +117,7 @@ router.put('/room-types/:id', requireRole('Admin', 'Manager') as any, validateBo
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<any[]>(
-        `UPDATE room_types SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+        `UPDATE room_types SET ${setClauses.join(', ')} WHERE id = $${idx}::uuid RETURNING *`,
         ...values
       );
     });
@@ -154,7 +154,7 @@ router.post('/rooms', requireRole('Admin', 'Manager') as any, validateBody(roomS
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<any[]>(
         `INSERT INTO rooms (room_type_id, room_number, floor, is_active)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
+         VALUES ($1::uuid, $2, $3, $4) RETURNING *`,
         body.roomTypeId, body.roomNumber, body.floor ?? null, body.isActive ?? true
       );
     });
@@ -193,7 +193,7 @@ router.patch('/rooms/:id/status', requireRole('Admin', 'Manager', 'Staff') as an
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
       return client.$queryRawUnsafe<any[]>(
-        `UPDATE rooms SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+        `UPDATE rooms SET ${setClauses.join(', ')} WHERE id = $${idx}::uuid RETURNING *`,
         ...values
       );
     });
@@ -220,8 +220,8 @@ router.get('/reservations', async (req: Request, res: Response): Promise<void> =
     const conditions: string[] = [];
     let idx = 1;
     if (status) { conditions.push(`r.status = $${idx++}`); values.push(status); }
-    if (from) { conditions.push(`r.check_out_date >= $${idx++}`); values.push(from); }
-    if (to) { conditions.push(`r.check_in_date <= $${idx++}`); values.push(to); }
+    if (from) { conditions.push(`r.check_out_date >= $${idx++}::date`); values.push(from); }
+    if (to) { conditions.push(`r.check_in_date <= $${idx++}::date`); values.push(to); }
     if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
     sql += ` ORDER BY r.check_in_date DESC LIMIT 200`;
 
@@ -242,17 +242,17 @@ router.post('/reservations', requireRole('Admin', 'Manager', 'Staff') as any, va
       // Check room availability (no double-booking)
       const conflict = await client.$queryRawUnsafe<any[]>(
         `SELECT id FROM reservations
-         WHERE room_id = $1
+         WHERE room_id = $1::uuid
            AND status IN ('CONFIRMED', 'CHECKED_IN')
-           AND check_in_date < $2
-           AND check_out_date > $3`,
+           AND check_in_date < $2::date
+           AND check_out_date > $3::date`,
         body.roomId, body.checkOutDate, body.checkInDate
       );
       if (conflict.length > 0) throw Object.assign(new Error('Room is already booked for the selected dates.'), { status: 409 });
 
       // Snapshot the room type's current rate
       const roomRows = await client.$queryRawUnsafe<any[]>(
-        `SELECT rt.rate_per_night FROM rooms r JOIN room_types rt ON rt.id = r.room_type_id WHERE r.id = $1`,
+        `SELECT rt.rate_per_night FROM rooms r JOIN room_types rt ON rt.id = r.room_type_id WHERE r.id = $1::uuid`,
         body.roomId
       );
       if (roomRows.length === 0) throw Object.assign(new Error('Room not found.'), { status: 404 });
@@ -264,8 +264,8 @@ router.post('/reservations', requireRole('Admin', 'Manager', 'Staff') as any, va
            (reservation_number, guest_id, guest_name, guest_email, guest_phone,
             room_id, check_in_date, check_out_date, rate_per_night, adults, children,
             special_requests, deposit_amount)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-        resNum, body.guestId ?? null, body.guestName, body.guestEmail ?? null, body.guestPhone ?? null,
+         VALUES ($1,$2,$3,$4,$5,$6::uuid,$7::date,$8::date,$9,$10,$11,$12,$13) RETURNING *`,
+        resNum, body.guestId ? body.guestId : null, body.guestName, body.guestEmail ?? null, body.guestPhone ?? null,
         body.roomId, body.checkInDate, body.checkOutDate, ratePerNight, body.adults ?? 1,
         body.children ?? 0, body.specialRequests ?? null, body.depositAmount ?? 0
       );
@@ -283,15 +283,15 @@ router.post('/reservations/:id/check-in', requireRole('Admin', 'Manager', 'Staff
     const { id } = req.params;
 
     const result = await withCurrentTenantDb(prisma, async (client) => {
-      const resRows = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1`, id);
+      const resRows = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1::uuid`, id);
       if (resRows.length === 0) throw Object.assign(new Error('Reservation not found.'), { status: 404 });
       const reservation = resRows[0];
       if (reservation.status !== 'CONFIRMED') throw Object.assign(new Error(`Cannot check in a reservation with status ${reservation.status}.`), { status: 400 });
 
-      await client.$executeRawUnsafe(`UPDATE reservations SET status = 'CHECKED_IN', actual_check_in = NOW(), updated_at = NOW() WHERE id = $1`, id);
-      await client.$executeRawUnsafe(`UPDATE rooms SET status = 'OCCUPIED', updated_at = NOW() WHERE id = $1`, reservation.room_id);
+      await client.$executeRawUnsafe(`UPDATE reservations SET status = 'CHECKED_IN', actual_check_in = NOW(), updated_at = NOW() WHERE id = $1::uuid`, id);
+      await client.$executeRawUnsafe(`UPDATE rooms SET status = 'OCCUPIED', updated_at = NOW() WHERE id = $1::uuid`, reservation.room_id);
 
-      const updated = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1`, id);
+      const updated = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1::uuid`, id);
       return updated[0];
     });
     res.json({ success: true, data: result });
@@ -312,7 +312,7 @@ router.post('/reservations/:id/check-out', requireRole('Admin', 'Manager') as an
       return client.$queryRawUnsafe<any[]>(`
         SELECT r.*, rm.room_number FROM reservations r
         LEFT JOIN rooms rm ON rm.id = r.room_id
-        WHERE r.id = $1`, id);
+        WHERE r.id = $1::uuid`, id);
     });
     if (resRows.length === 0) { res.status(404).json({ success: false, error: 'Reservation not found.' }); return; }
     const reservation = resRows[0];
@@ -328,7 +328,7 @@ router.post('/reservations/:id/check-out', requireRole('Admin', 'Manager') as an
 
     // Get folio charges
     const folioRows = await withCurrentTenantDb(prisma, async (client) => {
-      return client.$queryRawUnsafe<any[]>(`SELECT * FROM folio_charges WHERE reservation_id = $1`, id);
+      return client.$queryRawUnsafe<any[]>(`SELECT * FROM folio_charges WHERE reservation_id = $1::uuid`, id);
     });
     const folioTotal = (folioRows as any[]).reduce((sum, r) => sum + Number(r.amount), 0);
     const grandTotal = roomTotal + folioTotal;
@@ -381,11 +381,11 @@ router.post('/reservations/:id/check-out', requireRole('Admin', 'Manager') as an
     // Mark reservation checked out and room as needing housekeeping
     await withCurrentTenantDb(prisma, async (client) => {
       await client.$executeRawUnsafe(
-        `UPDATE reservations SET status = 'CHECKED_OUT', actual_check_out = NOW(), invoice_id = $2, updated_at = NOW() WHERE id = $1`,
+        `UPDATE reservations SET status = 'CHECKED_OUT', actual_check_out = NOW(), invoice_id = $2::uuid, updated_at = NOW() WHERE id = $1::uuid`,
         id, invoice.id
       );
       await client.$executeRawUnsafe(
-        `UPDATE rooms SET status = 'HOUSEKEEPING', housekeeping_status = 'DIRTY', updated_at = NOW() WHERE id = $1`,
+        `UPDATE rooms SET status = 'HOUSEKEEPING', housekeeping_status = 'DIRTY', updated_at = NOW() WHERE id = $1::uuid`,
         reservation.room_id
       );
     });
@@ -403,8 +403,8 @@ router.get('/reservations/:id/folio', async (req: Request, res: Response): Promi
     const { id } = req.params;
 
     const [resRows, chargeRows] = await Promise.all([
-      withCurrentTenantDb(prisma, async (client) => client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1`, id)),
-      withCurrentTenantDb(prisma, async (client) => client.$queryRawUnsafe<any[]>(`SELECT * FROM folio_charges WHERE reservation_id = $1 ORDER BY charge_date, created_at`, id)),
+      withCurrentTenantDb(prisma, async (client) => client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1::uuid`, id)),
+      withCurrentTenantDb(prisma, async (client) => client.$queryRawUnsafe<any[]>(`SELECT * FROM folio_charges WHERE reservation_id = $1::uuid ORDER BY charge_date, created_at`, id)),
     ]);
     if (resRows.length === 0) { res.status(404).json({ success: false, error: 'Reservation not found.' }); return; }
 
@@ -432,14 +432,14 @@ router.post('/reservations/:id/folio-charges', requireRole('Admin', 'Manager', '
     const user = (req as any).user;
 
     const rows = await withCurrentTenantDb(prisma, async (client) => {
-      const resRows = await client.$queryRawUnsafe<any[]>(`SELECT status FROM reservations WHERE id = $1`, id);
+      const resRows = await client.$queryRawUnsafe<any[]>(`SELECT status FROM reservations WHERE id = $1::uuid`, id);
       if (resRows.length === 0) throw Object.assign(new Error('Reservation not found.'), { status: 404 });
       if (!['CONFIRMED', 'CHECKED_IN'].includes(resRows[0].status)) {
         throw Object.assign(new Error('Cannot add charges to a completed or cancelled reservation.'), { status: 400 });
       }
       return client.$queryRawUnsafe<any[]>(
         `INSERT INTO folio_charges (reservation_id, description, amount, charge_date, posted_by_user_id)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+         VALUES ($1::uuid, $2, $3, $4::date, $5) RETURNING *`,
         id, body.description, body.amount, body.chargeDate ?? new Date().toISOString().slice(0, 10), user?.id ?? null
       );
     });
@@ -458,7 +458,7 @@ router.patch('/reservations/:id/cancel', requireRole('Admin', 'Manager') as any,
     const newStatus = noShow ? 'NO_SHOW' : 'CANCELLED';
 
     const result = await withCurrentTenantDb(prisma, async (client) => {
-      const resRows = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1`, id);
+      const resRows = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1::uuid`, id);
       if (resRows.length === 0) throw Object.assign(new Error('Reservation not found.'), { status: 404 });
       const reservation = resRows[0];
       if (!['CONFIRMED'].includes(reservation.status)) {
@@ -470,17 +470,17 @@ router.patch('/reservations/:id/cancel', requireRole('Admin', 'Manager') as any,
 
       const notePrefix = `[${newStatus}]${reason ? ': ' + reason : ''}`;
       await client.$executeRawUnsafe(
-        `UPDATE reservations SET status = $2, special_requests = CASE WHEN special_requests IS NULL OR special_requests = '' THEN $3 ELSE special_requests || ' | ' || $3 END, updated_at = NOW() WHERE id = $1`,
+        `UPDATE reservations SET status = $2, special_requests = CASE WHEN special_requests IS NULL OR special_requests = '' THEN $3 ELSE special_requests || ' | ' || $3 END, updated_at = NOW() WHERE id = $1::uuid`,
         id, newStatus, notePrefix
       );
 
       // Free up the room
       await client.$executeRawUnsafe(
-        `UPDATE rooms SET status = 'AVAILABLE', updated_at = NOW() WHERE id = $1`,
+        `UPDATE rooms SET status = 'AVAILABLE', updated_at = NOW() WHERE id = $1::uuid`,
         reservation.room_id
       );
 
-      const updated = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1`, id);
+      const updated = await client.$queryRawUnsafe<any[]>(`SELECT * FROM reservations WHERE id = $1::uuid`, id);
       return updated[0];
     });
     res.json({ success: true, data: result });
@@ -500,12 +500,12 @@ router.get('/reports/night-audit', async (req: Request, res: Response): Promise<
         client.$queryRawUnsafe<any[]>(`SELECT COUNT(*)::int AS total FROM rooms WHERE is_active = TRUE`),
         client.$queryRawUnsafe<any[]>(
           `SELECT COUNT(*)::int AS occupied FROM reservations
-           WHERE status = 'CHECKED_IN' AND check_in_date <= $1 AND check_out_date > $1`, date),
+           WHERE status = 'CHECKED_IN' AND check_in_date <= $1::date AND check_out_date > $1::date`, date),
         client.$queryRawUnsafe<any[]>(
           `SELECT COALESCE(SUM(rate_per_night), 0)::numeric AS room_revenue
            FROM reservations
            WHERE status IN ('CHECKED_IN', 'CHECKED_OUT')
-             AND check_in_date <= $1 AND check_out_date > $1`, date),
+             AND check_in_date <= $1::date AND check_out_date > $1::date`, date),
       ]);
       const total = Number(totalRow[0]?.total ?? 0);
       const occupied = Number(occupiedRow[0]?.occupied ?? 0);
@@ -538,7 +538,7 @@ router.get('/reports/occupancy', async (req: Request, res: Response): Promise<vo
            (SELECT COUNT(*)::int FROM rooms WHERE is_active = TRUE) AS total_rooms,
            (SELECT COUNT(*)::int FROM reservations
             WHERE status IN ('CHECKED_IN','CHECKED_OUT')
-              AND check_in_date <= gs::date AND check_out_date > gs::date) AS occupied_rooms
+              AND check_in_date <= gs AND check_out_date > gs) AS occupied_rooms
          FROM generate_series($1::date, $2::date, '1 day'::interval) gs
          ORDER BY gs`,
         from, to
