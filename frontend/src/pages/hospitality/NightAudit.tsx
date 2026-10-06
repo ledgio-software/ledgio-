@@ -32,8 +32,9 @@ export function NightAudit() {
       ]);
       setAudit(auditRes.data.data);
       setTrend(trendRes.data.data ?? []);
-    } catch {
-      setError("Failed to load night audit data.");
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Failed to load night audit data.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -61,6 +62,12 @@ export function NightAudit() {
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : audit && audit.totalRooms === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+          <BedDouble className="h-12 w-12 mb-4 opacity-30" />
+          <p className="text-lg font-medium">No rooms set up yet</p>
+          <p className="text-sm mt-1">Add rooms and room types in the Rooms section first.</p>
+        </div>
       ) : audit ? (
         <>
           {/* KPI Cards */}
