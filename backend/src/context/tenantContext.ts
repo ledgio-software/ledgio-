@@ -6,6 +6,7 @@ export interface TenantContextData {
   tenantName?: string;
   tenantSlug?: string;
   tenantTier?: number;
+  tenantSector?: string;
   tenantSubscriptionStatus?: string;
   tenantTrialEndsAt?: Date | null;
   tenantSubscriptionPaidUntil?: Date | null;

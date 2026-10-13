@@ -8,6 +8,7 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { seatLimitForTier, planName } from '../middleware/tierEnforcementMiddleware';
+import { isValidSector, SECTOR_SLUGS } from '../config/sectorPlans';
 import { invalidateTenantCacheById } from '../cache/tenantCache';
 import { BroadcastService } from '../services/broadcastService';
 import { CLOSED_ROLES, isLocationScopedRole } from '../services/warehouseAccessService';
@@ -179,13 +180,20 @@ router.put('/:id/tier', async (req: Request, res: Response) => {
     if (![1, 2, 3].includes(tier)) {
       return res.status(400).json({ success: false, error: 'Tier must be 1 (Shop), 2 (Business), or 3 (Enterprise).' });
     }
+    const sector = req.body?.sector;
+    if (sector !== undefined && !isValidSector(sector)) {
+      return res.status(400).json({ success: false, error: `Sector must be one of: ${SECTOR_SLUGS.join(', ')}.` });
+    }
 
     const before = await tenantRepository.findTenantById(prisma, req.params.id);
     if (!before) {
       return res.status(404).json({ success: false, error: 'Tenant not found.' });
     }
 
-    const updated = await prisma.tenant.update({ where: { id: req.params.id }, data: { tier } });
+    const updated = await prisma.tenant.update({
+      where: { id: req.params.id },
+      data: { tier, ...(sector !== undefined ? { sector } : {}) },
+    });
 
     // tenantContextMiddleware reads tier off a 30-minute Redis cache keyed
     // by id/slug/schema (see cache/tenantCache.ts) - without invalidating
@@ -200,7 +208,7 @@ router.put('/:id/tier', async (req: Request, res: Response) => {
       entityId: updated.id,
       tenantId: updated.id,
       actor: { ipAddress: req.ip || req.socket?.remoteAddress || null },
-      details: `Tenant "${updated.name}" (${updated.slug}) plan tier changed from ${before.tier} to ${tier} by platform admin.`,
+      details: `Tenant "${updated.name}" (${updated.slug}) plan changed from ${before.sector}/tier ${before.tier} to ${updated.sector}/tier ${tier} by platform admin.`,
     });
 
     return res.status(200).json({ success: true, message: 'Tenant tier updated.', data: { tenant: sanitizeTenantForResponse(updated) } });
@@ -400,13 +408,14 @@ router.post('/invite', authenticateJwt, tenantContextMiddleware, requireRole('Ad
     // means "has verified their email" here (tenantService.ts), not
     // "occupies a seat" - an admin mid-verification still fully counts.
     const currentTier = req.tenantContext?.tenantTier ?? 1;
-    const seatLimit = seatLimitForTier(currentTier);
+    const currentSector = req.tenantContext?.tenantSector;
+    const seatLimit = seatLimitForTier(currentTier, currentSector);
     if (Number.isFinite(seatLimit)) {
       const memberCount = await prisma.user.count({ where: { tenantId } });
       if (memberCount >= seatLimit) {
         return res.status(403).json({
           success: false,
-          error: `Your ${planName(currentTier)} plan is limited to ${seatLimit} team members. Upgrade your plan to invite more.`,
+          error: `Your ${planName(currentTier, currentSector)} plan is limited to ${seatLimit} team members. Upgrade your plan to invite more.`,
           upgradeRequired: true,
           currentTier,
           seatLimit,

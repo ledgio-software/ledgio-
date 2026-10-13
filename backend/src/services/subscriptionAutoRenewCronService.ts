@@ -4,6 +4,7 @@ import { prisma } from '../config/db';
 import { invalidateTenantCacheById } from '../cache/tenantCache';
 import { EmailService } from './EmailService';
 import * as paystackService from './paystackService';
+import { getPlansForSector, getSectorPlan } from '../config/sectorPlans';
 
 /**
  * Daily sweep that automatically renews subscriptions by charging the
@@ -56,6 +57,7 @@ export class SubscriptionAutoRenewCronService {
         id: true,
         name: true,
         tier: true,
+        sector: true,
         paystackAuthCode: true,
         paystackAuthSummary: true,
         subscriptionPaidUntil: true,
@@ -69,9 +71,6 @@ export class SubscriptionAutoRenewCronService {
 
     console.log(`[AutoRenewCron] Found ${candidates.length} tenant(s) eligible for auto-renewal.`);
 
-    const SUBSCRIPTION_PRICES: Record<number, number> = { 1: 105, 2: 305, 3: 510 };
-    const PLAN_NAMES: Record<number, string> = { 1: 'Starter', 2: 'Business', 3: 'Professional' };
-
     for (const tenant of candidates) {
       const admin = tenant.users[0];
       if (!admin?.email) {
@@ -79,8 +78,13 @@ export class SubscriptionAutoRenewCronService {
         continue;
       }
 
-      const amount = SUBSCRIPTION_PRICES[tenant.tier] ?? 105;
-      const planName = PLAN_NAMES[tenant.tier] ?? 'Starter';
+      const plan = getSectorPlan(tenant.sector, tenant.tier) ?? getPlansForSector(tenant.sector)[0];
+      if (plan.priceGhs === null) {
+        console.warn(`[AutoRenewCron] Tenant ${tenant.id} is on custom-priced ${plan.name} — skipping auto-renewal.`);
+        continue;
+      }
+      const amount = plan.priceGhs;
+      const planName = plan.name;
       const reference = `autorenew_${tenant.id}_${tenant.tier}_${Date.now()}`;
 
       try {

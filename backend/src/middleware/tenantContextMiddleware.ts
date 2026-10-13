@@ -131,6 +131,7 @@ export function createTenantContextMiddleware(options: TenantMiddlewareOptions =
         tenantName: tenant.name,
         tenantSlug: tenant.slug,
         tenantTier: tenant.tier,
+        tenantSector: (tenant as any).sector ?? 'retail',
         tenantSubscriptionStatus: (tenant as any).subscriptionStatus ?? 'ACTIVE',
         tenantTrialEndsAt: (tenant as any).trialEndsAt ?? null,
         tenantSubscriptionPaidUntil: (tenant as any).subscriptionPaidUntil ?? null,

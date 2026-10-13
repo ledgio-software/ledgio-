@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
+import { getSectorPlan, isValidSector } from '../config/sectorPlans';
 
 /**
  * The three subscription plans a tenant can be on (Tenant.tier: 1/2/3).
@@ -21,11 +22,19 @@ export const TENANT_PLANS: Record<number, { name: string; seatLimit: number }> =
   3: { name: 'Professional', seatLimit: Infinity },
 };
 
-export function planName(tier: number): string {
+export function planName(tier: number, sector?: string): string {
+  if (sector && isValidSector(sector)) {
+    const name = getSectorPlan(sector, tier)?.name;
+    if (name) return name;
+  }
   return TENANT_PLANS[tier]?.name || `Tier ${tier}`;
 }
 
-export function seatLimitForTier(tier: number): number {
+export function seatLimitForTier(tier: number, sector?: string): number {
+  if (sector && isValidSector(sector)) {
+    const limit = getSectorPlan(sector, tier)?.seatLimit;
+    if (limit !== undefined) return limit;
+  }
   return TENANT_PLANS[tier]?.seatLimit ?? TENANT_PLANS[1].seatLimit;
 }
 
@@ -48,6 +57,7 @@ export function requireTier(requiredTier: number, featureLabel: string) {
     }
 
     const currentTier = context.tenantTier !== undefined ? context.tenantTier : 1;
+    const sector = context.tenantSector;
 
     if (currentTier < requiredTier) {
       logger.warn('Plan tier block', {
@@ -56,17 +66,18 @@ export function requireTier(requiredTier: number, featureLabel: string) {
         currentTier,
         requiredTier,
         featureLabel,
+        sector,
         path: req.originalUrl,
       });
 
       res.status(403).json({
         success: false,
-        error: `${featureLabel} requires the ${planName(requiredTier)} plan or higher. Your business is currently on the ${planName(currentTier)} plan.`,
+        error: `${featureLabel} requires the ${planName(requiredTier, sector)} plan or higher. Your business is currently on the ${planName(currentTier, sector)} plan.`,
         upgradeRequired: true,
         currentTier,
         requiredTier,
-        currentPlanName: planName(currentTier),
-        requiredPlanName: planName(requiredTier),
+        currentPlanName: planName(currentTier, sector),
+        requiredPlanName: planName(requiredTier, sector),
         featureLabel,
       });
       return;

@@ -1,14 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/db';
-import { SUBSCRIPTION_PLANS } from './subscription';
+import { getSectorPlan } from '../config/sectorPlans';
+import { TENANT_PLANS } from '../middleware/tierEnforcementMiddleware';
 
 const router = Router();
 
 // Auth is handled upstream by adminPasscodeMiddleware.
 
-const PLAN_MAP = new Map(SUBSCRIPTION_PLANS.map((p) => [p.tier, p]));
-const priceForTier = (tier: number): number => PLAN_MAP.get(tier)?.priceGhs ?? 105;
-const nameForTier = (tier: number): string => PLAN_MAP.get(tier)?.name ?? 'Starter';
+// Custom-priced plans (Enterprise top tier) count as 0 since their price is negotiated off-platform.
+const priceFor = (sector: string, tier: number): number => getSectorPlan(sector, tier)?.priceGhs ?? 0;
+const nameFor = (sector: string, tier: number): string => getSectorPlan(sector, tier)?.name ?? 'Starter';
 
 /**
  * GET /api/v1/admin/revenue
@@ -35,6 +36,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         name: true,
         slug: true,
         tier: true,
+        sector: true,
         subscriptionStatus: true,
         trialEndsAt: true,
         subscriptionPaidUntil: true,
@@ -45,7 +47,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
     // ── Per-tenant enrichment ──────────────────────────────────────────────
     type TenantRow = {
-      id: string; name: string; slug: string; tier: number;
+      id: string; name: string; slug: string; tier: number; sector: string;
       tierName: string; priceGhs: number;
       subscriptionStatus: string;
       trialEndsAt: string | null; subscriptionPaidUntil: string | null;
@@ -55,8 +57,8 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     };
 
     const enriched: TenantRow[] = tenants.map((t) => {
-      const price = priceForTier(t.tier);
-      const tierName = nameForTier(t.tier);
+      const price = priceFor(t.sector, t.tier);
+      const tierName = nameFor(t.sector, t.tier);
       const trialDaysLeft = t.trialEndsAt
         ? Math.ceil((t.trialEndsAt.getTime() - now.getTime()) / 86_400_000)
         : null;
@@ -72,6 +74,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         name: t.name,
         slug: t.slug,
         tier: t.tier,
+        sector: t.sector,
         tierName,
         priceGhs: price,
         subscriptionStatus: t.subscriptionStatus,
@@ -97,14 +100,16 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     const revenueAtRisk = atRisk.reduce((s, t) => s + t.priceGhs, 0);
 
     // Tier breakdown
-    const tierBreakdown = SUBSCRIPTION_PLANS.map((plan) => {
-      const inTier = active.filter((t) => t.tier === plan.tier);
+    // Prices vary by sector, so priceGhs here is the average across active tenants in the tier.
+    const tierBreakdown = [1, 2, 3].map((tier) => {
+      const inTier = active.filter((t) => t.tier === tier);
+      const tierMrr = inTier.reduce((s, t) => s + t.priceGhs, 0);
       return {
-        tier: plan.tier,
-        name: plan.name,
-        priceGhs: plan.priceGhs,
+        tier,
+        name: TENANT_PLANS[tier].name,
+        priceGhs: inTier.length > 0 ? Math.round(tierMrr / inTier.length) : 0,
         activeCount: inTier.length,
-        tierMrr: inTier.length * plan.priceGhs,
+        tierMrr,
       };
     });
 

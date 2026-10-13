@@ -193,6 +193,7 @@ export function Register() {
         adminName: formData.adminName,
         baseCurrency: formData.baseCurrency,
         orgType: formData.orgType,
+        ...(searchParams.get('sector') ? { sector: searchParams.get('sector') } : {}),
         termsAccepted: true,
         acceptedTermsVersion: "v1.0",
         ...(formData.referralCode.trim() ? { referralCode: formData.referralCode.trim().toUpperCase() } : {}),

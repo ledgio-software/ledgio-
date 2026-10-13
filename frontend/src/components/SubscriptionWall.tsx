@@ -6,8 +6,7 @@ import { Button } from "./ui/Button";
 interface Plan {
   tier: number;
   name: string;
-  priceGhs: number;
-  seatLimit: number;
+  priceGhs: number | null;
   features: string[];
 }
 
@@ -20,19 +19,14 @@ export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedTier, setSelectedTier] = useState<number>(Math.max(currentTier, 1));
   const [isLoading, setIsLoading] = useState(false);
+  const [plansError, setPlansError] = useState(false);
 
   useEffect(() => {
     api.get<{ success: boolean; plans: Plan[] }>("/subscription/plans")
       .then((r) => setPlans(r.data.plans))
-      .catch(() => {
-        // Fallback to generic plans if fetch fails
-        setPlans([
-          { tier: 1, name: "Starter", priceGhs: 105, seatLimit: 3, features: ["Point of Sale", "Invoices & Bills", "Inventory", "Expense Claims", "Sales Reports"] },
-          { tier: 2, name: "Business", priceGhs: 305, seatLimit: 10, features: ["Everything in Starter", "Payroll (PAYE & SSNIT)", "Bank Reconciliation", "Approval Workflows", "Budgets & Analytics"] },
-          { tier: 3, name: "Professional", priceGhs: 510, seatLimit: Infinity, features: ["Everything in Business", "Unlimited team members", "Custom Fields", "Full Audit Trail", "Priority Support"] },
-        ]);
-      });
+      .catch(() => setPlansError(true));
   }, []);
+  const selectedPlan = plans.find((p) => p.tier === selectedTier);
   const [isVerifying, setIsVerifying] = useState(false);
   const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +84,12 @@ export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
         </div>
 
         {/* Plan cards */}
-        {plans.length === 0 && (
+        {plansError && (
+          <p role="alert" className="text-center text-sm text-red-600 dark:text-red-400 mb-6">
+            Could not load plans. Please refresh the page.
+          </p>
+        )}
+        {plans.length === 0 && !plansError && (
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
@@ -120,7 +119,9 @@ export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
                     <p className="text-sm text-gray-500 dark:text-gray-400">per month</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">GHS {plan.priceGhs}</span>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {plan.priceGhs === null ? "Custom" : `GHS ${plan.priceGhs}`}
+                    </span>
                   </div>
                 </div>
                 <ul className="space-y-1.5">
@@ -155,13 +156,20 @@ export function SubscriptionWall({ currentTier, onSubscribed }: Props) {
 
         {!pendingReference ? (
           <div className="text-center">
-            <Button onClick={handleSubscribe} disabled={isLoading} className="w-full max-w-xs mx-auto">
-              {isLoading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Opening payment…</>
-              ) : (
-                <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {plans.find((p) => p.tier === selectedTier)?.priceGhs} / month</>
-              )}
-            </Button>
+            {selectedPlan?.priceGhs === null ? (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                The {selectedPlan.name} plan has custom pricing. Email{" "}
+                <a href="mailto:ledgioapp@gmail.com" className="underline">ledgioapp@gmail.com</a> to subscribe.
+              </p>
+            ) : (
+              <Button onClick={handleSubscribe} disabled={isLoading || !selectedPlan} className="w-full max-w-xs mx-auto">
+                {isLoading ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Opening payment…</>
+                ) : (
+                  <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {selectedPlan?.priceGhs} / month</>
+                )}
+              </Button>
+            )}
           </div>
         ) : (
           <div className="text-center space-y-3">
