@@ -58,6 +58,13 @@ describe('Plan tiers (Shop/Business/Enterprise) - feature gating, admin upgrade,
     expect(res.body.data.tenant.tier).toBe(1);
   });
 
+  it('a newly onboarded tenant gets a 30-day free trial', async () => {
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    expect(tenant.subscriptionStatus).toBe('TRIAL');
+    const days = (tenant.trialEndsAt!.getTime() - tenant.createdAt.getTime()) / 86_400_000;
+    expect(Math.round(days)).toBe(30);
+  });
+
   describe('Business-tier routes are blocked on the Shop plan', () => {
     const cases: [string, string][] = [
       ['GET', '/api/v1/banking/accounts'],

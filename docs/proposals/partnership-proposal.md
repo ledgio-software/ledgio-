@@ -36,7 +36,7 @@ We have already signed a pilot referral agreement with our first partner, **Adam
 
 Ledgio is built for how Ghanaian businesses actually operate. It is not a foreign product grafted onto the Ghanaian market — it is designed from the ground up for GRA E-VAT clearance, Paystack and Mobile Money collection, PAYE and SSNIT payroll, NHIS pharmacy billing, and a complete double-entry general ledger that an accountant will trust on audit day. The platform covers 40+ modules across invoicing, inventory, POS, payroll, purchase orders, financial reporting, bank reconciliation, job costing, manufacturing, and more — all in one cloud-based workspace, accessible from any browser.
 
-Every new business receives a **90-day free trial, no credit card required**. Subscriptions begin after the trial:
+Every new business receives a **30-day free trial, no credit card required**. Subscriptions begin after the trial:
 
 | Plan | Monthly (GH₵) | Who It Is For | Key Modules |
 |------|--------------|--------------|-------------|
