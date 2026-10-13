@@ -5,11 +5,12 @@ This file records all significant changes, decisions, and progress made on the M
 ## [Date: 2026-10-13] - Change: Free trial shortened from 90 days to 30 days
 
 **What/Why:**
-Business decision: new signups now get a 30-day (1 month) free trial instead of 90 days. Applies only to tenants onboarded after deploy; existing tenants keep the `trial_ends_at` they were given, so no current trial is cut short and no tenant data is changed. The 7-day read-only grace period after the trial is unchanged.
+Business decision: the free trial is now 30 days (1 month) instead of 90 days, for new signups and existing trials. Migration `20261013000002_shorten_existing_trials_to_30_days` sets running TRIAL tenants' `trial_ends_at` to 30 days after signup; tenants already past 30 days get `trial_ends_at` = migration time, so they enter the usual 7-day read-only grace rather than being locked out instantly (owner chose "end immediately"). Only `trial_ends_at` changes: no trial is lengthened, ACTIVE (paid) tenants and tenants with no trial date are untouched, and no business data is modified. The 7-day grace period is unchanged.
 
 **Files Changed:**
 - **`backend/src/services/tenantService.ts`** — `TRIAL_DAYS = 30` used for `trialEndsAt` on onboarding.
 - **`backend/prisma/schema.prisma`** — Comment updated (no schema change).
+- **`backend/prisma/migrations/20261013000002_shorten_existing_trials_to_30_days/migration.sql`** — Data migration shortening existing running trials (verified on a local DB against new, old, already-short, paid and null-trial tenants).
 - **`ledgio-hub/src/pages/Home.tsx`**, **`frontend/src/pages/landing/LandingPage.tsx`** — Marketing copy says 30-day free trial.
 - **`docs/proposals/partnership-proposal.md`**, **`docs/proposals/referral-partner-invitation.md`** — Partner docs say 30-day trial.
 - **`backend/src/tests/tierEnforcement.test.ts`** — Asserts new tenants get a 30-day trial.
