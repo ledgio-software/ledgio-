@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
-import { getSectorPlan, isValidSector } from '../config/sectorPlans';
+import { getSectorPlan, isValidSector, isUnlockedOnStarter } from '../config/sectorPlans';
 
 /**
  * The three subscription plans a tenant can be on (Tenant.tier: 1/2/3).
@@ -58,8 +58,9 @@ export function requireTier(requiredTier: number, featureLabel: string) {
 
     const currentTier = context.tenantTier !== undefined ? context.tenantTier : 1;
     const sector = context.tenantSector;
+    const starterUnlock = requiredTier === 2 && currentTier >= 1 && isUnlockedOnStarter(sector, featureLabel);
 
-    if (currentTier < requiredTier) {
+    if (currentTier < requiredTier && !starterUnlock) {
       logger.warn('Plan tier block', {
         requestId: req.headers['x-request-id'] as string,
         tenantSlug: context.tenantSlug,

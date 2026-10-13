@@ -67,6 +67,7 @@ export function Sidebar() {
     isRestricted ? "professional" : effectiveMode,
     tier,
     settings?.posEnabled !== false,
+    settings?.starterUnlocks ?? [],
   );
 
   function handleModeClick(m: WorkspaceMode) {

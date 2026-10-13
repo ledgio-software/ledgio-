@@ -5,6 +5,7 @@ import { onboardTenant } from '../services/tenantService';
 import { deleteTenantBySlug, ensureTenantTableExists } from '../repository/tenantRepository';
 import { deleteUserByEmail, ensureUserTableExists } from '../repository/userRepository';
 import { dropTenantSchema } from '../database/tenantSchemaManager';
+import { invalidateTenantCacheById } from '../cache/tenantCache';
 
 describe('Plan tiers (Shop/Business/Enterprise) - feature gating, admin upgrade, and seat limits', () => {
   const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -18,6 +19,7 @@ describe('Plan tiers (Shop/Business/Enterprise) - feature gating, admin upgrade,
 
   async function cleanupTestData() {
     if (tenantId) {
+      await prisma.job.deleteMany({ where: { tenantId } }).catch(() => {});
       await prisma.user.deleteMany({ where: { tenantId, email: { not: adminEmail } } }).catch(() => {});
     }
     await deleteTenantBySlug(prisma, tenantSlug).catch(() => {});
@@ -104,6 +106,53 @@ describe('Plan tiers (Shop/Business/Enterprise) - feature gating, admin upgrade,
       const res = await request(app).put(`/api/v1/tenants/${tenantId}/tier`).send({ tier: 1, passcode: masterPasscode });
       expect(res.status).toBe(200);
       expect(res.body.data.tenant.tier).toBe(1);
+    });
+  });
+
+  describe('Sector Starter unlocks', () => {
+    async function setSector(sector: string) {
+      await prisma.tenant.update({ where: { id: tenantId }, data: { sector } });
+      await invalidateTenantCacheById(tenantId);
+    }
+
+    afterAll(async () => {
+      await prisma.job.deleteMany({ where: { tenantId } });
+      await setSector('retail');
+    });
+
+    it('a manufacturing Starter tenant can use Job Costing and Manufacturing, but not other Business features', async () => {
+      await setSector('manufacturing');
+      const auth = (r: request.Test) => r.set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug);
+
+      expect((await auth(request(app).get('/api/v1/jobs'))).status).toBe(200);
+      expect((await auth(request(app).get('/api/v1/manufacturing/bom-templates'))).status).toBe(200);
+      expect((await auth(request(app).get('/api/v1/budgets'))).status).toBe(403);
+
+      const current = await auth(request(app).get('/api/v1/tenants/current'));
+      expect(current.body.data.tenant.starterUnlocks).toEqual(['Job Costing', 'Manufacturing']);
+    });
+
+    it('a retail Starter tenant is still blocked from Job Costing', async () => {
+      await setSector('retail');
+      const res = await request(app).get('/api/v1/jobs').set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug);
+      expect(res.status).toBe(403);
+    });
+
+    it('a construction Starter tenant can create jobs up to 5 active, then is asked to upgrade', async () => {
+      await setSector('construction');
+      await prisma.job.createMany({
+        data: [1, 2, 3, 4].map((n) => ({ tenantId, jobNumber: `JOB-T${n}`, name: `Site ${n}`, status: n % 2 ? 'OPEN' : 'IN_PROGRESS' })),
+      });
+      await prisma.job.create({ data: { tenantId, jobNumber: 'JOB-T9', name: 'Finished site', status: 'COMPLETED' } });
+
+      const create = (name: string) =>
+        request(app).post('/api/v1/jobs').set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug).send({ name });
+
+      expect((await create('Fifth active job')).status).toBe(201);
+      const blocked = await create('Sixth active job');
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.upgradeRequired).toBe(true);
+      expect(blocked.body.error).toContain('up to 5 active jobs');
     });
   });
 

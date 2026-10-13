@@ -53,6 +53,27 @@ describe('sector-aware tier helpers', () => {
     expect(seatLimitForTier(2)).toBe(10);
   });
 
+  it('lets a sector Starter plan through for its unlocked Business features only', () => {
+    const run = (sector: string, feature: string, requiredTier = 2) => {
+      const next = jest.fn();
+      const res = { status: jest.fn().mockReturnValue({ json: jest.fn() }) } as unknown as Response;
+      const req = {
+        headers: {},
+        originalUrl: '/x',
+        tenantContext: { tenantId: 't1', tenantSchema: 's1', tenantTier: 1, tenantSector: sector },
+      } as unknown as Request;
+      requireTier(requiredTier, feature)(req, res, next);
+      return next.mock.calls.length === 1;
+    };
+
+    expect(run('manufacturing', 'Job Costing')).toBe(true);
+    expect(run('construction', 'Job Costing')).toBe(true);
+    expect(run('churches-ngos', 'Bank Reconciliation')).toBe(true);
+    expect(run('retail', 'Job Costing')).toBe(false);
+    expect(run('manufacturing', 'Payroll')).toBe(false);
+    expect(run('enterprise', 'Approval Workflows', 3)).toBe(false);
+  });
+
   it('names the sector plan in the 403 upgrade response', () => {
     const json = jest.fn();
     const res = { status: jest.fn().mockReturnValue({ json }) } as unknown as Response;

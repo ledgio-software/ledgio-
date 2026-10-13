@@ -8,6 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
+import { hasTierAccess } from "../../types/tenant";
 import { Landmark, Plus, CheckCircle, RefreshCw, ArrowUpRight, ArrowDownLeft, Search, X } from "lucide-react";
 
 const MONO_PUBLIC_KEY = import.meta.env.VITE_MONO_PUBLIC_KEY as string | undefined;
@@ -80,7 +81,7 @@ export function BankReconciliation() {
     // Skip the fetch entirely below Business tier - avoids a guaranteed 403
     // round trip (see requireTier() gating this router) before the locked
     // state below even has a chance to render.
-    if (!isLoadingTenantSettings && tenantSettings.tier >= 2) {
+    if (!isLoadingTenantSettings && hasTierAccess(tenantSettings, 2, "Bank Reconciliation")) {
       fetchBankingData();
     } else if (!isLoadingTenantSettings) {
       setIsLoading(false);
@@ -167,7 +168,7 @@ export function BankReconciliation() {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amt);
   };
 
-  if (!isLoadingTenantSettings && tenantSettings.tier < 2) {
+  if (!isLoadingTenantSettings && !hasTierAccess(tenantSettings, 2, "Bank Reconciliation")) {
     return <UpgradeRequired featureLabel="Bank Reconciliation" requiredTier={2} currentTier={tenantSettings.tier} />;
   }
 

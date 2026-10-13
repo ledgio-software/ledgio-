@@ -2,6 +2,23 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-10-13] - Fix: Sector Starter plans unlock the features ledgio-hub promises
+
+**What/Why:**
+Several Starter plans on ledgio-hub list features the backend locked to tier 2, so those customers couldn't use what they paid for. Each sector's Starter plan now unlocks exactly the Business-tier features its hub feature list names: Enterprise (Approval Workflows, Bank Reconciliation, Branch Comparison), Churches & NGOs (Bank Reconciliation), Manufacturing (Job Costing, Manufacturing/BOM), Construction (Job Costing, capped at 5 active jobs as advertised), Wholesale (AP/AR Aging). Access-only change: no schema migration, no data writes or deletes. Existing tier 2/3 access is unchanged.
+
+Also fixed: the mobile bottom nav always filtered as tier 1, hiding Business-tier menu items from paying Standard/Pro customers on phones; and CONSTRUCTION org-type nav hid Job Costing despite its comment saying it is kept.
+
+**Files Changed:**
+- **`backend/src/config/sectorPlans.ts`** — `STARTER_UNLOCKS` per sector, `starterUnlocksFor()`, `isUnlockedOnStarter()`, construction active-job limit.
+- **`backend/src/middleware/tierEnforcementMiddleware.ts`** — `requireTier(2, label)` passes for a tier-1 tenant whose sector unlocks that label.
+- **`backend/src/routes/jobs.ts`** — Construction Starter limited to 5 OPEN/IN_PROGRESS jobs on job creation.
+- **`backend/src/routes/tenants.ts`** — Tenant responses include `starterUnlocks`.
+- **`frontend/src/lib/navigation.ts`**, **`Sidebar.tsx`**, **`MobileBottomNav.tsx`**, **`CommandMenu.tsx`** — Unlocked items shown on Starter (including in the simplified Starter menu); mobile nav uses the real tier.
+- **`frontend/src/types/tenant.ts`**, **`TenantSettingsContext.tsx`** — `starterUnlocks` setting and `hasTierAccess()` helper.
+- **`frontend/src/pages/banking/BankReconciliation.tsx`**, **`approvals/Approvals.tsx`**, **`reports/AgingReport.tsx`** — Page-level tier checks use `hasTierAccess()`.
+- **`backend/src/tests/sectorPlans.test.ts`**, **`backend/src/tests/tierEnforcement.test.ts`** — Unlock and job-cap tests.
+
 ## [Date: 2026-10-13] - Feature: Sector-based subscription plans (billing matches ledgio-hub pricing)
 
 **What/Why:**

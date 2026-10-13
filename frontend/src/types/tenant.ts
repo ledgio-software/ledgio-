@@ -9,6 +9,16 @@ export const TIER_NAMES: Record<TenantTier, string> = {
   3: 'Professional',
 };
 
+// Mirrors requireTier() in backend tierEnforcementMiddleware.ts, including sector Starter unlocks.
+export function hasTierAccess(
+  settings: Pick<TenantSettings, 'tier' | 'starterUnlocks'>,
+  requiredTier: number,
+  featureLabel?: string,
+): boolean {
+  if (settings.tier >= requiredTier) return true;
+  return requiredTier === 2 && !!featureLabel && settings.starterUnlocks.includes(featureLabel);
+}
+
 export interface TenantSettings {
   id: string;
   companyName: string;
@@ -43,6 +53,8 @@ export interface TenantSettings {
   paystackAccountName: string | null;
   paystackConfigured: boolean;
   tier: TenantTier;
+  // Business-tier feature labels this tenant's sector includes on Starter (server-computed).
+  starterUnlocks: string[];
   // When false, the POS nav link and /pos route are hidden for this tenant.
   posEnabled: boolean;
   updatedAt: string;
@@ -54,6 +66,7 @@ export type UpdateTenantSettingsDTO = Partial<
     | 'id'
     | 'updatedAt'
     | 'tier'
+    | 'starterUnlocks'
     | 'graSecurityKeyConfigured'
     | 'paystackConfigured'
     | 'paystackSubaccountCode'
