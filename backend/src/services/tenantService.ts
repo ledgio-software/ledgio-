@@ -7,6 +7,7 @@ import { hashPassword } from '../utils/password';
 import { validatePasswordStrength } from '../utils/passwordPolicy';
 import { generateJwtToken } from '../utils/jwt';
 import { setTenantInCache, invalidateTenantCacheById } from '../cache/tenantCache';
+import { isValidSector, sectorFromOrgType } from '../config/sectorPlans';
 
 export interface OnboardTenantDTO {
   companyName?: string;
@@ -26,6 +27,7 @@ export interface OnboardTenantDTO {
   // sections the frontend shows. Any unrecognized/omitted value defaults
   // safely to BUSINESS (matches tier's default-on-absence style).
   orgType?: string;
+  sector?: string;
   referralCode?: string;
 }
 
@@ -39,6 +41,7 @@ export interface OnboardTenantResult {
     termsAcceptedAt: Date | null;
     tier: number;
     orgType: string;
+    sector: string;
     createdAt: Date;
   };
   admin: {
@@ -163,6 +166,7 @@ export async function onboardTenant(
   const tier = dto.tier !== undefined ? Number(dto.tier) : 1;
   const VALID_ORG_TYPES = new Set(['BUSINESS', 'NONPROFIT', 'SCHOOL', 'CHURCH', 'NGO', 'PHARMACY', 'RETAIL', 'WHOLESALE', 'SERVICE', 'CONSTRUCTION', 'HOSPITALITY']);
   const orgType = dto.orgType && VALID_ORG_TYPES.has(dto.orgType) ? dto.orgType : 'BUSINESS';
+  const sector = isValidSector(dto.sector) ? dto.sector : sectorFromOrgType(orgType);
   const trialEndsAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
   // Validate referral code if provided
@@ -201,6 +205,7 @@ export async function onboardTenant(
       tier,
       baseCurrency: dto.baseCurrency,
       orgType,
+      sector,
       subscriptionStatus: 'TRIAL',
       trialEndsAt,
       referralCode,
@@ -311,6 +316,7 @@ export async function onboardTenant(
       termsAcceptedAt: tenantRecord.termsAcceptedAt,
       tier: tenantRecord.tier,
       orgType: tenantRecord.orgType,
+      sector: tenantRecord.sector,
       createdAt: tenantRecord.createdAt,
     },
     admin: {

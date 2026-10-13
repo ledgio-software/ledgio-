@@ -12,6 +12,7 @@ import * as paystackService from '../services/paystackService';
 import { PaystackServiceError } from '../services/paystackService';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validateBody';
+import { getPlansForSector, getSectorPlan } from '../config/sectorPlans';
 
 // Webhook references are stored in Redis for 90 days to detect replays.
 const WEBHOOK_DEDUP_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -24,87 +25,9 @@ const verifySchema = z.object({
 
 const router = Router();
 
-export const SUBSCRIPTION_PLANS = [
-  {
-    tier: 1,
-    name: 'Starter',
-    priceGhs: 105,
-    seatLimit: 3,
-    features: ['Point of Sale', 'Invoices & Bills', 'Inventory', 'Expense Claims', 'Sales Reports'],
-  },
-  {
-    tier: 2,
-    name: 'Business',
-    priceGhs: 305,
-    seatLimit: 10,
-    features: ['Everything in Starter', 'Payroll (PAYE & SSNIT)', 'Bank Reconciliation', 'Approval Workflows', 'Budgets & Analytics'],
-  },
-  {
-    tier: 3,
-    name: 'Professional',
-    priceGhs: 510,
-    seatLimit: Infinity,
-    features: ['Everything in Business', 'Unlimited team members', 'Custom Fields', 'Full Audit Trail', 'Priority Support'],
-  },
-];
-
-export const HOSPITALITY_SUBSCRIPTION_PLANS = [
-  {
-    tier: 1,
-    name: 'Starter',
-    priceGhs: 200,
-    seatLimit: 3,
-    features: ['Room & rate management', 'Reservation system', 'Guest folio & billing', 'Expense tracking', 'Basic revenue reports'],
-  },
-  {
-    tier: 2,
-    name: 'Standard',
-    priceGhs: 400,
-    seatLimit: 10,
-    features: ['Everything in Starter', 'Housekeeping board', 'Night audit & RevPAR', 'Guest history & profiles', 'GRA e-VAT clearance', 'Bank reconciliation'],
-  },
-  {
-    tier: 3,
-    name: 'Pro',
-    priceGhs: 650,
-    seatLimit: Infinity,
-    features: ['Everything in Standard', 'Multi-property management (coming soon)', 'Conference & banquet revenue', 'Staff payroll', 'Advanced analytics', 'Priority support'],
-  },
-];
-
-export const SCHOOL_SUBSCRIPTION_PLANS = [
-  {
-    tier: 1,
-    name: 'Starter',
-    priceGhs: 250,
-    seatLimit: 3,
-    features: ['Student admissions & register', 'Student ledger & fee collection', 'GES-aligned chart of accounts', 'Income & Expenditure report', 'Weekly I&E email'],
-  },
-  {
-    tier: 2,
-    name: 'Standard',
-    priceGhs: 450,
-    seatLimit: 10,
-    features: ['Everything in Starter', 'Student health records', 'Fund accounting by term', 'Budgets by department', 'Expense claims & approvals', 'Approval workflows'],
-  },
-  {
-    tier: 3,
-    name: 'Pro',
-    priceGhs: 700,
-    seatLimit: Infinity,
-    features: ['Everything in Standard', 'Multi-campus management', 'Payroll for all staff', 'Full audit trail', 'Advanced analytics', 'Priority support'],
-  },
-];
-
-function getPlansForOrgType(orgType?: string | null) {
-  if (orgType === 'SCHOOL' || orgType === 'NONPROFIT') return SCHOOL_SUBSCRIPTION_PLANS;
-  if (orgType === 'HOSPITALITY') return HOSPITALITY_SUBSCRIPTION_PLANS;
-  return SUBSCRIPTION_PLANS;
-}
-
-// Public plans endpoint — returns generic plans (used by marketing/public pages)
-router.get('/plans/public', (_req: Request, res: Response): void => {
-  res.json({ success: true, plans: SUBSCRIPTION_PLANS });
+// Public plans endpoint (marketing pages). Optional ?sector=<slug>, defaults to retail.
+router.get('/plans/public', (req: Request, res: Response): void => {
+  res.json({ success: true, plans: getPlansForSector(req.query.sector as string | undefined) });
 });
 
 // All remaining routes require authentication and tenant context.
@@ -114,16 +37,16 @@ router.use(tenantContextMiddleware);
 
 /**
  * GET /api/v1/subscription/plans
- * Returns the plans for this tenant's org type (school vs generic).
+ * Returns the plans for this tenant's sector.
  */
 router.get('/plans', async (req: Request, res: Response): Promise<void> => {
   try {
     const context = req.tenantContext!;
     const tenant = await prisma.tenant.findUnique({
       where: { id: context.tenantId },
-      select: { orgType: true },
+      select: { sector: true },
     });
-    const plans = getPlansForOrgType(tenant?.orgType);
+    const plans = getPlansForSector(tenant?.sector);
     res.json({ success: true, plans });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -141,7 +64,7 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
       where: { id: context.tenantId },
       select: {
         tier: true,
-        orgType: true,
+        sector: true,
         subscriptionStatus: true,
         trialEndsAt: true,
         subscriptionPaidUntil: true,
@@ -177,7 +100,7 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
         ? Math.max(0, Math.ceil((tenant.subscriptionPaidUntil.getTime() - now) / 86_400_000))
         : null;
 
-    const plans = getPlansForOrgType(tenant.orgType);
+    const plans = getPlansForSector(tenant.sector);
     const plan = plans.find((p) => p.tier === tenant.tier) ?? plans[0];
 
     res.json({
@@ -185,6 +108,7 @@ router.get('/status', async (req: Request, res: Response): Promise<void> => {
       state,
       subscriptionStatus: tenant.subscriptionStatus,
       tier: tenant.tier,
+      sector: tenant.sector,
       planName: plan.name,
       priceGhs: plan.priceGhs,
       trialEndsAt: tenant.trialEndsAt?.toISOString() ?? null,
@@ -219,17 +143,20 @@ router.post('/initialize', requireRole('Admin'), validateBody(initializeSchema),
     const context = requireTenantContext();
     const tenant = await prisma.tenant.findUnique({
       where: { id: context.tenantId },
-      select: { id: true, orgType: true },
+      select: { id: true, sector: true },
     });
     if (!tenant) {
       res.status(404).json({ success: false, error: 'Tenant not found.' });
       return;
     }
 
-    const plans = getPlansForOrgType(tenant.orgType);
-    const plan = plans.find((p) => p.tier === planTier);
+    const plan = getSectorPlan(tenant.sector, planTier);
     if (!plan) {
       res.status(400).json({ success: false, error: 'Invalid plan tier. Must be 1, 2, or 3.' });
+      return;
+    }
+    if (plan.priceGhs === null) {
+      res.status(400).json({ success: false, error: `The ${plan.name} plan has custom pricing. Please contact sales to upgrade.` });
       return;
     }
 
@@ -280,11 +207,20 @@ router.post('/verify', requireRole('Admin'), validateBody(verifySchema), async (
     const context = requireTenantContext();
     const subscriptionPaidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    const tenant = await prisma.tenant.findUnique({ where: { id: context.tenantId }, select: { tier: true, orgType: true } });
-    const plans = getPlansForOrgType(tenant?.orgType);
-    const plan = plans.find((p) => p.tier === planTier);
-    if (!plan) {
+    // The reference must be one /initialize issued for this tenant and tier.
+    if (!reference.startsWith(`sub_${context.tenantId}_${planTier}_`)) {
+      res.status(400).json({ success: false, error: 'Payment reference does not match this workspace or plan.' });
+      return;
+    }
+
+    const tenant = await prisma.tenant.findUnique({ where: { id: context.tenantId }, select: { tier: true, sector: true } });
+    const plan = getSectorPlan(tenant?.sector, planTier);
+    if (!plan || plan.priceGhs === null) {
       res.status(400).json({ success: false, error: 'Invalid plan tier.' });
+      return;
+    }
+    if (verification.amount < plan.priceGhs) {
+      res.status(400).json({ success: false, error: `Amount paid (GHS ${verification.amount}) is less than the ${plan.name} plan price (GHS ${plan.priceGhs}).` });
       return;
     }
     const newTier = plan.tier > (tenant?.tier ?? 1) ? plan.tier : (tenant?.tier ?? 1);
@@ -377,14 +313,20 @@ router.post('/webhook', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === Number(metadata.planTier));
-    if (!plan) {
+    const existing = await prisma.tenant.findUnique({ where: { id: metadata.tenantId }, select: { tier: true, sector: true } });
+    if (!existing) {
+      res.json({ success: true, ignored: true });
+      return;
+    }
+    const plan = getSectorPlan(existing.sector, Number(metadata.planTier));
+    // Paystack sends amounts in pesewas.
+    const amountPaidGhs = Number(event.data?.amount || 0) / 100;
+    if (!plan || plan.priceGhs === null || amountPaidGhs < plan.priceGhs) {
       res.json({ success: true, ignored: true });
       return;
     }
 
     const subscriptionPaidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const existing = await prisma.tenant.findUnique({ where: { id: metadata.tenantId }, select: { tier: true } });
     const newTier = plan.tier > (existing?.tier ?? 1) ? plan.tier : (existing?.tier ?? 1);
 
     await prisma.tenant.update({

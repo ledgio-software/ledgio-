@@ -17,17 +17,17 @@ interface ExportManifestEntry {
   description: string;
 }
 
-const PLANS = [
-  { tier: 1, name: "Starter", priceGhs: 105, tierKey: 'starter' as const },
-  { tier: 2, name: "Business", priceGhs: 305, tierKey: 'business' as const, popular: true },
-  { tier: 3, name: "Professional", priceGhs: 510, tierKey: 'professional' as const },
-];
+interface SubscriptionPlan {
+  tier: number;
+  name: string;
+  priceGhs: number | null;
+  features: string[];
+}
 
-function SectorHighlightsCard({ orgType, currentTier }: { orgType: string; currentTier: number }) {
+function SectorHighlightsCard({ orgType, currentTier, tierName }: { orgType: string; currentTier: number; tierName: string }) {
   const highlight = SECTOR_FEATURE_HIGHLIGHTS[orgType] ?? SECTOR_FEATURE_HIGHLIGHTS['BUSINESS'];
   const tierLabels: Record<number, keyof typeof highlight.planFeatures> = { 1: 'starter', 2: 'business', 3: 'professional' };
   const features = highlight.planFeatures[tierLabels[currentTier] ?? 'starter'];
-  const tierName = PLANS.find((p) => p.tier === currentTier)?.name ?? 'Starter';
 
   return (
     <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 p-4 mb-4">
@@ -58,6 +58,7 @@ function SubscriptionTab() {
     autoRenewEnabled: boolean;
   } | null>(null);
   const [selectedTier, setSelectedTier] = useState<number>(1);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [pendingRef, setPendingRef] = useState<string | null>(null);
@@ -75,7 +76,12 @@ function SubscriptionTab() {
       setStatus(r.data);
       setSelectedTier(r.data.tier ?? 1);
     }).catch(() => setStatusError(true));
+    api.get<{ success: boolean; plans: SubscriptionPlan[] }>("/subscription/plans")
+      .then((r) => setPlans(r.data.plans ?? []))
+      .catch(() => setStatusError(true));
   }, []);
+
+  const selectedPlan = plans.find((p) => p.tier === selectedTier);
 
   async function handlePay() {
     setError(null); setIsLoading(true);
@@ -245,13 +251,10 @@ function SubscriptionTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           {status && (user as any)?.orgType && (
-            <SectorHighlightsCard orgType={(user as any).orgType} currentTier={selectedTier} />
+            <SectorHighlightsCard orgType={(user as any).orgType} currentTier={selectedTier} tierName={selectedPlan?.name ?? 'Starter'} />
           )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {PLANS.map((plan) => {
-              const orgType: string = (user as any)?.orgType ?? 'BUSINESS';
-              const highlight = SECTOR_FEATURE_HIGHLIGHTS[orgType] ?? SECTOR_FEATURE_HIGHLIGHTS['BUSINESS'];
-              const planFeatures = highlight.planFeatures[plan.tierKey];
+            {plans.map((plan) => {
               return (
                 <button
                   key={plan.tier}
@@ -262,13 +265,17 @@ function SubscriptionTab() {
                       : "border-secondary-200 dark:border-secondary-700 hover:border-secondary-300"
                   }`}
                 >
-                  {plan.popular && (
+                  {plan.tier === 2 && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">Popular</span>
                   )}
                   <p className="font-semibold text-sm">{plan.name}</p>
-                  <p className="text-lg font-bold">GHS {plan.priceGhs}<span className="text-xs font-normal text-secondary-500">/mo</span></p>
+                  {plan.priceGhs === null ? (
+                    <p className="text-lg font-bold">Custom</p>
+                  ) : (
+                    <p className="text-lg font-bold">GHS {plan.priceGhs}<span className="text-xs font-normal text-secondary-500">/mo</span></p>
+                  )}
                   <ul className="mt-2 space-y-1">
-                    {planFeatures.map((f) => (
+                    {plan.features.map((f) => (
                       <li key={f} className="flex items-center gap-1.5 text-xs text-secondary-600 dark:text-secondary-400">
                         <Check className="h-3 w-3 text-green-500 flex-shrink-0" aria-hidden />{f}
                       </li>
@@ -292,9 +299,15 @@ function SubscriptionTab() {
           {successMsg && <p className="text-green-600 dark:text-green-400 text-sm">{successMsg}</p>}
 
           {!pendingRef ? (
-            <Button onClick={handlePay} disabled={isLoading}>
-              {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Preparing payment…</> : <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {PLANS.find((p) => p.tier === selectedTier)?.priceGhs}/month</>}
-            </Button>
+            selectedPlan?.priceGhs === null ? (
+              <p className="text-sm text-secondary-600 dark:text-secondary-400">
+                The {selectedPlan.name} plan has custom pricing. Contact <a href="mailto:ledgioapp@gmail.com" className="underline">ledgioapp@gmail.com</a> to upgrade.
+              </p>
+            ) : (
+              <Button onClick={handlePay} disabled={isLoading || !selectedPlan}>
+                {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />Preparing payment…</> : <><CreditCard className="h-4 w-4 mr-2" aria-hidden />Pay GHS {selectedPlan?.priceGhs}/month</>}
+              </Button>
+            )
           ) : (
             <div className="space-y-3">
               {paymentUrl && (

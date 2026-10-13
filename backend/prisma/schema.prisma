@@ -32,6 +32,8 @@ model Tenant {
   // PUT /tenants/current. Plain string, not a Prisma enum, matching how
   // `tier`/`baseCurrency` aren't enums either.
   orgType                 String    @default("BUSINESS") @map("org_type")
+  // Sector slug from ledgio-hub sectorPricing.ts; selects plan names and prices (config/sectorPlans.ts).
+  sector                 String    @default("retail") @map("sector")
   // Guided onboarding wizard fields (Phase 3 trust feature). businessType is
   // freeform-ish (e.g. "Sole Proprietor"/"Partnership"/"Limited Company") -
   // not a Prisma enum, same convention as orgType/tier. `isLive` flips true

@@ -2,6 +2,25 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-10-13] - Feature: Sector-based subscription plans (billing matches ledgio-hub pricing)
+
+**What/Why:**
+ledgio-hub advertises 10 sectors × 3 tiers with different names and prices (e.g. Pharmacy ₵350/600/900, Retail ₵105/205/350), but the backend billed everyone from one generic list (₵105/305/510), with only hospitality/school overrides keyed by `orgType`. A pharmacy paid the retail price. Tenants now carry a `sector`, and all billing, plan names and seat limits come from one sector catalogue that mirrors the hub. Tier numbers (1/2/3) and all `requireTier` feature gates are unchanged.
+
+Also fixed in `/subscription/verify` and the webhook: the paid amount was never checked against the plan price, and the reference wasn't tied to the tenant/tier, so a Starter payment could activate Pro.
+
+**Files Changed:**
+- **`backend/src/config/sectorPlans.ts`** (new) — Sector plan catalogue (names, GHS prices, seat limits, features) matching `ledgio-hub/src/lib/sectorPricing.ts`; Enterprise top tier is custom-priced (`priceGhs: null`, Contact Sales).
+- **`backend/prisma/schema.prisma`**, **`backend/prisma/migrations/20261013000001_add_sector_to_tenants/migration.sql`** — `tenants.sector` column, backfilled from `org_type`.
+- **`backend/src/routes/subscription.ts`** — Plans/status/initialize/verify/webhook use the tenant's sector; verify checks reference + amount; webhook checks amount; custom-priced plans can't be self-checked-out.
+- **`backend/src/services/subscriptionAutoRenewCronService.ts`**, **`backend/src/routes/adminRevenue.ts`** — Sector prices for renewals and MRR.
+- **`backend/src/middleware/tierEnforcementMiddleware.ts`**, **`backend/src/middleware/tenantContextMiddleware.ts`**, **`backend/src/context/tenantContext.ts`** — Sector in tenant context; upgrade messages and seat limits use sector plan names/limits.
+- **`backend/src/services/tenantService.ts`**, **`backend/src/repository/tenantRepository.ts`** — Onboarding stores `sector` (from hub `?sector=`, else derived from `orgType`).
+- **`backend/src/routes/tenants.ts`** — Seat-limit check is sector-aware; admin `PUT /tenants/:id/tier` accepts optional `sector`.
+- **`frontend/src/pages/auth/Register.tsx`** — Forwards `?sector=` to `/tenants/onboard`.
+- **`frontend/src/pages/settings/Settings.tsx`**, **`frontend/src/components/SubscriptionWall.tsx`** — Plans loaded from the API instead of hardcoded generic prices; handle custom pricing.
+- **`backend/src/tests/sectorPlans.test.ts`** (new) — Catalogue, name/seat helpers and 403 message.
+
 ## [Date: 2026-09-22] - Fix: Church member form — add Branch field, surface real API errors
 
 **What/Why:**

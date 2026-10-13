@@ -72,7 +72,8 @@ describe('Plan tiers (Shop/Business/Enterprise) - feature gating, admin upgrade,
       expect(res.status).toBe(403);
       expect(res.body.success).toBe(false);
       expect(res.body.upgradeRequired).toBe(true);
-      expect(res.body.error).toContain('Business plan');
+      // Tenant defaults to the retail sector, whose tier-2 plan is "Standard".
+      expect(res.body.error).toContain('Standard plan');
     });
   });
 

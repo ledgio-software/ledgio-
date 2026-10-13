@@ -11,6 +11,7 @@ export interface TenantRecord {
   tier: number;
   baseCurrency: string;
   orgType: string;
+  sector: string;
   businessType: string | null;
   vatRegistered: boolean;
   graTin: string | null;
@@ -48,6 +49,7 @@ export interface CreateTenantData {
   tier?: number;
   baseCurrency?: string;
   orgType?: string;
+  sector?: string;
   subscriptionStatus?: string;
   trialEndsAt?: Date | null;
   referralCode?: string;
@@ -77,6 +79,7 @@ export async function createTenant(prisma: PrismaClient, data: CreateTenantData)
       tier,
       ...(data.baseCurrency ? { baseCurrency: data.baseCurrency } : {}),
       ...(data.orgType ? { orgType: data.orgType } : {}),
+      ...(data.sector ? { sector: data.sector } : {}),
       ...(data.subscriptionStatus ? { subscriptionStatus: data.subscriptionStatus } : {}),
       ...(data.trialEndsAt !== undefined ? { trialEndsAt: data.trialEndsAt } : {}),
       ...(data.referralCode ? { referralCode: data.referralCode } : {}),
