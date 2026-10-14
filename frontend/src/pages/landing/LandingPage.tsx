@@ -288,7 +288,7 @@ export function LandingPage() {
 
           <p className="mt-4 flex items-center justify-center gap-2 text-xs font-semibold text-secondary-400">
             <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-            90-day free trial • No credit card • Workspace provisioned instantly
+            30-day free trial • No credit card • Workspace provisioned instantly
           </p>
 
           {/* Stat strip */}
@@ -531,7 +531,7 @@ export function LandingPage() {
           </div>
 
           <p className="mt-8 text-center text-xs text-secondary-500">
-            All plans include a 90-day free trial. No credit card required to register. Upgrade instantly via Mobile Money or card from your Settings. — <Link to="/legal" className="text-emerald-500 hover:text-emerald-400">see SLA & Fair Use policy</Link>.
+            All plans include a 30-day free trial. No credit card required to register. Upgrade instantly via Mobile Money or card from your Settings. — <Link to="/legal" className="text-emerald-500 hover:text-emerald-400">see SLA & Fair Use policy</Link>.
           </p>
         </div>
       </section>

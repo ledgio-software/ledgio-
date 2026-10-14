@@ -39,8 +39,9 @@ export function MobileBottomNav() {
     user?.role,
     user?.orgType,
     isRestricted ? "professional" : mode,
-    1,
+    settings?.tier ?? 1,
     settings?.posEnabled !== false,
+    settings?.starterUnlocks ?? [],
   );
   const allItems = visibleGroups.flatMap((g) => g.items);
 

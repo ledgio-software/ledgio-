@@ -70,6 +70,8 @@ export interface NavItem {
   href: string;
   icon: any;
   minTier?: number;
+  /** Backend requireTier() label; lets a sector's Starter unlock show this item. */
+  feature?: string;
 }
 
 export interface NavGroup {
@@ -123,7 +125,7 @@ const ORG_TYPE_HIDDEN: Record<string, ReadonlySet<string>> = {
   ]),
   CONSTRUCTION: new Set([
     '/pos',
-    '/manufacturing', '/manufacturing/jobs', '/manufacturing/job-work-orders',
+    '/manufacturing', '/manufacturing/job-work-orders',
     '/pdc', '/reports/interest-charges',
     '/reports/stock-aging', '/reports/sales-channel', '/reports/monthly-sales-ledger',
   ]),
@@ -280,16 +282,16 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { name: "Chart of Accounts", href: "/accounts", icon: BookOpen },
       { name: "Journal Vouchers", href: "/journals", icon: FileSpreadsheet },
-      { name: "Banking & Feeds", href: "/banking", icon: Landmark, minTier: 2 },
+      { name: "Banking & Feeds", href: "/banking", icon: Landmark, minTier: 2, feature: "Bank Reconciliation" },
       { name: "Tax Rates", href: "/settings/tax-rates", icon: Percent },
       { name: "Fiscal Periods", href: "/settings/fiscal-periods", icon: CalendarClock },
       { name: "Recurring Transactions", href: "/settings/recurring-transactions", icon: Repeat, minTier: 2 },
       { name: "Fixed Assets", href: "/fixed-assets", icon: Building2, minTier: 2 },
       { name: "Cost Centres", href: "/cost-centres", icon: Layers, minTier: 2 },
-      { name: "Manufacturing", href: "/manufacturing", icon: Cog, minTier: 2 },
+      { name: "Manufacturing", href: "/manufacturing", icon: Cog, minTier: 2, feature: "Manufacturing" },
       { name: "Withholding Tax", href: "/settings/wht-rates", icon: Percent, minTier: 2 },
       { name: "Price Lists", href: "/settings/price-lists", icon: BadgeDollarSign, minTier: 2 },
-      { name: "Job Costing", href: "/manufacturing/jobs", icon: ClipboardList, minTier: 2 },
+      { name: "Job Costing", href: "/manufacturing/jobs", icon: ClipboardList, minTier: 2, feature: "Job Costing" },
       { name: "Job Work Orders", href: "/manufacturing/job-work-orders", icon: Truck, minTier: 2 },
       { name: "Cost Categories", href: "/cost-categories", icon: Layers, minTier: 2 },
       { name: "Scenarios", href: "/settings/scenarios", icon: GitBranch, minTier: 2 },
@@ -310,9 +312,9 @@ export const navigationGroups: NavGroup[] = [
       { name: "Cash Flow Statement", href: "/reports/cash-flow", icon: Waves },
       { name: "Cash Flow Forecast", href: "/reports/cash-flow-forecast", icon: TrendingUp, minTier: 2 },
       { name: "KPI Dashboard", href: "/reports/kpis", icon: Gauge, minTier: 2 },
-      { name: "AP/AR Aging", href: "/reports/aging", icon: Clock, minTier: 2 },
+      { name: "AP/AR Aging", href: "/reports/aging", icon: Clock, minTier: 2, feature: "AP/AR Aging Analysis" },
       { name: "Sales Channel Report", href: "/reports/sales-channel", icon: Store, minTier: 2 },
-      { name: "Branch Comparison", href: "/reports/branch-comparison", icon: GitBranch, minTier: 2 },
+      { name: "Branch Comparison", href: "/reports/branch-comparison", icon: GitBranch, minTier: 2, feature: "Branch Comparison Report" },
       { name: "Landed Cost", href: "/reports/landed-costs", icon: Anchor, minTier: 2 },
       { name: "Budgets", href: "/reports/budgets", icon: Target, minTier: 2 },
       { name: "Analytics Dashboard", href: "/reports/analytics", icon: LineChart, minTier: 2 },
@@ -340,7 +342,7 @@ export const navigationGroups: NavGroup[] = [
   {
     sectionTitle: "ADMINISTRATION",
     items: [
-      { name: "Approvals", href: "/approvals", icon: ShieldCheck, minTier: 2 },
+      { name: "Approvals", href: "/approvals", icon: ShieldCheck, minTier: 2, feature: "Approval Workflows" },
       { name: "Audit Trail", href: "/audit-logs", icon: ShieldCheck },
       { name: "Sync Failures", href: "/sync/failures", icon: WifiOff },
       { name: "AI Assistant Activity", href: "/help-assistant/activity", icon: Bot },
@@ -576,7 +578,10 @@ export function getVisibleNavGroups(
   mode: WorkspaceMode = 'professional',
   tier: number = 1,
   posEnabled: boolean = true,
+  starterUnlocks: string[] = [],
 ): NavGroup[] {
+  const isUnlocked = (item: NavItem) =>
+    !!item.feature && item.minTier === 2 && tier < 2 && starterUnlocks.includes(item.feature);
   // Filter groups restricted to a specific org type (e.g. PHARMACY section)
   let groups = navigationGroups.filter(
     (group) => !group.orgTypeOnly || group.orgTypeOnly === orgType
@@ -624,7 +629,7 @@ export function getVisibleNavGroups(
 
   // Plan tier gate: hide items that require a higher-tier plan.
   groups = groups
-    .map((group) => ({ ...group, items: group.items.filter((item) => !item.minTier || item.minTier <= tier) }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.minTier || item.minTier <= tier || isUnlocked(item)) }))
     .filter((group) => group.items.length > 0);
 
   // Restricted roles use the existing role allowlist only — mode doesn't apply.
@@ -642,7 +647,8 @@ export function getVisibleNavGroups(
     groups = groups
       .map((group) => {
         const items = group.items
-          .filter((item) => !hidden.has(item.href))
+          // A sector's Starter unlocks are part of the plan, so the simplified menu must not hide them.
+          .filter((item) => !hidden.has(item.href) || isUnlocked(item))
           .map((item) => ({
             ...item,
             name: MODE_LABELS[item.href]?.[mode] ?? item.name,

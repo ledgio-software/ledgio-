@@ -72,7 +72,7 @@ model Tenant {
   paystackAccountName     String?   @map("paystack_account_name")
   isLive                  Boolean   @default(false) @map("is_live")
   // Subscription billing: TRIAL | ACTIVE | GRACE | EXPIRED.
-  // New tenants start as TRIAL with trialEndsAt = +90 days. On payment,
+  // New tenants start as TRIAL with trialEndsAt = +30 days. On payment,
   // status flips to ACTIVE and subscriptionPaidUntil = +30 days.
   // Existing tenants (grandfathered) are set to ACTIVE in the migration.
   subscriptionStatus      String    @default("TRIAL") @map("subscription_status")

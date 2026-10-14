@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { Button } from "../../components/ui/Button";
 import { useTenantSettings } from "../../hooks/useTenantSettings";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
+import { hasTierAccess } from "../../types/tenant";
 import { api } from "../../lib/api";
 
 interface AgingTotals {
@@ -89,7 +90,7 @@ export function AgingReport() {
   }, []);
 
   useEffect(() => {
-    if (!isLoadingTenantSettings && settings.tier >= 2) {
+    if (!isLoadingTenantSettings && hasTierAccess(settings, 2, "AP/AR Aging Analysis")) {
       fetchAging();
     }
   }, [fetchAging, isLoadingTenantSettings, settings.tier]);
@@ -101,7 +102,7 @@ export function AgingReport() {
     return <div className="py-8 text-center text-secondary-500">Loading...</div>;
   }
 
-  if (settings.tier < 2) {
+  if (!hasTierAccess(settings, 2, "AP/AR Aging Analysis")) {
     return <UpgradeRequired featureLabel="AP/AR Aging Analysis" requiredTier={2} currentTier={settings.tier} />;
   }
 

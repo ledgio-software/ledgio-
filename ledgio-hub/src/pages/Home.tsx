@@ -67,7 +67,7 @@ const WHY_STATS = [
     link: { label: 'Explore sector solutions', to: '/for/retail' },
   },
   {
-    value: '90',
+    value: '30',
     label: 'Day free trial',
     body: 'No credit card required. Full access to your plan from the very first day. Your workspace is live the moment you verify your business email.',
     link: { label: 'Start free trial', to: '/pricing' },
@@ -273,7 +273,7 @@ export function Home() {
               onClick={() => openOnboarding()}
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-950/60 transition-colors"
             >
-              Start Free — 90-Day Trial <ArrowRight className="h-4 w-4" />
+              Start Free — 30-Day Trial <ArrowRight className="h-4 w-4" />
             </button>
             <Link
               to="/features"
@@ -284,7 +284,7 @@ export function Home() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-6 text-xs text-ink-500">
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> 90-day free trial</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> 30-day free trial</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> No credit card required</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> GRA e-VAT compliant</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-brand-500" /> Workspace live in minutes</span>
@@ -813,7 +813,7 @@ export function Home() {
                   onClick={() => openOnboarding()}
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm bg-white text-ink-900 hover:bg-ink-100 transition-colors shadow-lg"
                 >
-                  Register Free — 90-Day Trial <ArrowRight className="h-4 w-4" />
+                  Register Free — 30-Day Trial <ArrowRight className="h-4 w-4" />
                 </button>
                 <Link
                   to="/demo"
@@ -823,7 +823,7 @@ export function Home() {
                 </Link>
               </div>
               <div className="mt-8 flex flex-wrap justify-center gap-6 text-xs text-white/60">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> 90-day free trial</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> 30-day free trial</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> No credit card required</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> Cancel anytime</span>
                 <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-white/40" /> Your data, your export</span>

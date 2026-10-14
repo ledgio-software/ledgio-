@@ -7,7 +7,8 @@ import { requireRole } from '../middleware/rbacMiddleware';
 import { requireTenantContext } from '../context/tenantContext';
 import { resolveDefaultAccount, listAccounts } from '../repository/accountRepository';
 import * as journalEntryService from '../services/journalEntryService';
-import { requireTier } from '../middleware/tierEnforcementMiddleware';
+import { requireTier, planName } from '../middleware/tierEnforcementMiddleware';
+import { CONSTRUCTION_STARTER_ACTIVE_JOB_LIMIT } from '../config/sectorPlans';
 
 const router = Router();
 router.use(authenticateJwt, tenantContextMiddleware);
@@ -72,9 +73,22 @@ router.get('/:id', requireRole('Viewer'), async (req, res) => {
 
 // POST /jobs
 router.post('/', requireRole('Accountant'), async (req, res) => {
-  const { tenantId } = requireTenantContext();
+  const { tenantId, tenantTier, tenantSector } = requireTenantContext();
   try {
     const body = createJobSchema.parse(req.body);
+    if ((tenantTier ?? 1) < 2 && tenantSector === 'construction') {
+      const activeJobs = await (prisma as any).job.count({ where: { tenantId, status: { in: ['OPEN', 'IN_PROGRESS'] } } });
+      if (activeJobs >= CONSTRUCTION_STARTER_ACTIVE_JOB_LIMIT) {
+        return res.status(403).json({
+          success: false,
+          error: `Your ${planName(1, tenantSector)} plan allows up to ${CONSTRUCTION_STARTER_ACTIVE_JOB_LIMIT} active jobs. Complete or cancel a job, or upgrade to ${planName(2, tenantSector)} for unlimited jobs.`,
+          upgradeRequired: true,
+          currentTier: tenantTier ?? 1,
+          requiredTier: 2,
+          featureLabel: 'Unlimited active jobs',
+        });
+      }
+    }
     const jobNumber = await nextJobNumber(tenantId);
     const job = await (prisma as any).job.create({
       data: {

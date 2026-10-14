@@ -98,6 +98,32 @@ export const SECTOR_PLANS: Record<SectorSlug, SectorPlan[]> = {
   ]),
 };
 
+// requireTier() feature labels that a sector's Starter plan includes even though
+// they are Business-tier (2) features for everyone else, per the hub's Starter feature lists.
+export const STARTER_UNLOCKS: Record<SectorSlug, string[]> = {
+  retail: [],
+  enterprise: ['Approval Workflows', 'Bank Reconciliation', 'Branch Comparison Report'],
+  schools: [],
+  'churches-ngos': ['Bank Reconciliation'],
+  pharmacy: [],
+  manufacturing: ['Job Costing', 'Manufacturing'],
+  'professional-services': [],
+  hospitality: [],
+  construction: ['Job Costing'],
+  wholesale: ['AP/AR Aging Analysis'],
+};
+
+// Hub: construction Starter is "Job costing (up to 5 active jobs)".
+export const CONSTRUCTION_STARTER_ACTIVE_JOB_LIMIT = 5;
+
+export function starterUnlocksFor(sector: string | null | undefined): string[] {
+  return isValidSector(sector) ? STARTER_UNLOCKS[sector] : [];
+}
+
+export function isUnlockedOnStarter(sector: string | null | undefined, featureLabel: string): boolean {
+  return starterUnlocksFor(sector).includes(featureLabel);
+}
+
 const ORG_TYPE_TO_SECTOR: Record<string, SectorSlug> = {
   SCHOOL: 'schools',
   NONPROFIT: 'churches-ngos',

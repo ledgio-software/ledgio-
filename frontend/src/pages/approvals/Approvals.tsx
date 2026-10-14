@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { api } from "../../lib/api";
 import { useTenantSettings } from "../../contexts/TenantSettingsContext";
 import { UpgradeRequired } from "../../components/UpgradeRequired";
+import { hasTierAccess } from "../../types/tenant";
 
 interface ApprovalStep {
   level: number;
@@ -52,7 +53,7 @@ export function Approvals() {
   }, []);
 
   useEffect(() => {
-    if (!isLoadingTenantSettings && tenantSettings.tier >= 2) {
+    if (!isLoadingTenantSettings && hasTierAccess(tenantSettings, 2, "Approval Workflows")) {
       fetchWorkflows();
     } else if (!isLoadingTenantSettings) {
       setIsLoading(false);
@@ -82,7 +83,7 @@ export function Approvals() {
     }
   };
 
-  if (!isLoadingTenantSettings && tenantSettings.tier < 2) {
+  if (!isLoadingTenantSettings && !hasTierAccess(tenantSettings, 2, "Approval Workflows")) {
     return <UpgradeRequired featureLabel="Approval Workflows" requiredTier={2} currentTier={tenantSettings.tier} />;
   }
 

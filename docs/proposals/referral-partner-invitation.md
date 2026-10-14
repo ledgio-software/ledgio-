@@ -32,7 +32,7 @@ Ledgio is a cloud-based accounting and business management platform built specif
 
 The platform also includes AI-assisted tools: an AI Help Assistant that answers accounting questions in plain English, OCR receipt scanning that reads vendor invoices from a photograph, and AI categorisation for imported bank transactions.
 
-Every business that signs up receives a **90-day free trial, no credit card required**, up and running in under five minutes at [ledgio-fawn.vercel.app](https://ledgio-fawn.vercel.app).
+Every business that signs up receives a **30-day free trial, no credit card required**, up and running in under five minutes at [ledgio-fawn.vercel.app](https://ledgio-fawn.vercel.app).
 
 Ledgio currently offers three subscription plans:
 
@@ -97,11 +97,11 @@ There is no technical requirement. There is no sales training required. The role
 
 2. You email ledgioapp@gmail.com with the business name and contact person before they register. This is your attribution record. A personal referral link — issued when we formalise the partnership — also auto-attributes sign-ups through it.
 
-3. The business signs up for the 90-day free trial at ledgio-fawn.vercel.app. Attribution is confirmed within one business day.
+3. The business signs up for the 30-day free trial at ledgio-fawn.vercel.app. Attribution is confirmed within one business day.
 
 4. Ledgio handles the demonstration, onboarding, and all ongoing support from here.
 
-5. After the 90-day trial, the business moves to a paid subscription. Your commission begins from their first payment.
+5. After the 30-day trial, the business moves to a paid subscription. Your commission begins from their first payment.
 
 6. By the 5th of each month you receive a commission statement listing every active referred client, their plan, the amount received, and the commission owed.
 

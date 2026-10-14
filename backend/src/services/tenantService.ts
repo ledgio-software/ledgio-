@@ -9,6 +9,9 @@ import { generateJwtToken } from '../utils/jwt';
 import { setTenantInCache, invalidateTenantCacheById } from '../cache/tenantCache';
 import { isValidSector, sectorFromOrgType } from '../config/sectorPlans';
 
+// Applies to new signups only; existing tenants keep the trialEndsAt they were given.
+export const TRIAL_DAYS = 30;
+
 export interface OnboardTenantDTO {
   companyName?: string;
   name?: string;
@@ -167,7 +170,7 @@ export async function onboardTenant(
   const VALID_ORG_TYPES = new Set(['BUSINESS', 'NONPROFIT', 'SCHOOL', 'CHURCH', 'NGO', 'PHARMACY', 'RETAIL', 'WHOLESALE', 'SERVICE', 'CONSTRUCTION', 'HOSPITALITY']);
   const orgType = dto.orgType && VALID_ORG_TYPES.has(dto.orgType) ? dto.orgType : 'BUSINESS';
   const sector = isValidSector(dto.sector) ? dto.sector : sectorFromOrgType(orgType);
-  const trialEndsAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+  const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
 
   // Validate referral code if provided
   const rawReferralCode = (dto.referralCode || '').trim().toUpperCase();

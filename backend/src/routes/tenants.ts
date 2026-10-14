@@ -8,7 +8,7 @@ import { authenticateJwt } from '../middleware/authMiddleware';
 import { tenantContextMiddleware } from '../middleware/tenantContextMiddleware';
 import { requireRole } from '../middleware/rbacMiddleware';
 import { seatLimitForTier, planName } from '../middleware/tierEnforcementMiddleware';
-import { isValidSector, SECTOR_SLUGS } from '../config/sectorPlans';
+import { isValidSector, SECTOR_SLUGS, starterUnlocksFor } from '../config/sectorPlans';
 import { invalidateTenantCacheById } from '../cache/tenantCache';
 import { BroadcastService } from '../services/broadcastService';
 import { CLOSED_ROLES, isLocationScopedRole } from '../services/warehouseAccessService';
@@ -36,6 +36,7 @@ function sanitizeTenantForResponse(tenant: any) {
     // paystackService.ts), so paystackSubaccountCode/paystackAccountNumber/
     // paystackAccountName are safe to return as-is, not stripped.
     paystackConfigured: Boolean(rest.paystackSubaccountCode),
+    starterUnlocks: starterUnlocksFor(rest.sector),
   };
 }
 
