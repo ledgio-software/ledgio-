@@ -139,6 +139,17 @@ describe('Plan tiers (Shop/Business/Enterprise) - feature gating, admin upgrade,
       expect(current.body.data.tenant.starterUnlocks).toEqual(['Job Costing', 'Manufacturing']);
     });
 
+    it('a church/NGO Starter tenant can set up the weekly report email; retail cannot', async () => {
+      const getSchedule = () =>
+        request(app).get('/api/v1/reports/schedule').set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug);
+
+      await setSector('churches-ngos');
+      expect((await getSchedule()).status).toBe(200);
+
+      await setSector('retail');
+      expect((await getSchedule()).status).toBe(403);
+    });
+
     it('a retail Starter tenant is still blocked from Job Costing', async () => {
       await setSector('retail');
       const res = await request(app).get('/api/v1/jobs').set('Authorization', `Bearer ${adminToken}`).set('X-Tenant-ID', tenantSlug);
