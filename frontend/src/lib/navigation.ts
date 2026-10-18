@@ -77,8 +77,8 @@ export interface NavItem {
 export interface NavGroup {
   sectionTitle: string;
   items: NavItem[];
-  /** When set, this group is only shown for tenants whose orgType matches this value. */
-  orgTypeOnly?: string;
+  /** When set, this group is only shown for tenants whose orgType matches (one of) these values. */
+  orgTypeOnly?: string | string[];
 }
 
 // Hrefs hidden from unrestricted roles in simplified workspace modes.
@@ -406,7 +406,7 @@ export const navigationGroups: NavGroup[] = [
   },
   {
     sectionTitle: "CHURCH",
-    orgTypeOnly: "CHURCH",
+    orgTypeOnly: ["CHURCH", "NGO"],
     items: [
       { name: "Dashboard",   href: "/church/dashboard",   icon: LayoutDashboard },
       { name: "Members",     href: "/church/members",     icon: Users },
@@ -584,7 +584,9 @@ export function getVisibleNavGroups(
     !!item.feature && item.minTier === 2 && tier < 2 && starterUnlocks.includes(item.feature);
   // Filter groups restricted to a specific org type (e.g. PHARMACY section)
   let groups = navigationGroups.filter(
-    (group) => !group.orgTypeOnly || group.orgTypeOnly === orgType
+    (group) =>
+      !group.orgTypeOnly ||
+      (Array.isArray(group.orgTypeOnly) ? group.orgTypeOnly.includes(orgType ?? "") : group.orgTypeOnly === orgType)
   );
 
   const NONPROFIT_FAMILY = new Set(["NONPROFIT", "SCHOOL", "CHURCH", "NGO"]);

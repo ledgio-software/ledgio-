@@ -2,6 +2,21 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-10-14] - Fix: Church & NGO plans — weekly I&E email on Starter, church features for NGOs
+
+**What/Why:**
+Audit of the Churches & NGOs plans against ledgio-hub. Prices and seat limits already matched. Two gaps fixed:
+1. Churches & NGOs Starter (and Schools Starter) advertise a "Weekly I&E Email", but the only weekly email comes from Scheduled Reports, a tier-2 feature, so Starter tenants couldn't enable it. Added `Scheduled Reports` to those sectors' `STARTER_UNLOCKS`.
+2. NGO org-type tenants are on the Churches & NGOs plan (member registry, attendance, events, etc.) but the church menu and `/church/*` routes only allowed the CHURCH org type. They now allow NGO too.
+
+Access-only change: no schema or data changes.
+
+**Files Changed:**
+- **`backend/src/config/sectorPlans.ts`** — `Scheduled Reports` unlocked on Starter for `churches-ngos` and `schools`.
+- **`frontend/src/lib/navigation.ts`** — `orgTypeOnly` accepts a list; church group shown for CHURCH and NGO.
+- **`frontend/src/App.tsx`** — `/church/*` routes allow CHURCH and NGO.
+- **`backend/src/tests/sectorPlans.test.ts`**, **`backend/src/tests/tierEnforcement.test.ts`** — Unlock tests.
+
 ## [Date: 2026-10-13] - Change: Free trial shortened from 90 days to 30 days
 
 **What/Why:**

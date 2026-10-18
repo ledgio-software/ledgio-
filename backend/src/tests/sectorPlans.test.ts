@@ -69,6 +69,9 @@ describe('sector-aware tier helpers', () => {
     expect(run('manufacturing', 'Job Costing')).toBe(true);
     expect(run('construction', 'Job Costing')).toBe(true);
     expect(run('churches-ngos', 'Bank Reconciliation')).toBe(true);
+    expect(run('churches-ngos', 'Scheduled Reports')).toBe(true);
+    expect(run('schools', 'Scheduled Reports')).toBe(true);
+    expect(run('retail', 'Scheduled Reports')).toBe(false);
     expect(run('retail', 'Job Costing')).toBe(false);
     expect(run('manufacturing', 'Payroll')).toBe(false);
     expect(run('enterprise', 'Approval Workflows', 3)).toBe(false);

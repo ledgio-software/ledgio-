@@ -103,8 +103,8 @@ export const SECTOR_PLANS: Record<SectorSlug, SectorPlan[]> = {
 export const STARTER_UNLOCKS: Record<SectorSlug, string[]> = {
   retail: [],
   enterprise: ['Approval Workflows', 'Bank Reconciliation', 'Branch Comparison Report'],
-  schools: [],
-  'churches-ngos': ['Bank Reconciliation'],
+  schools: ['Scheduled Reports'],
+  'churches-ngos': ['Bank Reconciliation', 'Scheduled Reports'],
   pharmacy: [],
   manufacturing: ['Job Costing', 'Manufacturing'],
   'professional-services': [],
