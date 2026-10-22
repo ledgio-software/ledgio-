@@ -123,13 +123,14 @@ export function Login() {
       {SYSTEM_DOWN && (
         <div
           role="alert"
-          className="sm:mx-auto sm:w-full sm:max-w-md mb-6 flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+          className="sm:mx-auto sm:w-full sm:max-w-md mb-8 rounded-2xl border-2 border-red-300 bg-red-50 px-6 py-8 text-center text-red-800 shadow-xl dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
         >
-          <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" aria-hidden />
-          <div className="text-sm">
-            <p className="font-semibold">System down</p>
-            <p>The Ledgio team is working on it. Please be patient.</p>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50">
+            <AlertTriangle className="h-9 w-9" aria-hidden />
           </div>
+          <p className="text-2xl font-bold">System down</p>
+          <p className="mt-2 text-base">The Ledgio team is working on it.</p>
+          <p className="text-base">Please be patient.</p>
         </div>
       )}
 
