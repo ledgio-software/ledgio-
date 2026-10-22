@@ -7,6 +7,10 @@ import { api } from "../../lib/api";
 import { collectBotFingerprint } from "../../lib/botFingerprint";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/Card";
 import { AuthSplitLayout } from "../../components/layout/AuthSplitLayout";
+import { AlertTriangle } from "lucide-react";
+
+// Outage notice. The backend/DB may be unreachable, so this is a frontend constant, not an API flag. Set to false once service is restored.
+const SYSTEM_DOWN = true;
 
 export function Login() {
   const navigate = useNavigate();
@@ -116,6 +120,19 @@ export function Login() {
       imageAlt="Business analytics dashboard on a laptop screen"
       tagline="Sign back in to your dedicated, schema-isolated workspace - real-time ledgers, inventory, and reports, wherever you left off."
     >
+      {SYSTEM_DOWN && (
+        <div
+          role="alert"
+          className="sm:mx-auto sm:w-full sm:max-w-md mb-6 flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+        >
+          <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" aria-hidden />
+          <div className="text-sm">
+            <p className="font-semibold">System down</p>
+            <p>The Ledgio team is working on it. Please be patient.</p>
+          </div>
+        </div>
+      )}
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md mb-8 text-center">
         <h1 className="text-3xl font-extrabold text-primary-600 dark:text-primary-500 tracking-tight lg:hidden">
           Ledgio
