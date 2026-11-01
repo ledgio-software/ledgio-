@@ -2,6 +2,14 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-11-01] - Ops: Render backend back to the free plan
+
+**What/Why:**
+No active users, and the Render workspace was suspended for non-payment. `ledgio-backend` moves from `starter` to `free` in the Blueprint to stop monthly charges (`ledgio-redis` was already `free`). Trade-offs: idle spin-down (~1 min cold start) and Render's free-tier SMTP block, so Gmail email (signup verification, password reset, invoices) will not send until the plan goes back to `starter`. No code or data changes; the database is on Neon, not Render.
+
+**Files Changed:**
+- **`render.yaml`** — `ledgio-backend` plan `starter` → `free`; comments updated.
+
 ## [Date: 2026-10-14] - Fix: Church & NGO plans — weekly I&E email on Starter, church features for NGOs
 
 **What/Why:**
