@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CheckCircle2, XCircle, Clock, Building2, Users, TrendingUp } from 'lucide-react';
 
-const API = 'https://ledgio-backend.onrender.com/api/v1';
+const API = import.meta.env.VITE_API_BASE_URL || 'https://ledgio-backend.onrender.com/api/v1';
 
 interface PartnerInfo {
   name: string;

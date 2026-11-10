@@ -2,6 +2,21 @@
 
 This file records all significant changes, decisions, and progress made on the Multi-Tenant Web-Based Accounting Platform project. Entries are in reverse-chronological order.
 
+## [Date: 2026-11-10] - Ops: prepare the Blueprint for a move to a new Render account
+
+**What/Why:**
+The backend is moving to a different Render account because of billing. Deploying `render.yaml` as a Blueprint on the new account would have silently generated new `JWT_SECRET` and `BROADCAST_MASTER_SECRET` values, and `CREDENTIAL_ENCRYPTION_KEY` was missing from the Blueprint entirely. A new encryption key would make every tenant's saved GRA credentials undecryptable, and a new master secret would change the admin console passcode. All three are now `sync: false` so they get copied from the old service. `BASE_URL` (keep-alive ping) is added as `sync: false` because the new account gets a new `*.onrender.com` URL. The header now describes Neon instead of Prisma Postgres and has a short move checklist. The hub's Partner Portal had the backend URL hardcoded; it now reads `VITE_API_BASE_URL`, keeping the old URL as the fallback. The frontend CSP allowed WebSockets only to `wss://ledgio-backend.onrender.com`; it now allows `wss://*.onrender.com` so the new URL works.
+
+**Files:** `render.yaml`, `ledgio-hub/src/pages/PartnerPortal.tsx`, `frontend/vercel.json`, `STATUS.md`
+
+## [Date: 2026-11-01] - Ops: Render backend back to the free plan
+
+**What/Why:**
+No active users, and the Render workspace was suspended for non-payment. `ledgio-backend` moves from `starter` to `free` in the Blueprint to stop monthly charges (`ledgio-redis` was already `free`). Trade-offs: idle spin-down (~1 min cold start) and Render's free-tier SMTP block, so Gmail email (signup verification, password reset, invoices) will not send until the plan goes back to `starter`. No code or data changes; the database is on Neon, not Render.
+
+**Files Changed:**
+- **`render.yaml`** — `ledgio-backend` plan `starter` → `free`; comments updated.
+
 ## [Date: 2026-10-14] - Fix: Church & NGO plans — weekly I&E email on Starter, church features for NGOs
 
 **What/Why:**
